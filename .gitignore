@@ -1,0 +1,13 @@
+# Rahasia — JANGAN commit (berisi OANDA_TOKEN)
+.env
+*.local
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Build Go
+/bar-replay
+*.exe
