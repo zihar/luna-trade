@@ -2,6 +2,9 @@
 .env
 *.local
 
+# Catatan deploy lokal (berisi IP/instance ID + info keamanan)
+DEPLOY-NOTES.md
+
 # OS / editor
 .DS_Store
 *.swp
