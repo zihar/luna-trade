@@ -1,0 +1,18 @@
+# Rahasia — jangan ikut ke build context (token OANDA).
+.env
+*.local
+
+# Git & meta
+.git
+.gitignore
+README.md
+
+# Build artifact lokal
+/bar-replay
+*.exe
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

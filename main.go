@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"io"
 	"log"
 	"net/http"
@@ -62,11 +63,34 @@ func main() {
 		addr = ":" + p
 	}
 
-	http.Handle("/", noCache(http.FileServer(http.Dir("."))))
-	http.HandleFunc("/api/candles", candlesHandler(token))
+	mux := http.NewServeMux()
+	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
+	mux.HandleFunc("/api/candles", candlesHandler(token))
 
 	log.Printf("Bar Replay (OANDA %s) → http://localhost%s", oandaEnv(), addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.ListenAndServe(addr, basicAuth(mux)))
+}
+
+// basicAuth membungkus handler dengan HTTP Basic Auth bila BASIC_AUTH_USER dan
+// BASIC_AUTH_PASS di-set. Kalau salah satu kosong (mis. dev lokal), auth
+// dilewati. Pakai ConstantTimeCompare supaya tak bocor lewat timing attack.
+func basicAuth(h http.Handler) http.Handler {
+	user := os.Getenv("BASIC_AUTH_USER")
+	pass := os.Getenv("BASIC_AUTH_PASS")
+	if user == "" || pass == "" {
+		return h
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok ||
+			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Bar Replay"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // noCache mencegah browser men-cache aset (terutama index.html) supaya

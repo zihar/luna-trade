@@ -1,0 +1,19 @@
+[Unit]
+Description=Bar Replay — manual forex backtester (OANDA proxy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bar-replay
+ExecStart=/opt/bar-replay/bar-replay
+EnvironmentFile=/etc/bar-replay.env
+Restart=on-failure
+RestartSec=3
+# Hardening ringan
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
