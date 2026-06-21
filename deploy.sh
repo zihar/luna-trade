@@ -19,7 +19,7 @@ echo "==> Build arm64 (Graviton)…"
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "$BIN" .
 echo "    binary: $(ls -lh "$BIN" | awk '{print $5}')"
 
-echo "==> Kirim binary + index.html + assets/ ke $HOST…"
+echo "==> Kirim binary + index.html + assets/ ke ${HOST} ..."
 scp -o StrictHostKeyChecking=accept-new "$BIN" index.html "$HOST:/tmp/"
 scp -o StrictHostKeyChecking=accept-new -r assets "$HOST:/tmp/luna-assets"
 
@@ -37,4 +37,6 @@ echo -n "    status: "; sudo systemctl is-active bar-replay
 REMOTE
 
 rm -f "$BIN"
-echo "==> Selesai → http://13.228.71.38:8765"
+# IP instance dinamis (tanpa Elastic IP) — ambil dari HostName ssh config biar tak basi.
+IP=$(ssh -G "$HOST" | awk '/^hostname /{print $2}')
+echo "==> Selesai -> http://${IP}:8765"
