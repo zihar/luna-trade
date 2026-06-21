@@ -11,7 +11,7 @@ dan lihat hasil R + journal. Data dari **OANDA v20**; tidak terhubung ke engine 
 ## Jalankan
 
 ```bash
-cd ~/Projects/bar-replay
+cd ~/Projects/luna-trade
 export OANDA_TOKEN=<personal-access-token-v20>
 export OANDA_ENV=practice            # atau: live
 go run .
