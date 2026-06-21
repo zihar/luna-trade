@@ -1,4 +1,4 @@
-# Bar Replay — image kecil untuk deploy numpang di instance alertd.
+# Luna Trade — image kecil untuk deploy numpang di instance alertd.
 #
 # Multi-stage: build binary statis di stage golang, lalu salin ke base
 # distroless (sudah bawa ca-certificates untuk panggil HTTPS OANDA).
@@ -23,6 +23,7 @@ WORKDIR /app
 # Binary + aset statis (FileServer serve dari working dir "/app").
 COPY --from=build /bar-replay /app/bar-replay
 COPY index.html /app/index.html
+COPY assets /app/assets
 
 # Token & kredensial basic-auth disuntik saat run (-e ...), jangan di-bake ke image.
 # BASIC_AUTH_USER + BASIC_AUTH_PASS: kalau kosong, auth dilewati (dev lokal).

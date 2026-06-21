@@ -1,4 +1,4 @@
-// Bar Replay — proxy tipis untuk OANDA v20.
+// Luna Trade — proxy tipis untuk OANDA v20.
 //
 // Serve index.html (same-origin → tak ada masalah CORS) dan relay /api/candles
 // ke OANDA dengan token disisipkan dari env (aman, tak pernah sampai ke browser).
@@ -67,7 +67,7 @@ func main() {
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
 	mux.HandleFunc("/api/candles", candlesHandler(token))
 
-	log.Printf("Bar Replay (OANDA %s) → http://localhost%s", oandaEnv(), addr)
+	log.Printf("Luna Trade (OANDA %s) → http://localhost%s", oandaEnv(), addr)
 	log.Fatal(http.ListenAndServe(addr, basicAuth(mux)))
 }
 
@@ -85,7 +85,7 @@ func basicAuth(h http.Handler) http.Handler {
 		if !ok ||
 			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
 			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Bar Replay"`)
+			w.Header().Set("WWW-Authenticate", `Basic realm="Luna Trade"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

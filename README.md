@@ -1,4 +1,8 @@
-# Bar Replay — Manual Forex Backtester (OANDA)
+<p align="center">
+  <img src="assets/luna-trade-logo.png" alt="Luna Trade" width="320">
+</p>
+
+# Luna Trade — Manual Forex Backtester (OANDA)
 
 Tool web standalone untuk *manual backtest* gaya TradingView Bar Replay: geser candle
 satu per satu di **multi-timeframe**, pasang entry manual (drag garis Entry/SL/TP),

@@ -1,5 +1,5 @@
 [Unit]
-Description=Bar Replay — manual forex backtester (OANDA proxy)
+Description=Luna Trade — manual forex backtester (OANDA proxy)
 After=network-online.target
 Wants=network-online.target
 
