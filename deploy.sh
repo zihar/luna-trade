@@ -37,6 +37,5 @@ echo -n "    status: "; sudo systemctl is-active bar-replay
 REMOTE
 
 rm -f "$BIN"
-# IP instance dinamis (tanpa Elastic IP) — ambil dari HostName ssh config biar tak basi.
-IP=$(ssh -G "$HOST" | awk '/^hostname /{print $2}')
-echo "==> Selesai -> http://${IP}:8765"
+# URL publik lewat nginx + TLS (reverse proxy ke app di :8765).
+echo "==> Selesai -> https://lunatrade.domudame.com"
