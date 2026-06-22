@@ -117,9 +117,9 @@
            display:flex;align-items:center;gap:8px}
   .ctxitem:hover{background:var(--btn-hover)}
   /* editor teks inline di chart */
-  .text-editor{position:fixed;z-index:1100;background:var(--inset);color:var(--txt);border:1px solid var(--accent);
-    border-radius:5px;padding:4px 6px;font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    min-width:120px;min-height:28px;resize:both;outline:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .text-editor{position:fixed;z-index:1100;background:var(--panel);color:var(--txt);border:1px solid var(--accent);
+    border-radius:4px;padding:2px 7px;font:13px/1.3 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-width:70px;min-height:22px;resize:none;outline:none;text-align:center;overflow:hidden}
 
   /* ===================== polish pass ===================== */
   :root{ color-scheme:dark;
@@ -169,7 +169,7 @@
   .journal-wrap::-webkit-scrollbar-thumb,.bottompanel::-webkit-scrollbar-thumb{
     background:var(--border); border-radius:6px; border:3px solid transparent; background-clip:padding-box; }
 
-  .ctxmenu,.text-editor{ box-shadow:var(--shadow); }
+  .ctxmenu{ box-shadow:var(--shadow); }
 
   /* toggle mode REPLAY | LIVE (Fase 0) */
   .modeseg{ display:inline-flex; border:1px solid var(--border); border-radius:7px; overflow:hidden; height:30px; }
@@ -469,8 +469,9 @@ klinecharts.registerOverlay({
     const x=Math.min(...xs), y=Math.min(...ys), w=Math.max(...xs)-x, h=Math.max(...ys)-y;
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(227,179,65,0.10)', borderColor:'#e3b341', borderSize:1 } }];
-    const t=overlay&&overlay.extendData;                       // teks opsional (klik 2× utk edit)
-    if(t) figs.push({type:'text',attrs:{x:x+5,y:y+4,text:String(t),align:'left',baseline:'top'},styles:{color:drawTextColor,size:12}});
+    const t=overlay&&overlay.extendData;                       // teks opsional
+    if(t) figs.push({type:'text',attrs:{x:x+5,y:y+4,text:String(t),align:'left',baseline:'top'},
+      styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     return figs;
   }
 });
@@ -483,7 +484,8 @@ klinecharts.registerOverlay({
     const a=coordinates[0], b=coordinates[1];
     const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:{color:'#4a71ff',size:1}}];
     const t=overlay&&overlay.extendData;
-    if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my-5,text:String(t),align:'center',baseline:'bottom'},styles:{color:drawTextColor,size:12}}); }
+    if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my-6,text:String(t),align:'center',baseline:'bottom'},
+      styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
   }
 });
@@ -1156,7 +1158,9 @@ function disarmIcons(){ document.querySelectorAll('.dtool').forEach(x=>x.classLi
 function delHooks(){ return {
   onDrawEnd:(e)=>{ try{expandPosition(e&&e.overlay); expandBox(e&&e.overlay); applyTextInput(e&&e.overlay);}catch(_){} inProgressId=null; disarmIcons(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
-  onDoubleClick:(e)=>{ try{ if(e.overlay&&e.overlay.name==='text') editTextOverlay(e.overlay); }catch(_){} return false; },
+  onDoubleClick:(e)=>{ try{ const n=e.overlay&&e.overlay.name;
+    if(n==='text') editTextOverlay(e.overlay);
+    else if(n==='rect'||n==='trendline'){ hideAddTextNow(); editShapeText(e.overlay); } }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; return false; },
@@ -1177,23 +1181,24 @@ let textEditorEl=null;
 function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor saat tool Text dipakai
 function editTextOverlay(o){ if(o && o.name==='text') openOverlayTextEditor(o,true); }     // 'text': kosong = hapus
 function editShapeText(o){ if(o && (o.name==='rect'||o.name==='trendline')) openOverlayTextEditor(o,false); } // bentuk tetap walau teks kosong
-function openOverlayTextEditor(o, removeIfEmpty, anchorClient){
+// lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
+function overlayTextAnchor(o){
+  const rect=$('#chart').getBoundingClientRect();
+  const toPx=p=>{ let px=null; try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
+  const pts=o.points||[];
+  if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2-8}; }
+  const p=pts[0]; if(!p) return null; const px=toPx(p);
+  return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
+}
+function openOverlayTextEditor(o, removeIfEmpty){
   if(!o) return;
-  let x,y;
-  if(anchorClient){ x=anchorClient.x; y=anchorClient.y; }   // dari tombol "+ Add text"
-  else {
-    const p=o.points && o.points[0]; if(!p) return;
-    let px=null;
-    try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){}
-    if(Array.isArray(px)) px=px[0];
-    const rect=$('#chart').getBoundingClientRect();
-    x=rect.left+(px?px.x:rect.width/2); y=rect.top+(px?px.y:rect.height/2);
-  }
+  const a=overlayTextAnchor(o); if(!a) return;
+  const x=a.x, y=a.y;
 
   if(textEditorEl){ try{textEditorEl.remove();}catch(e){} textEditorEl=null; }
   const ta=document.createElement('textarea');
   ta.className='text-editor'; ta.value=o.extendData||''; ta.rows=1;
-  ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-14)+'px';
+  ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-20)+'px'; ta.style.transform='translateX(-50%)';
   document.body.appendChild(ta); textEditorEl=ta;
   ta.focus(); ta.select();
 
@@ -1296,7 +1301,7 @@ addTextBtn.addEventListener('mouseleave',()=>{ overAddBtn=false; scheduleHideAdd
 addTextBtn.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); });
 addTextBtn.addEventListener('click',e=>{ e.stopPropagation();
   const o=addBtnTarget&&chart.getOverlayById(addBtnTarget);
-  if(o){ const r=addTextBtn.getBoundingClientRect(); openOverlayTextEditor(o,false,{x:r.left+r.width/2,y:r.top}); }
+  if(o) openOverlayTextEditor(o,false);   // editor muncul in-place di lokasi teks
   hideAddTextNow();
 });
 $('#chart').addEventListener('mousemove',e=>{
