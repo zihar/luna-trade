@@ -546,18 +546,21 @@ function highlightTF(){ tfWrap.querySelectorAll('button').forEach(b=>b.classList
 $('#instrument').value = localStorage.getItem('br_inst')||'EUR_USD';
 $('#date').value = new Date().toISOString().slice(0,10);   // default: hari ini
 currentTF = localStorage.getItem('br_tf')||'M15';
-guessPip(); highlightTF(); $('#instrument').onchange = guessPip;
+guessPip(); highlightTF();
+// ganti pair → langsung load data terkini (tombol Load khusus backtest by tanggal)
+$('#instrument').onchange = ()=>{ guessPip(); loadInit(true); };
 function guessPip(){
   const s=$('#instrument').value;
   $('#pipSize').value = s.includes('BTC')?1 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : 0.0001;
 }
 
-$('#loadBtn').onclick = loadInit;
-async function loadInit(){
+// loadBtn → backtest dari tanggal terpilih; latest=true → langsung data terkini (saat ganti pair)
+$('#loadBtn').onclick = ()=>loadInit(false);
+async function loadInit(latest){
   inst = $('#instrument').value;
   const date = $('#date').value;
-  if(!date){ setStatus('Pilih tanggal dulu.',true); return; }
-  localStorage.setItem('br_inst',inst); localStorage.setItem('br_date',date);
+  if(!latest && !date){ setStatus('Pilih tanggal dulu.',true); return; }
+  localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   clearDrawings(); resetTrade();
@@ -565,7 +568,7 @@ async function loadInit(){
   setStatus('Mengambil '+inst+' '+currentTF+' …');
   try{
     const todayStr=new Date().toISOString().slice(0,10);
-    const opt = (date>=todayStr) ? {count:5000} : {count:5000,to:date+'T00:00:00Z'};
+    const opt = (latest || !date || date>=todayStr) ? {count:5000} : {count:5000,to:date+'T00:00:00Z'};
     const c = await fetchCandles(currentTF,opt);
     if(!c.length) throw new Error('data kosong');
     tfData[currentTF]=c;
