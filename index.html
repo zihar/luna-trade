@@ -176,9 +176,6 @@
     <option>GBP_JPY</option><option>EUR_JPY</option>
     <option>BTC_USD</option>
   </select>
-  <label class="status">Tanggal mulai</label>
-  <input id="date" type="date">
-  <button id="loadBtn" class="primary">Load</button>
   <span class="vsep"></span>
   <button id="themeBtn" title="Ganti tema gelap/terang">☀️</button>
   <span class="grow"></span>
@@ -242,6 +239,10 @@
 <div class="replaybar" id="replaybar">
   <button id="replayToggle" title="Hide/Show Replay">⏷</button>
   <div class="rcontent" id="rcontent">
+    <span class="rlabel">Backtest date</span>
+    <input id="date" type="date">
+    <button id="loadBtn" class="primary" title="Backtest dari tanggal terpilih (ganti pair = auto-load data terkini)">Load</button>
+    <span class="rsep"></span>
     <button id="prevBtn" title="Prev (←)">⏪</button>
     <button id="playBtn" title="Play/Pause (Space)">▶</button>
     <button id="nextBtn" title="Next (→)">⏩</button>
