@@ -85,6 +85,9 @@
   .replaybar .clock{color:var(--gold);font-weight:600;font-variant-numeric:tabular-nums}
   .replaybar .price{font-variant-numeric:tabular-nums}
   .replaybar button{padding:5px 12px}
+  #liveBtn.active{background:#ef5350;color:#fff;border-color:#ef5350}
+  @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
+  #liveBtn.active{animation:livepulse 1.6s ease-in-out infinite}
   /* panel bawah: Trade Manual & Statistik (collapsible) */
   .bottompanel{background:var(--panel);border-top:1px solid var(--border);max-height:38vh;overflow-y:auto}
   .bottompanel.collapsed .bottomcontent{display:none}
@@ -243,6 +246,8 @@
     <button id="playBtn" title="Play/Pause (Space)">▶</button>
     <button id="nextBtn" title="Next (→)">⏩</button>
     <span class="rsep"></span>
+    <button id="liveBtn" title="Auto-refresh candle terbaru — interval menyesuaikan TF">🟢 Live</button>
+    <span class="rsep"></span>
     <span class="rlabel">Waktu NY</span><span class="clock" id="clock">—</span>
     <span class="rsep"></span>
     <span class="rlabel">Harga</span><span class="price" id="curprice">—</span>
@@ -272,6 +277,7 @@ let currentTF = 'M15';
 let T = null;            // cursor time (ms) = close-time candle TF tampil saat ini
 let lastLen = -1;
 let playing = false, playTimer = null;
+let live = false, liveTimer = null;
 let trade = null;        // {dir,entry,sl,tp,risk,time,lineEntry,lineSL,lineTP}
 let journal = [];
 let drawIds = [];        // overlay drawing
@@ -552,6 +558,7 @@ async function loadInit(){
   const date = $('#date').value;
   if(!date){ setStatus('Pilih tanggal dulu.',true); return; }
   localStorage.setItem('br_inst',inst); localStorage.setItem('br_date',date);
+  if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
@@ -568,6 +575,7 @@ async function loadInit(){
   lastLen=-1;
   setStatus(`Loaded ${currentTF}. Next/Play untuk maju (auto-extend forward). Ganti TF di atas chart.`);
   render(true);
+  startLive();   // live otomatis nyala tiap selesai Load; mati sendiri saat replay dipakai
 }
 
 async function fetchCandles(tf,{count,to,from}){
@@ -615,6 +623,7 @@ function render(full){
 // ===================== replay control =====================
 function step(d){
   if(T==null) return;
+  if(live) stopLive();   // pakai replay → keluar dari mode live
   const arr=tfData[currentTF], dur=DUR[currentTF];
   let lo=0,h=arr.length;
   while(lo<h){ const m=(lo+h)>>1; if(arr[m].timestamp+dur<=T) lo=m+1; else h=m; }
@@ -640,7 +649,7 @@ $('#bottomToggle').onclick=()=>{ const b=$('#bottompanel'); const c=b.classList.
 if(localStorage.getItem('br_bottomHidden')){ $('#bottompanel').classList.add('collapsed'); $('#bottomToggle').textContent='⏶'; }
 $('#speed').oninput=()=>{ $('#speedval').textContent=$('#speed').value+'/s'; if(playing){pause();play();} };
 function togglePlay(){ playing?pause():play(); }
-function play(){ if(T==null)return; playing=true; $('#playBtn').textContent='⏸'; playTimer=setInterval(()=>step(1),1000/(+$('#speed').value)); }
+function play(){ if(T==null)return; if(live) stopLive(); playing=true; $('#playBtn').textContent='⏸'; playTimer=setInterval(()=>step(1),1000/(+$('#speed').value)); }
 function pause(){ playing=false; $('#playBtn').textContent='▶'; clearInterval(playTimer); }
 
 // ===================== auto-extend forward =====================
@@ -657,6 +666,53 @@ async function autoExtend(tf){
     else setStatus('Sudah di ujung data terbaru OANDA utk '+tf+'.');
   }catch(e){ setStatus('Auto-extend gagal: '+e.message,true); }
   finally{ extending[tf]=false; }
+}
+
+// ===================== live auto-refresh (interval menyesuaikan TF) =====================
+const LIVE_MIN = 10000, LIVE_MAX = 300000;   // poll: min 10 dtk, maks 5 mnt
+// interval ≈ seperempat periode TF, dibatasi [10dtk, 5mnt]
+function liveInterval(tf){ return Math.min(LIVE_MAX, Math.max(LIVE_MIN, DUR[tf]/4)); }
+function liveLabel(ms){ return ms>=60000 ? (ms/60000).toFixed(ms%60000?1:0)+'m' : (ms/1000)+'s'; }
+
+$('#liveBtn').onclick = ()=>{ live ? stopLive() : startLive(); };
+
+function startLive(){
+  if(T==null){ setStatus('Load data dulu sebelum Live.',true); return; }
+  live=true;
+  $('#liveBtn').classList.add('active'); $('#liveBtn').textContent='🔴 Live';
+  $('#liveBtn').title='Live aktif · refresh tiap '+liveLabel(liveInterval(currentTF))+' (menyesuaikan TF)';
+  scheduleLive();
+}
+function stopLive(){
+  live=false; clearTimeout(liveTimer); liveTimer=null;
+  $('#liveBtn').classList.remove('active'); $('#liveBtn').textContent='🟢 Live';
+  $('#liveBtn').title='Auto-refresh candle terbaru — interval menyesuaikan TF';
+}
+// setTimeout (bukan setInterval) agar interval ikut berubah saat TF diganti
+function scheduleLive(){
+  clearTimeout(liveTimer);
+  liveTimer=setTimeout(async()=>{
+    if(!live) return;
+    try{ await liveRefresh(); }catch(e){}
+    if(live) scheduleLive();
+  }, liveInterval(currentTF));
+}
+async function liveRefresh(){
+  const tf=currentTF, arr=tfData[tf];
+  if(!arr||!arr.length) return;
+  const oldLast = arr[arr.length-1].timestamp;
+  const atEdge  = T >= oldLast + DUR[tf];   // cursor menempel di candle terakhir → ikut maju
+  await autoExtend(tf);
+  if(tf!==currentTF) return;                 // TF keburu diganti saat fetch
+  const a=tfData[tf];
+  const fresh = a.filter(c=>c.timestamp>oldLast);
+  if(!fresh.length) return;                  // belum ada candle baru yang close
+  if(atEdge){
+    if(trade) fresh.forEach(c=>checkTrade(c)); // hormati SL/TP pada candle baru
+    T = a[a.length-1].timestamp + DUR[tf];
+    lastLen=-1; render(true);
+  }
+  // jika tidak atEdge: candle ikut tersimpan diam-diam, user tetap di posisi review-nya
 }
 
 // ===================== trade (drag garis) =====================
