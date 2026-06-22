@@ -171,6 +171,7 @@
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
     <option>AUD_USD</option><option>USD_CAD</option><option>XAU_USD</option>
     <option>GBP_JPY</option><option>EUR_JPY</option>
+    <option>BTC_USD</option>
   </select>
   <label class="status">Tanggal mulai</label>
   <input id="date" type="date">
@@ -258,8 +259,8 @@
 
 <script>
 // ===================== konstanta =====================
-const TF_LIST = ['M1','M5','M15','M30','H1','H4','D'];
-const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7}; // ms
+const TF_LIST = ['M1','M5','M15','M30','H1','H4','D','W'];
+const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7,W:6.048e8}; // ms
 const FWD_CHUNK = 500;
 const NY_TZ = 'America/New_York';
 const $ = s => document.querySelector(s);
@@ -277,7 +278,7 @@ let drawIds = [];        // overlay drawing
 const extending = {};
 
 // ===================== util =====================
-function priceDecimals(){ return inst.includes('JPY')?3 : inst.includes('XAU')?3 : 5; }
+function priceDecimals(){ return inst.includes('BTC')?1 : inst.includes('JPY')?3 : inst.includes('XAU')?3 : 5; }
 function fmt(p){ return p==null||isNaN(p)?'—':(+p).toFixed(priceDecimals()); }
 function nyTime(ms){
   try{
@@ -542,7 +543,7 @@ currentTF = localStorage.getItem('br_tf')||'M15';
 guessPip(); highlightTF(); $('#instrument').onchange = guessPip;
 function guessPip(){
   const s=$('#instrument').value;
-  $('#pipSize').value = s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : 0.0001;
+  $('#pipSize').value = s.includes('BTC')?1 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : 0.0001;
 }
 
 $('#loadBtn').onclick = loadInit;
