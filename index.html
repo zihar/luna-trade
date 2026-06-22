@@ -236,6 +236,15 @@
           padding:9px 16px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
           opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
   .toast.show{ opacity:1; top:18px; }
+
+  /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
+  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:5px;
+    background:var(--panel); border:1px solid var(--accent); color:var(--txt); font-size:12px;
+    padding:4px 10px; border-radius:7px; cursor:pointer; box-shadow:var(--shadow);
+    transform:translate(-50%,-100%); white-space:nowrap; }
+  .addtext-btn.show{ display:inline-flex; }
+  .addtext-btn:hover{ background:var(--btn-hover); }
+  .addtext-btn .pl{ color:var(--accent); font-weight:700; font-size:15px; line-height:1; }
 </style>
 
 <div class="toolbar">
@@ -454,12 +463,28 @@ function expandBox(o){
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
   performEventPressedMove:boxPressedMove,
-  createPointFigures:({coordinates})=>{
+  createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
     const xs=coordinates.map(c=>c.x), ys=coordinates.map(c=>c.y);
     const x=Math.min(...xs), y=Math.min(...ys), w=Math.max(...xs)-x, h=Math.max(...ys)-y;
-    return [{ type:'rect', attrs:{x,y,width:w,height:h},
+    const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(227,179,65,0.10)', borderColor:'#e3b341', borderSize:1 } }];
+    const t=overlay&&overlay.extendData;                       // teks opsional (klik 2× utk edit)
+    if(t) figs.push({type:'text',attrs:{x:x+5,y:y+4,text:String(t),align:'left',baseline:'top'},styles:{color:drawTextColor,size:12}});
+    return figs;
+  }
+});
+
+// custom overlay: Trendline (2 titik) dengan teks opsional — klik 2× utk edit
+klinecharts.registerOverlay({
+  name:'trendline', totalStep:3, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const a=coordinates[0], b=coordinates[1];
+    const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:{color:'#4a71ff',size:1}}];
+    const t=overlay&&overlay.extendData;
+    if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my-5,text:String(t),align:'center',baseline:'bottom'},styles:{color:drawTextColor,size:12}}); }
+    return figs;
   }
 });
 
@@ -1126,16 +1151,16 @@ function updateOpenTradeBox(){
 }
 
 // ===================== drawing tools (ikon, ala TV) =====================
-let selectedId=null, hoverId=null, inProgressId=null;
+let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
 function disarmIcons(){ document.querySelectorAll('.dtool').forEach(x=>x.classList.remove('armed')); }
 function delHooks(){ return {
   onDrawEnd:(e)=>{ try{expandPosition(e&&e.overlay); expandBox(e&&e.overlay); applyTextInput(e&&e.overlay);}catch(_){} inProgressId=null; disarmIcons(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
   onDoubleClick:(e)=>{ try{ if(e.overlay&&e.overlay.name==='text') editTextOverlay(e.overlay); }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; return false; },
-  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; return false; },
-  onMouseEnter:(e)=>{ hoverId=e.overlay.id; return false; },
-  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id) hoverId=null; return false; },
+  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} return false; },
+  onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; return false; },
+  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; return false; },
 };}
 function createDraw(name,btn,extra){
@@ -1149,15 +1174,21 @@ function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(
 
 // Text: editor inline di chart. Dipakai saat baru dibuat & saat double-click teks lama.
 let textEditorEl=null;
-function applyTextInput(o){ editTextOverlay(o); }   // dipanggil dari onDrawEnd
-function editTextOverlay(o){
-  if(!o || o.name!=='text') return;
-  const p=o.points && o.points[0]; if(!p) return;
-  let px=null;
-  try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){}
-  if(Array.isArray(px)) px=px[0];
-  const rect=$('#chart').getBoundingClientRect();
-  const x=rect.left+(px?px.x:rect.width/2), y=rect.top+(px?px.y:rect.height/2);
+function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor saat tool Text dipakai
+function editTextOverlay(o){ if(o && o.name==='text') openOverlayTextEditor(o,true); }     // 'text': kosong = hapus
+function editShapeText(o){ if(o && (o.name==='rect'||o.name==='trendline')) openOverlayTextEditor(o,false); } // bentuk tetap walau teks kosong
+function openOverlayTextEditor(o, removeIfEmpty, anchorClient){
+  if(!o) return;
+  let x,y;
+  if(anchorClient){ x=anchorClient.x; y=anchorClient.y; }   // dari tombol "+ Add text"
+  else {
+    const p=o.points && o.points[0]; if(!p) return;
+    let px=null;
+    try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){}
+    if(Array.isArray(px)) px=px[0];
+    const rect=$('#chart').getBoundingClientRect();
+    x=rect.left+(px?px.x:rect.width/2); y=rect.top+(px?px.y:rect.height/2);
+  }
 
   if(textEditorEl){ try{textEditorEl.remove();}catch(e){} textEditorEl=null; }
   const ta=document.createElement('textarea');
@@ -1173,9 +1204,9 @@ function editTextOverlay(o){
     const fresh=(o.extendData==null||o.extendData==='');
     if(save){
       const v=ta.value;
-      if(v.trim()==='') { try{chart.removeOverlay(o.id);}catch(e){} }
+      if(v.trim()===''){ if(removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} } else { try{chart.overrideOverlay({id:o.id,extendData:''});}catch(e){} } }
       else { try{chart.overrideOverlay({id:o.id,extendData:v});}catch(e){} }
-    }else if(fresh){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru → hapus
+    }else if(fresh && removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru (khusus Text)
   };
   const grow=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
   ta.addEventListener('input',grow); grow();
@@ -1232,7 +1263,7 @@ function posPressedMove(t){
 }
 
 const DRAW_TOOLS=[
-  {name:'segment',title:'Trendline',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
+  {name:'trendline',title:'Trendline (pilih → hover → + Add text)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
   {name:'horizontalStraightLine',title:'Garis horizontal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
   {name:'verticalStraightLine',title:'Garis vertikal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
   {name:'rect',title:'Rectangle / Zona',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
@@ -1247,6 +1278,32 @@ const _dt=$('#drawtools');
 DRAW_TOOLS.forEach(t=>{ const b=document.createElement('button'); b.className='dtool'; b.title=t.title; b.innerHTML=t.svg; b.onclick=()=> createDraw(t.name,b); _dt.appendChild(b); });
 const _sp=document.createElement('div'); _sp.className='spacer'; _dt.appendChild(_sp);
 const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Hapus semua gambar'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
+
+// ===================== "+ Add text" pada trendline & rect (ala TradingView) =====================
+// Garis dipilih (klik) → hover garisnya → tombol "+ Add text" muncul DI ATAS kursor (tak menutupi garis).
+const addTextBtn=document.createElement('div'); addTextBtn.className='addtext-btn'; document.body.appendChild(addTextBtn);
+let overAddBtn=false, addBtnTarget=null, addHideTimer=null;
+function showAddText(id,x,y){
+  addBtnTarget=id; const o=chart.getOverlayById(id);
+  addTextBtn.innerHTML = (o&&o.extendData) ? '✎ Edit teks' : '<span class="pl">+</span> Add text';
+  addTextBtn.style.left=Math.round(x)+'px'; addTextBtn.style.top=Math.round(y-14)+'px';
+  addTextBtn.classList.add('show');
+}
+function hideAddTextNow(){ clearTimeout(addHideTimer); addTextBtn.classList.remove('show'); }
+function scheduleHideAddText(){ clearTimeout(addHideTimer); addHideTimer=setTimeout(()=>{ if(!overAddBtn) addTextBtn.classList.remove('show'); },200); }
+addTextBtn.addEventListener('mouseenter',()=>{ overAddBtn=true; clearTimeout(addHideTimer); });
+addTextBtn.addEventListener('mouseleave',()=>{ overAddBtn=false; scheduleHideAddText(); });
+addTextBtn.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); });
+addTextBtn.addEventListener('click',e=>{ e.stopPropagation();
+  const o=addBtnTarget&&chart.getOverlayById(addBtnTarget);
+  if(o){ const r=addTextBtn.getBoundingClientRect(); openOverlayTextEditor(o,false,{x:r.left+r.width/2,y:r.top}); }
+  hideAddTextNow();
+});
+$('#chart').addEventListener('mousemove',e=>{
+  const can = hoverId && hoverId===selectedId && (hoverName==='trendline'||hoverName==='rect');
+  if(can) showAddText(hoverId, e.clientX, e.clientY);
+  else if(!overAddBtn) scheduleHideAddText();
+});
 
 // ===================== stats & journal =====================
 function renderStats(){
