@@ -5,20 +5,23 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <style>
   :root{
-    --bg:#0e1116; --panel:#161b22; --border:#2a313c; --txt:#d7dbe0; --muted:#8b95a3;
-    --green:#26a69a; --red:#ef5350; --accent:#3b82f6; --gold:#e3b341;
-    --inset:#0b0e13; --btn:#21262d; --btn-hover:#272d36; --btn-border-hover:#3a4350; --line:#1c2229;
+    --bg:#101013; --panel:#16161a; --border:#2a313c; --txt:#d7dbe0; --muted:#89898b;
+    --green:#26a69a; --red:#ef5350; --accent:#4a71ff; --gold:#e3b341;
+    --inset:#0b0b0e; --btn:#1f2026; --btn-hover:#272832; --btn-border-hover:#3a4350; --line:#1c1d23;
   }
   body.light{
     --bg:#f4f6f9; --panel:#ffffff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
-    --accent:#2563eb; --gold:#b07d0a;
+    --accent:#3a5fe0; --gold:#b07d0a;
     --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
   }
   *{box-sizing:border-box}
-  body{margin:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  body{margin:0;font:13px/1.45 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
        background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;
            background:var(--panel);border-bottom:1px solid var(--border)}
@@ -28,11 +31,13 @@
   button:hover{border-color:var(--btn-border-hover);background:var(--btn-hover)}
   button:disabled{opacity:.4;cursor:not-allowed}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  button.buy{background:var(--green);border-color:var(--green);color:#04211e}
-  button.sell{background:var(--red);border-color:var(--red);color:#2a0808}
+  /* BUY/SELL pastel ala TradeLocker (mint / salmon, teks gelap) */
+  button.buy{background:#79d3a4;border-color:#79d3a4;color:#06291b;font-weight:700}
+  button.sell{background:#ff8f8f;border-color:#ff8f8f;color:#3d0c0c;font-weight:700}
+  button.buy:hover,button.sell:hover{filter:brightness(1.07)}
   button.tf{padding:5px 10px;font-weight:600}
-  button.tf.on,button.on{background:var(--gold);border-color:var(--gold);color:#1a1400}
-  button.tool.armed{background:var(--gold);border-color:var(--gold);color:#1a1400}
+  button.tf.on,button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.tool.armed{background:var(--accent);border-color:var(--accent);color:#fff}
   .grow{flex:1}
   .status{font-size:12px;color:var(--muted)}
   .main{flex:1;display:flex;min-height:0}
@@ -71,7 +76,7 @@
   .drawtools .spacer{flex:1}
   .dtool{width:32px;height:32px;display:flex;align-items:center;justify-content:center;padding:0;color:var(--muted)}
   .dtool:hover{color:var(--txt)}
-  .dtool.armed{background:var(--gold);border-color:var(--gold);color:#1a1400}
+  .dtool.armed{background:var(--accent);border-color:var(--accent);color:#fff}
   .dtool svg{width:18px;height:18px}
   a{color:var(--accent)}
   .speed{display:flex;gap:6px;align-items:center;margin-top:7px}
@@ -171,7 +176,7 @@
   .modeseg button{ border:0; border-radius:0; background:var(--btn); color:var(--muted);
                    padding:0 13px; height:100%; font-weight:600; font-size:11px; letter-spacing:.05em; }
   .modeseg button:hover:not(:disabled){ background:var(--btn-hover); color:var(--txt); }
-  .modeseg button.on{ background:var(--gold); color:#1a1400; }
+  .modeseg button.on{ background:var(--accent); color:#fff; }
   .modeseg button:disabled{ opacity:.45; cursor:not-allowed; }
 
   /* sizing readout (Fase 1a) */
@@ -582,6 +587,20 @@ klinecharts.registerOverlay({
   }
 });
 
+// custom overlay: garis level trade (Entry/SL/TP) + label price & $/% (ala TradeLocker)
+klinecharts.registerOverlay({
+  name:'tradeLevel', totalStep:2, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates,bounding})=>{
+    if(!coordinates.length) return [];
+    const y=coordinates[0].y, d=overlay.extendData||{}, c=d.color||'#888';
+    const xR=(bounding&&bounding.width)?bounding.width:600;
+    return [
+      {type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:c,size:1,style:'dashed'}},
+      {type:'text',attrs:{x:6,y:y-3,text:d.label||'',align:'left',baseline:'bottom'},styles:{color:c,size:10}},
+    ];
+  },
+});
+
 // ===================== chart init (1 chart besar) =====================
 const darkStyles = {
   grid:{ horizontal:{color:'#1a1f27'}, vertical:{color:'#1a1f27'} },
@@ -738,6 +757,14 @@ function render(full){
   $('#tfinfo').textContent = `${currentTF} · ${data.length} bar`;
   updateOpenTradeBox();
   renderAcct();
+  updateOrderBtns();
+}
+// tombol BUY/SELL menampilkan harga sekarang (ala one-click TradeLocker)
+function updateOrderBtns(){
+  const cur=currentCandle(), px=cur?fmt(cur.close):'';
+  const bb=$('#buyBtn'), sb=$('#sellBtn');
+  if(bb) bb.textContent='BUY ▲'+(px?'  '+px:'');
+  if(sb) sb.textContent='SELL ▼'+(px?'  '+px:'');
 }
 
 // ===================== replay control =====================
@@ -919,12 +946,32 @@ function hline(value,color,onMove){
     onPressedMoving:(e)=>{ const v=e.overlay.points[0].value; if(v!=null) onMove(+v); return false; },
   });
 }
+// label + warna per garis trade dari state terkini ($/% relatif balance)
+function tradeLineInfo(kind){
+  if(!trade) return {color:'#888',text:''};
+  const dec=priceDecimals(), units=trade.units||0, bal=+$('#balance').value||0, cur=currentCandle();
+  if(kind==='entry'){ const pnl=cur?pnlUsd(trade.dir,trade.entry,cur.close,units):0;
+    return {color:'#e3b341', text:`Entry ${trade.entry.toFixed(dec)}   ${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(2)}`}; }
+  if(kind==='sl'){ const loss=Math.abs(pnlUsd(trade.dir,trade.entry,trade.sl,units)), pct=bal?loss/bal*100:0;
+    return {color:'#ef5350', text:`SL ${trade.sl.toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
+  const rew=Math.abs(pnlUsd(trade.dir,trade.entry,trade.tp,units)), pctt=bal?rew/bal*100:0;
+  return {color:'#26a69a', text:`TP ${trade.tp.toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
+}
+function tradeLevel(kind,value){
+  const info=tradeLineInfo(kind);
+  return chart.createOverlay({ name:'tradeLevel', points:[{value}], extendData:{kind,color:info.color,label:info.text},
+    onPressedMoving:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null||!trade) return false;
+      if(kind==='entry') trade.entry=v; else if(kind==='sl'){ trade.sl=v; recalcRisk(); } else if(kind==='tp') trade.tp=v;
+      const ni=tradeLineInfo(kind); try{chart.overrideOverlay({id:e.overlay.id,extendData:{kind,color:ni.color,label:ni.text}});}catch(_){}
+      updateOpenTradeBox(); return false; },
+  });
+}
 function drawTradeLines(){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(trade&&trade[k]){ try{chart.removeOverlay(trade[k]);}catch(e){} trade[k]=null; }});
   if(!trade) return;
-  trade.lineEntry=hline(trade.entry,'#e3b341',v=>{ trade.entry=v; recalcRisk(); updateOpenTradeBox(); });
-  trade.lineSL   =hline(trade.sl,'#ef5350',   v=>{ trade.sl=v;    recalcRisk(); updateOpenTradeBox(); });
-  trade.lineTP   =hline(trade.tp,'#26a69a',   v=>{ trade.tp=v;    updateOpenTradeBox(); });
+  trade.lineEntry=tradeLevel('entry',trade.entry);
+  trade.lineSL   =tradeLevel('sl',trade.sl);
+  trade.lineTP   =tradeLevel('tp',trade.tp);
 }
 function recalcRisk(){
   if(!trade) return;
