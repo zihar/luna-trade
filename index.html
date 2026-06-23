@@ -11,17 +11,19 @@
 <script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <style>
   :root{
-    --bg:#101013; --panel:#16161a; --border:#2a313c; --txt:#d7dbe0; --muted:#89898b;
-    --green:#26a69a; --red:#ef5350; --accent:#4a71ff; --gold:#e3b341;
-    --inset:#0b0b0e; --btn:#1f2026; --btn-hover:#272832; --btn-border-hover:#3a4350; --line:#1c1d23;
+    --bg:#101013; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
+    --green:#54c88c; --red:#ff6f6f; --accent:#4a71ff;
+    --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#1b2f2a; --tint-sell:#3d1a1e;
+    --inset:#0e0e11; --btn:#1b1b1f; --btn-hover:#26262b; --btn-border-hover:#3a3a40; --line:#26262b;
   }
   body.light{
-    --bg:#f4f6f9; --panel:#ffffff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
-    --accent:#3a5fe0; --gold:#b07d0a;
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
+    --green:#1a9d6e; --red:#d8504e; --accent:#3a5fe0;
+    --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#e3f3ec; --tint-sell:#fbe9e9;
     --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
   }
   *{box-sizing:border-box}
-  body{margin:0;font:13px/1.45 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  body{margin:0;font:12px/1.45 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
        background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;
            background:var(--panel);border-bottom:1px solid var(--border)}
@@ -32,8 +34,8 @@
   button:disabled{opacity:.4;cursor:not-allowed}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   /* BUY/SELL pastel ala TradeLocker (mint / salmon, teks gelap) */
-  button.buy{background:#79d3a4;border-color:#79d3a4;color:#06291b;font-weight:700}
-  button.sell{background:#ff8f8f;border-color:#ff8f8f;color:#3d0c0c;font-weight:700}
+  button.buy{background:var(--buy);border-color:var(--buy);color:#06291b;font-weight:700}
+  button.sell{background:var(--sell);border-color:var(--sell);color:#3d0c0c;font-weight:700}
   button.buy:hover,button.sell:hover{filter:brightness(1.07)}
   button.tf{padding:5px 10px;font-weight:600}
   button.tf.on,button.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -55,7 +57,7 @@
   .row input,.row select{flex:1;width:100%}
   .btns{display:flex;gap:5px}
   .btns button{flex:1;padding:8px 0}
-  .clock{font-variant-numeric:tabular-nums;color:var(--gold);font-weight:600}
+  .clock{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
   .price{font-variant-numeric:tabular-nums}
   .stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}
   .stat{background:var(--inset);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
@@ -68,7 +70,7 @@
   td:first-child,th:first-child{text-align:left}
   .journal-wrap{max-height:200px;overflow-y:auto}
   .kbd{display:inline-block;background:var(--inset);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted)}
-  .open-trade{background:var(--inset);border:1px solid var(--gold);border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px}
+  .open-trade{background:var(--inset);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .chartrow{flex:1;display:flex;min-height:0}
   .drawtools{width:42px;background:var(--panel);border-right:1px solid var(--border);
@@ -87,10 +89,13 @@
   .rcontent{display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap}
   .rsep{width:1px;height:18px;background:var(--border)}
   .rlabel{color:var(--muted);font-size:11px}
-  .replaybar .clock{color:var(--gold);font-weight:600;font-variant-numeric:tabular-nums}
+  .datefield{position:relative;display:inline-flex}
+  .datedisplay{padding:5px 12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .datefield input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
+  .replaybar .clock{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
   .replaybar .price{font-variant-numeric:tabular-nums}
   .replaybar button{padding:5px 12px}
-  #liveBtn.active{background:#ef5350;color:#fff;border-color:#ef5350}
+  #liveBtn.active{background:var(--red);color:#fff;border-color:var(--red)}
   @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
   #liveBtn.active{animation:livepulse 1.6s ease-in-out infinite}
   /* panel bawah: Trade Manual & Statistik (collapsible) */
@@ -98,8 +103,31 @@
   .bottompanel.collapsed .bottomcontent{display:none}
   .bottomhead{display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid var(--border)}
   .bottomhead .rlabel{font-size:11px;color:var(--muted)}
-  .bottomcontent{display:flex;gap:22px;padding:11px 12px;align-items:flex-start;flex-wrap:wrap}
-  .bp-section{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .bottomcontent{display:block;padding:0}
+  /* tabs Positions/Pending/Closed/Statistik (ala TradeLocker) */
+  .tp-tabs{display:flex;gap:2px}
+  .tp-tabs button{background:transparent;border:0;border-radius:0;color:var(--muted);font-size:12px;
+    padding:6px 12px;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px}
+  .tp-tabs button:hover{color:var(--txt)}
+  .tp-tabs button.on{color:var(--txt);border-bottom-color:var(--accent)}
+  .tp-tabs button b{font-size:10px;color:var(--muted);background:var(--inset);border-radius:9px;padding:0 6px;font-weight:600}
+  .tp-tabs button.on b{color:var(--accent)}
+  .tp-pane{display:block}
+  .tp-pane[hidden]{display:none}
+  #paneStats{padding:11px 12px}
+  .tp-tablewrap{overflow:auto;max-height:100%}
+  .tp-table{width:100%;border-collapse:collapse;font-size:12px}
+  .tp-table thead th{position:sticky;top:0;background:var(--panel);z-index:1;
+    font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.44px;text-transform:capitalize;
+    text-align:left;padding:9px 10px;white-space:nowrap}
+  .tp-table tbody td{padding:9px 10px;color:var(--txt);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .tp-table tbody tr:hover{background:var(--btn-hover)}
+  .tp-table .t-side-buy{color:var(--green);font-weight:600}
+  .tp-table .t-side-sell{color:var(--red);font-weight:600}
+  .tp-table .t-pos{color:var(--green)} .tp-table .t-neg{color:var(--red)}
+  .tp-table .t-act button{font-size:11px;padding:3px 9px;margin-right:5px}
+  .tp-empty{padding:22px 12px;color:var(--muted);font-size:12px;text-align:center}
+  .bp-section{display:flex;flex-direction:column;gap:8px;min-width:0;padding:11px 12px}
   .bp-title{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .bp-trade{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
   .fld{display:flex;flex-direction:column;gap:3px}
@@ -181,15 +209,17 @@
 
   /* sizing readout (Fase 1a) */
   .sizing{ flex-basis:100%; display:flex; gap:18px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:2px; }
-  .sizing b{ font-family:var(--mono); color:var(--gold); }
+  .sizing b{ font-family:var(--mono); color:var(--accent); }
   .sizing .neg{ color:var(--red); } .sizing .pos{ color:var(--green); }
 
   /* bar metrik akun (Fase 1b) */
-  .acctbar{ display:flex; gap:18px; align-items:center; }
+  .acctbar{ display:flex; gap:16px; align-items:center; }
   .acctbar .m{ display:flex; flex-direction:column; line-height:1.15; }
   .acctbar .m i{ color:var(--muted); font-style:normal; font-size:9px; text-transform:uppercase; letter-spacing:.05em; }
   .acctbar .m b{ font-family:var(--mono); font-size:13px; }
   .acctbar .pos{ color:var(--green); } .acctbar .neg{ color:var(--red); }
+  .acctbar #resetBtn,.acctbar #closeAllBtn{ font-size:11px; padding:5px 11px; }
+  .acctbar #resetBtn{ color:var(--muted); }
 
   /* order lanjutan (Fase 1c) */
   .adv-row{ flex-basis:100%; display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:2px; }
@@ -207,19 +237,27 @@
   #equityCurve{ width:100%; height:96px; display:block; background:var(--inset);
                 border:1px solid var(--border); border-radius:6px; }
 
-  /* watchlist + price alert (Fase 1d) */
-  .watchlist{ width:194px; background:var(--panel); border-left:1px solid var(--border);
+  /* watchlist (Markets) — gaya tabel TradeLocker */
+  .watchlist{ width:360px; background:var(--panel); border-left:1px solid var(--border);
               display:flex; flex-direction:column; overflow-y:auto; flex:none; }
   .watchlist.hidden{ display:none; }
   .wl-head{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
             padding:9px 11px 6px; display:flex; align-items:center; gap:7px; }
   .wl-head::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
-  .wl-row{ display:flex; align-items:center; gap:6px; padding:6px 11px; cursor:pointer;
-           border-bottom:1px solid var(--line); font-size:12px; }
+  .wl-row{ display:grid; grid-template-columns:minmax(56px,1fr) 56px 56px 40px 54px 54px; gap:3px; align-items:center;
+           padding:0 8px; height:36px; cursor:pointer; font-size:12px; }
   .wl-row:hover{ background:var(--btn-hover); }
-  .wl-row.on{ background:rgba(59,130,246,.10); box-shadow:inset 2px 0 0 var(--accent); }
-  .wl-sym{ flex:1; font-weight:600; }
-  .wl-px{ font-family:var(--mono); }
+  .wl-row.on{ background:rgba(74,113,255,.16); }
+  .wl-row > span{ font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums; }
+  .wl-hdr{ color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.44px; text-transform:capitalize;
+           cursor:default; height:auto; padding:10px 8px 8px; position:sticky; top:0; background:var(--panel); z-index:1; }
+  .wl-hdr:hover{ background:var(--panel); }
+  .wl-hdr > span{ font-family:inherit; }
+  .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); }
+  .wl-bid.up,.wl-ask.up{ color:var(--green); }
+  .wl-bid.down,.wl-ask.down{ color:var(--red); }
+  .wl-num{ color:var(--muted); }
+  .wl-spr{ text-align:right; font-size:11px; color:var(--muted); }
   .wl-chg{ font-family:var(--mono); font-size:10px; width:54px; text-align:right; color:var(--muted); }
   .wl-chg.up{ color:var(--green); } .wl-chg.down{ color:var(--red); }
   .wl-alert{ margin-top:4px; border-top:1px solid var(--border); padding-bottom:8px; }
@@ -245,6 +283,72 @@
   .addtext-btn.show{ display:inline-flex; }
   .addtext-btn:hover{ background:var(--btn-hover); }
   .addtext-btn .pl{ color:var(--accent); font-weight:700; font-size:15px; line-height:1; }
+
+  /* ===================== layout 5-zona (TradeLocker) ===================== */
+  .app{ flex:1; min-height:0; position:relative; display:grid;
+        grid-template-columns:56px 1fr var(--markets-w,300px);
+        grid-template-rows:1fr var(--trades-h,210px);
+        grid-template-areas:"rail center markets" "rail trades trades"; }
+
+  /* pembatas yang bisa digeser (resize Markets & Trades) */
+  .rh{ position:absolute; z-index:60; background:transparent; transition:background .12s; }
+  .rh:hover,.rh.drag{ background:var(--accent); }
+  .rh-markets{ top:0; bottom:var(--trades-h,210px); width:7px;
+               right:calc(var(--markets-w,300px) - 3px); cursor:col-resize; }
+  .rh-markets.hidden{ display:none; }
+  .rh-trades{ left:56px; right:0; height:7px;
+              bottom:calc(var(--trades-h,210px) - 3px); cursor:row-resize; }
+  #rail{ grid-area:rail; background:var(--panel); border-right:1px solid var(--border);
+         display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; }
+  .center{ grid-area:center; min-width:0; min-height:0; display:flex; flex-direction:column;
+           position:relative; background:var(--bg); }
+  #watchlist{ grid-area:markets; width:auto; flex:initial; }
+  #bottompanel{ grid-area:trades; max-height:none; overflow:auto; }
+  .center #chart{ flex:1; min-height:0; }
+  .railbtn{ width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+            padding:0; font-size:15px; color:var(--muted); background:transparent; border-color:transparent; }
+  .railbtn:hover{ color:var(--txt); background:var(--btn-hover); }
+  .railbtn.on{ color:var(--accent); }
+  .raildiv{ width:22px; height:1px; background:var(--border); margin:3px 0; }
+  .railspacer{ flex:1; }
+  #rail .drawtools{ width:auto; background:transparent; border:0; padding:0; gap:4px; }
+  .demo-badge{ font-size:8px; letter-spacing:.08em; color:var(--muted);
+               border:1px solid var(--border); border-radius:4px; padding:2px 4px; }
+
+  /* ===================== popup setting objek gambar & chart (TradingView-like) ===================== */
+  .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
+           border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
+  .objpop.show{ display:block; }
+  .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
+  .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
+  .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
+  .sw.on{ border-color:var(--txt); }
+  .pp-chip{ padding:4px 10px; font-size:11px; color:var(--muted); background:var(--btn); border:1px solid var(--border); border-radius:5px; cursor:pointer; }
+  .pp-chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:2px; }
+  .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
+  .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; padding:2px; }
+
+  /* order panel ringkas (docked di Markets / mengambang di atas chart) */
+  .orderpanel{ border-top:1px solid var(--border); padding:10px; }
+  .orderpanel .bp-title{ margin-bottom:8px; }
+  .orderpanel .bp-trade{ display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end; }
+  .orderpanel .fld{ width:auto; }
+  .orderpanel .fld input{ width:100%; }
+  .orderpanel #openTradeBox{ grid-column:1/-1; }
+  .orderpanel #buyBtn,.orderpanel #sellBtn{ width:100%; padding:9px 0; }
+  .orderpanel #closeBtn,.orderpanel #partialBtn{ grid-column:1/-1; }
+  .orderpanel .adv-row{ grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:0; }
+  .orderpanel .sizing{ grid-column:1/-1; flex-direction:column; gap:3px; margin-top:0; }
+  .orderpanel[data-dock="floating"]{ position:fixed; top:90px; left:70px; width:286px; z-index:1100; max-height:calc(100vh - 120px); overflow:auto;
+    background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow); border-radius:8px; }
+  /* header order panel: grip drag + dock + close */
+  .op-bar{ display:flex; align-items:center; gap:7px; padding:6px 6px 5px; cursor:move; user-select:none; touch-action:none; }
+  .op-grip{ color:var(--muted); letter-spacing:-2px; font-size:13px; line-height:1; }
+  .op-t{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .op-icon,.wl-x{ padding:2px 7px; font-size:12px; background:transparent; border-color:transparent; color:var(--muted); border-radius:5px; }
+  .op-icon:hover,.wl-x:hover{ color:var(--txt); background:var(--btn-hover); }
+  .wl-x{ font-size:11px; padding:1px 6px; }
 </style>
 
 <div class="toolbar">
@@ -268,43 +372,87 @@
   <span class="status" id="status"></span>
 </div>
 
-<div class="main">
-  <div class="chartwrap">
+<div class="app">
+  <aside class="rail" id="rail">
+    <button class="railbtn" id="toggleMarkets" title="Markets panel">▦</button>
+    <button class="railbtn" id="toggleOrder" title="Order panel">⊞</button>
+    <button class="railbtn" id="toggleTrades" title="Trades panel">▤</button>
+    <div class="raildiv"></div>
+    <div class="drawtools" id="drawtools"></div>
+    <div class="railspacer"></div>
+    <span class="demo-badge">DEMO</span>
+  </aside>
+  <div class="center">
     <div class="tfbar">
       <span class="status" style="margin-right:4px">TF:</span>
       <span id="tfbtns"></span>
       <span class="sep"></span>
       <button id="replayPick" title="Pilih titik mulai replay langsung di chart">⏮ Bar Replay</button>
     </div>
-    <div class="chartrow">
-      <div class="drawtools" id="drawtools"></div>
-      <div id="chart"></div>
-    </div>
+    <div id="chart"></div>
   </div>
+  <div class="rh rh-markets" id="rhMarkets" title="Geser untuk ubah lebar Markets"></div>
+  <div class="rh rh-trades" id="rhTrades" title="Geser untuk ubah tinggi Trades"></div>
   <div class="watchlist" id="watchlist">
-    <div class="wl-head">Markets</div>
+    <div class="wl-head">Markets<span class="grow"></span><button class="wl-x" id="marketsClose" title="Sembunyikan Markets">✕</button></div>
     <div id="wlRows"></div>
-    <div class="wl-alert">
+    <div class="wl-alert" style="display:none">
       <div class="wl-head">Price Alert</div>
       <div class="row"><input id="alertPrice" type="number" step="0.0001" placeholder="harga level"><button id="alertAdd" class="primary">+ Set</button></div>
       <div id="alertList"></div>
     </div>
+    <div class="orderpanel" id="orderpanel" data-dock="docked">
+      <div class="op-bar" id="opBar">
+        <span class="op-grip">⠿</span><span class="op-t">Order</span>
+        <span class="grow"></span>
+        <button class="op-icon" id="opDock" title="Lepas / dock ke Markets">⇲</button>
+        <button class="op-icon" id="opClose" title="Tutup order panel">✕</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<div class="bottompanel" id="bottompanel">
+  <div class="bottompanel" id="bottompanel">
   <div class="bottomhead">
-    <button id="bottomToggle" title="Hide/Show Trade, Statistik & Journal">⏷</button>
-    <span class="rlabel">Trade · Statistik · Journal</span>
+    <button id="bottomToggle" title="Hide/Show panel Trades">⏷</button>
+    <div class="tp-tabs" id="tpTabs">
+      <button class="on" data-tab="positions">Positions <b id="tpNPos">0</b></button>
+      <button data-tab="pending">Pending <b id="tpNPend">0</b></button>
+      <button data-tab="closed">Closed Positions</button>
+      <button data-tab="stats">Statistik</button>
+    </div>
     <span class="grow"></span>
     <div class="acctbar" id="acctbar">
       <span class="m"><i>Balance</i><b id="acBal">—</b></span>
-      <span class="m"><i>Open P/L</i><b id="acOpen">$0.00</b></span>
+      <span class="m"><i>Profit &amp; Loss</i><b id="acOpen">$0.00</b></span>
       <span class="m"><i>Equity</i><b id="acEq">—</b></span>
+      <span class="m"><i>Margin Used</i><b id="acMargin">$0.00</b></span>
+      <span class="m"><i>Free Margin</i><b id="acFree">—</b></span>
+      <button id="resetBtn" title="Hapus semua riwayat trade">Reset</button>
+      <button id="closeAllBtn" title="Tutup semua posisi & batalkan pending">Close All</button>
     </div>
   </div>
   <div class="bottomcontent" id="bottomcontent">
-    <div class="bp-section">
+    <div class="tp-tablewrap tp-pane" id="paneTable">
+      <table class="tp-table"><thead id="tpHead"></thead><tbody id="tpBody"></tbody></table>
+    </div>
+    <div class="tp-pane" id="paneStats" hidden>
+      <div class="bp-section bp-stats">
+        <div class="stats">
+          <div class="stat"><div class="k">Trades</div><div class="v" id="stTrades">0</div></div>
+          <div class="stat"><div class="k">Win rate</div><div class="v" id="stWin">—</div></div>
+          <div class="stat"><div class="k">Total R</div><div class="v" id="stR">0.0</div></div>
+          <div class="stat"><div class="k">Profit factor</div><div class="v" id="stPF">—</div></div>
+          <div class="stat"><div class="k">Net P&L</div><div class="v" id="stNet">—</div></div>
+          <div class="stat"><div class="k">Max DD</div><div class="v" id="stDD">—</div></div>
+          <div class="stat"><div class="k">Expectancy</div><div class="v" id="stExp">—</div></div>
+        </div>
+        <div class="equitywrap">
+          <div class="t">Equity curve</div>
+          <canvas id="equityCurve"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="bp-section" id="orderForm">
       <h3 class="bp-title">Trade Manual <span style="color:var(--muted);font-size:10px;text-transform:none">· drag garis di chart</span></h3>
       <div class="bp-trade">
         <div id="openTradeBox"></div>
@@ -331,39 +479,18 @@
         <div id="sizingBox" class="sizing"></div>
       </div>
     </div>
-
-    <div class="bp-section bp-stats">
-      <h3 class="bp-title">Statistik</h3>
-      <div class="stats">
-        <div class="stat"><div class="k">Trades</div><div class="v" id="stTrades">0</div></div>
-        <div class="stat"><div class="k">Win rate</div><div class="v" id="stWin">—</div></div>
-        <div class="stat"><div class="k">Total R</div><div class="v" id="stR">0.0</div></div>
-        <div class="stat"><div class="k">Profit factor</div><div class="v" id="stPF">—</div></div>
-        <div class="stat"><div class="k">Net P&L</div><div class="v" id="stNet">—</div></div>
-        <div class="stat"><div class="k">Max DD</div><div class="v" id="stDD">—</div></div>
-        <div class="stat"><div class="k">Expectancy</div><div class="v" id="stExp">—</div></div>
-      </div>
-      <div class="equitywrap">
-        <div class="t">Equity curve</div>
-        <canvas id="equityCurve"></canvas>
-      </div>
-    </div>
-
-    <div class="bp-section bp-journal">
-      <h3 class="bp-title">Journal <button id="resetBtn" style="padding:2px 8px;font-size:11px;margin-left:6px">Reset</button></h3>
-      <div class="journal-wrap">
-        <table><thead><tr><th>Entry (NY)</th><th>Dir</th><th>Entry</th><th>Exit</th><th>R</th></tr></thead>
-        <tbody id="journal"></tbody></table>
-      </div>
-    </div>
   </div>
+</div>
 </div>
 
 <div class="replaybar" id="replaybar">
   <button id="replayToggle" title="Hide/Show Replay">⏷</button>
   <div class="rcontent" id="rcontent">
     <span class="rlabel">Backtest date</span>
-    <input id="date" type="date">
+    <span class="datefield">
+      <button type="button" id="dateDisplay" class="datedisplay" title="Pilih tanggal backtest">Pilih tanggal</button>
+      <input id="date" type="date">
+    </span>
     <button id="loadBtn" class="primary" title="Backtest dari tanggal terpilih (ganti pair = auto-load data terkini)">Load</button>
     <span class="rsep"></span>
     <button id="prevBtn" title="Prev (←)">⏪</button>
@@ -428,6 +555,86 @@ function revealed(tf){
 }
 function currentCandle(){ const a=revealed(currentTF); return a.length?a[a.length-1]:null; }
 
+// [PROTOTIPE presisi sub-bar] Petakan (timestamp,value) ke pixel dgn interpolasi
+// LINEAR di antara 2 bar tetangga (klinecharts sendiri snap ke posisi bar → tak ada
+// presisi dalam-bar). Dgn ini, timestamp presisi (mis. jam high sebenarnya) mendarat
+// di posisi yang sama di TF mana pun → konsisten Daily↔1H seperti TradingView.
+function subBarPx(ts, value){
+  const px=t=>{ let c=chart.convertToPixel({timestamp:t,value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c)) c=c[0]; return c; };
+  const arr=revealed(currentTF);
+  if(!arr.length) return px(ts);
+  let a=0,b=arr.length; while(a<b){ const m=(a+b)>>1; if(arr[m].timestamp<=ts) a=m+1; else b=m; }
+  const i=a-1;
+  if(i<0) return px(arr[0].timestamp);
+  if(i>=arr.length-1) return px(arr[arr.length-1].timestamp);
+  const t0=arr[i].timestamp, t1=arr[i+1].timestamp;
+  const c0=px(t0), c1=px(t1);
+  if(!c0||!c1) return c0||c1;
+  const f=(t1>t0)?(ts-t0)/(t1-t0):0;
+  return { x:c0.x + f*(c1.x-c0.x), y:c0.y };
+}
+// koordinat pixel tiap titik overlay via interpolasi sub-bar (x presisi dari waktu,
+// y dari harga). Fallback ke coordinates bawaan klinecharts bila titik tak lengkap.
+function subBarCoords(overlay, coordinates){
+  const pts=overlay&&overlay.points; if(!pts||!pts.length) return coordinates;
+  return pts.map((p,i)=>{ if(p&&p.timestamp!=null&&p.value!=null){ const q=subBarPx(p.timestamp,p.value); if(q) return q; } return coordinates[i]||coordinates[0]; });
+}
+
+// [presisi sub-bar] pixel-x → timestamp presisi (interpolasi antar 2 bar tetangga)
+function pxToTime(x){
+  const arr=revealed(currentTF); if(!arr.length) return null;
+  let c=chart.convertFromPixel({x,y:0},{paneId:'candle_pane'}); if(Array.isArray(c)) c=c[0];
+  let i = (c&&c.dataIndex!=null)?Math.round(c.dataIndex):(c&&c.timestamp!=null?arr.findIndex(b=>b.timestamp===c.timestamp):null);
+  if(i==null||i<0) i=0; if(i>arr.length-1) i=arr.length-1;
+  const px=t=>{let p=chart.convertToPixel({timestamp:t,value:0},{paneId:'candle_pane',absolute:true}); if(Array.isArray(p))p=p[0]; return p?p.x:null;};
+  const xi=px(arr[i].timestamp);
+  let j=(x>=xi)?Math.min(i+1,arr.length-1):Math.max(i-1,0);
+  if(j===i||xi==null) return arr[i].timestamp;
+  const xj=px(arr[j].timestamp); if(xj==null||xj===xi) return arr[i].timestamp;
+  const f=(x-xi)/(xj-xi);
+  return Math.round(arr[i].timestamp + f*(arr[j].timestamp-arr[i].timestamp));
+}
+function pxToValue(y){ let c=chart.convertFromPixel({x:10,y},{paneId:'candle_pane'}); if(Array.isArray(c))c=c[0]; return c?c.value:null; }
+
+// [magnet] snap (time,value) ke high/low candle terdekat — pakai data intraday
+// terhalus yang ter-load dalam rentang bar saat ini → mendarat di extreme PRESISI.
+let magnetOn = (localStorage.getItem('br_magnet')==='1');
+function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].length) return tf; } return currentTF; }
+function magnetSnap(time, value){
+  const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
+  let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
+  const i=Math.max(0,a-1), barOpen=arr[i].timestamp, barEnd=barOpen+DUR[cur];
+  const ftf=finestLoadedTF();
+  const src=(DUR[ftf]<DUR[cur]&&tfData[ftf])?tfData[ftf]:arr;
+  let best=null, bestD=Infinity;
+  for(const c of src){ if(c.timestamp>=barOpen && c.timestamp<barEnd){
+    if(Math.abs(c.high-value)<bestD){bestD=Math.abs(c.high-value); best={timestamp:c.timestamp,value:c.high};}
+    if(Math.abs(c.low-value)<bestD){bestD=Math.abs(c.low-value); best={timestamp:c.timestamp,value:c.low};}
+  }}
+  if(!best){ const c=arr[i]; let bd=Infinity,bv=c.close; for(const v of [c.open,c.high,c.low,c.close]){const d=Math.abs(v-value);if(d<bd){bd=d;bv=v;}} best={timestamp:barOpen,value:bv}; }
+  return best;
+}
+// klik presisi yang dikumpulkan selama menggambar (menggantikan snap-ke-bar klinecharts)
+let pendingClicks=[];
+
+// ===== style per-objek gambar (ala TradingView): id → {color,size,style} =====
+const DRAW_DEFAULT = {
+  trendline:{color:'#4a71ff',size:1,style:'solid'},
+  rect:{color:'#4a71ff',size:1,style:'solid'},
+  fib3:{color:'#4a71ff',size:1,style:'solid'},
+  dateRange:{color:'#4a71ff',size:2,style:'solid'},
+  text:{color:'',size:13,style:'solid'},
+};
+const objStyle = {};   // overlayId -> {color,size,style}
+function dstyle(o){ return Object.assign({}, DRAW_DEFAULT[o&&o.name]||{color:'#4a71ff',size:1,style:'solid'}, objStyle[o&&o.id]||{}); }
+function setObjStyle(id, patch){
+  objStyle[id]=Object.assign({}, objStyle[id]||{}, patch);
+  try{ const o=chart.getOverlayById(id); if(o) chart.overrideOverlay({id, points:o.points}); }catch(e){}
+}
+// klinecharts hanya kenal 'solid'/'dashed' → 'dotted' & 'dashed' dipetakan ke dashedValue [dash,gap]
+const DASHV={ dashed:[10,8], dotted:[2,7] };
+function lsLine(st){ const d=DASHV[st&&st.style]; return d?{style:'dashed',dashedValue:d}:{style:'solid'}; }
+
 // ===================== resize 8-titik (box) untuk rect & fib =====================
 // 8 titik: 0 TL · 1 TC · 2 TR · 3 MR · 4 BR · 5 BC · 6 BL · 7 ML
 function writeBox(pts,L,R,T,B){
@@ -465,10 +672,13 @@ klinecharts.registerOverlay({
   performEventPressedMove:boxPressedMove,
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
-    const xs=coordinates.map(c=>c.x), ys=coordinates.map(c=>c.y);
+    const C=subBarCoords(overlay,coordinates);
+    const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
     const x=Math.min(...xs), y=Math.min(...ys), w=Math.max(...xs)-x, h=Math.max(...ys)-y;
+    const st=dstyle(overlay);
+    const rl=lsLine(st);
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
-      styles:{ style:'stroke_fill', color:'rgba(227,179,65,0.10)', borderColor:'#e3b341', borderSize:1 } }];
+      styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
     const t=overlay&&overlay.extendData;                       // teks opsional
     if(t) figs.push({type:'text',attrs:{x:x+5,y:y+4,text:String(t),align:'left',baseline:'top'},
       styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
@@ -481,8 +691,10 @@ klinecharts.registerOverlay({
   name:'trendline', totalStep:3, needDefaultPointFigure:true,
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
-    const a=coordinates[0], b=coordinates[1];
-    const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:{color:'#4a71ff',size:1}}];
+    const C=subBarCoords(overlay,coordinates);    // render via interpolasi sub-bar
+    const a=C[0], b=C[1];
+    const st=dstyle(overlay);
+    const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))}];
     const t=overlay&&overlay.extendData;
     if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my-6,text:String(t),align:'center',baseline:'bottom'},
       styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
@@ -496,19 +708,21 @@ klinecharts.registerOverlay({
   performEventPressedMove:boxPressedMove,
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
-    const xs=coordinates.map(c=>c.x), ys=coordinates.map(c=>c.y);
+    const C=subBarCoords(overlay,coordinates);
+    const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
     const xL=Math.min(...xs), xR=Math.max(...xs), yTop=Math.min(...ys), yBot=Math.max(...ys);
     const vals=overlay.points.map(p=>p.value).filter(v=>v!=null);
     if(vals.length<2) return [];
     const vTop=Math.max(...vals), vBot=Math.min(...vals);
     const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
+    const st=dstyle(overlay);
     const figs=[];
     [0,0.5,1].forEach(Lv=>{
       const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
       const y = yTop + (yBot-yTop)*f;
       const price = vTop + (vBot-vTop)*f;
-      figs.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:'#e3b341',size:1,style:'solid'}});
-      figs.push({type:'text',attrs:{x:xL+2,y:y-2,text:Lv+'  '+price.toFixed(priceDecimals()),align:'left',baseline:'bottom'},styles:{color:'#e3b341',size:10}});
+      figs.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))});
+      figs.push({type:'text',attrs:{x:xL+2,y:y-2,text:Lv+'  '+price.toFixed(priceDecimals()),align:'left',baseline:'bottom'},styles:{color:st.color,size:10}});
     });
     return figs;
   }
@@ -522,7 +736,8 @@ function posFigures(dir){
     if(!coordinates.length||pts[0].value==null) return [];
     const dec=priceDecimals();
     const pip=parseFloat(document.getElementById('pipSize').value)||0.0001;
-    const xs=coordinates.map(c=>c.x);
+    const C=subBarCoords(overlay,coordinates);
+    const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
     if(xR<=xL) xR=(bounding&&bounding.width)?bounding.width:xL+140;
     const F=[];
@@ -530,24 +745,24 @@ function posFigures(dir){
     const box =(y1,y2,c)=>F.push({type:'rect',attrs:{x:xL,y:Math.min(y1,y2),width:xR-xL,height:Math.abs(y2-y1)},styles:{style:'fill',color:c}});
     const txt =(y,t,c,bl)=>F.push({type:'text',attrs:{x:xL+4,y,text:t,align:'left',baseline:bl||'bottom'},styles:{color:c,size:10}});
 
-    const entry=pts[0].value, yE=coordinates[0].y;
+    const entry=pts[0].value, yE=C[0].y;
     const haveTP = pts.length>1 && pts[1] && pts[1].value!=null && coordinates.length>1;
     const haveSL = pts.length>2 && pts[2] && pts[2].value!=null && coordinates.length>2;
-    if(!haveTP){ line(yE,'#e3b341'); txt(yE,'Entry '+entry.toFixed(dec),'#e3b341'); return F; }
+    if(!haveTP){ line(yE,'#4a71ff'); txt(yE,'Entry '+entry.toFixed(dec),'#4a71ff'); return F; }
 
-    const tp=pts[1].value, yT=coordinates[1].y;
-    box(yE,yT,'rgba(38,166,154,0.14)'); line(yT,'#26a69a'); line(yE,'#e3b341');
-    txt(yT,'TP '+tp.toFixed(dec)+'  ('+Math.round(Math.abs(tp-entry)/pip)+'p)','#26a69a');
+    const tp=pts[1].value, yT=C[1].y;
+    box(yE,yT,'rgba(84,200,140,0.16)'); line(yT,'#54c88c'); line(yE,'#4a71ff');
+    txt(yT,'TP '+tp.toFixed(dec)+'  ('+Math.round(Math.abs(tp-entry)/pip)+'p)','#54c88c');
     if(!haveSL){
-      txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  — klik SL','#e3b341');
+      txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  — klik SL','#4a71ff');
       return F;
     }
-    const sl=pts[2].value, yS=coordinates[2].y;
+    const sl=pts[2].value, yS=C[2].y;
     const riskDist=Math.abs(entry-sl), rewDist=Math.abs(tp-entry);
     const rr=riskDist?(rewDist/riskDist):0;
-    box(yE,yS,'rgba(239,83,80,0.14)'); line(yS,'#ef5350');
-    txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  RR 1:'+rr.toFixed(2),'#e3b341');
-    txt(yS,'SL '+sl.toFixed(dec)+'  ('+Math.round(riskDist/pip)+'p)','#ef5350','top');
+    box(yE,yS,'rgba(255,111,111,0.16)'); line(yS,'#ff6f6f');
+    txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  RR 1:'+rr.toFixed(2),'#4a71ff');
+    txt(yS,'SL '+sl.toFixed(dec)+'  ('+Math.round(riskDist/pip)+'p)','#ff6f6f','top');
     return F;
   };
 }
@@ -563,10 +778,12 @@ klinecharts.registerOverlay({
     if(!coordinates.length) return [];
     const t=overlay.extendData;
     if(t==null||t==='') return [];
-    const lines=String(t).split('\n'), x=coordinates[0].x, y0=coordinates[0].y, lh=16;
+    const C=subBarCoords(overlay,coordinates), x=C[0].x, y0=C[0].y, lh=16;
+    const st=dstyle(overlay);
+    const lines=String(t).split('\n');
     return lines.map((ln,i)=>({ type:'text',
       attrs:{x, y:y0+i*lh, text:ln, align:'left', baseline:'top'},
-      styles:{color:drawTextColor, size:13, backgroundColor:'transparent', borderColor:'transparent',
+      styles:{color:(st.color||drawTextColor), size:(st.size||13), backgroundColor:'transparent', borderColor:'transparent',
               paddingLeft:0, paddingRight:0, paddingTop:0, paddingBottom:0} }));
   }
 });
@@ -591,23 +808,25 @@ klinecharts.registerOverlay({
   name:'dateRange', totalStep:3, needDefaultPointFigure:true,
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
-    const a=coordinates[0], b=coordinates[1];
+    const C=subBarCoords(overlay,coordinates);
+    const a=C[0], b=C[1];
     // garis utama + panah di ujung b
     const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
     const s=10, c=Math.cos(.42), sn=Math.sin(.42);
     const w1x=b.x-s*(ux*c-uy*sn), w1y=b.y-s*(ux*sn+uy*c);
     const w2x=b.x-s*(ux*c+uy*sn), w2y=b.y-s*(-ux*sn+uy*c);
+    const st=dstyle(overlay);
     const figs=[
-      {type:'line',attrs:{coordinates:[a,b]},styles:{color:'#3b82f6',size:2}},
-      {type:'line',attrs:{coordinates:[b,{x:w1x,y:w1y}]},styles:{color:'#3b82f6',size:2}},
-      {type:'line',attrs:{coordinates:[b,{x:w2x,y:w2y}]},styles:{color:'#3b82f6',size:2}},
+      {type:'line',attrs:{coordinates:[a,b]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))},
+      {type:'line',attrs:{coordinates:[b,{x:w1x,y:w1y}]},styles:{color:st.color,size:st.size}},
+      {type:'line',attrs:{coordinates:[b,{x:w2x,y:w2y}]},styles:{color:st.color,size:st.size}},
     ];
     const t0=overlay.points[0]&&overlay.points[0].timestamp, t1=overlay.points[1]&&overlay.points[1].timestamp;
     if(t0!=null&&t1!=null){
       const bars=barsBetween(t0,t1);
       const label=bars+' bar · '+fmtDur(bars*DUR[currentTF]);
       const cx=(a.x+b.x)/2, cy=Math.max(a.y,b.y)+16, w=label.length*6.4+14;
-      figs.push({type:'rect',attrs:{x:cx-w/2,y:cy-9,width:w,height:18},styles:{style:'fill',color:'#3b82f6'}});
+      figs.push({type:'rect',attrs:{x:cx-w/2,y:cy-9,width:w,height:18},styles:{style:'fill',color:'#4a71ff'}});
       figs.push({type:'text',attrs:{x:cx,y:cy,text:label,align:'center',baseline:'middle'},styles:{color:'#fff',size:11}});
     }
     return figs;
@@ -630,23 +849,23 @@ klinecharts.registerOverlay({
 
 // ===================== chart init (1 chart besar) =====================
 const darkStyles = {
-  grid:{ horizontal:{color:'#1a1f27'}, vertical:{color:'#1a1f27'} },
+  grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
-    bar:{ upColor:'#26a69a',downColor:'#ef5350',noChangeColor:'#888',
-          upBorderColor:'#26a69a',downBorderColor:'#ef5350',upWickColor:'#26a69a',downWickColor:'#ef5350'},
-    priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#0e1116'} } },
-    tooltip:{ rect:{color:'#161b22'}, text:{color:'#d7dbe0'} },
+    bar:{ upColor:'#54c88c',downColor:'#ff6f6f',noChangeColor:'#89898b',
+          upBorderColor:'#54c88c',downBorderColor:'#ff6f6f',upWickColor:'#54c88c',downWickColor:'#ff6f6f'},
+    priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
+    tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'} },
   },
-  xAxis:{ axisLine:{color:'#2a313c'}, tickText:{color:'#8b95a3'}, tickLine:{color:'#2a313c'} },
-  yAxis:{ axisLine:{color:'#2a313c'}, tickText:{color:'#8b95a3'}, tickLine:{color:'#2a313c'} },
-  crosshair:{ horizontal:{ text:{backgroundColor:'#3b82f6'} }, vertical:{ text:{backgroundColor:'#3b82f6'} } },
-  overlay:{ text:{color:'#e8edf2', backgroundColor:'rgba(74,82,94,0.92)', borderColor:'rgba(0,0,0,0)'} },
+  xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b'}, tickLine:{color:'#434346'} },
+  yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b'}, tickLine:{color:'#434346'} },
+  crosshair:{ horizontal:{ text:{backgroundColor:'#4a71ff'} }, vertical:{ text:{backgroundColor:'#4a71ff'} } },
+  overlay:{ text:{color:'#fff', backgroundColor:'rgba(27,27,31,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
 const lightStyles = {
   grid:{ horizontal:{color:'#eceff3'}, vertical:{color:'#eceff3'} },
   candle:{
-    bar:{ upColor:'#26a69a',downColor:'#ef5350',noChangeColor:'#999',
-          upBorderColor:'#26a69a',downBorderColor:'#ef5350',upWickColor:'#26a69a',downWickColor:'#ef5350'},
+    bar:{ upColor:'#54c88c',downColor:'#ff6f6f',noChangeColor:'#999',
+          upBorderColor:'#54c88c',downBorderColor:'#ff6f6f',upWickColor:'#54c88c',downWickColor:'#ff6f6f'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
     tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'} },
   },
@@ -664,6 +883,7 @@ function applyTheme(t){
   document.body.classList.toggle('light', light);
   drawTextColor = light?'#1e242e':'#e8edf2';
   try{ chart.setStyles(light?lightStyles:darkStyles); }catch(e){}
+  try{ applyChartCfg(); }catch(e){}   // pertahankan warna chart kustom user di atas tema
   const b=$('#themeBtn'); if(b){ b.textContent = light?'🌙':'☀️'; b.title = light?'Ke mode gelap':'Ke mode terang'; }
   localStorage.setItem('br_theme', t);
   try{ drawEquity(); }catch(e){}   // warna kurva ikut tema
@@ -705,6 +925,18 @@ function highlightTF(){ tfWrap.querySelectorAll('button').forEach(b=>b.classList
 // ===================== load awal =====================
 $('#instrument').value = localStorage.getItem('br_inst')||'EUR_USD';
 $('#date').value = new Date().toISOString().slice(0,10);   // default: hari ini
+// tampilan tanggal ala "Senin, 13 May 2026" (hari Indonesia, bulan Inggris)
+function fmtBacktestDate(v){
+  if(!v) return 'Pilih tanggal';
+  const d=new Date(v+'T00:00:00');
+  const hari=new Intl.DateTimeFormat('id-ID',{weekday:'long'}).format(d);
+  const bulan=new Intl.DateTimeFormat('en-US',{month:'short'}).format(d);
+  return `${hari}, ${d.getDate()} ${bulan} ${d.getFullYear()}`;
+}
+function syncDateDisplay(){ $('#dateDisplay').textContent = fmtBacktestDate($('#date').value); }
+$('#dateDisplay').onclick = ()=>{ const i=$('#date'); if(i.showPicker) i.showPicker(); else { i.focus(); i.click(); } };
+$('#date').onchange = syncDateDisplay;
+syncDateDisplay();
 currentTF = localStorage.getItem('br_tf')||'M15';
 guessPip(); highlightTF();
 // ganti pair → langsung load data terkini (tombol Load khusus backtest by tanggal)
@@ -753,7 +985,7 @@ async function fetchCandles(tf,{count,to,from}){
   })).sort((a,b)=>a.timestamp-b.timestamp);
 }
 // hanya tampilkan error (merah); pesan info disembunyikan
-function setStatus(t,err){ const s=$('#status'); if(err){ s.innerHTML=t; s.style.color='#ef5350'; } else { s.innerHTML=''; } }
+function setStatus(t,err){ const s=$('#status'); if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; } else { s.innerHTML=''; } }
 
 // ===================== ganti TF (chart tetap 1) =====================
 async function switchTF(tf){
@@ -962,7 +1194,7 @@ function openTrade(dir){
          trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
          time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
   $('#closeBtn').disabled=false;
-  drawTradeLines(); updateOpenTradeBox();
+  drawTradeLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)
 function moveLine(id,value){ if(id==null) return; try{ chart.overrideOverlay({id, points:[{value}]}); }catch(e){} }
@@ -978,11 +1210,11 @@ function tradeLineInfo(kind){
   if(!trade) return {color:'#888',text:''};
   const dec=priceDecimals(), units=trade.units||0, bal=+$('#balance').value||0, cur=currentCandle();
   if(kind==='entry'){ const pnl=cur?pnlUsd(trade.dir,trade.entry,cur.close,units):0;
-    return {color:'#e3b341', text:`Entry ${trade.entry.toFixed(dec)}   ${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(2)}`}; }
+    return {color:'#4a71ff', text:`Entry ${trade.entry.toFixed(dec)}   ${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(2)}`}; }
   if(kind==='sl'){ const loss=Math.abs(pnlUsd(trade.dir,trade.entry,trade.sl,units)), pct=bal?loss/bal*100:0;
-    return {color:'#ef5350', text:`SL ${trade.sl.toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
+    return {color:'#ff6f6f', text:`SL ${trade.sl.toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
   const rew=Math.abs(pnlUsd(trade.dir,trade.entry,trade.tp,units)), pctt=bal?rew/bal*100:0;
-  return {color:'#26a69a', text:`TP ${trade.tp.toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
+  return {color:'#54c88c', text:`TP ${trade.tp.toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
 }
 function tradeLevel(kind,value){
   const info=tradeLineInfo(kind);
@@ -1045,10 +1277,10 @@ function drawPendingLines(){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending&&pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} pending[k]=null; }});
   if(!pending) return;
   // drag Entry → geser SL & TP dengan delta yang sama (jaga jarak)
-  pending.lineEntry=hline(pending.entry,'#3b82f6',v=>{ const d=v-pending.entry; pending.entry=v; pending.sl+=d; pending.tp+=d;
+  pending.lineEntry=hline(pending.entry,'#4a71ff',v=>{ const d=v-pending.entry; pending.entry=v; pending.sl+=d; pending.tp+=d;
     moveLine(pending.lineSL,pending.sl); moveLine(pending.lineTP,pending.tp); });
-  pending.lineSL=hline(pending.sl,'#ef5350',v=>{ pending.sl=v; });
-  pending.lineTP=hline(pending.tp,'#26a69a',v=>{ pending.tp=v; });
+  pending.lineSL=hline(pending.sl,'#ff6f6f',v=>{ pending.sl=v; });
+  pending.lineTP=hline(pending.tp,'#54c88c',v=>{ pending.tp=v; });
 }
 function clearPendingLines(){ if(!pending) return; ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} }}); }
 function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending dibatalkan.'); }
@@ -1119,6 +1351,7 @@ $('#buyBtn').onclick=()=>submitOrder('long');
 $('#sellBtn').onclick=()=>submitOrder('short');
 $('#closeBtn').onclick=()=>broker.closeMarket();
 $('#partialBtn').onclick=()=>partialClose(0.5);
+$('#closeAllBtn').onclick=()=>{ try{ if(trade) broker.closeMarket(); }catch(e){} try{ if(pending) cancelPending(); }catch(e){} };
 // toggle Market | Pending
 document.querySelectorAll('#ordType button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#ordType button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
@@ -1128,6 +1361,7 @@ document.querySelectorAll('#ordType button').forEach(b=>b.onclick=()=>{
 });
 function updateOpenTradeBox(){
   renderSizing();
+  try{renderTrades();}catch(e){}
   $('#partialBtn').disabled=!trade;
   $('#closeBtn').disabled=!(trade||pending);
   const box=$('#openTradeBox');
@@ -1136,15 +1370,15 @@ function updateOpenTradeBox(){
     const liveR=cur?(cur.close-trade.entry)*mul/(trade.risk||1e-9):0;
     const liveUsd=cur?pnlUsd(trade.dir,trade.entry,cur.close,trade.units||0):0;
     box.innerHTML=`<div class="open-trade">
-      <b style="color:${trade.dir==='long'?'#26a69a':'#ef5350'}">${trade.dir.toUpperCase()}</b>
+      <b style="color:${trade.dir==='long'?'#54c88c':'#ff6f6f'}">${trade.dir.toUpperCase()}</b>
       @ ${fmt(trade.entry)} · SL ${fmt(trade.sl)} · TP ${fmt(trade.tp)} · ${lotLabel(trade.units||0)}${trade.trail>0?' · trail':''}<br>
       Floating: <b class="${liveR>=0?'pos':'neg'}">${liveR>=0?'+':''}${liveR.toFixed(2)}R</b>
       · <b class="${liveUsd>=0?'pos':'neg'}">${liveUsd>=0?'+':''}$${liveUsd.toFixed(2)}</b></div>`;
     return;
   }
   if(pending){
-    box.innerHTML=`<div class="open-trade" style="border-color:#3b82f6">
-      <b style="color:#3b82f6">PENDING ${pending.dir.toUpperCase()} ${pending.type}</b>
+    box.innerHTML=`<div class="open-trade" style="border-color:#4a71ff">
+      <b style="color:#4a71ff">PENDING ${pending.dir.toUpperCase()} ${pending.type}</b>
       @ ${fmt(pending.entry)} · SL ${fmt(pending.sl)} · TP ${fmt(pending.tp)} · ${lotLabel(pending.units||0)}<br>
       <span style="color:var(--muted)">menunggu harga tersentuh — Close = batalkan</span></div>`;
     return;
@@ -1154,13 +1388,18 @@ function updateOpenTradeBox(){
 
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
-function disarmIcons(){ document.querySelectorAll('.dtool').forEach(x=>x.classList.remove('armed')); }
+function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
 function delHooks(){ return {
-  onDrawEnd:(e)=>{ try{expandPosition(e&&e.overlay); expandBox(e&&e.overlay); applyTextInput(e&&e.overlay);}catch(_){} inProgressId=null; disarmIcons(); return false; },
+  onDrawEnd:(e)=>{ const o=e&&e.overlay;
+    try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
+      const pts=pendingClicks.slice(0,n).map(p=>({timestamp:p.timestamp,value:p.value}));
+      for(let k=0;k<n;k++) o.points[k]=pts[k];
+      chart.overrideOverlay({id:o.id, points:pts}); } }catch(_){}
+    pendingClicks=[];
+    try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){} inProgressId=null; disarmIcons(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
-  onDoubleClick:(e)=>{ try{ const n=e.overlay&&e.overlay.name;
-    if(n==='text') editTextOverlay(e.overlay);
-    else if(n==='rect'||n==='trendline'){ hideAddTextNow(); editShapeText(e.overlay); } }catch(_){} return false; },
+  onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
+    if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; return false; },
@@ -1169,12 +1408,28 @@ function delHooks(){ return {
 };}
 function createDraw(name,btn,extra){
   try{
+    pendingClicks=[];
     const id=chart.createOverlay(Object.assign({name},delHooks(),extra||{}));
     if(id){ drawIds.push(id); inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
     else setStatus('Gagal aktifkan '+name,true);
   }catch(e){ setStatus('Drawing error: '+e.message,true); }
 }
 function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(id);}catch(e){} }); drawIds=[]; selectedId=hoverId=null; }
+
+// tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
+// waktu sub-bar; bila magnet aktif, snap ke high/low candle terdekat.
+$('#chart').addEventListener('mousedown', (ev)=>{
+  if(!inProgressId) return;
+  const r=$('#chart').getBoundingClientRect();
+  let t=pxToTime(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
+  if(t==null||v==null) return;
+  if(magnetOn){ const s=magnetSnap(t,v); if(s){ t=s.timestamp; v=s.value; } }
+  pendingClicks.push({timestamp:t, value:v});
+}, true);
+
+// posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
+let lastPtr={x:innerWidth/2,y:innerHeight/2};
+$('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; });
 
 // Text: editor inline di chart. Dipakai saat baru dibuat & saat double-click teks lama.
 let textEditorEl=null;
@@ -1283,6 +1538,12 @@ const _dt=$('#drawtools');
 DRAW_TOOLS.forEach(t=>{ const b=document.createElement('button'); b.className='dtool'; b.title=t.title; b.innerHTML=t.svg; b.onclick=()=> createDraw(t.name,b); _dt.appendChild(b); });
 const _sp=document.createElement('div'); _sp.className='spacer'; _dt.appendChild(_sp);
 const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Hapus semua gambar'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
+// toggle Magnet (snap ke high/low candle) — ala TradingView
+const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
+const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap titik ke high/low candle (on/off)'; _mag.innerHTML=MAGNET_SVG;
+if(magnetOn) _mag.classList.add('armed');
+_mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); };
+_dt.appendChild(_mag);
 
 // ===================== "+ Add text" pada trendline & rect (ala TradingView) =====================
 // Garis dipilih (klik) → hover garisnya → tombol "+ Add text" muncul DI ATAS kursor (tak menutupi garis).
@@ -1357,7 +1618,7 @@ function drawEquity(){
   ctx.strokeStyle=getCSS('--accent'); ctx.lineWidth=1.6; ctx.beginPath();
   pts.forEach((v,i)=> i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v))); ctx.stroke();
 }
-function getCSS(v){ return getComputedStyle(document.body).getPropertyValue(v).trim()||'#3b82f6'; }
+function getCSS(v){ return getComputedStyle(document.body).getPropertyValue(v).trim()||'#4a71ff'; }
 // bar metrik akun: Balance (realized) · Open P/L (floating) · Equity
 function renderAcct(){
   const bal=+$('#balance').value||0;
@@ -1368,17 +1629,92 @@ function renderAcct(){
   $('#acBal').textContent=usd(bal);
   const o=$('#acOpen'); o.textContent=(openPnl>=0?'+':'-')+usd(Math.abs(openPnl)); o.className=openPnl>=0?'pos':'neg';
   $('#acEq').textContent=usd(eq);
+  let margin=0; if(trade){ margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100; }   // leverage 100
+  const m=$('#acMargin'); if(m) m.textContent=usd(margin);
+  const fm=$('#acFree'); if(fm) fm.textContent=usd(eq-margin);
 }
-function renderJournal(){
-  $('#journal').innerHTML=journal.slice().reverse().map(t=>`<tr>
-    <td>${nyTime(t.time).slice(5)}</td>
-    <td style="color:${t.dir==='long'?'#26a69a':'#ef5350'}">${t.dir==='long'?'▲':'▼'}</td>
-    <td>${fmt(t.entry)}</td><td>${fmt(t.exit)}</td>
-    <td class="${t.r>0?'pos':'neg'}">${t.r>0?'+':''}${t.r.toFixed(2)}</td></tr>`).join('');
+// ===================== panel Trades (tabel posisi ala TradeLocker) =====================
+let activeTradeTab = localStorage.getItem('br_tradeTab') || 'positions';
+const usdFmt = v => (v<0?'-$':'$')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const sideCls = d => d==='long'?'t-side-buy':'t-side-sell';
+const sideTxt = d => d==='long'?'Buy':'Sell';
+function thRow(cols){ return '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>'; }
+function emptyRow(span,msg){ return `<tr><td class="tp-empty" colspan="${span}">${msg}</td></tr>`; }
+
+function renderTrades(){
+  // jumlah di tab
+  $('#tpNPos').textContent  = trade?1:0;
+  $('#tpNPend').textContent = pending?1:0;
+  // aktifkan tab + pane
+  document.querySelectorAll('#tpTabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===activeTradeTab));
+  const isStats = activeTradeTab==='stats';
+  $('#paneTable').hidden = isStats;
+  $('#paneStats').hidden = !isStats;
+  if(isStats){ try{renderStats();}catch(e){} return; }
+
+  const head=$('#tpHead'), body=$('#tpBody');
+  const sym=inst.replace('_','');
+  const cur=currentCandle();
+  if(activeTradeTab==='positions'){
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Stop Loss','Take Profit','Margin','Profit & Loss','Actions']);
+    if(!trade){ body.innerHTML=emptyRow(9,'No open positions'); return; }
+    const mkt=cur?cur.close:trade.entry;
+    const pl=pnlUsd(trade.dir,trade.entry,mkt,trade.units||0);
+    const margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100;
+    body.innerHTML=`<tr>
+      <td><b>${sym}</b></td>
+      <td class="${sideCls(trade.dir)}">${sideTxt(trade.dir)}</td>
+      <td>${lotLabel(trade.units||0)}</td>
+      <td>${fmt(trade.entry)} / ${fmt(mkt)}</td>
+      <td>${fmt(trade.sl)}</td>
+      <td>${fmt(trade.tp)}</td>
+      <td>${usdFmt(margin)}</td>
+      <td class="${pl>=0?'t-pos':'t-neg'}">${pl>=0?'+':''}${usdFmt(pl)}</td>
+      <td class="t-act"><button data-act="partial">Close ½</button><button data-act="close">Close</button></td></tr>`;
+  } else if(activeTradeTab==='pending'){
+    head.innerHTML=thRow(['Instrument','Side','Type','Entry','Stop Loss','Take Profit','Size','Actions']);
+    if(!pending){ body.innerHTML=emptyRow(8,'No pending orders'); return; }
+    body.innerHTML=`<tr>
+      <td><b>${sym}</b></td>
+      <td class="${sideCls(pending.dir)}">${sideTxt(pending.dir)}</td>
+      <td style="text-transform:capitalize">${pending.type}</td>
+      <td>${fmt(pending.entry)}</td>
+      <td>${fmt(pending.sl)}</td>
+      <td>${fmt(pending.tp)}</td>
+      <td>${lotLabel(pending.units||0)}</td>
+      <td class="t-act"><button data-act="cancel">Cancel</button></td></tr>`;
+  } else { // closed
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry','Exit','R','Profit & Loss','Closed (NY)']);
+    if(!journal.length){ body.innerHTML=emptyRow(8,'No closed positions'); return; }
+    body.innerHTML=journal.slice().reverse().map(t=>`<tr>
+      <td><b>${sym}</b></td>
+      <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}${t.partial?' ½':''}</td>
+      <td>${t.units!=null?lotLabel(t.units):'—'}</td>
+      <td>${fmt(t.entry)}</td>
+      <td>${fmt(t.exit)}</td>
+      <td class="${t.r>0?'t-pos':'t-neg'}">${t.r>0?'+':''}${t.r.toFixed(2)}R</td>
+      <td class="${(t.pnlCcy||0)>=0?'t-pos':'t-neg'}">${t.pnlCcy!=null?((t.pnlCcy>=0?'+':'')+usdFmt(t.pnlCcy)):'—'}</td>
+      <td style="color:var(--muted)">${nyTime(t.exitTime||t.time).slice(5)}</td></tr>`).join('');
+  }
 }
+// kompat: pemanggil lama renderJournal() → render tabel posisi
+function renderJournal(){ renderTrades(); }
+// pindah tab
+document.querySelectorAll('#tpTabs button').forEach(b=>b.onclick=()=>{
+  activeTradeTab=b.dataset.tab; localStorage.setItem('br_tradeTab',activeTradeTab);
+  if($('#bottompanel').classList.contains('collapsed')) toggleTrades();   // buka kalau ke-collapse
+  renderTrades();
+});
+// aksi per baris (Close / Close ½ / Cancel)
+$('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-act]'); if(!b) return;
+  const a=b.dataset.act;
+  if(a==='close') broker.closeMarket();
+  else if(a==='partial') partialClose(0.5);
+  else if(a==='cancel') cancelPending();
+});
 function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal)); }
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
-$('#resetBtn').onclick=()=>{ if(confirm('Hapus semua journal?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderJournal(); } };
+$('#resetBtn').onclick=()=>{ if(confirm('Hapus semua riwayat trade?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
@@ -1400,25 +1736,35 @@ async function fetchQuote(sym){
   try{
     const r=await fetch(`/api/candles?instrument=${encodeURIComponent(sym)}&granularity=D&count=2`);
     const j=await r.json(); if(!j.candles||!j.candles.length) return null;
-    const cs=j.candles, last=+cs[cs.length-1].mid.c, prev=cs.length>1?+cs[cs.length-2].mid.c:last;
-    return {last, chg: prev?(last-prev)/prev*100:0};
+    const cs=j.candles, c0=cs[cs.length-1], last=+c0.mid.c, prev=cs.length>1?+cs[cs.length-2].mid.c:last;
+    return {last, chg: prev?(last-prev)/prev*100:0, hi:+c0.mid.h, lo:+c0.mid.l};
   }catch(e){ return null; }
 }
 async function refreshQuotes(){
   await Promise.all(WATCH_SYMS.map(async s=>{ const q=await fetchQuote(s); if(q) quoteCache[s]=q; }));
   renderWatch();
 }
+function pipOf(s){ return Math.pow(10, -(symDecimals(s)-1)); }   // pip per simbol (FX 1e-4, JPY 1e-2, dst)
 function renderWatch(){
   const box=$('#wlRows'); if(!box) return;
-  box.innerHTML=WATCH_SYMS.map(s=>{
-    const q=quoteCache[s], dec=symDecimals(s);
-    const px=q?q.last.toFixed(dec):'—';
-    const chg=q?((q.chg>=0?'+':'')+q.chg.toFixed(2)+'%'):'';
-    const cls=q?(q.chg>=0?'up':'down'):'';
-    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}">
-      <span class="wl-sym">${s}</span><span class="wl-px">${px}</span><span class="wl-chg ${cls}">${chg}</span></div>`;
+  const hdr=`<div class="wl-row wl-hdr">
+    <span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
+  const rows=WATCH_SYMS.map(s=>{
+    const q=quoteCache[s], dec=symDecimals(s), pip=pipOf(s), sym=s.replace('_','');
+    if(!q) return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}">
+      <span class="wl-sym">${sym}</span><span class="wl-bid">—</span><span class="wl-ask">—</span><span class="wl-spr">—</span><span class="wl-num">—</span><span class="wl-num">—</span></div>`;
+    const sprd=pip*1.6, bid=q.last-sprd/2, ask=q.last+sprd/2;   // bid/ask sintetis dari last + spread (Fase 2: pricing nyata)
+    const up=q.chg>=0;
+    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(q.chg>=0?'+':'')+q.chg.toFixed(2)}% hari ini">
+      <span class="wl-sym">${sym}</span>
+      <span class="wl-bid ${up?'up':'down'}">${bid.toFixed(dec)}</span>
+      <span class="wl-ask ${up?'up':'down'}">${ask.toFixed(dec)}</span>
+      <span class="wl-spr">${(sprd/pip).toFixed(1)}</span>
+      <span class="wl-num">${q.hi!=null?q.hi.toFixed(dec):'—'}</span>
+      <span class="wl-num">${q.lo!=null?q.lo.toFixed(dec):'—'}</span></div>`;
   }).join('');
-  box.querySelectorAll('.wl-row').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
+  box.innerHTML=hdr+rows;
+  box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
 function selectSymbol(s){ if(s===inst) return; $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
 
@@ -1445,6 +1791,15 @@ function addAlert(){
   saveAlerts(); drawAlertLines(); renderAlertList();
 }
 function removeAlert(i){ const a=alerts[i]; if(a&&a.id){ try{chart.removeOverlay(a.id);}catch(e){} } alerts.splice(i,1); saveAlerts(); drawAlertLines(); renderAlertList(); }
+// buat alert di harga tertentu (dipakai klik-kanan chart)
+function createAlertAt(price){
+  if(price==null||isNaN(price)) return;
+  const p=+(+price).toFixed(priceDecimals());
+  if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
+  alerts.push({sym:inst,price:p,id:null});
+  saveAlerts(); drawAlertLines(); renderAlertList();
+  toast('🔔 Alert dibuat di '+p);
+}
 // alert berbunyi saat candle simbol aktif menembus level (replay & live)
 function checkAlerts(c){
   const fired=alerts.filter(a=>a.sym===inst && c.low<=a.price && a.price<=c.high);
@@ -1458,8 +1813,98 @@ function checkAlerts(c){
   saveAlerts(); drawAlertLines(); renderAlertList();
 }
 $('#alertAdd').onclick=addAlert;
-$('#watchBtn').onclick=()=>{ const c=$('#watchlist').classList.toggle('hidden'); localStorage.setItem('br_watchHidden',c?'1':''); chart.resize(); };
-if(localStorage.getItem('br_watchHidden')) $('#watchlist').classList.add('hidden');
+// ===================== order panel: docked / mengambang (bebas digeser) =====================
+const app=document.querySelector('.app');
+{ const op=$('#orderpanel'), of=$('#orderForm'); if(op&&of) op.appendChild(of); }
+// ukuran tersimpan untuk Markets & Trades
+const savedMarketsW=()=> localStorage.getItem('br_marketsW') || '360';
+const savedTradesH =()=> localStorage.getItem('br_tradesH')  || '210';
+
+function setOrderDock(floating, keepPos){
+  const op=$('#orderpanel'); if(!op) return;
+  op.dataset.dock=floating?'floating':'docked';
+  if(floating){
+    document.body.appendChild(op);
+    if(!keepPos){
+      const pos=JSON.parse(localStorage.getItem('br_opPos')||'null');
+      op.style.left=(pos? pos.x : 70)+'px';
+      op.style.top =(pos? pos.y : 90)+'px';
+    }
+  }else{
+    op.style.left=''; op.style.top='';
+    $('#watchlist').appendChild(op);
+  }
+  const d=$('#opDock'); if(d) d.textContent=floating?'⇱':'⇲';
+}
+function setMarketsHidden(hidden){
+  $('#watchlist').classList.toggle('hidden',hidden);
+  $('#rhMarkets').classList.toggle('hidden',hidden);
+  app.style.setProperty('--markets-w', hidden?'0px':savedMarketsW()+'px');
+  $('#toggleMarkets').classList.toggle('on',!hidden);
+  setOrderDock(hidden);   // auto-float saat Markets disembunyikan, dock saat tampil
+  try{chart.resize();}catch(e){}
+}
+function toggleMarkets(){ const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':''); }
+function toggleOrder(){ const op=$('#orderpanel'); const hide=op.style.display!=='none'; op.style.display=hide?'none':''; $('#toggleOrder').classList.toggle('on',!hide); }
+function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('collapsed');
+  app.style.setProperty('--trades-h', c?'36px':savedTradesH()+'px');
+  $('#bottomToggle').textContent=c?'⏶':'⏷'; $('#toggleTrades').classList.toggle('on',!c);
+  localStorage.setItem('br_bottomHidden',c?'1':''); try{chart.resize();}catch(e){} if(!c){try{drawEquity();}catch(e){}} }
+$('#watchBtn').onclick=toggleMarkets;
+$('#toggleMarkets').onclick=toggleMarkets;
+$('#toggleOrder').onclick=toggleOrder;
+$('#toggleTrades').onclick=toggleTrades;
+$('#bottomToggle').onclick=toggleTrades;
+$('#marketsClose').onclick=toggleMarkets;     // sembunyikan dari header Markets
+$('#opClose').onclick=toggleOrder;             // tutup dari header order panel
+$('#opDock').onclick=()=>{ setOrderDock($('#orderpanel').dataset.dock!=='floating', true); };
+
+// --- drag order panel ke mana saja (lewat header / grip) ---
+(function(){ const op=$('#orderpanel'), bar=$('#opBar'); if(!op||!bar) return;
+  let drag=false,sx,sy,ox,oy;
+  bar.addEventListener('pointerdown',e=>{
+    if(e.target.closest('button')) return;
+    if(op.dataset.dock!=='floating'){ setOrderDock(true,true); }
+    const r=op.getBoundingClientRect();
+    drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    op.style.left=ox+'px'; op.style.top=oy+'px';
+    bar.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  bar.addEventListener('pointermove',e=>{ if(!drag) return;
+    let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+    nx=Math.max(0,Math.min(window.innerWidth - op.offsetWidth, nx));
+    ny=Math.max(0,Math.min(window.innerHeight - 36, ny));
+    op.style.left=nx+'px'; op.style.top=ny+'px';
+    localStorage.setItem('br_opPos',JSON.stringify({x:nx,y:ny}));
+  });
+  const stop=()=>{ drag=false; };
+  bar.addEventListener('pointerup',stop); bar.addEventListener('pointercancel',stop);
+})();
+
+// --- geser pembatas: lebar Markets & tinggi Trades ---
+function makeResizer(handle, axis, varName, lsKey){
+  let drag=false;
+  handle.addEventListener('pointerdown',e=>{ drag=true; handle.classList.add('drag');
+    handle.setPointerCapture(e.pointerId); e.preventDefault(); });
+  handle.addEventListener('pointermove',e=>{ if(!drag) return;
+    const r=app.getBoundingClientRect(); let v;
+    if(axis==='x'){ v=Math.max(180, Math.min(r.width-260, r.right-e.clientX)); }
+    else         { v=Math.max(80,  Math.min(r.height*0.75, r.bottom-e.clientY)); }
+    v=Math.round(v); app.style.setProperty(varName, v+'px'); localStorage.setItem(lsKey, v);
+    try{chart.resize();}catch(err){}
+  });
+  const stop=()=>{ if(!drag) return; drag=false; handle.classList.remove('drag'); try{chart.resize();}catch(err){} if(axis==='y'){try{drawEquity();}catch(err){}} };
+  handle.addEventListener('pointerup',stop); handle.addEventListener('pointercancel',stop);
+}
+makeResizer($('#rhMarkets'),'x','--markets-w','br_marketsW');
+makeResizer($('#rhTrades'), 'y','--trades-h', 'br_tradesH');
+
+// sinkron state awal
+setMarketsHidden(!!localStorage.getItem('br_watchHidden'));
+$('#toggleOrder').classList.add('on');
+const _coll=$('#bottompanel').classList.contains('collapsed');
+app.style.setProperty('--trades-h', _coll?'36px':savedTradesH()+'px');
+$('#toggleTrades').classList.toggle('on',!_coll);
 
 // ===================== keyboard =====================
 window.addEventListener('keydown',e=>{
@@ -1468,7 +1913,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
-  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; disarmIcons(); } }
+  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); } }
   else if(e.key.toLowerCase()==='b'){submitOrder('long')}
   else if(e.key.toLowerCase()==='s'){submitOrder('short')}
 });
@@ -1492,23 +1937,96 @@ $('#chart').addEventListener('click',()=>{
   setStatus('Replay mulai '+nyTime(hoverTs)+' (NY). Next/Play untuk maju.');
 });
 
+// ===================== popup setting objek gambar (double-click / klik-kanan) =====================
+const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
+const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);
+function markOn(sel,el){ objPop.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); }
+function showObjPopup(o, cx, cy){
+  if(!o||DRAW_DEFAULT[o.name]===undefined) return;
+  const st=dstyle(o), hasText=(o.name==='trendline'||o.name==='rect'||o.name==='text');
+  const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
+  const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
+  const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
+  objPop.innerHTML=`<div class="pp-lbl">Warna</div><div class="pp-row">${cols}</div>`
+    +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
+    +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
+    +`<div class="pp-act">${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Hapus</button></div>`;
+  objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
+  objPop.style.top =Math.min(cy,window.innerHeight-220)+'px';
+  objPop.classList.add('show');
+  objPop.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); markOn('[data-col]',b); });
+  objPop.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); markOn('[data-w]',b); });
+  objPop.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); markOn('[data-st]',b); });
+  const tb=objPop.querySelector('#ppText'); if(tb) tb.onclick=()=>{ hideObjPopup(); openOverlayTextEditor(o,false); };
+  objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
+}
+function hideObjPopup(){ objPop.classList.remove('show'); }
+document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&&!objPop.contains(e.target)) hideObjPopup(); }, true);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); chartSet.classList.remove('show'); } });
+
+// ===================== setting chart (⚙ rail): candle, background, grid =====================
+const CHART_DEFAULT={up:'#54c88c',down:'#ff6f6f',bg:'#101013',grid:'#1f1f24'};
+let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
+function applyChartCfg(){
+  try{ chart.setStyles({
+    grid:{horizontal:{color:chartCfg.grid},vertical:{color:chartCfg.grid}},
+    candle:{bar:{upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.up,downBorderColor:chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}},
+  }); }catch(e){}
+  const c=document.querySelector('.center'), ch=document.getElementById('chart');
+  if(c) c.style.background=chartCfg.bg; if(ch) ch.style.background=chartCfg.bg;
+}
+function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
+const gearBtn=document.createElement('button'); gearBtn.className='railbtn'; gearBtn.id='chartSetBtn'; gearBtn.title='Setting chart'; gearBtn.textContent='⚙';
+{ const _rail=document.getElementById('rail'); const _rs=_rail.querySelector('.railspacer'); _rail.insertBefore(gearBtn,_rs); }
+const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
+function showChartSet(){
+  const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
+  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Background','bg')+row('Grid','grid')+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
+  const r=gearBtn.getBoundingClientRect();
+  chartSet.style.left=Math.min(r.right+8,window.innerWidth-220)+'px';
+  chartSet.style.top=Math.max(8,Math.min(r.top,window.innerHeight-280))+'px';
+  chartSet.classList.add('show');
+  chartSet.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
+  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(); };
+}
+gearBtn.onclick=(e)=>{ e.stopPropagation(); chartSet.classList.contains('show')?chartSet.classList.remove('show'):showChartSet(); };
+document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)&&e.target!==gearBtn) chartSet.classList.remove('show'); }, true);
+applyChartCfg();   // terapkan cfg tersimpan saat startup
+
 // ===================== context menu: reset chart view =====================
 const ctxMenu=document.createElement('div');
 ctxMenu.className='ctxmenu'; ctxMenu.style.display='none';
-ctxMenu.innerHTML='<div class="ctxitem" id="ctxReset">↺ Reset chart view</div>';
 document.body.appendChild(ctxMenu);
 function hideCtx(){ ctxMenu.style.display='none'; }
+function showCtx(x,y,items){
+  ctxMenu.innerHTML=items.map((it,i)=>`<div class="ctxitem" data-ci="${i}">${it.label}</div>`).join('');
+  ctxMenu.style.display='block';
+  const mw=ctxMenu.offsetWidth||190, mh=ctxMenu.offsetHeight||44;
+  ctxMenu.style.left=Math.min(x,window.innerWidth-mw-6)+'px';
+  ctxMenu.style.top =Math.min(y,window.innerHeight-mh-6)+'px';
+  ctxMenu.querySelectorAll('.ctxitem').forEach(el=>el.onclick=()=>{ hideCtx(); items[+el.dataset.ci].fn(); });
+}
 $('#chart').addEventListener('contextmenu',e=>{
   e.preventDefault();
-  // jepit posisi agar tak keluar viewport
-  const mw=170,mh=44;
-  ctxMenu.style.left=Math.min(e.clientX,window.innerWidth-mw)+'px';
-  ctxMenu.style.top =Math.min(e.clientY,window.innerHeight-mh)+'px';
-  ctxMenu.style.display='block';
+  if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); showObjPopup(o, e.clientX, e.clientY); return; } }
+  const rect=$('#chart').getBoundingClientRect();
+  const yIn=e.clientY-rect.top;
+  const price=pxToValue(yIn);
+  const items=[];
+  if(price!=null && !isNaN(price)){
+    // deteksi alert dekat kursor (pita ±6px) → tawarkan hapus
+    const pa=pxToValue(yIn-6), pb=pxToValue(yIn+6);
+    let nearIdx=-1;
+    if(pa!=null && pb!=null){ const lo=Math.min(pa,pb), hi=Math.max(pa,pb);
+      nearIdx=alerts.findIndex(a=>a.sym===inst && a.price>=lo && a.price<=hi); }
+    if(nearIdx>=0) items.push({label:`✕ Hapus alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
+    items.push({label:`🔔 Buat alert di ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
+  }
+  items.push({label:'↺ Reset chart view', fn:resetChartView});
+  showCtx(e.clientX, e.clientY, items);
 });
 window.addEventListener('click',hideCtx);
 window.addEventListener('blur',hideCtx);
-$('#ctxReset').onclick=()=>{ hideCtx(); resetChartView(); };
 // Kembalikan zoom/scroll/skala ke default utk instrument + TF yang sedang dibuka.
 function resetChartView(){
   if(T==null){ setStatus('Load dulu.',true); return; }

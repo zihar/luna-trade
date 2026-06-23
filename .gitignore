@@ -5,6 +5,9 @@
 # Catatan deploy lokal (berisi IP/instance ID + info keamanan)
 DEPLOY-NOTES.md
 
+# Roadmap kerja lokal (memuat catatan keamanan/infra)
+ROADMAP.md
+
 # OS / editor
 .DS_Store
 *.swp
