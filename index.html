@@ -695,6 +695,46 @@ function magnetSnap(time, value){
   if(!best){ const c=arr[i]; let bd=Infinity,bv=c.close; for(const v of [c.open,c.high,c.low,c.close]){const d=Math.abs(v-value);if(d<bd){bd=d;bv=v;}} best={timestamp:barOpen,value:bv}; }
   return best;
 }
+// [magnet presisi M5] Saat menggambar dgn magnet di TF besar (mis. Daily), high/low hanya
+// se-presisi data terhalus yg KEBETULAN ter-load → sering mentok di jam buka candle (mis.
+// Daily buka 18:00 NY). Setelah gambar selesai, ambil M5 ON-DEMAND utk rentang tiap candle
+// yg di-magnet, lalu geser titik ke menit high/low M5 yg sebenarnya → presisi saat pindah TF.
+const m5WinCache={};                    // key: "INST|barOpenMs" → array M5 candle (rentang 1 bar)
+function barRangeContaining(tf, ts){    // batas [open,end) bar TF `tf` yang memuat ts (anti-gap weekend)
+  const arr=tfData[tf]; if(!arr||!arr.length||ts==null) return null;
+  let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=ts) a=m+1; else b=m;}
+  const i=Math.max(0,a-1), open=arr[i].timestamp;
+  const end=(i+1<arr.length)?arr[i+1].timestamp:open+DUR[tf];
+  return {open,end};
+}
+async function ensureM5Window(open,end){
+  const key=inst+'|'+open; if(m5WinCache[key]) return m5WinCache[key];
+  const count=Math.min(5000, Math.ceil((end-open)/DUR.M5)+3);   // from+count (hindari konflik from+to+count OANDA)
+  try{ const data=await fetchCandles('M5',{from:new Date(open).toISOString(), count}); m5WinCache[key]=data; return data; }
+  catch(e){ return null; }
+}
+const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1}; // box & penanda axis: dilewati
+async function refineMagnetPoints(id){
+  try{
+    const o=chart.getOverlayById(id); if(!o||MAGNET_REFINE_SKIP[o.name]) return;
+    if(DUR[currentTF]<=DUR.M5) return;                         // sudah ≤M5 → tak ada gunanya
+    const cur=currentTF; if(!tfData[cur]||!tfData[cur].length) return;
+    const pts=(o.points||[]).map(p=>({timestamp:p.timestamp,value:p.value}));
+    let changed=false;
+    for(const p of pts){
+      if(p.timestamp==null||p.value==null) continue;
+      const rng=barRangeContaining(cur,p.timestamp); if(!rng) continue;
+      const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
+      let best=null,bd=Infinity;
+      for(const c of m5){ if(c.timestamp>=rng.open && c.timestamp<rng.end){
+        const dh=Math.abs(c.high-p.value); if(dh<bd){bd=dh; best={timestamp:c.timestamp,value:c.high};}
+        const dl=Math.abs(c.low -p.value); if(dl<bd){bd=dl; best={timestamp:c.timestamp,value:c.low };}
+      }}
+      if(best && (best.timestamp!==p.timestamp || best.value!==p.value)){ p.timestamp=best.timestamp; p.value=best.value; changed=true; }
+    }
+    if(changed){ try{chart.overrideOverlay({id, points:pts});}catch(e){} }
+  }catch(e){}
+}
 // klik presisi yang dikumpulkan selama menggambar (menggantikan snap-ke-bar klinecharts)
 let pendingClicks=[];
 
@@ -1590,7 +1630,9 @@ function delHooks(){ return {
       for(let k=0;k<n;k++) o.points[k]=pts[k];
       chart.overrideOverlay({id:o.id, points:pts}); } }catch(_){}
     pendingClicks=[];
-    try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){} inProgressId=null; disarmIcons(); return false; },
+    try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
+    if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke high/low M5 presisi (async, on-demand)
+    inProgressId=null; disarmIcons(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
     if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
