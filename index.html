@@ -640,30 +640,15 @@ function revealed(tf){
 }
 function currentCandle(){ const a=revealed(currentTF); return a.length?a[a.length-1]:null; }
 
-// [PROTOTIPE presisi sub-bar] Petakan (timestamp,value) ke pixel dgn interpolasi
-// LINEAR di antara 2 bar tetangga (klinecharts sendiri snap ke posisi bar → tak ada
-// presisi dalam-bar). Dgn ini, timestamp presisi (mis. jam high sebenarnya) mendarat
-// di posisi yang sama di TF mana pun → konsisten Daily↔1H seperti TradingView.
-function subBarPx(ts, value){
-  const px=t=>{ let c=chart.convertToPixel({timestamp:t,value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c)) c=c[0]; return c; };
-  const arr=revealed(currentTF);
-  if(!arr.length) return px(ts);
-  let a=0,b=arr.length; while(a<b){ const m=(a+b)>>1; if(arr[m].timestamp<=ts) a=m+1; else b=m; }
-  const i=a-1;
-  if(i<0) return px(arr[0].timestamp);
-  if(i>=arr.length-1) return px(arr[arr.length-1].timestamp);
-  const t0=arr[i].timestamp, t1=arr[i+1].timestamp;
-  const c0=px(t0), c1=px(t1);
-  if(!c0||!c1) return c0||c1;
-  const f=(t1>t0)?(ts-t0)/(t1-t0):0;
-  return { x:c0.x + f*(c1.x-c0.x), y:c0.y };
-}
-// koordinat pixel tiap titik overlay via interpolasi sub-bar (x presisi dari waktu,
-// y dari harga). Fallback ke coordinates bawaan klinecharts bila titik tak lengkap.
-function subBarCoords(overlay, coordinates){
-  const pts=overlay&&overlay.points; if(!pts||!pts.length) return coordinates;
-  return pts.map((p,i)=>{ if(p&&p.timestamp!=null&&p.value!=null){ const q=subBarPx(p.timestamp,p.value); if(q) return q; } return coordinates[i]||coordinates[0]; });
-}
+// Koordinat pixel tiap titik overlay (rect/trendline/fib/dateRange/text/position).
+// DULU: interpolasi sub-bar (x pecahan antar bar) demi presisi dalam-bar. MASALAH: titik
+// handle bawaan klinecharts (`needDefaultPointFigure`) SELALU di-snap ke pusat bar
+// (timestampToDataIndex→binarySearchNearest→indeks integer). Jadi BENTUK (sub-bar) & HANDLE
+// (snapped) bisa meleset s/d ±½ lebar bar → "titik drag bergeser dari pojok" + ukuran tampak
+// berubah saat resize (drag klinecharts snap ke bar). SOLUSI: pakai koordinat NATIVE
+// klinecharts (identik dengan posisi handle) → bentuk & handle SELALU sinkron, di semua TF.
+// Harga/y tetap presisi (value→pixel akurat); hanya x yang ikut grid bar — sama spt TradingView.
+function subBarCoords(overlay, coordinates){ return coordinates; }
 
 // [presisi sub-bar] pixel-x → timestamp presisi (interpolasi antar 2 bar tetangga)
 function pxToTime(x){
@@ -680,6 +665,17 @@ function pxToTime(x){
   return Math.round(arr[i].timestamp + f*(arr[j].timestamp-arr[i].timestamp));
 }
 function pxToValue(y){ let c=chart.convertFromPixel({x:10,y},{paneId:'candle_pane'}); if(Array.isArray(c))c=c[0]; return c?c.value:null; }
+// snap waktu sub-bar (hasil pxToTime) ke timestamp bar TERDEKAT — dipakai garis vertikal
+// supaya penanda waktu = waktu candle yg diklik, dan garis nempel pas di bar itu (jadi
+// bisa diklik ulang utk select/hapus). Di luar rentang bar (mis. area future) dibiarkan.
+function snapTimeToBar(t){
+  const arr=revealed(currentTF); if(!arr.length||t==null) return t;
+  if(t<=arr[0].timestamp) return arr[0].timestamp;
+  const last=arr[arr.length-1].timestamp; if(t>=last) return last;
+  let lo=0,hi=arr.length-1; while(lo<hi){ const m=(lo+hi)>>1; if(arr[m].timestamp<t) lo=m+1; else hi=m; }
+  const b=arr[lo].timestamp, a=arr[lo-1]?arr[lo-1].timestamp:b;
+  return (t-a<=b-t)?a:b;
+}
 
 // [magnet] snap (time,value) ke high/low candle terdekat — pakai data intraday
 // terhalus yang ter-load dalam rentang bar saat ini → mendarat di extreme PRESISI.
@@ -772,9 +768,10 @@ klinecharts.registerOverlay({
     const rl=lsLine(st);
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
-    const t=overlay&&overlay.extendData;                       // teks opsional
-    if(t) figs.push({type:'text',attrs:{x:x+5,y:y+4,text:String(t),align:'left',baseline:'top'},
-      styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
+    const t=overlay&&overlay.extendData;                       // teks opsional → di TENGAH kotak, center
+    if(t){ const lines=String(t).split('\n'), lh=15, cx=x+w/2, cy=y+h/2, y0=cy-(lines.length-1)*lh/2;
+      lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:y0+i*lh,text:ln,align:'center',baseline:'middle'},
+        styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
     return figs;
   }
 });
@@ -792,6 +789,41 @@ klinecharts.registerOverlay({
     if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my,text:String(t),align:'center',baseline:'middle'},
       styles:{color:drawTextColor,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
+  }
+});
+
+// garis horizontal/vertikal: override bawaan klinecharts agar penanda harga (axis Y) &
+// penanda waktu (axis X) SELALU tampil — bukan cuma saat garis terpilih. Bawaan klinecharts
+// meng-gate "default axis figure" ke overlay yang sedang aktif; di sini kita render lewat
+// createY/XAxisFigures yang TIDAK ter-gate, jadi tag selalu nempel di axis.
+function axisTagColor(o){ return (o&&o.styles&&o.styles.line&&o.styles.line.color)||'#4a71ff'; }
+klinecharts.registerOverlay({
+  name:'horizontalStraightLine', totalStep:2, needDefaultPointFigure:true,
+  needDefaultXAxisFigure:true, needDefaultYAxisFigure:false,   // tag harga (Y) kita render sendiri & selalu
+  createPointFigures:({coordinates,bounding})=>{ const cy=coordinates[0].y; return [
+    // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
+    {type:'rect', attrs:{x:0,y:cy-6,width:bounding.width,height:12}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
+    {type:'line', attrs:{coordinates:[{x:0,y:cy},{x:bounding.width,y:cy}]}} ]; },
+  createYAxisFigures:({overlay,coordinates,bounding,yAxis})=>{
+    const c=coordinates[0], p=overlay.points[0]; if(!c||!p||p.value==null) return [];
+    const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
+    return [{type:'text', ignoreEvent:true,
+      attrs:{x:fromZero?0:bounding.width, y:c.y, text:fmtPx(p.value), align:fromZero?'left':'right', baseline:'middle'},
+      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)'}}];
+  }
+});
+klinecharts.registerOverlay({
+  name:'verticalStraightLine', totalStep:2, needDefaultPointFigure:true,
+  needDefaultXAxisFigure:false, needDefaultYAxisFigure:true,   // tag waktu (X) kita render sendiri & selalu
+  createPointFigures:({coordinates,bounding})=>{ const cx=coordinates[0].x; return [
+    // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
+    {type:'rect', attrs:{x:cx-6,y:0,width:12,height:bounding.height}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
+    {type:'line', attrs:{coordinates:[{x:cx,y:0},{x:cx,y:bounding.height}]}} ]; },
+  createXAxisFigures:({overlay,coordinates})=>{
+    const c=coordinates[0], p=overlay.points[0]; if(!c||!p||p.timestamp==null) return [];
+    return [{type:'text', ignoreEvent:true,
+      attrs:{x:c.x, y:0, text:nyTime(p.timestamp), align:'center'},
+      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)'}}];
   }
 });
 
@@ -1553,6 +1585,8 @@ function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
       const pts=pendingClicks.slice(0,n).map(p=>({timestamp:p.timestamp,value:p.value}));
+      // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + garis bisa diklik/hapus)
+      if(o.name==='verticalStraightLine') pts.forEach(p=>{ p.timestamp=snapTimeToBar(p.timestamp); });
       for(let k=0;k<n;k++) o.points[k]=pts[k];
       chart.overrideOverlay({id:o.id, points:pts}); } }catch(_){}
     pendingClicks=[];
@@ -1604,6 +1638,8 @@ function overlayTextAnchor(o){
   const toPx=p=>{ let px=null; try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
   const pts=o.points||[];
   if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
+  if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
   const p=pts[0]; if(!p) return null; const px=toPx(p);
   return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
 }
