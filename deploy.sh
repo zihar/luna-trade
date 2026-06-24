@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Deploy/update Luna Trade ke instance forex-alertd (numpang, tanpa Docker).
 #
+# FALLBACK MANUAL. Jalur deploy utama sekarang AUTO-PULL: push ke `main` → EC2
+# build + restart sendiri dalam <=1 menit (lihat deploy/luna-deploy.* & DEPLOY-NOTES.md).
+# Skrip push-based ini dipakai untuk emergency/offline atau tes binary tanpa commit.
+# CATATAN: kalau luna-deploy.timer aktif, hasil scp manual akan DITIMPA kembali ke
+# versi `main` dalam <=1 menit selama isinya beda dari yang sudah di-commit.
+#
 # Build binary statis arm64 → scp ke instance → restart systemd service.
 # Hanya update binary + index.html + assets/; service unit & /etc/bar-replay.env
 # (token + basic-auth) sudah terpasang di instance, tidak disentuh.

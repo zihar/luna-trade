@@ -1,0 +1,9 @@
+[Unit]
+Description=Luna Trade auto-deploy (pull origin/main, build arm64, restart bar-replay)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Jalan sebagai root: build, tulis binary, sync aset, restart bar-replay, update unit file.
+ExecStart=/opt/bar-replay/luna-deploy.sh
