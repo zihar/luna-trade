@@ -279,13 +279,13 @@
   .toast.show{ opacity:1; top:18px; }
 
   /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
-  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:5px;
-    background:var(--panel); border:1px solid var(--accent); color:var(--txt); font-size:12px;
-    padding:4px 10px; border-radius:7px; cursor:pointer; box-shadow:var(--shadow);
-    transform:translate(-50%,-100%); white-space:nowrap; }
+  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:4px;
+    background:transparent; border:none; color:var(--accent); font-size:12px; font-weight:600;
+    padding:2px 4px; cursor:pointer; white-space:nowrap;
+    transform:translate(-50%,-100%); text-shadow:0 1px 3px rgba(0,0,0,.65); }
   .addtext-btn.show{ display:inline-flex; }
-  .addtext-btn:hover{ background:var(--btn-hover); }
-  .addtext-btn .pl{ color:var(--accent); font-weight:700; font-size:15px; line-height:1; }
+  .addtext-btn:hover{ color:var(--txt); }
+  .addtext-btn .pl{ font-weight:700; font-size:14px; line-height:1; }
 
   /* ===================== layout 5-zona (TradeLocker) ===================== */
   .app{ flex:1; min-height:0; position:relative; display:grid;
@@ -332,6 +332,16 @@
   .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:2px; }
   .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
   .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; padding:2px; }
+  /* editor level Fibonacci */
+  .fibpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
+           border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
+  .fibpop.show{ display:block; }
+  .fibpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 7px; }
+  .fp-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .fp-row input{ flex:1; width:100%; }
+  .fp-x{ width:26px; padding:5px 0; font-size:12px; color:var(--muted); }
+  .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
+  .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
   .orderpanel{ border-top:1px solid var(--border); padding:12px; }
@@ -588,8 +598,9 @@
 
 <script>
 // ===================== konstanta =====================
-const TF_LIST = ['M1','M5','M15','M30','H1','H4','D','W'];
-const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7,W:6.048e8}; // ms
+const TF_LIST = ['M1','M5','M15','M30','H1','H4','D','W','MN'];
+const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7,W:6.048e8,MN:2.63e9}; // ms (MN≈30.44 hari)
+const GRAN = {MN:'M'};   // label TF → granularity OANDA (MN = Monthly = 'M')
 const FWD_CHUNK = 500;
 const NY_TZ = 'America/New_York';
 const $ = s => document.querySelector(s);
@@ -785,6 +796,12 @@ klinecharts.registerOverlay({
 });
 
 // custom overlay: Fibonacci 0 · 0.5 · 1 (lebar = selebar tarikan, arah ikut tarik)
+// level Fibonacci yang bisa diatur (tambah/hapus/ubah nilai) — global, tersimpan di localStorage
+const FIB_DEFAULT=[0,0.5,1];
+let fibLevels; try{ fibLevels=JSON.parse(localStorage.getItem('br_fibLevels')); if(!Array.isArray(fibLevels)||!fibLevels.length) fibLevels=FIB_DEFAULT.slice(); }catch(e){ fibLevels=FIB_DEFAULT.slice(); }
+function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
+function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
+
 klinecharts.registerOverlay({
   name:'fib3', totalStep:3, needDefaultPointFigure:true,
   performEventPressedMove:boxPressedMove,
@@ -799,7 +816,7 @@ klinecharts.registerOverlay({
     const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
     const st=dstyle(overlay);
     const figs=[];
-    [0,0.5,1].forEach(Lv=>{
+    fibLevels.forEach(Lv=>{
       const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
       const y = yTop + (yBot-yTop)*f;
       const price = vTop + (vBot-vTop)*f;
@@ -1057,7 +1074,7 @@ async function loadInit(latest){
 }
 
 async function fetchCandles(tf,{count,to,from}){
-  let u=`/api/candles?instrument=${encodeURIComponent(inst)}&granularity=${tf}&count=${count||5000}`;
+  let u=`/api/candles?instrument=${encodeURIComponent(inst)}&granularity=${GRAN[tf]||tf}&count=${count||5000}`;
   if(to)   u+=`&to=${encodeURIComponent(to)}`;
   if(from) u+=`&from=${encodeURIComponent(from)}`;
   const r=await fetch(u); const j=await r.json();
@@ -1672,7 +1689,7 @@ const DRAW_TOOLS=[
   {name:'horizontalStraightLine',title:'Garis horizontal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
   {name:'verticalStraightLine',title:'Garis vertikal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
   {name:'rect',title:'Rectangle / Zona',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
-  {name:'fib3',title:'Fibonacci (0 · 0.5 · 1)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
+  {name:'fib3',title:'Fibonacci (level bisa diatur: klik-kanan → ⚙ Level)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
   {name:'longPosition',pos:'long',title:'Long position (auto 1:3, RR live)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 16 V8 M9.5 10.5 L12 8 l2.5 2.5"/></svg>'},
   {name:'shortPosition',pos:'short',title:'Short position (auto 1:3, RR live)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 8 V16 M9.5 13.5 L12 16 l2.5 -2.5"/></svg>'},
   {name:'text',title:'Text / Anotasi',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
@@ -1694,10 +1711,11 @@ _dt.appendChild(_mag);
 // Garis dipilih (klik) → hover garisnya → tombol "+ Add text" muncul DI ATAS kursor (tak menutupi garis).
 const addTextBtn=document.createElement('div'); addTextBtn.className='addtext-btn'; document.body.appendChild(addTextBtn);
 let overAddBtn=false, addBtnTarget=null, addHideTimer=null;
-function showAddText(id,x,y){
-  addBtnTarget=id; const o=chart.getOverlayById(id);
-  addTextBtn.innerHTML = (o&&o.extendData) ? '✎ Edit teks' : '<span class="pl">+</span> Add text';
-  addTextBtn.style.left=Math.round(x)+'px'; addTextBtn.style.top=Math.round(y-14)+'px';
+function showAddText(id){
+  addBtnTarget=id; const o=chart.getOverlayById(id); if(!o) return;
+  addTextBtn.innerHTML = o.extendData ? 'Edit text' : '<span class="pl">+</span> Add text';
+  const a=overlayTextAnchor(o); if(!a){ hideAddTextNow(); return; }   // nempel persis di tengah garis
+  addTextBtn.style.left=Math.round(a.x)+'px'; addTextBtn.style.top=Math.round(a.y-8)+'px';
   addTextBtn.classList.add('show');
 }
 function hideAddTextNow(){ clearTimeout(addHideTimer); addTextBtn.classList.remove('show'); }
@@ -1712,7 +1730,7 @@ addTextBtn.addEventListener('click',e=>{ e.stopPropagation();
 });
 $('#chart').addEventListener('mousemove',e=>{
   const can = hoverId && hoverId===selectedId && (hoverName==='trendline'||hoverName==='rect');
-  if(can) showAddText(hoverId, e.clientX, e.clientY);
+  if(can) showAddText(hoverId);
   else if(!overAddBtn) scheduleHideAddText();
 });
 
@@ -2114,7 +2132,7 @@ function showObjPopup(o, cx, cy){
   objPop.innerHTML=`<div class="pp-lbl">Warna</div><div class="pp-row">${cols}</div>`
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
-    +`<div class="pp-act">${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Hapus</button></div>`;
+    +`<div class="pp-act">${o.name==='fib3'?'<button id="ppFib">⚙ Level</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Hapus</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
   objPop.style.top =Math.min(cy,window.innerHeight-220)+'px';
   objPop.classList.add('show');
@@ -2122,11 +2140,29 @@ function showObjPopup(o, cx, cy){
   objPop.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); markOn('[data-w]',b); });
   objPop.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); markOn('[data-st]',b); });
   const tb=objPop.querySelector('#ppText'); if(tb) tb.onclick=()=>{ hideObjPopup(); openOverlayTextEditor(o,false); };
+  const fb=objPop.querySelector('#ppFib'); if(fb) fb.onclick=()=>{ const x=objPop.offsetLeft, y=objPop.offsetTop; hideObjPopup(); showFibPop(x,y); };
   objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
 }
 function hideObjPopup(){ objPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&&!objPop.contains(e.target)) hideObjPopup(); }, true);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); chartSet.classList.remove('show'); } });
+
+// ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
+const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
+function showFibPop(cx,cy){
+  const rows=fibLevels.map((v,i)=>`<div class="fp-row"><input type="number" step="0.001" value="${v}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Hapus level">✕</button></div>`).join('');
+  fibPop.innerHTML=`<div class="pp-lbl">Level Fibonacci</div>${rows}`
+    +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
+  fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
+  fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
+  fibPop.classList.add('show');
+  fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i]=v; saveFibLevels(); } });
+  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[0]; saveFibLevels(); showFibPop(cx,cy); });
+  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push(0.618); saveFibLevels(); showFibPop(cx,cy); };
+  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=FIB_DEFAULT.slice(); saveFibLevels(); showFibPop(cx,cy); };
+}
+function hideFibPop(){ fibPop.classList.remove('show'); }
+document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
 
 // ===================== setting chart (⚙ rail): candle, background, grid =====================
 const CHART_DEFAULT={up:'#4ec4ae',down:'#e7635f',bg:'#101013',grid:'#1f1f24'};
