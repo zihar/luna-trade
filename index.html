@@ -2264,11 +2264,17 @@ replayBtn.onclick=()=>{
     setStatus('Bar Replay: arahkan & KLIK bar di chart untuk pilih titik mulai replay.');
   }else{ render(true); setStatus('Pilih titik dibatalkan.'); }
 };
+const REPLAY_SCROLL_MS=450;   // durasi animasi geser ke bar yang dipilih
 $('#chart').addEventListener('click',()=>{
   if(!pickMode||hoverTs==null) return;
-  T = hoverTs + DUR[currentTF];
-  pickMode=false; replayBtn.classList.remove('on'); lastLen=-1; render(true);
-  setStatus('Replay mulai '+nyTime(hoverTs)+' (NY). Next/Play untuk maju.');
+  const ts=hoverTs;
+  pickMode=false; replayBtn.classList.remove('on');
+  setStatus('Replay mulai '+nyTime(ts)+' (NY) …');
+  // animasi: bar yang diklik meluncur ke tepi kanan (semua bar masih tampil),
+  // lalu setelah animasi selesai data dipotong di titik itu → transisi mulus tanpa lompat.
+  try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
+  setTimeout(()=>{ T=ts+DUR[currentTF]; lastLen=-1; render(true);
+    setStatus('Replay mulai '+nyTime(ts)+' (NY). Next/Play untuk maju.'); }, REPLAY_SCROLL_MS+30);
 });
 
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
