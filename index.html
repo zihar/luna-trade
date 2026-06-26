@@ -665,6 +665,29 @@ function pxToTime(x){
   return Math.round(arr[i].timestamp + f*(arr[j].timestamp-arr[i].timestamp));
 }
 function pxToValue(y){ let c=chart.convertFromPixel({x:10,y},{paneId:'candle_pane'}); if(Array.isArray(c))c=c[0]; return c?c.value:null; }
+// ---- anchor x titik overlay: hybrid timestamp (in-data, durable) / dataIndex (area future) ----
+// klinecharts meng-clamp timestamp ke candle terakhir, tapi MENG-EKSTRAPOLASI dataIndex tanpa
+// clamp → titik di area kosong kanan WAJIB dibawa sebagai {dataIndex} (tanpa timestamp).
+function idxToPx(idx){ let p=chart.convertToPixel({dataIndex:idx,value:0},{paneId:'candle_pane',absolute:true}); if(Array.isArray(p))p=p[0]; return p?p.x:null; }
+function tsToPx(t){ let p=chart.convertToPixel({timestamp:t,value:0},{paneId:'candle_pane',absolute:true}); if(Array.isArray(p))p=p[0]; return p?p.x:null; }
+function barSpacePx(){ const li=revealed(currentTF).length-1; const a=idxToPx(li), b=idxToPx(li-1); return (a!=null&&b!=null&&a!==b)?(a-b):8; }
+// pixel-x → anchor durable: dalam-data → timestamp presisi sub-bar; future → dataIndex fractional
+function xAnchorFromPx(x){
+  const arr=revealed(currentTF); if(!arr.length) return null;
+  const li=arr.length-1, xLast=idxToPx(li), bs=barSpacePx();
+  const floatIdx = (xLast!=null)? li + (x-xLast)/bs : li;
+  if(floatIdx <= li + 0.0001){ const t=pxToTime(x); return t!=null?{timestamp:t}:null; }   // in-range
+  return {dataIndex: floatIdx};                                                              // future
+}
+// timestamp (virtual bila future) — untuk label/durasi/anchor teks
+function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
+  if(p.dataIndex!=null){ const a=revealed(currentTF); if(!a.length) return null;
+    const li=a.length-1; return Math.round(a[li].timestamp + (p.dataIndex-li)*DUR[currentTF]); } return null; }
+// objek key x untuk convertToPixel & rebuild point (pertahankan timestamp vs dataIndex)
+function keyOf(p){ return (p&&p.timestamp!=null)?{timestamp:p.timestamp}:{dataIndex:p&&p.dataIndex}; }
+// float index untuk ordering kiri/kanan & titik tengah
+function fidxOf(p){ if(p&&p.dataIndex!=null) return p.dataIndex; const li=revealed(currentTF).length-1, xLast=idxToPx(li), xx=tsToPx(p&&p.timestamp); return (xLast!=null&&xx!=null)? li+(xx-xLast)/barSpacePx() : li; }
+function midAnchor(a,b){ if(a.timestamp!=null&&b.timestamp!=null) return {timestamp:Math.round((a.timestamp+b.timestamp)/2)}; return {dataIndex:(fidxOf(a)+fidxOf(b))/2}; }
 // snap waktu sub-bar (hasil pxToTime) ke timestamp bar TERDEKAT — dipakai garis vertikal
 // supaya penanda waktu = waktu candle yg diklik, dan garis nempel pas di bar itu (jadi
 // bisa diklik ulang utk select/hapus). Di luar rentang bar (mis. area future) dibiarkan.
@@ -766,21 +789,23 @@ function lsLine(st){ const d=DASHV[st&&st.style]; return d?{style:'dashed',dashe
 
 // ===================== resize 8-titik (box) untuk rect & fib =====================
 // 8 titik: 0 TL · 1 TC · 2 TR · 3 MR · 4 BR · 5 BC · 6 BL · 7 ML
-function writeBox(pts,L,R,T,B){
-  const mT=(L+R)/2, mV=(T+B)/2;
-  const xy=[[L,T],[mT,T],[R,T],[R,mV],[R,B],[mT,B],[L,B],[L,mV]];
-  for(let i=0;i<8;i++) pts[i]={timestamp:xy[i][0], value:xy[i][1]};
+// Lxa/Rxa = anchor x (objek {timestamp}|{dataIndex}) sisi kiri/kanan → kotak bisa melebar ke future.
+function writeBox(pts,Lxa,Rxa,T,B){
+  const mV=(T+B)/2, mxa=midAnchor(Lxa,Rxa);
+  const xa=[Lxa,mxa,Rxa,Rxa,Rxa,mxa,Lxa,Lxa], vy=[T,T,T,mV,B,B,B,mV];
+  for(let i=0;i<8;i++) pts[i]=Object.assign({value:vy[i]}, xa[i]);
 }
 // dipanggil saat salah satu handle di-drag → recompute jadi kotak rapi (tetap axis-aligned)
 function boxPressedMove(t){
   const pts=t.points, k=t.performPointIndex, pp=t.performPoint;
   if(!pts||pts.length<8||pp==null) return;
-  let L=pts[0].timestamp, R=pts[2].timestamp, T=pts[0].value, B=pts[6].value;
-  if(k===0||k===6||k===7) L=pp.timestamp;     // sisi kiri
-  if(k===2||k===3||k===4) R=pp.timestamp;     // sisi kanan
+  let Lxa=keyOf(pts[0]), Rxa=keyOf(pts[2]), T=pts[0].value, B=pts[6].value;
+  if(k===0||k===6||k===7) Lxa=keyOf(pp);      // sisi kiri
+  if(k===2||k===3||k===4) Rxa=keyOf(pp);      // sisi kanan
   if(k===0||k===1||k===2) T=pp.value;         // sisi atas
   if(k===4||k===5||k===6) B=pp.value;         // sisi bawah
-  writeBox(pts,L,R,T,B);
+  if(fidxOf(Lxa)>fidxOf(Rxa)){ const tmp=Lxa; Lxa=Rxa; Rxa=tmp; }   // jaga kiri<kanan saat lewat sisi seberang
+  writeBox(pts,Lxa,Rxa,T,B);
 }
 // setelah 2 klik (2 titik) → mekarkan jadi 8 titik handle
 function expandBox(o){
@@ -788,10 +813,11 @@ function expandBox(o){
   if(!o.points || o.points.length>=8) return;
   const p0=o.points[0], p1=o.points[1];
   if(!p0||!p1||p0.value==null||p1.value==null) return;
-  const L=Math.min(p0.timestamp,p1.timestamp), R=Math.max(p0.timestamp,p1.timestamp);
+  const a0=keyOf(p0), a1=keyOf(p1), left=fidxOf(p0)<=fidxOf(p1);
+  const Lxa=left?a0:a1, Rxa=left?a1:a0;
   const T=Math.max(p0.value,p1.value), B=Math.min(p0.value,p1.value);
   const ext = o.name==='fib3' ? {zeroTop:p0.value>=p1.value} : o.extendData;  // fib: arah 0→1 ikut tarikan
-  const pts=new Array(8); writeBox(pts,L,R,T,B);
+  const pts=new Array(8); writeBox(pts,Lxa,Rxa,T,B);
   try{ chart.overrideOverlay({id:o.id, points:pts, extendData:ext}); }catch(e){}
 }
 
@@ -860,9 +886,9 @@ klinecharts.registerOverlay({
     {type:'rect', attrs:{x:cx-6,y:0,width:12,height:bounding.height}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
     {type:'line', attrs:{coordinates:[{x:cx,y:0},{x:cx,y:bounding.height}]}} ]; },
   createXAxisFigures:({overlay,coordinates})=>{
-    const c=coordinates[0], p=overlay.points[0]; if(!c||!p||p.timestamp==null) return [];
+    const c=coordinates[0], p=overlay.points[0], ts=tsOf(p); if(!c||!p||ts==null) return [];
     return [{type:'text', ignoreEvent:true,
-      attrs:{x:c.x, y:0, text:nyTime(p.timestamp), align:'center'},
+      attrs:{x:c.x, y:0, text:nyTime(ts), align:'center'},
       styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)'}}];
   }
 });
@@ -992,7 +1018,7 @@ klinecharts.registerOverlay({
       {type:'line',attrs:{coordinates:[b,{x:w1x,y:w1y}]},styles:{color:st.color,size:st.size}},
       {type:'line',attrs:{coordinates:[b,{x:w2x,y:w2y}]},styles:{color:st.color,size:st.size}},
     ];
-    const t0=overlay.points[0]&&overlay.points[0].timestamp, t1=overlay.points[1]&&overlay.points[1].timestamp;
+    const t0=tsOf(overlay.points[0]), t1=tsOf(overlay.points[1]);
     if(t0!=null&&t1!=null){
       const bars=barsBetween(t0,t1);
       const label=bars+' bar · '+fmtDur(bars*DUR[currentTF]);
@@ -1160,6 +1186,27 @@ async function fetchCandles(tf,{count,to,from}){
 function setStatus(t,err){ const s=$('#status'); if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; } else { s.innerHTML=''; } }
 
 // ===================== ganti TF (chart tetap 1) =====================
+// Titik overlay di area future dibawa via dataIndex (relatif dataset TF saat ini). Saat ganti TF
+// dataset berubah → simpan waktu wall-clock (virtual ts) sebelum pindah, lalu petakan ulang ke
+// dataIndex TF baru supaya posisi future tetap di waktu yang sama.
+function snapshotFuturePoints(){
+  const snap=[];
+  drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(!o||!o.points) return;
+    o.points.forEach((p,i)=>{ if(p&&p.timestamp==null&&p.dataIndex!=null){ const vt=tsOf(p); if(vt!=null) snap.push({id,i,vt}); } });
+  }catch(e){} });
+  return snap;
+}
+function reanchorFuturePoints(snap){
+  if(!snap||!snap.length) return;
+  const a=revealed(currentTF); if(!a.length) return;
+  const li=a.length-1, lt=a[li].timestamp, byId={};
+  snap.forEach(s=>{ (byId[s.id]||(byId[s.id]=[])).push(s); });
+  Object.keys(byId).forEach(id=>{ try{ const o=chart.getOverlayById(id); if(!o||!o.points) return;
+    const pts=o.points.map(p=>Object.assign({},p));
+    byId[id].forEach(s=>{ if(pts[s.i]){ delete pts[s.i].timestamp; pts[s.i].dataIndex = li + (s.vt-lt)/DUR[currentTF]; } });
+    chart.overrideOverlay({id, points:pts});
+  }catch(e){} });
+}
 async function switchTF(tf){
   if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load dulu.'); return; }
   if(!tfData[tf]){
@@ -1167,8 +1214,10 @@ async function switchTF(tf){
     try{ tfData[tf]=await fetchCandles(tf,{count:5000,to:new Date(T).toISOString()}); }
     catch(e){ setStatus('Gagal TF '+tf+': '+e.message,true); return; }
   }
+  const futSnap=snapshotFuturePoints();         // rekam waktu wall-clock titik future (TF lama)
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
   lastLen=-1; render(true);
+  reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
   setStatus('TF → '+tf);
 }
 
@@ -1624,9 +1673,9 @@ function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach
 function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
-      const pts=pendingClicks.slice(0,n).map(p=>({timestamp:p.timestamp,value:p.value}));
+      const pts=pendingClicks.slice(0,n).map(p=> p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value});
       // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + garis bisa diklik/hapus)
-      if(o.name==='verticalStraightLine') pts.forEach(p=>{ p.timestamp=snapTimeToBar(p.timestamp); });
+      if(o.name==='verticalStraightLine') pts.forEach(p=>{ if(p.timestamp!=null) p.timestamp=snapTimeToBar(p.timestamp); });
       for(let k=0;k<n;k++) o.points[k]=pts[k];
       chart.overrideOverlay({id:o.id, points:pts}); } }catch(_){}
     pendingClicks=[];
@@ -1659,10 +1708,10 @@ function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(
 $('#chart').addEventListener('mousedown', (ev)=>{
   if(!inProgressId) return;
   const r=$('#chart').getBoundingClientRect();
-  let t=pxToTime(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
-  if(t==null||v==null) return;
-  if(magnetOn){ const s=magnetSnap(t,v); if(s){ t=s.timestamp; v=s.value; } }
-  pendingClicks.push({timestamp:t, value:v});
+  const xa=xAnchorFromPx(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
+  if(!xa||v==null) return;
+  if(magnetOn){ const s=magnetSnap(tsOf(xa),v); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
+  pendingClicks.push(Object.assign({value:v}, xa));
 }, true);
 
 // posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
@@ -1677,7 +1726,7 @@ function editShapeText(o){ if(o && (o.name==='rect'||o.name==='trendline')) open
 // lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
 function overlayTextAnchor(o){
   const rect=$('#chart').getBoundingClientRect();
-  const toPx=p=>{ let px=null; try{ px=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
+  const toPx=p=>{ let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
   const pts=o.points||[];
   if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
   // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
@@ -1734,14 +1783,15 @@ function expandPosition(o){
   if(!o.points || o.points.length>=5) return;          // sudah di-expand
   const p0=o.points[0]; if(!p0 || p0.value==null) return;
   const dir=o.name==='longPosition'?'long':'short';
-  const entry=p0.value, tEntry=p0.timestamp;
+  const entry=p0.value;
   const risk=tfDefaultRisk();
   const sl=dir==='long'? entry-risk : entry+risk;
   const tp=dir==='long'? entry+DEFAULT_POS_RR*risk : entry-DEFAULT_POS_RR*risk;
-  const tRight=tEntry + 15*DUR[currentTF];
+  // sisi kanan = 15 bar ke kanan; bila melewati candle terakhir → pakai dataIndex (area future, tak ter-clamp)
+  const Lxa=keyOf(p0), li=revealed(currentTF).length-1, Rxa=(fidxOf(p0)+15>li)?{dataIndex:fidxOf(p0)+15}:{timestamp:tsOf(p0)+15*DUR[currentTF]};
   try{ chart.overrideOverlay({ id:o.id, points:[
-    {timestamp:tEntry,value:entry}, {timestamp:tRight,value:tp}, {timestamp:tRight,value:sl},
-    {timestamp:tEntry,value:tp},    {timestamp:tRight,value:entry} ] }); }
+    Object.assign({value:entry},Lxa), Object.assign({value:tp},Rxa), Object.assign({value:sl},Rxa),
+    Object.assign({value:tp},Lxa),    Object.assign({value:entry},Rxa) ] }); }
   catch(e){ setStatus('Position expand error: '+e.message,true); }
 }
 // Entry/TP/SL = drag vertikal (level); handle kiri/kanan = drag horizontal (lebar waktu).
@@ -1749,17 +1799,17 @@ function posPressedMove(t){
   const pts=t.points, k=t.performPointIndex, pp=t.performPoint;
   if(!pts||pts.length<5||pp==null) return;
   let entry=pts[0].value, tp=pts[1].value, sl=pts[2].value;
-  let tL=pts[0].timestamp, tR=pts[1].timestamp;
+  let tL=keyOf(pts[0]), tR=keyOf(pts[1]);
   if(k===0) entry=pp.value;            // Entry: hanya level
   else if(k===1) tp=pp.value;          // TP: hanya level
   else if(k===2) sl=pp.value;          // SL: hanya level
-  else if(k===3) tL=pp.timestamp;      // handle kiri: hanya lebar
-  else if(k===4) tR=pp.timestamp;      // handle kanan: hanya lebar
-  pts[0]={timestamp:tL, value:entry};
-  pts[1]={timestamp:tR, value:tp};
-  pts[2]={timestamp:tR, value:sl};
-  pts[3]={timestamp:tL, value:tp};     // di sisi kiri, sejajar garis TP (tak menimpa Entry)
-  pts[4]={timestamp:tR, value:entry};  // di sisi kanan, sejajar garis Entry
+  else if(k===3) tL=keyOf(pp);         // handle kiri: hanya lebar
+  else if(k===4) tR=keyOf(pp);         // handle kanan: hanya lebar
+  pts[0]=Object.assign({value:entry}, tL);
+  pts[1]=Object.assign({value:tp}, tR);
+  pts[2]=Object.assign({value:sl}, tR);
+  pts[3]=Object.assign({value:tp}, tL);     // di sisi kiri, sejajar garis TP (tak menimpa Entry)
+  pts[4]=Object.assign({value:entry}, tR);  // di sisi kanan, sejajar garis Entry
 }
 
 const DRAW_TOOLS=[
