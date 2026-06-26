@@ -2326,12 +2326,16 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); h
 const CHART_DEFAULT={up:'#4ec4ae',down:'#ff3b3b',bg:'#101013',grid:'#1f1f24'};
 let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
 function applyChartCfg(){
+  // bg & grid ikut tema: light mode → kanvas putih + grid terang; dark → pakai cfg (bisa dikustom)
+  const light=document.body.classList.contains('light');
+  const bg   = light ? '#ffffff' : chartCfg.bg;
+  const grid = light ? '#eceff3' : chartCfg.grid;
   try{ chart.setStyles({
-    grid:{horizontal:{color:chartCfg.grid},vertical:{color:chartCfg.grid}},
+    grid:{horizontal:{color:grid},vertical:{color:grid}},
     candle:{bar:{upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.up,downBorderColor:chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}},
   }); }catch(e){}
   const c=document.querySelector('.center'), ch=document.getElementById('chart');
-  if(c) c.style.background=chartCfg.bg; if(ch) ch.style.background=chartCfg.bg;
+  if(c) c.style.background=bg; if(ch) ch.style.background=bg;
 }
 function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
 const gearBtn=document.createElement('button'); gearBtn.className='railbtn'; gearBtn.id='chartSetBtn'; gearBtn.title='Setting chart'; gearBtn.textContent='⚙';
