@@ -2323,13 +2323,17 @@ document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
 
 // ===================== setting chart (⚙ rail): candle, background, grid =====================
-const CHART_DEFAULT={up:'#4ec4ae',down:'#ff3b3b',bg:'#101013',grid:'#1f1f24'};
+// bg & grid disimpan PER-TEMA (light/dark) supaya setting global tetap berfungsi di kedua tema
+const CHART_DEFAULT={up:'#4ec4ae',down:'#ff3b3b',bgDark:'#101013',gridDark:'#1f1f24',bgLight:'#ffffff',gridLight:'#eceff3'};
 let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
+// migrasi skema lama {bg,grid} (dulu dipakai utk dark) → kunci per-tema
+if('bg' in chartCfg){ chartCfg.bgDark=chartCfg.bg; delete chartCfg.bg; }
+if('grid' in chartCfg){ chartCfg.gridDark=chartCfg.grid; delete chartCfg.grid; }
 function applyChartCfg(){
-  // bg & grid ikut tema: light mode → kanvas putih + grid terang; dark → pakai cfg (bisa dikustom)
+  // bg & grid per-tema → setting global berfungsi di light & dark
   const light=document.body.classList.contains('light');
-  const bg   = light ? '#ffffff' : chartCfg.bg;
-  const grid = light ? '#eceff3' : chartCfg.grid;
+  const bg   = light ? chartCfg.bgLight   : chartCfg.bgDark;
+  const grid = light ? chartCfg.gridLight : chartCfg.gridDark;
   try{ chart.setStyles({
     grid:{horizontal:{color:grid},vertical:{color:grid}},
     candle:{bar:{upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.up,downBorderColor:chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}},
@@ -2343,7 +2347,10 @@ const gearBtn=document.createElement('button'); gearBtn.className='railbtn'; gea
 const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
 function showChartSet(){
   const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
-  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Background','bg')+row('Grid','grid')+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
+  // bg & grid → edit kunci tema yang sedang aktif
+  const light=document.body.classList.contains('light'), thm=light?'light':'dark';
+  const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
+  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
   const r=gearBtn.getBoundingClientRect();
   chartSet.style.left=Math.min(r.right+8,window.innerWidth-220)+'px';
   chartSet.style.top=Math.max(8,Math.min(r.top,window.innerHeight-280))+'px';
