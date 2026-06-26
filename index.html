@@ -1061,8 +1061,8 @@ klinecharts.registerOverlay({
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
-    bar:{ upColor:'#54c88c',downColor:'#ff6f6f',noChangeColor:'#89898b',
-          upBorderColor:'#54c88c',downBorderColor:'#ff6f6f',upWickColor:'#54c88c',downWickColor:'#ff6f6f'},
+    bar:{ upColor:'#54c88c',downColor:'#ff3b3b',noChangeColor:'#89898b',
+          upBorderColor:'#54c88c',downBorderColor:'#ff3b3b',upWickColor:'#54c88c',downWickColor:'#ff3b3b'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
     tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'} },
   },
@@ -1074,8 +1074,8 @@ const darkStyles = {
 const lightStyles = {
   grid:{ horizontal:{color:'#eceff3'}, vertical:{color:'#eceff3'} },
   candle:{
-    bar:{ upColor:'#54c88c',downColor:'#ff6f6f',noChangeColor:'#999',
-          upBorderColor:'#54c88c',downBorderColor:'#ff6f6f',upWickColor:'#54c88c',downWickColor:'#ff6f6f'},
+    bar:{ upColor:'#54c88c',downColor:'#ff3b3b',noChangeColor:'#999',
+          upBorderColor:'#54c88c',downBorderColor:'#ff3b3b',upWickColor:'#54c88c',downWickColor:'#ff3b3b'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
     tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'} },
   },
@@ -2323,7 +2323,7 @@ document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
 
 // ===================== setting chart (⚙ rail): candle, background, grid =====================
-const CHART_DEFAULT={up:'#4ec4ae',down:'#e7635f',bg:'#101013',grid:'#1f1f24'};
+const CHART_DEFAULT={up:'#4ec4ae',down:'#ff3b3b',bg:'#101013',grid:'#1f1f24'};
 let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
 function applyChartCfg(){
   try{ chart.setStyles({
