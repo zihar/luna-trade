@@ -430,7 +430,6 @@
   </div>
   <span class="vsep"></span>
   <button id="themeBtn" title="Ganti tema gelap/terang">☀️</button>
-  <button id="watchBtn" title="Tampilkan/sembunyikan Markets & Alert">☰</button>
   <span class="grow"></span>
   <span class="status" id="status"></span>
 </div>
@@ -2185,7 +2184,6 @@ function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('
   app.style.setProperty('--trades-h', c?'36px':savedTradesH()+'px');
   $('#bottomToggle').textContent=c?'⏶':'⏷'; $('#toggleTrades').classList.toggle('on',!c);
   localStorage.setItem('br_bottomHidden',c?'1':'0'); try{chart.resize();}catch(e){} if(!c){try{drawEquity();}catch(e){}} }
-$('#watchBtn').onclick=toggleMarkets;
 $('#toggleMarkets').onclick=toggleMarkets;
 $('#toggleOrder').onclick=toggleOrder;
 $('#toggleTrades').onclick=toggleTrades;
