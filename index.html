@@ -2264,7 +2264,7 @@ replayBtn.onclick=()=>{
     setStatus('Bar Replay: arahkan & KLIK bar di chart untuk pilih titik mulai replay.');
   }else{ render(true); setStatus('Pilih titik dibatalkan.'); }
 };
-const REPLAY_SCROLL_MS=450;   // durasi animasi geser ke bar yang dipilih
+const REPLAY_SCROLL_MS=700;   // durasi animasi geser ke bar yang dipilih
 $('#chart').addEventListener('click',()=>{
   if(!pickMode||hoverTs==null) return;
   const ts=hoverTs;
