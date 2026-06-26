@@ -703,8 +703,11 @@ function snapTimeToBar(t){
 // [magnet] snap (time,value) ke high/low candle terdekat — pakai data intraday
 // terhalus yang ter-load dalam rentang bar saat ini → mendarat di extreme PRESISI.
 let magnetOn = (localStorage.getItem('br_magnet')==='1');
+const MAGNET_PX = 16;     // radius tarik magnet (px) — "lemah": hanya nempel bila kursor dekat high/low
 function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].length) return tf; } return currentTF; }
-function magnetSnap(time, value){
+// snap (time,value) ke high/low candle terdekat, TAPI hanya bila kursor (px,py) berada dalam
+// radius MAGNET_PX dari extreme itu — di luar radius kembalikan null (titik dibiarkan bebas).
+function magnetSnap(time, value, px, py){
   const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
   const i=Math.max(0,a-1), barOpen=arr[i].timestamp, barEnd=barOpen+DUR[cur];
@@ -716,6 +719,11 @@ function magnetSnap(time, value){
     if(Math.abs(c.low-value)<bestD){bestD=Math.abs(c.low-value); best={timestamp:c.timestamp,value:c.low};}
   }}
   if(!best){ const c=arr[i]; let bd=Infinity,bv=c.close; for(const v of [c.open,c.high,c.low,c.close]){const d=Math.abs(v-value);if(d<bd){bd=d;bv=v;}} best={timestamp:barOpen,value:bv}; }
+  // gate jarak (magnet lemah): bila kursor jauh dari extreme → jangan paksa nempel
+  if(best && px!=null && py!=null){
+    let cp=chart.convertToPixel({timestamp:best.timestamp,value:best.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp))cp=cp[0];
+    if(cp && Math.hypot(px-cp.x, py-cp.y) > MAGNET_PX) return null;
+  }
   return best;
 }
 // [magnet presisi M5] Saat menggambar dgn magnet di TF besar (mis. Daily), high/low hanya
@@ -753,6 +761,12 @@ async function refineMagnetPoints(id){
         const dh=Math.abs(c.high-p.value); if(dh<bd){bd=dh; best={timestamp:c.timestamp,value:c.high};}
         const dl=Math.abs(c.low -p.value); if(dl<bd){bd=dl; best={timestamp:c.timestamp,value:c.low };}
       }}
+      // hanya refine titik yang memang DEKAT extreme (sudah ter-magnet); titik bebas dibiarkan
+      if(best){
+        let pp=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(pp))pp=pp[0];
+        let bp=chart.convertToPixel({timestamp:best.timestamp,value:best.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(bp))bp=bp[0];
+        if(pp&&bp&&Math.hypot(pp.x-bp.x, pp.y-bp.y) > MAGNET_PX) best=null;
+      }
       if(best && (best.timestamp!==p.timestamp || best.value!==p.value)){ p.timestamp=best.timestamp; p.value=best.value; changed=true; }
     }
     if(changed){ try{chart.overrideOverlay({id, points:pts});}catch(e){} }
@@ -1710,7 +1724,7 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   const r=$('#chart').getBoundingClientRect();
   const xa=xAnchorFromPx(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
   if(!xa||v==null) return;
-  if(magnetOn){ const s=magnetSnap(tsOf(xa),v); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
+  if(magnetOn){ const s=magnetSnap(tsOf(xa), v, ev.clientX-r.left, ev.clientY-r.top); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
   pendingClicks.push(Object.assign({value:v}, xa));
 }, true);
 
