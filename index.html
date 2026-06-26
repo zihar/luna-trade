@@ -1125,9 +1125,10 @@ const AXIS_ZONE = 70; // lebar perkiraan sumbu harga (px) dari tepi kanan chart
 
 // ===================== TF buttons =====================
 const tfWrap = $('#tfbtns');
+const TF_LABEL = {MN:'M'};   // label tampil per-TF (key internal tetap, mis. MN → "M")
 TF_LIST.forEach(tf=>{
   const b=document.createElement('button');
-  b.className='tf'; b.textContent=tf; b.dataset.tf=tf;
+  b.className='tf'; b.textContent=TF_LABEL[tf]||tf; b.dataset.tf=tf;
   b.onclick=()=>switchTF(tf);
   tfWrap.appendChild(b);
 });
@@ -1708,6 +1709,7 @@ function delHooks(){ return {
 function createDraw(name,btn,extra){
   try{
     pendingClicks=[];
+    if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }   // mau gambar baru → tampilkan lagi
     const base={name};
     if(BUILTIN_LINE[name]) base.styles=klineLineStyles(dstyle({name}));   // garis h/v: default dotted + warna
     const id=chart.createOverlay(Object.assign(base,delHooks(),extra||{}));
@@ -1841,6 +1843,16 @@ const TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const _dt=$('#drawtools');
 DRAW_TOOLS.forEach(t=>{ const b=document.createElement('button'); b.className='dtool'; b.title=t.title; b.innerHTML=t.svg; b.onclick=()=> createDraw(t.name,b); _dt.appendChild(b); });
 const _sp=document.createElement('div'); _sp.className='spacer'; _dt.appendChild(_sp);
+// toggle Hide/Show SEMUA gambar (tanpa menghapus) — pakai properti `visible` overlay klinecharts
+let drawsHidden=false;
+const EYE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYEOFF_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.8 4.6A11 11 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-3.2 4.1M6.5 6.5A18.3 18.3 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.4-.9"/></svg>';
+function applyDrawsVisibility(){ drawIds.forEach(id=>{ try{chart.overrideOverlay({id, visible:!drawsHidden});}catch(e){} }); }
+const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className='dtool';
+function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Tampilkan semua gambar':'Sembunyikan semua gambar'; _hd.classList.toggle('armed',drawsHidden); }
+syncHideDrawBtn();
+_hd.onclick=()=>{ drawsHidden=!drawsHidden; applyDrawsVisibility(); syncHideDrawBtn(); };
+_dt.appendChild(_hd);
 const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Hapus semua gambar'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
 // toggle Magnet (snap ke high/low candle) — ala TradingView
 const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
