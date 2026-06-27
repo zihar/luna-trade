@@ -31,6 +31,7 @@ type Config struct {
 	LiveEnabled        bool     // gate global endpoint order
 	MaxOrderUnits      float64  // cap ukuran per order
 	WhitelistInstr     []string // instrumen yang boleh ditradingkan
+	StreamInstruments  []string // instrumen yang di-stream harga realtime (SSE)
 	BasicAuthUser      string
 	BasicAuthPass      string
 	Creds              BrokerCreds
@@ -56,6 +57,19 @@ func loadConfig() Config {
 				c.WhitelistInstr = append(c.WhitelistInstr, s)
 			}
 		}
+	}
+	// Instrumen yang di-stream: STREAM_INSTRUMENTS > whitelist > default majors+XAU.
+	// Set tetap (v1): ganti instrumen = restart. Klien SSE filter sendiri sisi FE.
+	if s := os.Getenv("STREAM_INSTRUMENTS"); s != "" {
+		for _, x := range strings.Split(s, ",") {
+			if x = strings.TrimSpace(x); x != "" {
+				c.StreamInstruments = append(c.StreamInstruments, x)
+			}
+		}
+	} else if len(c.WhitelistInstr) > 0 {
+		c.StreamInstruments = c.WhitelistInstr
+	} else {
+		c.StreamInstruments = []string{"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "XAU_USD"}
 	}
 	c.Creds = BrokerCreds{
 		Kind:      "oanda",

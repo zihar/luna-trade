@@ -5,14 +5,17 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,7 +23,8 @@ type OANDAConnector struct {
 	token     string
 	accountID string
 	env       string // practice | live
-	hc        *http.Client
+	hc        *http.Client // REST: ber-timeout
+	sc        *http.Client // streaming: TANPA timeout (cancel hanya via ctx)
 }
 
 func NewOANDAConnector(c BrokerCreds) *OANDAConnector {
@@ -29,6 +33,7 @@ func NewOANDAConnector(c BrokerCreds) *OANDAConnector {
 		accountID: c.AccountID,
 		env:       c.Env,
 		hc:        &http.Client{Timeout: 15 * time.Second},
+		sc:        &http.Client{Timeout: 0},
 	}
 }
 
@@ -40,6 +45,14 @@ func (o *OANDAConnector) restHost() string {
 		return "https://api-fxtrade.oanda.com"
 	}
 	return "https://api-fxpractice.oanda.com"
+}
+
+// streamHost = host streaming (terpisah dari REST).
+func (o *OANDAConnector) streamHost() string {
+	if o.env == "live" {
+		return "https://stream-fxtrade.oanda.com"
+	}
+	return "https://stream-fxpractice.oanda.com"
 }
 
 // acctPath membangun path /v3/accounts/{id}/<suffix>.
@@ -311,8 +324,118 @@ func (o *OANDAConnector) CloseTrade(ctx context.Context, tradeID string, units f
 	return OrderResult{}, fmt.Errorf("CloseTrade belum diimplementasi (Langkah 3)")
 }
 
+// PriceStream membuka pricing stream OANDA dan menulis Tick ke ch sampai ctx
+// dibatalkan. Reconnect + backoff internal; hanya kembali (dgn ctx.Err()) saat
+// ctx selesai. Pemanggil (Hub) menyediakan SATU ch untuk seluruh hidup stream.
 func (o *OANDAConnector) PriceStream(ctx context.Context, insts []Instrument, ch chan<- Tick) error {
-	return fmt.Errorf("PriceStream belum diimplementasi (Langkah 4)")
+	if o.accountID == "" {
+		return fmt.Errorf("OANDA_ACCOUNT_ID kosong")
+	}
+	if len(insts) == 0 {
+		return fmt.Errorf("tidak ada instrumen untuk di-stream")
+	}
+	names := make([]string, len(insts))
+	for i, in := range insts {
+		names[i] = string(in)
+	}
+	q := url.Values{}
+	q.Set("instruments", strings.Join(names, ","))
+	streamURL := o.streamHost() + "/v3/accounts/" + url.PathEscape(o.accountID) + "/pricing/stream?" + q.Encode()
+
+	backoff := time.Second
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		n, err := o.streamOnce(ctx, streamURL, ch)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if n > 0 {
+			backoff = time.Second // koneksi tadi sehat → reset backoff
+		}
+		log.Printf("pricing stream putus (ticks=%d, err=%v) — reconnect dalam %s", n, err, backoff)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+		if backoff *= 2; backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+// streamOnce menjalankan satu sesi stream sampai putus/error. Watchdog 10 dtk:
+// OANDA kirim HEARTBEAT tiap ~5 dtk; bila tak ada baris apa pun 10 dtk → koneksi
+// dianggap mati (TCP belum tentu sadar) → request dibatalkan agar reconnect.
+func (o *OANDAConnector) streamOnce(ctx context.Context, streamURL string, ch chan<- Tick) (int, error) {
+	rctx, rcancel := context.WithCancel(ctx)
+	defer rcancel()
+
+	req, err := http.NewRequestWithContext(rctx, http.MethodGet, streamURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+o.token)
+	req.Header.Set("Accept-Datetime-Format", "RFC3339")
+	resp, err := o.sc.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+		return 0, fmt.Errorf("stream status %d: %s", resp.StatusCode, truncate(body, 300))
+	}
+
+	wd := time.AfterFunc(10*time.Second, rcancel)
+	defer wd.Stop()
+
+	sc := bufio.NewScanner(resp.Body)
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20) // baris pricing bisa panjang (banyak bucket)
+
+	n := 0
+	for sc.Scan() {
+		wd.Reset(10 * time.Second)
+		line := sc.Bytes()
+
+		var hdr struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(line, &hdr) != nil || hdr.Type != "PRICE" {
+			continue // HEARTBEAT / lain → cukup reset watchdog di atas
+		}
+		var p struct {
+			Instrument  string `json:"instrument"`
+			Time        string `json:"time"`
+			CloseoutBid string `json:"closeoutBid"`
+			CloseoutAsk string `json:"closeoutAsk"`
+			Bids        []struct {
+				Price string `json:"price"`
+			} `json:"bids"`
+			Asks []struct {
+				Price string `json:"price"`
+			} `json:"asks"`
+		}
+		if json.Unmarshal(line, &p) != nil {
+			continue
+		}
+		bid, ask := parseF(p.CloseoutBid), parseF(p.CloseoutAsk)
+		if bid == 0 && len(p.Bids) > 0 {
+			bid = parseF(p.Bids[0].Price)
+		}
+		if ask == 0 && len(p.Asks) > 0 {
+			ask = parseF(p.Asks[0].Price)
+		}
+		select {
+		case ch <- Tick{Instrument: Instrument(p.Instrument), Bid: bid, Ask: ask, Time: p.Time}:
+			n++
+		case <-rctx.Done():
+			return n, rctx.Err()
+		}
+	}
+	return n, sc.Err()
 }
 
 // --- util ---
