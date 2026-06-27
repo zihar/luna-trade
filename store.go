@@ -9,6 +9,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -106,6 +107,10 @@ CREATE TABLE IF NOT EXISTS order_audit (
   resp_json   TEXT,                        -- raw response broker
   ts          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+-- Idempotency: client_tag unik (kecuali kosong/NULL → boleh banyak utk order
+-- tanpa tag). Klaim kedua dgn tag sama gagal di INSERT → ditolak sbg duplikat.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_order_audit_tag
+  ON order_audit(client_tag) WHERE client_tag IS NOT NULL AND client_tag <> '';
 `
 
 // logf util kecil supaya pemanggil store bisa lapor sekali di startup.
@@ -129,6 +134,38 @@ func (s *Store) SaveOrderAudit(broker, clientTag, endpoint, reqJSON string, resp
 		`INSERT INTO order_audit (broker,client_tag,endpoint,req_json,resp_status,resp_json)
 		 VALUES (?,?,?,?,?,?)`,
 		broker, clientTag, endpoint, reqJSON, respStatus, respJSON,
+	)
+	return err
+}
+
+// ClaimOrder mengklaim client_tag dengan menyisipkan baris audit 'pending'
+// (resp_status=0). UNIQUE index pada client_tag membuat klaim kedua gagal di
+// INSERT → balikan claimed=false = duplikat; pemanggil WAJIB menolak order agar
+// tak dobel. Tag yang sama tidak akan pernah mengeksekusi order dua kali, bahkan
+// jika request datang bersamaan (klaim di-serialkan oleh SetMaxOpenConns(1) dan
+// dijamin atomik oleh UNIQUE constraint).
+func (s *Store) ClaimOrder(broker, clientTag, endpoint, reqJSON string) (id int64, claimed bool, err error) {
+	res, err := s.db.Exec(
+		`INSERT INTO order_audit (broker,client_tag,endpoint,req_json,resp_status,resp_json)
+		 VALUES (?,?,?,?,0,'')`,
+		broker, clientTag, endpoint, reqJSON,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	id, _ = res.LastInsertId()
+	return id, true, nil
+}
+
+// CompleteOrderAudit melengkapi baris audit yang sudah diklaim (ClaimOrder)
+// dengan status & respons broker setelah order dieksekusi.
+func (s *Store) CompleteOrderAudit(id int64, respStatus int, respJSON string) error {
+	_, err := s.db.Exec(
+		`UPDATE order_audit SET resp_status=?, resp_json=? WHERE id=?`,
+		respStatus, respJSON, id,
 	)
 	return err
 }

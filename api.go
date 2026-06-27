@@ -114,18 +114,44 @@ func handleOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	reqJSON, _ := json.Marshal(req)
+
+	// Idempotency: klaim clientTag DULU (sebelum eksekusi). Klaim kedua dgn tag
+	// sama → 409, order TIDAK diulang → cegah dobel-order akibat double-click /
+	// refresh / retry jaringan. clientTag harus stabil per-intent (mis. UUID per
+	// klik tombol); retry yang DISENGAJA pakai tag baru. Tanpa clientTag tak ada
+	// proteksi — audit dicatat jalur lama (kompatibel mundur).
+	var auditID int64
+	var claimed bool
+	if store != nil && req.ClientTag != "" {
+		id, ok, err := store.ClaimOrder(conn.Name(), req.ClientTag, "/api/order", string(reqJSON))
+		switch {
+		case err != nil:
+			log.Printf("klaim order_audit gagal (lanjut tanpa dedup): %v", err)
+		case !ok:
+			writeErr(w, http.StatusConflict, "order dengan clientTag ini sudah diproses — cek posisi sebelum kirim ulang")
+			return
+		default:
+			auditID, claimed = id, true
+		}
+	}
+
 	ctx, cancel := reqCtx(r)
 	defer cancel()
 	res, perr := conn.PlaceOrder(ctx, req)
 
-	// Audit SELALU dicatat (sukses maupun ditolak), pakai body tervalidasi.
+	// Audit SELALU dicatat (sukses maupun ditolak). Jika sudah diklaim → lengkapi
+	// baris itu; jika tidak (tanpa clientTag) → catat baris baru.
 	if store != nil {
-		reqJSON, _ := json.Marshal(req)
 		respStatus := http.StatusOK
 		if perr != nil {
 			respStatus = http.StatusBadGateway
 		}
-		if err := store.SaveOrderAudit(conn.Name(), req.ClientTag, "/api/order", string(reqJSON), respStatus, string(res.Raw)); err != nil {
+		if claimed {
+			if err := store.CompleteOrderAudit(auditID, respStatus, string(res.Raw)); err != nil {
+				log.Printf("complete order_audit gagal: %v", err)
+			}
+		} else if err := store.SaveOrderAudit(conn.Name(), req.ClientTag, "/api/order", string(reqJSON), respStatus, string(res.Raw)); err != nil {
 			log.Printf("order_audit gagal: %v", err)
 		}
 	}
