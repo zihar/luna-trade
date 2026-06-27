@@ -247,6 +247,8 @@
   .wl-head{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
             padding:9px 11px 6px; display:flex; align-items:center; gap:7px; }
   .wl-head::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
+  .wl-live{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--muted); opacity:.45; }
+  .wl-live.on{ background:var(--green); opacity:1; box-shadow:0 0 5px var(--green); }
   .wl-row{ display:grid; grid-template-columns:minmax(56px,1fr) 56px 56px 40px 54px 54px; gap:3px; align-items:center;
            padding:0 8px; height:36px; cursor:pointer; font-size:12px; }
   .wl-row:hover{ background:var(--btn-hover); }
@@ -456,7 +458,7 @@
   <div class="rh rh-markets" id="rhMarkets" title="Geser untuk ubah lebar Markets"></div>
   <div class="rh rh-trades" id="rhTrades" title="Geser untuk ubah tinggi Trades"></div>
   <div class="watchlist" id="watchlist">
-    <div class="wl-head">Markets<span class="grow"></span><button class="wl-x" id="marketsClose" title="Sembunyikan Markets">✕</button></div>
+    <div class="wl-head">Markets<span class="wl-live" id="wlLive" title="Harga live terputus"></span><span class="grow"></span><button class="wl-x" id="marketsClose" title="Sembunyikan Markets">✕</button></div>
     <div id="wlRows"></div>
     <div class="wl-alert" style="display:none">
       <div class="wl-head">Price Alert</div>
@@ -616,7 +618,8 @@ let trade = null;        // {dir,entry,sl,tp,risk,units,trail,time,lineEntry,lin
 let pending = null;      // order menunggu harga tersentuh (Fase 1c)
 let lotsManual = false;  // true setelah user ubah lot/stepper manual → Risk% berhenti auto-isi lot
 let alerts = [];         // price alert: {sym,price,id} (Fase 1d)
-let quoteCache = {};     // harga terkini per simbol utk watchlist
+let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)
+let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (Lapis 4)
 let journal = [];
 let drawIds = [];        // overlay drawing
 const extending = {};
@@ -1257,8 +1260,11 @@ function lotStepSize(){ return inst.includes('XAU')?1 : inst.includes('BTC')?0.0
 function lotDec(){ return inst.includes('BTC')?4 : inst.includes('XAU')?1 : 2; }
 function currentLots(){ return Math.max(0,+$('#lotInput').value||0); }
 function setLots(v){ const el=$('#lotInput'); if(el){ el.value=Math.max(0,v).toFixed(lotDec()); } renderOrderPanel(); try{renderSizing();}catch(e){} }
-// bid/ask sintetis dari candle sekarang + spread (Fase 2: pricing nyata)
-function curBidAsk(){ const c=currentCandle(); if(!c) return null; const pip=+$('#pipSize').value||instSpec().pip; const s=pip*1.6; return {bid:c.close-s/2, ask:c.close+s/2, mid:c.close}; }
+// bid/ask: mode Live + stream tersambung → harga pasar NYATA; selain itu (replay/paper) sintetis dari candle.
+function curBidAsk(){
+  if(live && priceConnected){ const t=liveTicks[inst]; if(t) return {bid:t.bid, ask:t.ask, mid:(t.bid+t.ask)/2}; }
+  const c=currentCandle(); if(!c) return null; const pip=+$('#pipSize').value||instSpec().pip; const s=pip*1.6; return {bid:c.close-s/2, ask:c.close+s/2, mid:c.close};
+}
 function suggestLotsFromRisk(){
   const cur=currentCandle(); if(!cur) return null;
   const bal=+$('#balance').value||0, rp=+$('#riskPct').value||0;
@@ -2066,23 +2072,58 @@ function renderWatch(){
   const hdr=`<div class="wl-row wl-hdr">
     <span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
   const rows=WATCH_SYMS.map(s=>{
-    const q=quoteCache[s], dec=symDecimals(s), pip=pipOf(s), sym=s.replace('_','');
-    if(!q) return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}">
+    const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s), pip=pipOf(s), sym=s.replace('_','');
+    if(!q && !lt) return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}">
       <span class="wl-sym">${sym}</span><span class="wl-bid">—</span><span class="wl-ask">—</span><span class="wl-spr">—</span><span class="wl-num">—</span><span class="wl-num">—</span></div>`;
-    const sprd=pip*1.6, bid=q.last-sprd/2, ask=q.last+sprd/2;   // bid/ask sintetis dari last + spread (Fase 2: pricing nyata)
-    const up=q.chg>=0;
-    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(q.chg>=0?'+':'')+q.chg.toFixed(2)}% hari ini">
+    let bid, ask, sprd;
+    if(lt){ bid=lt.bid; ask=lt.ask; sprd=ask-bid; }                 // bid/ask realtime
+    else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
+    const chg=q?q.chg:0, up=chg>=0;
+    const hi=q&&q.hi!=null?q.hi.toFixed(dec):'—', lo=q&&q.lo!=null?q.lo.toFixed(dec):'—';
+    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(chg>=0?'+':'')+chg.toFixed(2)}% hari ini">
       <span class="wl-sym">${sym}</span>
       <span class="wl-bid ${up?'up':'down'}">${bid.toFixed(dec)}</span>
       <span class="wl-ask ${up?'up':'down'}">${ask.toFixed(dec)}</span>
       <span class="wl-spr">${(sprd/pip).toFixed(1)}</span>
-      <span class="wl-num">${q.hi!=null?q.hi.toFixed(dec):'—'}</span>
-      <span class="wl-num">${q.lo!=null?q.lo.toFixed(dec):'—'}</span></div>`;
+      <span class="wl-num">${hi}</span>
+      <span class="wl-num">${lo}</span></div>`;
   }).join('');
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
 function selectSymbol(s){ if(s===inst) return; $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
+
+// ===================== live price stream (SSE /api/prices) =====================
+// Satu EventSource → semua simbol watchlist. Throttle render via rAF (tick bisa
+// berkali-kali/detik saat pasar ramai). Reconnect manual berbackoff (EventSource
+// tak selalu auto-reconnect, mis. saat respons non-200/503).
+let priceES=null, priceConnected=false, priceBackoff=1000, priceRenderQueued=false;
+function setLiveDot(){ const d=$('#wlLive'); if(d){ d.classList.toggle('on',priceConnected); d.title=priceConnected?'Harga live tersambung':'Harga live terputus'; } }
+function queuePriceRender(){
+  if(priceRenderQueued) return; priceRenderQueued=true;
+  requestAnimationFrame(()=>{ priceRenderQueued=false;
+    if(!$('#watchlist').classList.contains('hidden')) renderWatch();
+    if(live) renderOrderPanel();   // order panel pakai harga live hanya saat mode Live
+  });
+}
+function connectPriceStream(){
+  try{ if(priceES) priceES.close(); }catch(e){}
+  priceES=new EventSource('/api/prices');
+  priceES.onopen=()=>{ priceConnected=true; priceBackoff=1000; setLiveDot(); };
+  priceES.onmessage=(e)=>{
+    let t; try{ t=JSON.parse(e.data); }catch(_){ return; }
+    if(!t||!t.instrument) return;
+    liveTicks[t.instrument]={bid:t.bid, ask:t.ask, time:t.time};
+    if(!priceConnected){ priceConnected=true; setLiveDot(); }
+    queuePriceRender();
+  };
+  priceES.onerror=()=>{
+    priceConnected=false; setLiveDot();
+    try{ priceES.close(); }catch(e){}                 // ambil alih reconnect sepenuhnya
+    setTimeout(connectPriceStream, priceBackoff);
+    priceBackoff=Math.min(priceBackoff*2, 30000);
+  };
+}
 
 function loadAlerts(){ try{alerts=(JSON.parse(localStorage.getItem('br_alerts'))||[]).map(a=>({sym:a.sym,price:a.price,id:null}))}catch(e){alerts=[]} }
 function saveAlerts(){ localStorage.setItem('br_alerts',JSON.stringify(alerts.map(a=>({sym:a.sym,price:a.price})))); }
@@ -2414,5 +2455,6 @@ $('#riskPct').addEventListener('input', ()=>{ localStorage.setItem('br_riskPct',
 loadAlerts(); renderAlertList(); renderWatch();
 loadJournal(); renderStats(); renderJournal(); renderAcct();
 loadInit();  // auto-load tanggal hari ini saat dibuka
-refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes
+refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
+setLiveDot(); connectPriceStream();                   // harga realtime via SSE
 </script>
