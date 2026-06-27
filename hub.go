@@ -21,12 +21,13 @@ type Hub struct {
 
 	mu        sync.Mutex
 	subs      map[chan Tick]struct{}
-	cancel    context.CancelFunc // != nil → upstream sedang jalan
+	last      map[Instrument]Tick // snapshot harga terakhir per instrumen
+	cancel    context.CancelFunc  // != nil → upstream sedang jalan
 	stopTimer *time.Timer
 }
 
 func newHub(conn Connector, insts []Instrument) *Hub {
-	return &Hub{conn: conn, insts: insts, subs: map[chan Tick]struct{}{}}
+	return &Hub{conn: conn, insts: insts, subs: map[chan Tick]struct{}{}, last: map[Instrument]Tick{}}
 }
 
 // Subscribe mendaftarkan klien baru & mengembalikan channel tick miliknya.
@@ -39,8 +40,16 @@ func (h *Hub) Subscribe() chan Tick {
 		h.stopTimer.Stop()
 		h.stopTimer = nil
 	}
-	ch := make(chan Tick, 32)
+	ch := make(chan Tick, 64)
 	h.subs[ch] = struct{}{}
+	// Seed snapshot terakhir → subscriber baru langsung dapat harga semua instrumen
+	// walau OANDA hanya kirim snapshot sekali (tab baru / join mid-stream / pasar tutup).
+	for _, t := range h.last {
+		select {
+		case ch <- t:
+		default:
+		}
+	}
 
 	if h.cancel == nil { // 0→1: baru di sini upstream dibuka (satu-satunya)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -96,6 +105,7 @@ func (h *Hub) runUpstream(ctx context.Context) {
 // (buffer penuh) di-skip ticknya, tak menahan upstream maupun klien lain.
 func (h *Hub) broadcast(t Tick) {
 	h.mu.Lock()
+	h.last[t.Instrument] = t // simpan snapshot utk subscriber berikutnya
 	for ch := range h.subs {
 		select {
 		case ch <- t:
