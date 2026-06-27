@@ -47,7 +47,11 @@
   .tfbar{display:flex;gap:5px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
   .tfbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
-  #chart{flex:1;min-height:0}
+  #chart{flex:1;min-height:0;position:relative}
+  /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
+  .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
+    background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
+    padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
   .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
            display:flex;flex-direction:column;overflow-y:auto}
   .panel{padding:12px;border-bottom:1px solid var(--border)}
@@ -620,6 +624,7 @@ let lotsManual = false;  // true setelah user ubah lot/stepper manual → Risk% 
 let alerts = [];         // price alert: {sym,price,id} (Fase 1d)
 let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)
 let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (Lapis 4)
+let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
 let journal = [];
 let drawIds = [];        // overlay drawing
 const extending = {};
@@ -1088,7 +1093,7 @@ const lightStyles = {
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:NY_TZ});
-new ResizeObserver(()=>chart.resize()).observe($('#chart'));
+new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
 
 // ===================== tema gelap/terang =====================
 function applyTheme(t){
@@ -1252,6 +1257,7 @@ function render(full){
   renderAcct();
   updateOrderBtns();
   refreshLotSuggestion();
+  updatePriceTimer();
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
 function unitsPer(){ return inst.includes('BTC')||inst.includes('XAU') ? 1 : 100000; }
@@ -1371,11 +1377,13 @@ function startLive(){
   $('#liveBtn').classList.add('active'); $('#liveBtn').textContent='🔴 Live';
   $('#liveBtn').title='Live aktif · refresh tiap '+liveLabel(liveInterval(currentTF))+' (menyesuaikan TF)';
   scheduleLive();
+  updatePriceTimer();
 }
 function stopLive(){
   live=false; clearTimeout(liveTimer); liveTimer=null;
   $('#liveBtn').classList.remove('active'); $('#liveBtn').textContent='🟢 Live';
   $('#liveBtn').title='Auto-refresh candle terbaru — interval menyesuaikan TF';
+  updatePriceTimer();
 }
 // setTimeout (bukan setInterval) agar interval ikut berubah saat TF diganti
 function scheduleLive(){
@@ -2125,6 +2133,48 @@ function connectPriceStream(){
   };
 }
 
+// ===================== countdown candle berikutnya (mode Live) =====================
+function fmtCountdown(ms){
+  let s=Math.max(0,Math.floor(ms/1000));
+  const d=Math.floor(s/86400); s-=d*86400;
+  const h=Math.floor(s/3600);  s-=h*3600;
+  const m=Math.floor(s/60);    s-=m*60;
+  const p2=n=>String(n).padStart(2,'0');
+  if(d>0) return d+'d '+p2(h)+':'+p2(m)+':'+p2(s);
+  if(h>0) return p2(h)+':'+p2(m)+':'+p2(s);
+  return p2(m)+':'+p2(s);
+}
+// tutup candle TF aktif = open candle terakhir + durasi; lompati boundary yg sudah lewat
+// (mis. data live belum sempat fetch candle baru) agar hitung mundur tak nyangkut di 00:00.
+function nextCandleEnd(){
+  const c=currentCandle(); if(!c) return null;
+  const dur=DUR[currentTF]; let end=c.timestamp+dur, now=Date.now();
+  while(end<=now) end+=dur;
+  return end;
+}
+function updatePriceTimer(){
+  const el=priceTimerEl; if(!el) return;
+  const c=currentCandle(), end=nextCandleEnd();
+  // hanya saat mode Live (realtime) — sembunyikan di replay/tanpa data
+  if(!live || c==null || end==null){ el.style.display='none'; return; }
+  let p=chart.convertToPixel({timestamp:c.timestamp, value:c.close},{paneId:'candle_pane',absolute:true});
+  if(Array.isArray(p)) p=p[0];
+  if(!p || p.y==null){ el.style.display='none'; return; }
+  const H=$('#chart').clientHeight||0, y=Math.max(0,Math.min(p.y, H-22));   // jaga tetap di area chart
+  el.textContent='⏱ '+fmtCountdown(end-Date.now());
+  el.style.top=y+'px';
+  el.style.display='block';
+}
+function initPriceTimer(){
+  priceTimerEl=document.createElement('div');
+  priceTimerEl.className='price-timer'; priceTimerEl.id='priceTimer';
+  $('#chart').appendChild(priceTimerEl);
+  setInterval(updatePriceTimer, 1000);                       // detak tiap detik
+  try{ chart.subscribeAction('onScroll', updatePriceTimer); }catch(e){}
+  try{ chart.subscribeAction('onZoom',   updatePriceTimer); }catch(e){}
+  updatePriceTimer();
+}
+
 function loadAlerts(){ try{alerts=(JSON.parse(localStorage.getItem('br_alerts'))||[]).map(a=>({sym:a.sym,price:a.price,id:null}))}catch(e){alerts=[]} }
 function saveAlerts(){ localStorage.setItem('br_alerts',JSON.stringify(alerts.map(a=>({sym:a.sym,price:a.price})))); }
 // custom overlay: garis alert (horizontal) + badge ✕ kecil di ujung kanan utk hapus
@@ -2457,4 +2507,5 @@ loadJournal(); renderStats(); renderJournal(); renderAcct();
 loadInit();  // auto-load tanggal hari ini saat dibuka
 refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
 setLiveDot(); connectPriceStream();                   // harga realtime via SSE
+initPriceTimer();                                     // countdown candle berikutnya
 </script>
