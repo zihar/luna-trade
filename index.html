@@ -52,6 +52,7 @@
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
+  .price-timer.closed{ background:var(--muted); opacity:.75; }
   .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
            display:flex;flex-direction:column;overflow-y:auto}
   .panel{padding:12px;border-bottom:1px solid var(--border)}
@@ -2152,6 +2153,13 @@ function nextCandleEnd(){
   while(end<=now) end+=dur;
   return end;
 }
+// pasar dianggap tutup bila tick harga simbol aktif basi (OANDA bekukan waktu
+// tick saat tutup, mis. akhir pekan) → countdown tak relevan.
+function marketClosed(){
+  const t=liveTicks[inst];
+  if(t && t.time){ const age=Date.now()-Date.parse(t.time); if(age>300000) return true; } // >5 mnt
+  return false;
+}
 function updatePriceTimer(){
   const el=priceTimerEl; if(!el) return;
   const c=currentCandle(), end=nextCandleEnd();
@@ -2161,7 +2169,8 @@ function updatePriceTimer(){
   if(Array.isArray(p)) p=p[0];
   if(!p || p.y==null){ el.style.display='none'; return; }
   const H=$('#chart').clientHeight||0, y=Math.max(0,Math.min(p.y, H-22));   // jaga tetap di area chart
-  el.textContent='⏱ '+fmtCountdown(end-Date.now());
+  if(marketClosed()){ el.textContent='⏱ Tutup'; el.classList.add('closed'); }
+  else { el.textContent='⏱ '+fmtCountdown(end-Date.now()); el.classList.remove('closed'); }
   el.style.top=y+'px';
   el.style.display='block';
 }
