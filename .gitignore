@@ -16,6 +16,7 @@ ROADMAP.md
 
 # Build Go
 /bar-replay
+/luna-trade
 *.exe
 
 # SQLite (persistensi live trading — data lokal, jangan commit)
