@@ -1,0 +1,87 @@
+// Konfigurasi server + kredensial broker. Sekarang: single-user, kredensial
+// dibaca dari env (BrokerCreds tunggal). Seam multi-user: CredStore.For(userID)
+// nanti bisa di-back DB tanpa mengubah pemanggil.
+package main
+
+import (
+	"os"
+	"strconv"
+	"strings"
+)
+
+// BrokerCreds = kantong kredensial per-broker (cukup untuk OANDA & TradeLocker).
+type BrokerCreds struct {
+	Kind string // "oanda" | "tradelocker"
+
+	// OANDA
+	Token     string
+	AccountID string
+	Env       string // practice | live
+
+	// TradeLocker (Fase 8)
+	Email    string
+	Password string
+	Server   string
+	TLEnv    string // demo | live
+}
+
+// Config = setelan server runtime.
+type Config struct {
+	Broker             string   // connector aktif: oanda | tradelocker
+	LiveEnabled        bool     // gate global endpoint order
+	MaxOrderUnits      float64  // cap ukuran per order
+	WhitelistInstr     []string // instrumen yang boleh ditradingkan
+	BasicAuthUser      string
+	BasicAuthPass      string
+	Creds              BrokerCreds
+}
+
+// loadConfig membaca semua env yang relevan (loadDotEnv sudah dipanggil di main).
+func loadConfig() Config {
+	c := Config{
+		Broker:        envOr("BROKER", "oanda"),
+		LiveEnabled:   os.Getenv("LIVE_TRADING_ENABLED") == "1",
+		BasicAuthUser: os.Getenv("BASIC_AUTH_USER"),
+		BasicAuthPass: os.Getenv("BASIC_AUTH_PASS"),
+	}
+	c.MaxOrderUnits = 100000
+	if v := os.Getenv("MAX_ORDER_UNITS"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			c.MaxOrderUnits = f
+		}
+	}
+	if w := os.Getenv("WHITELIST_INSTRUMENTS"); w != "" {
+		for _, s := range strings.Split(w, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				c.WhitelistInstr = append(c.WhitelistInstr, s)
+			}
+		}
+	}
+	c.Creds = BrokerCreds{
+		Kind:      "oanda",
+		Token:     os.Getenv("OANDA_TOKEN"),
+		AccountID: os.Getenv("OANDA_ACCOUNT_ID"),
+		Env:       envOr("OANDA_ENV", "practice"),
+		Email:     os.Getenv("TRADELOCKER_EMAIL"),
+		Password:  os.Getenv("TRADELOCKER_PASSWORD"),
+		Server:    os.Getenv("TRADELOCKER_SERVER"),
+		TLEnv:     envOr("TRADELOCKER_ENV", "demo"),
+	}
+	return c
+}
+
+// CredStore = seam multi-user. Sekarang envCredStore mengembalikan satu set.
+type CredStore interface {
+	For(userID string) (BrokerCreds, error)
+}
+
+type envCredStore struct{ c BrokerCreds }
+
+func (e envCredStore) For(string) (BrokerCreds, error) { return e.c, nil }
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
