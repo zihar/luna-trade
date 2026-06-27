@@ -7,16 +7,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"time"
 )
 
-// cfg & conn = state server tunggal (single-user). Di-set di main.go saat startup.
+// cfg, conn & hub = state server tunggal (single-user). Di-set di main.go saat startup.
 var (
 	cfg  Config
 	conn Connector
+	hub  *Hub
 )
 
 // registerAPI mendaftarkan handler live ke mux. Dipanggil dari main().
@@ -24,6 +26,58 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/account", handleAccount)
 	mux.HandleFunc("GET /api/positions", handlePositions)
 	mux.HandleFunc("POST /api/order", requireLive(handleOrder))
+	mux.HandleFunc("GET /api/prices", handlePrices)
+}
+
+// handlePrices = SSE harga realtime. Read-only (tak butuh LIVE_TRADING_ENABLED),
+// tapi butuh OANDA_ACCOUNT_ID. Semua klien berbagi SATU upstream lewat hub.
+func handlePrices(w http.ResponseWriter, r *http.Request) {
+	if hub == nil {
+		writeErr(w, http.StatusServiceUnavailable, "stream tidak aktif")
+		return
+	}
+	if cfg.Creds.AccountID == "" {
+		writeErr(w, http.StatusServiceUnavailable, "OANDA_ACCOUNT_ID kosong — stream tak tersedia")
+		return
+	}
+	fl, ok := w.(http.Flusher)
+	if !ok {
+		writeErr(w, http.StatusInternalServerError, "streaming tak didukung")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // matikan buffering nginx utk SSE
+	w.WriteHeader(http.StatusOK)
+	fl.Flush()
+
+	ch := hub.Subscribe()
+	defer hub.Unsubscribe(ch)
+
+	keepalive := time.NewTicker(15 * time.Second)
+	defer keepalive.Stop()
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case t, ok := <-ch:
+			if !ok {
+				return
+			}
+			b, _ := json.Marshal(t)
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
+				return
+			}
+			fl.Flush()
+		case <-keepalive.C:
+			if _, err := io.WriteString(w, ":ka\n\n"); err != nil {
+				return
+			}
+			fl.Flush()
+		}
+	}
 }
 
 // requireLive menolak endpoint mutasi (order/close) bila live trading tidak diaktifkan.

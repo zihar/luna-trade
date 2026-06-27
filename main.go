@@ -95,9 +95,15 @@ func main() {
 		log.Fatal("LIVE_TRADING_ENABLED=1 tapi OANDA_ACCOUNT_ID kosong")
 	}
 	if cfg.Creds.AccountID == "" {
-		log.Printf("PERINGATAN: OANDA_ACCOUNT_ID kosong — /api/account & /api/positions tak akan jalan")
+		log.Printf("PERINGATAN: OANDA_ACCOUNT_ID kosong — /api/account, /api/positions & /api/prices tak akan jalan")
 	}
-	log.Printf("Connector aktif: %s (live trading: %v)", cfg.Broker, cfg.LiveEnabled)
+	// Hub harga realtime: satu upstream OANDA → fan-out ke semua klien SSE.
+	streamInsts := make([]Instrument, len(cfg.StreamInstruments))
+	for i, s := range cfg.StreamInstruments {
+		streamInsts[i] = Instrument(s)
+	}
+	hub = newHub(conn, streamInsts)
+	log.Printf("Connector aktif: %s (live trading: %v, stream: %d instrumen)", cfg.Broker, cfg.LiveEnabled, len(streamInsts))
 
 	mux := http.NewServeMux()
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
