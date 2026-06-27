@@ -69,7 +69,12 @@ func loadConfig() Config {
 	} else if len(c.WhitelistInstr) > 0 {
 		c.StreamInstruments = c.WhitelistInstr
 	} else {
-		c.StreamInstruments = []string{"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "XAU_USD"}
+		// Cocokkan dgn watchlist FE (opsi #instrument di index.html) agar semua baris
+		// Markets ter-update realtime, termasuk BTC_USD (crypto, trading 24/7).
+		c.StreamInstruments = []string{
+			"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD",
+			"XAU_USD", "GBP_JPY", "EUR_JPY", "BTC_USD",
+		}
 	}
 	c.Creds = BrokerCreds{
 		Kind:      "oanda",
