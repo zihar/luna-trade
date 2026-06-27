@@ -431,11 +431,11 @@
   </select>
   <span class="vsep"></span>
   <div class="modeseg" id="modeseg">
-    <button class="on" data-mode="replay" title="Backtest / simulasi lokal (R-based)">REPLAY</button>
-    <button data-mode="live" disabled title="Eksekusi nyata ke OANDA practice — aktif di Fase 2">LIVE</button>
+    <button class="on" data-mode="replay" title="Backtest / local simulation (R-based)">REPLAY</button>
+    <button data-mode="live" disabled title="Real execution to OANDA practice — active in Phase 2">LIVE</button>
   </div>
   <span class="vsep"></span>
-  <button id="themeBtn" title="Ganti tema gelap/terang">☀️</button>
+  <button id="themeBtn" title="Toggle dark/light theme">☀️</button>
   <span class="grow"></span>
   <span class="status" id="status"></span>
 </div>
@@ -455,38 +455,38 @@
       <span class="status" style="margin-right:4px">TF:</span>
       <span id="tfbtns"></span>
       <span class="sep"></span>
-      <button id="replayPick" title="Pilih titik mulai replay langsung di chart">⏮ Bar Replay</button>
+      <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
     </div>
     <div id="chart"></div>
   </div>
-  <div class="rh rh-markets" id="rhMarkets" title="Geser untuk ubah lebar Markets"></div>
-  <div class="rh rh-trades" id="rhTrades" title="Geser untuk ubah tinggi Trades"></div>
+  <div class="rh rh-markets" id="rhMarkets" title="Drag to resize Markets width"></div>
+  <div class="rh rh-trades" id="rhTrades" title="Drag to resize Trades height"></div>
   <div class="watchlist" id="watchlist">
-    <div class="wl-head">Markets<span class="wl-live" id="wlLive" title="Harga live terputus"></span><span class="grow"></span><button class="wl-x" id="marketsClose" title="Sembunyikan Markets">✕</button></div>
+    <div class="wl-head">Markets<span class="wl-live" id="wlLive" title="Live price disconnected"></span><span class="grow"></span><button class="wl-x" id="marketsClose" title="Hide Markets">✕</button></div>
     <div id="wlRows"></div>
     <div class="wl-alert" style="display:none">
       <div class="wl-head">Price Alert</div>
-      <div class="row"><input id="alertPrice" type="number" step="0.0001" placeholder="harga level"><button id="alertAdd" class="primary">+ Set</button></div>
+      <div class="row"><input id="alertPrice" type="number" step="0.0001" placeholder="alert level"><button id="alertAdd" class="primary">+ Set</button></div>
       <div id="alertList"></div>
     </div>
     <div class="orderpanel" id="orderpanel" data-dock="docked">
       <div class="op-bar" id="opBar">
         <span class="op-grip">⠿</span><span class="op-t">Order</span>
         <span class="grow"></span>
-        <button class="op-icon" id="opDock" title="Lepas / dock ke Markets">⇲</button>
-        <button class="op-icon" id="opClose" title="Tutup order panel">✕</button>
+        <button class="op-icon" id="opDock" title="Detach / dock to Markets">⇲</button>
+        <button class="op-icon" id="opClose" title="Close order panel">✕</button>
       </div>
     </div>
   </div>
 
   <div class="bottompanel" id="bottompanel">
   <div class="bottomhead">
-    <button id="bottomToggle" title="Hide/Show panel Trades">⏷</button>
+    <button id="bottomToggle" title="Hide/Show Trades panel">⏷</button>
     <div class="tp-tabs" id="tpTabs">
       <button class="on" data-tab="positions">Positions <b id="tpNPos">0</b></button>
       <button data-tab="pending">Pending <b id="tpNPend">0</b></button>
       <button data-tab="closed">Closed Positions</button>
-      <button data-tab="stats">Statistik</button>
+      <button data-tab="stats">Statistics</button>
     </div>
     <span class="grow"></span>
     <div class="acctbar" id="acctbar">
@@ -495,8 +495,8 @@
       <span class="m"><i>Equity</i><b id="acEq">—</b></span>
       <span class="m"><i>Margin Used</i><b id="acMargin">$0.00</b></span>
       <span class="m"><i>Free Margin</i><b id="acFree">—</b></span>
-      <button id="resetBtn" title="Hapus semua riwayat trade">Reset</button>
-      <button id="closeAllBtn" title="Tutup semua posisi & batalkan pending">Close All</button>
+      <button id="resetBtn" title="Delete all trade history">Reset</button>
+      <button id="closeAllBtn" title="Close all positions & cancel pending">Close All</button>
     </div>
   </div>
   <div class="bottomcontent" id="bottomcontent">
@@ -527,15 +527,15 @@
           <button class="op3-collapse" id="op2Expand" title="Expand/collapse detail SL · TP">⌄</button>
         </div>
         <div class="op3-seg" id="ordType">
-          <button class="on" data-t="market" title="Eksekusi di harga sekarang">Market</button>
-          <button data-t="pending" title="Order menunggu harga tersentuh">Pending</button>
+          <button class="on" data-t="market" title="Execute at current price">Market</button>
+          <button data-t="pending" title="Order waits for price to be touched">Pending</button>
         </div>
         <div class="op3-dir" id="dirSeg">
           <button class="dir-sell on" data-d="short">Sell</button>
           <button class="dir-buy" data-d="long">Buy</button>
         </div>
         <div id="openTradeBox"></div>
-        <div class="fld op3-pend" id="pendEntryFld" style="display:none"><label>Entry pending</label><input id="pendEntry" type="number" step="0.0001"></div>
+        <div class="fld op3-pend" id="pendEntryFld" style="display:none"><label>Pending Entry</label><input id="pendEntry" type="number" step="0.0001"></div>
         <div class="op3-detail" id="op3Detail" hidden>
           <div class="op3-sltp">
             <div class="op3-card">
@@ -561,9 +561,9 @@
         <div class="op3-size">
           <label class="op3-risk"><input type="checkbox" id="riskOn" checked> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
           <div class="op2-step">
-            <button type="button" id="lotDown" title="Kurangi lot">−</button>
+            <button type="button" id="lotDown" title="Decrease lot">−</button>
             <div class="op2-step-val"><input id="lotInput" type="text" inputmode="decimal" value="0.10"><span id="lotUnit">lots</span></div>
-            <button type="button" id="lotUp" title="Tambah lot">+</button>
+            <button type="button" id="lotUp" title="Increase lot">+</button>
           </div>
         </div>
         <button class="op3-exec dir-sell" id="execBtn">SELL</button>
@@ -578,19 +578,19 @@
   <div class="rcontent" id="rcontent">
     <span class="rlabel">Backtest date</span>
     <span class="datefield">
-      <button type="button" id="dateDisplay" class="datedisplay" title="Pilih tanggal backtest">Pilih tanggal</button>
+      <button type="button" id="dateDisplay" class="datedisplay" title="Pick backtest date">Pick a date</button>
       <input id="date" type="date">
     </span>
-    <button id="loadBtn" class="primary" title="Backtest dari tanggal terpilih (ganti pair = auto-load data terkini)">Load</button>
+    <button id="loadBtn" class="primary" title="Backtest from selected date (changing pair = auto-load latest data)">Load</button>
     <span class="rsep"></span>
     <button id="prevBtn" title="Prev (←)">⏪</button>
     <button id="playBtn" title="Play/Pause (Space)">▶</button>
     <button id="nextBtn" title="Next (→)">⏩</button>
     <span class="rsep"></span>
-    <button id="liveBtn" title="Auto-refresh candle terbaru — interval menyesuaikan TF">🟢 Live</button>
+    <button id="liveBtn" title="Auto-refresh latest candle — interval adapts to TF">🟢 Live</button>
     <span class="rsep"></span>
     <span class="rlabel">Speed</span>
-    <select id="speed" title="Kecepatan play (candle/detik)">
+    <select id="speed" title="Play speed (candles/sec)">
       <option value="1">1×</option>
       <option value="2">2×</option>
       <option value="3" selected>3×</option>
@@ -1146,7 +1146,7 @@ $('#instrument').value = localStorage.getItem('br_inst')||'EUR_USD';
 $('#date').value = new Date().toISOString().slice(0,10);   // default: hari ini
 // tampilan tanggal ala "Senin, 13 May 2026" (hari Indonesia, bulan Inggris)
 function fmtBacktestDate(v){
-  if(!v) return 'Pilih tanggal';
+  if(!v) return 'Pick a date';
   const d=new Date(v+'T00:00:00');
   const hari=new Intl.DateTimeFormat('id-ID',{weekday:'long'}).format(d);
   const bulan=new Intl.DateTimeFormat('en-US',{month:'short'}).format(d);
@@ -1171,24 +1171,24 @@ $('#loadBtn').onclick = ()=>loadInit(false);
 async function loadInit(latest){
   inst = $('#instrument').value;
   const date = $('#date').value;
-  if(!latest && !date){ setStatus('Pilih tanggal dulu.',true); return; }
+  if(!latest && !date){ setStatus('Pick a date first.',true); return; }
   localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
-  setStatus('Mengambil '+inst+' '+currentTF+' …');
+  setStatus('Fetching '+inst+' '+currentTF+' …');
   try{
     const todayStr=new Date().toISOString().slice(0,10);
     const opt = (latest || !date || date>=todayStr) ? {count:5000} : {count:5000,to:date+'T00:00:00Z'};
     const c = await fetchCandles(currentTF,opt);
     if(!c.length) throw new Error('data kosong');
     tfData[currentTF]=c;
-  }catch(e){ setStatus('Gagal load: '+e.message,true); return; }
+  }catch(e){ setStatus('Failed to load: '+e.message,true); return; }
   const a=tfData[currentTF];
   T = a[a.length-1].timestamp + DUR[currentTF];
   lastLen=-1;
-  setStatus(`Loaded ${currentTF}. Next/Play untuk maju (auto-extend forward). Ganti TF di atas chart.`);
+  setStatus(`Loaded ${currentTF}. Next/Play to advance (auto-extend forward). Change TF above the chart.`);
   render(true);
   startLive();   // live otomatis nyala tiap selesai Load; mati sendiri saat replay dipakai
 }
@@ -1230,11 +1230,11 @@ function reanchorFuturePoints(snap){
   }catch(e){} });
 }
 async function switchTF(tf){
-  if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load dulu.'); return; }
+  if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load first.'); return; }
   if(!tfData[tf]){
-    setStatus('Mengambil '+tf+' …');
+    setStatus('Fetching '+tf+' …');
     try{ tfData[tf]=await fetchCandles(tf,{count:5000,to:new Date(T).toISOString()}); }
-    catch(e){ setStatus('Gagal TF '+tf+': '+e.message,true); return; }
+    catch(e){ setStatus('Failed TF '+tf+': '+e.message,true); return; }
   }
   const futSnap=snapshotFuturePoints();         // rekam waktu wall-clock titik future (TF lama)
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
@@ -1333,7 +1333,7 @@ function step(d){
   }
   render();
 }
-function pauseIfNoData(){ if(playing){ pause(); setStatus('Menarik data forward… tekan Play lagi.'); } }
+function pauseIfNoData(){ if(playing){ pause(); setStatus('Pulling data forward… press Play again.'); } }
 $('#nextBtn').onclick=()=>step(1);
 $('#prevBtn').onclick=()=>step(-1);
 $('#playBtn').onclick=togglePlay;
@@ -1358,8 +1358,8 @@ async function autoExtend(tf){
     const last=arr[arr.length-1].timestamp;
     const fresh=more.filter(c=>c.timestamp>last);
     if(fresh.length){ arr.push(...fresh); render(); }
-    else setStatus('Sudah di ujung data terbaru OANDA utk '+tf+'.');
-  }catch(e){ setStatus('Auto-extend gagal: '+e.message,true); }
+    else setStatus('Already at the latest OANDA data for '+tf+'.');
+  }catch(e){ setStatus('Auto-extend failed: '+e.message,true); }
   finally{ extending[tf]=false; }
 }
 
@@ -1372,17 +1372,17 @@ function liveLabel(ms){ return ms>=60000 ? (ms/60000).toFixed(ms%60000?1:0)+'m' 
 $('#liveBtn').onclick = ()=>{ live ? stopLive() : startLive(); };
 
 function startLive(){
-  if(T==null){ setStatus('Load data dulu sebelum Live.',true); return; }
+  if(T==null){ setStatus('Load data first before Live.',true); return; }
   live=true;
   $('#liveBtn').classList.add('active'); $('#liveBtn').textContent='🔴 Live';
-  $('#liveBtn').title='Live aktif · refresh tiap '+liveLabel(liveInterval(currentTF))+' (menyesuaikan TF)';
+  $('#liveBtn').title='Live active · refresh every '+liveLabel(liveInterval(currentTF))+' (adapts to TF)';
   scheduleLive();
   updatePriceTimer();
 }
 function stopLive(){
   live=false; clearTimeout(liveTimer); liveTimer=null;
   $('#liveBtn').classList.remove('active'); $('#liveBtn').textContent='🟢 Live';
-  $('#liveBtn').title='Auto-refresh candle terbaru — interval menyesuaikan TF';
+  $('#liveBtn').title='Auto-refresh latest candle — interval adapts to TF';
   updatePriceTimer();
 }
 // setTimeout (bukan setInterval) agar interval ikut berubah saat TF diganti
@@ -1465,11 +1465,11 @@ function renderSizing(){
   const rr = Math.abs(entry-sl)>0 ? Math.abs(tp-entry)/Math.abs(entry-sl) : 0;
   const pctRisk = bal? riskUsd/bal*100 : 0;
   box.innerHTML =
-    `<span>Ukuran: <b>${lotLabel(units)}</b> · ${Math.round(units).toLocaleString('en-US')} u</span>`+
-    `<span>Risiko: <b class="neg">$${riskUsd.toFixed(2)}</b> (${pctRisk.toFixed(2)}%)</span>`+
-    `<span>Potensi: <b class="pos">$${rewUsd.toFixed(2)}</b></span>`+
+    `<span>Size: <b>${lotLabel(units)}</b> · ${Math.round(units).toLocaleString('en-US')} u</span>`+
+    `<span>Risk: <b class="neg">$${riskUsd.toFixed(2)}</b> (${pctRisk.toFixed(2)}%)</span>`+
+    `<span>Reward: <b class="pos">$${rewUsd.toFixed(2)}</b></span>`+
     `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`+
-    (trade?'':`<span style="opacity:.7">(preview — entry = harga sekarang, dir long)</span>`);
+    (trade?'':`<span style="opacity:.7">(preview — entry = current price, dir long)</span>`);
 }
 
 // ===================== trade (drag garis) =====================
@@ -1547,12 +1547,12 @@ function onNewBar(c){ checkPending(c); checkTrade(c); checkAlerts(c); }
 
 // ---------- pending order (limit/stop) ----------
 function placePending(dir){
-  if(T==null){ setStatus('Load dulu.',true); return; }
-  if(trade){ setStatus('Tutup posisi dulu (1 posisi sekaligus).',true); return; }
-  if(pending){ setStatus('Sudah ada pending — batalkan dulu.',true); return; }
+  if(T==null){ setStatus('Load first.',true); return; }
+  if(trade){ setStatus('Close position first (one position at a time).',true); return; }
+  if(pending){ setStatus("There's already a pending — cancel it first.",true); return; }
   const cur=currentCandle(); if(!cur) return;
   const entry=+$('#pendEntry').value;
-  if(!entry){ setStatus('Isi harga Entry pending dulu.',true); return; }
+  if(!entry){ setStatus('Enter the pending Entry price first.',true); return; }
   const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=+$('#rr').value, dist=slp*pip;
   const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
   const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
@@ -1562,7 +1562,7 @@ function placePending(dir){
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
            lineEntry:null,lineSL:null,lineTP:null};
   drawPendingLines(); updateOpenTradeBox();
-  setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — menunggu harga tersentuh.');
+  setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting for price to be touched.');
 }
 function drawPendingLines(){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending&&pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} pending[k]=null; }});
@@ -1575,7 +1575,7 @@ function drawPendingLines(){
   if(pending.tp!=null) pending.lineTP=hline(pending.tp,'#54c88c',v=>{ pending.tp=v; });
 }
 function clearPendingLines(){ if(!pending) return; ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} }}); }
-function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending dibatalkan.'); }
+function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending cancelled.'); }
 function checkPending(c){
   if(!pending || trade) return;
   if(!(c.low<=pending.entry && pending.entry<=c.high)) return;   // belum tersentuh
@@ -1584,7 +1584,7 @@ function checkPending(c){
          units:pending.units,trail:pending.trail,time:c.timestamp,lineEntry:null,lineSL:null,lineTP:null};
   pending=null;
   drawTradeLines(); updateOpenTradeBox();
-  toast('✓ Pending tereksekusi @ '+fmt(trade.entry));
+  toast('✓ Pending executed @ '+fmt(trade.entry));
 }
 // ---------- partial close ----------
 function partialClose(frac){
@@ -1624,13 +1624,13 @@ const ReplayBroker = {
 };
 const LiveBroker = {
   mode:'live',
-  market(){ setStatus('Mode LIVE belum aktif (Fase 2).',true); },
-  closeMarket(){ setStatus('Mode LIVE belum aktif (Fase 2).',true); },
+  market(){ setStatus('LIVE mode not active yet (Phase 2).',true); },
+  closeMarket(){ setStatus('LIVE mode not active yet (Phase 2).',true); },
   hasOpen(){ return false; },
 };
 let broker = ReplayBroker;
 function setMode(m){
-  if(m==='live'){ setStatus('Mode LIVE belum aktif (Fase 2).',true); return; }  // dikunci sampai Fase 2
+  if(m==='live'){ setStatus('LIVE mode not active yet (Phase 2).',true); return; }  // dikunci sampai Fase 2
   broker = (m==='live') ? LiveBroker : ReplayBroker;
   document.querySelectorAll('#modeseg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
 }
@@ -1689,7 +1689,7 @@ function updateOpenTradeBox(){
     box.innerHTML=`<div class="open-trade" style="border-color:#4a71ff">
       <b style="color:#4a71ff">PENDING ${pending.dir.toUpperCase()} ${pending.type}</b>
       @ ${fmt(pending.entry)} · SL ${fmt(pending.sl)} · TP ${fmt(pending.tp)} · ${lotLabel(pending.units||0)}<br>
-      <span style="color:var(--muted)">menunggu harga tersentuh — Close = batalkan</span></div>`;
+      <span style="color:var(--muted)">waiting for price to be touched — Close = cancel</span></div>`;
     return;
   }
   box.innerHTML='';
@@ -1727,7 +1727,7 @@ function createDraw(name,btn,extra){
     if(BUILTIN_LINE[name]) base.styles=klineLineStyles(dstyle({name}));   // garis h/v: default dotted + warna
     const id=chart.createOverlay(Object.assign(base,delHooks(),extra||{}));
     if(id){ drawIds.push(id); inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
-    else setStatus('Gagal aktifkan '+name,true);
+    else setStatus('Failed to activate '+name,true);
   }catch(e){ setStatus('Drawing error: '+e.message,true); }
 }
 function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(id);}catch(e){} }); drawIds=[]; selectedId=hoverId=null; }
@@ -1842,14 +1842,14 @@ function posPressedMove(t){
 }
 
 const DRAW_TOOLS=[
-  {name:'trendline',title:'Trendline (pilih → hover → + Add text)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
-  {name:'horizontalStraightLine',title:'Garis horizontal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
-  {name:'verticalStraightLine',title:'Garis vertikal',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
-  {name:'rect',title:'Rectangle / Zona',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
-  {name:'fib3',title:'Fibonacci (level bisa diatur: klik-kanan → ⚙ Level)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
+  {name:'trendline',title:'Trendline (select → hover → + Add text)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
+  {name:'horizontalStraightLine',title:'Horizontal line',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
+  {name:'verticalStraightLine',title:'Vertical line',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
+  {name:'rect',title:'Rectangle / Zone',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
+  {name:'fib3',title:'Fibonacci (levels configurable: right-click → ⚙ Level)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
   {name:'longPosition',pos:'long',title:'Long position (auto 1:3, RR live)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 16 V8 M9.5 10.5 L12 8 l2.5 2.5"/></svg>'},
   {name:'shortPosition',pos:'short',title:'Short position (auto 1:3, RR live)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 8 V16 M9.5 13.5 L12 16 l2.5 -2.5"/></svg>'},
-  {name:'text',title:'Text / Anotasi',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
+  {name:'text',title:'Text / Annotation',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
   {name:'dateRange',title:'Date Range (jumlah bar & durasi)',svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 5 V19 M18 5 V19 M9 12 h6 M9 12 l2 -2 M9 12 l2 2 M15 12 l-2 -2 M15 12 l-2 2"/></svg>'},
 ];
 const TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>';
@@ -1862,14 +1862,14 @@ const EYE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const EYEOFF_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.8 4.6A11 11 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-3.2 4.1M6.5 6.5A18.3 18.3 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.4-.9"/></svg>';
 function applyDrawsVisibility(){ drawIds.forEach(id=>{ try{chart.overrideOverlay({id, visible:!drawsHidden});}catch(e){} }); }
 const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className='dtool';
-function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Tampilkan semua gambar':'Sembunyikan semua gambar'; _hd.classList.toggle('armed',drawsHidden); }
+function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Show all drawings':'Hide all drawings'; _hd.classList.toggle('armed',drawsHidden); }
 syncHideDrawBtn();
 _hd.onclick=()=>{ drawsHidden=!drawsHidden; applyDrawsVisibility(); syncHideDrawBtn(); };
 _dt.appendChild(_hd);
-const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Hapus semua gambar'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
+const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Delete all drawings'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
 // toggle Magnet (snap ke high/low candle) — ala TradingView
 const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
-const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap titik ke high/low candle (on/off)'; _mag.innerHTML=MAGNET_SVG;
+const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap point to candle high/low (on/off)'; _mag.innerHTML=MAGNET_SVG;
 if(magnetOn) _mag.classList.add('armed');
 _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); };
 _dt.appendChild(_mag);
@@ -2044,7 +2044,7 @@ $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data
 });
 function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal)); }
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
-$('#resetBtn').onclick=()=>{ if(confirm('Hapus semua riwayat trade?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
+$('#resetBtn').onclick=()=>{ if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
@@ -2088,7 +2088,7 @@ function renderWatch(){
     else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
     const chg=q?q.chg:0, up=chg>=0;
     const hi=q&&q.hi!=null?q.hi.toFixed(dec):'—', lo=q&&q.lo!=null?q.lo.toFixed(dec):'—';
-    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(chg>=0?'+':'')+chg.toFixed(2)}% hari ini">
+    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(chg>=0?'+':'')+chg.toFixed(2)}% today">
       <span class="wl-sym">${sym}</span>
       <span class="wl-bid ${up?'up':'down'}">${bid.toFixed(dec)}</span>
       <span class="wl-ask ${up?'up':'down'}">${ask.toFixed(dec)}</span>
@@ -2106,7 +2106,7 @@ function selectSymbol(s){ if(s===inst) return; $('#instrument').value=s; inst=s;
 // berkali-kali/detik saat pasar ramai). Reconnect manual berbackoff (EventSource
 // tak selalu auto-reconnect, mis. saat respons non-200/503).
 let priceES=null, priceConnected=false, priceBackoff=1000, priceRenderQueued=false;
-function setLiveDot(){ const d=$('#wlLive'); if(d){ d.classList.toggle('on',priceConnected); d.title=priceConnected?'Harga live tersambung':'Harga live terputus'; } }
+function setLiveDot(){ const d=$('#wlLive'); if(d){ d.classList.toggle('on',priceConnected); d.title=priceConnected?'Live price connected':'Live price disconnected'; } }
 function queuePriceRender(){
   if(priceRenderQueued) return; priceRenderQueued=true;
   requestAnimationFrame(()=>{ priceRenderQueued=false;
@@ -2215,11 +2215,11 @@ function renderAlertList(){
   const box=$('#alertList'); if(!box) return;
   box.innerHTML=alerts.length
     ? alerts.map((a,i)=>`<div class="al-row"><span>🔔 ${a.sym} @ ${a.price}</span><button class="al-x" data-i="${i}">✕</button></div>`).join('')
-    : '<div class="al-empty">— belum ada alert —</div>';
+    : '<div class="al-empty">— no alerts yet —</div>';
   box.querySelectorAll('.al-x').forEach(b=>b.onclick=()=>removeAlert(+b.dataset.i));
 }
 function addAlert(){
-  const p=+$('#alertPrice').value; if(!p){ setStatus('Isi harga level alert dulu.',true); return; }
+  const p=+$('#alertPrice').value; if(!p){ setStatus('Enter the alert level price first.',true); return; }
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
   alerts.push({sym:inst,price:p,id:null}); $('#alertPrice').value='';
   saveAlerts(); drawAlertLines(); renderAlertList();
@@ -2232,7 +2232,7 @@ function createAlertAt(price){
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
   alerts.push({sym:inst,price:p,id:null});
   saveAlerts(); drawAlertLines(); renderAlertList();
-  toast('🔔 Alert dibuat di '+p);
+  toast('🔔 Alert created at '+p);
 }
 // alert berbunyi saat candle simbol aktif menembus level (replay & live)
 function checkAlerts(c){
@@ -2357,24 +2357,24 @@ let pickMode=false, hoverTs=null;
 const replayBtn=$('#replayPick');
 chart.subscribeAction('onCrosshairChange', d=>{ if(d&&d.kLineData&&d.kLineData.timestamp!=null) hoverTs=d.kLineData.timestamp; });
 replayBtn.onclick=()=>{
-  if(T==null){ setStatus('Load dulu.',true); return; }
+  if(T==null){ setStatus('Load first.',true); return; }
   pickMode=!pickMode; replayBtn.classList.toggle('on',pickMode);
   if(pickMode){
     chart.applyNewData(tfData[currentTF]); lastLen=tfData[currentTF].length;  // tampilkan semua bar
-    setStatus('Bar Replay: arahkan & KLIK bar di chart untuk pilih titik mulai replay.');
-  }else{ render(true); setStatus('Pilih titik dibatalkan.'); }
+    setStatus('Bar Replay: point & CLICK a bar on the chart to pick the replay start.');
+  }else{ render(true); setStatus('Point selection cancelled.'); }
 };
 const REPLAY_SCROLL_MS=700;   // durasi animasi geser ke bar yang dipilih
 $('#chart').addEventListener('click',()=>{
   if(!pickMode||hoverTs==null) return;
   const ts=hoverTs;
   pickMode=false; replayBtn.classList.remove('on');
-  setStatus('Replay mulai '+nyTime(ts)+' (NY) …');
+  setStatus('Replay from '+nyTime(ts)+' (NY) …');
   // animasi: bar yang diklik meluncur ke tepi kanan (semua bar masih tampil),
   // lalu setelah animasi selesai data dipotong di titik itu → transisi mulus tanpa lompat.
   try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
   setTimeout(()=>{ T=ts+DUR[currentTF]; lastLen=-1; render(true);
-    setStatus('Replay mulai '+nyTime(ts)+' (NY). Next/Play untuk maju.'); }, REPLAY_SCROLL_MS+30);
+    setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
 
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
@@ -2387,10 +2387,10 @@ function showObjPopup(o, cx, cy){
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  objPop.innerHTML=`<div class="pp-lbl">Warna</div><div class="pp-row">${cols}</div>`
+  objPop.innerHTML=`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
-    +`<div class="pp-act">${o.name==='fib3'?'<button id="ppFib">⚙ Level</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Hapus</button></div>`;
+    +`<div class="pp-act">${o.name==='fib3'?'<button id="ppFib">⚙ Level</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
   objPop.style.top =Math.min(cy,window.innerHeight-220)+'px';
   objPop.classList.add('show');
@@ -2407,8 +2407,8 @@ document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
 function showFibPop(cx,cy){
-  const rows=fibLevels.map((v,i)=>`<div class="fp-row"><input type="number" step="0.001" value="${v}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Hapus level">✕</button></div>`).join('');
-  fibPop.innerHTML=`<div class="pp-lbl">Level Fibonacci</div>${rows}`
+  const rows=fibLevels.map((v,i)=>`<div class="fp-row"><input type="number" step="0.001" value="${v}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
+  fibPop.innerHTML=`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
     +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
   fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
   fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
@@ -2488,8 +2488,8 @@ $('#chart').addEventListener('contextmenu',e=>{
     let nearIdx=-1;
     if(pa!=null && pb!=null){ const lo=Math.min(pa,pb), hi=Math.max(pa,pb);
       nearIdx=alerts.findIndex(a=>a.sym===inst && a.price>=lo && a.price<=hi); }
-    if(nearIdx>=0) items.push({label:`✕ Hapus alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
-    items.push({label:`🔔 Buat alert di ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
+    if(nearIdx>=0) items.push({label:`✕ Delete alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
+    items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
   items.push({label:'↺ Reset chart view', fn:resetChartView});
   showCtx(e.clientX, e.clientY, items);
@@ -2498,11 +2498,11 @@ window.addEventListener('click',hideCtx);
 window.addEventListener('blur',hideCtx);
 // Kembalikan zoom/scroll/skala ke default utk instrument + TF yang sedang dibuka.
 function resetChartView(){
-  if(T==null){ setStatus('Load dulu.',true); return; }
+  if(T==null){ setStatus('Load first.',true); return; }
   lastLen=-1; render(true);                 // re-apply data current → reset skala harga & posisi
   try{ chart.setBarSpace(8); }catch(e){}     // reset level zoom waktu ke default
   try{ chart.scrollToRealTime(); }catch(e){} // tempel ke bar terbaru yang terungkap
-  setStatus('Chart view di-reset ke default ('+currentTF+').');
+  setStatus('Chart view reset to default ('+currentTF+').');
 }
 
 // ===================== init =====================
