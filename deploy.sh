@@ -22,7 +22,8 @@ BIN="/tmp/bar-replay-arm64"
 cd "$(dirname "$0")"
 
 echo "==> Build arm64 (Graviton)…"
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "$BIN" .
+# -mod=vendor: deps (modernc.org/sqlite, pure-Go) di-vendor → build offline, no CGO.
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -mod=vendor -ldflags="-s -w" -o "$BIN" .
 echo "    binary: $(ls -lh "$BIN" | awk '{print $5}')"
 
 echo "==> Kirim binary + index.html + assets/ ke ${HOST} ..."

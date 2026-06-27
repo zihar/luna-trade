@@ -2,7 +2,7 @@
 # Auto-deploy pull-based untuk Luna Trade.
 # Dipanggil luna-deploy.timer tiap 1 menit (sebagai root) via /opt/bar-replay/luna-deploy.sh.
 # Idempotent: hanya build + restart kalau ada commit baru di origin/<BRANCH>.
-# Build native arm64 di EC2 (std-lib only → tak perlu network module fetch).
+# Build native arm64 di EC2 (deps di-vendor → tetap offline, tak perlu module fetch).
 # TIDAK menyentuh /etc/bar-replay.env (OANDA_TOKEN + basic-auth tetap aman).
 set -euo pipefail
 
@@ -30,7 +30,7 @@ echo "[$(ts)] deploy: ${LOCAL:0:8} -> ${REMOTE:0:8}"
 git reset --hard "origin/$BRANCH"
 
 # Build ke temp lalu install atomik (binary lama tetap jalan kalau build gagal: set -e).
-"$GO" build -ldflags="-s -w" -o /tmp/luna.new .
+"$GO" build -mod=vendor -ldflags="-s -w" -o /tmp/luna.new .
 install -m 0755 /tmp/luna.new "$RUNTIME/bar-replay"
 rm -f /tmp/luna.new
 

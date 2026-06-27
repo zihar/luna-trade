@@ -17,3 +17,8 @@ ROADMAP.md
 # Build Go
 /bar-replay
 *.exe
+
+# SQLite (persistensi live trading — data lokal, jangan commit)
+*.db
+*.db-wal
+*.db-shm
