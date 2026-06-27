@@ -52,7 +52,6 @@
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
-  .price-timer.closed{ background:var(--muted); opacity:.75; }
   .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
            display:flex;flex-direction:column;overflow-y:auto}
   .panel{padding:12px;border-bottom:1px solid var(--border)}
@@ -2168,9 +2167,10 @@ function updatePriceTimer(){
   let p=chart.convertToPixel({timestamp:c.timestamp, value:c.close},{paneId:'candle_pane',absolute:true});
   if(Array.isArray(p)) p=p[0];
   if(!p || p.y==null){ el.style.display='none'; return; }
+  // pasar tutup / libur → sembunyikan (countdown tak relevan)
+  if(marketClosed()){ el.style.display='none'; return; }
   const H=$('#chart').clientHeight||0, y=Math.max(0,Math.min(p.y, H-22));   // jaga tetap di area chart
-  if(marketClosed()){ el.textContent='⏱ Tutup'; el.classList.add('closed'); }
-  else { el.textContent='⏱ '+fmtCountdown(end-Date.now()); el.classList.remove('closed'); }
+  el.textContent='⏱ '+fmtCountdown(end-Date.now());
   el.style.top=y+'px';
   el.style.display='block';
 }
