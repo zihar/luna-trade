@@ -52,6 +52,11 @@ func host() string {
 	return "https://api-fxpractice.oanda.com"
 }
 
+// store = persistensi server-side (journal/fills/snapshot/audit live trading).
+// Package-level supaya handler API (api.go) bisa mengaksesnya. Boleh nil saat
+// belum ada DB_PATH yang valid — handler live yang akan menjaga nil-nya.
+var store *Store
+
 func main() {
 	loadDotEnv(".env")
 	token := os.Getenv("OANDA_TOKEN")
@@ -63,9 +68,41 @@ func main() {
 		addr = ":" + p
 	}
 
+	// Buka SQLite (default ./luna.db lokal; di server di-set ke /opt/bar-replay/luna.db).
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "luna.db"
+	}
+	st, err := openStore(dbPath)
+	if err != nil {
+		log.Fatalf("buka DB %s: %v", dbPath, err)
+	}
+	defer st.Close()
+	st.logReady(dbPath)
+	store = st
+
+	// Konfigurasi + connector broker aktif (single-user).
+	cfg = loadConfig()
+	// Live trading mengeksekusi uang nyata → basic-auth WAJIB nyala lebih dulu.
+	if cfg.LiveEnabled && (cfg.BasicAuthUser == "" || cfg.BasicAuthPass == "") {
+		log.Fatal("LIVE_TRADING_ENABLED=1 tapi BASIC_AUTH_USER/PASS kosong — aktifkan basic-auth dulu")
+	}
+	conn = buildConnector(cfg)
+	// Account ID wajib untuk endpoint akun/posisi/order. Live tanpa account ID = pasti
+	// salah konfig → fail-fast. Tanpa live, chart + /api/candles tetap jalan (token saja),
+	// jadi cukup warning supaya deployment charting murni tak ikut crash.
+	if cfg.LiveEnabled && cfg.Creds.AccountID == "" {
+		log.Fatal("LIVE_TRADING_ENABLED=1 tapi OANDA_ACCOUNT_ID kosong")
+	}
+	if cfg.Creds.AccountID == "" {
+		log.Printf("PERINGATAN: OANDA_ACCOUNT_ID kosong — /api/account & /api/positions tak akan jalan")
+	}
+	log.Printf("Connector aktif: %s (live trading: %v)", cfg.Broker, cfg.LiveEnabled)
+
 	mux := http.NewServeMux()
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
 	mux.HandleFunc("/api/candles", candlesHandler(token))
+	registerAPI(mux)
 
 	log.Printf("Luna Trade (OANDA %s) → http://localhost%s", oandaEnv(), addr)
 	log.Fatal(http.ListenAndServe(addr, basicAuth(mux)))
