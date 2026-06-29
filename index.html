@@ -211,8 +211,10 @@
   .acct-badge{ display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 11px; border-radius:7px;
     border:1px solid var(--border); background:var(--btn); color:var(--muted);
     font-size:11px; font-weight:700; letter-spacing:.04em; }
-  .acct-badge.paper{ color:var(--accent); }
+  .acct-badge.demo{ color:var(--accent); }
   .acct-badge.live{ color:var(--green); }
+  .tzsel{ height:30px; padding:2px 8px; border-radius:7px; background:var(--btn); border:1px solid var(--border);
+    color:var(--txt); font-size:11px; cursor:pointer; }
   /* kontrol playback hanya tampil saat mode Bar Replay aktif */
   #replayCtrls{ display:contents; }
   .replaybar:not(.replaying) #replayCtrls{ display:none; }
@@ -433,7 +435,17 @@
     <option>BTC_USD</option>
   </select>
   <span class="vsep"></span>
-  <span class="acct-badge paper" id="acctBadge" title="Paper trading account — real OANDA execution comes in Phase 2">● PAPER</span>
+  <span class="acct-badge demo" id="acctBadge" title="Demo account (simulated, no real money) — real OANDA execution comes in Phase 2">● DEMO</span>
+  <span class="vsep"></span>
+  <select id="tzSel" class="tzsel" title="Display timezone (all times)">
+    <option value="America/New_York">New York</option>
+    <option value="UTC">UTC</option>
+    <option value="Europe/London">London</option>
+    <option value="Asia/Tokyo">Tokyo</option>
+    <option value="Asia/Singapore">Singapore</option>
+    <option value="Asia/Jakarta">Jakarta</option>
+    <option value="__local">Local</option>
+  </select>
   <span class="vsep"></span>
   <button id="themeBtn" title="Toggle dark/light theme">☀️</button>
   <span class="grow"></span>
@@ -448,7 +460,6 @@
     <div class="raildiv"></div>
     <div class="drawtools" id="drawtools"></div>
     <div class="railspacer"></div>
-    <span class="demo-badge">DEMO</span>
   </aside>
   <div class="center">
     <div class="tfbar">
@@ -608,6 +619,9 @@ const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7,W:6.048e8
 const GRAN = {MN:'M'};   // label TF → granularity OANDA (MN = Monthly = 'M')
 const FWD_CHUNK = 500;
 const NY_TZ = 'America/New_York';
+// Zona waktu tampilan (chart X-axis + semua label waktu). Bisa diganti via dropdown #tzSel.
+function resolveTZ(v){ return v==='__local' ? (Intl.DateTimeFormat().resolvedOptions().timeZone||NY_TZ) : (v||NY_TZ); }
+let chartTZ = resolveTZ(localStorage.getItem('br_tz'));
 const $ = s => document.querySelector(s);
 
 // ===================== state =====================
@@ -637,7 +651,7 @@ function priceDecimals(){ return inst.includes('BTC')?1 : inst.includes('JPY')?3
 function fmt(p){ return p==null||isNaN(p)?'—':(+p).toFixed(priceDecimals()); }
 function nyTime(ms){
   try{
-    return new Intl.DateTimeFormat('en-CA',{timeZone:NY_TZ,year:'numeric',month:'2-digit',day:'2-digit',
+    return new Intl.DateTimeFormat('en-CA',{timeZone:chartTZ,year:'numeric',month:'2-digit',day:'2-digit',
       hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms)).replace(',','');
   }catch(e){ return new Date(ms).toISOString().slice(0,16).replace('T',' '); }
 }
@@ -1095,7 +1109,7 @@ const lightStyles = {
   crosshair:{ horizontal:{ text:{backgroundColor:'#2563eb'} }, vertical:{ text:{backgroundColor:'#2563eb'} } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
-const chart = klinecharts.init('chart', {styles:darkStyles, timezone:NY_TZ});
+const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
 
 // ===================== tema gelap/terang =====================
@@ -2211,19 +2225,16 @@ function scheduleRollRefresh(){
 // lewat, biarkan liveRefresh menarik candle complete (OHLC otoritatif) lalu mulai periode baru.
 function pushFormingCandle(){
   if(!live || marketClosed()) return;
-  const arr=tfData[currentTF]; if(!arr||!arr.length) return;
+  const last=currentCandle(); if(!last) return;   // candle terakhir yg DITAMPILKAN (sinkron dgn render → anti-gap)
   const mid=liveMid(); if(mid==null) return;
-  const dur=DUR[currentTF], last=arr[arr.length-1], now=Date.now();
-  const baseOpen=last.timestamp+dur;            // periode tepat setelah candle complete terakhir
-  if(now<baseOpen) return;                       // periode forming belum mulai
-  // periode yang SEDANG berjalan (grid dari candle terakhir) — selalu ada bar utk menit kini,
-  // tak menunggu liveRefresh → hilangkan jeda/gap saat pergantian bar.
-  const curOpen=baseOpen + Math.floor((now-baseOpen)/dur)*dur;
-  if(!formingBar || formingBar.timestamp!==curOpen){
-    // open = close periode sebelumnya → candle nyambung, tak ada loncatan
-    const prevClose=(formingBar && formingBar.timestamp<curOpen)?formingBar.close:last.close;
-    formingBar={timestamp:curOpen, open:prevClose, high:Math.max(prevClose,mid), low:Math.min(prevClose,mid), close:mid, volume:0};
-    if(curOpen>baseOpen) scheduleRollRefresh();   // ada periode yg sudah tutup → tarik OHLC otoritatif
+  const dur=DUR[currentTF], now=Date.now();
+  // forming SELALU tepat 1 bar setelah candle terakhir (jangan lompat periode → tak ada gap waktu);
+  // open = close candle sebelumnya (tak ada gap harga).
+  const openTs=last.timestamp+dur;
+  if(now<openTs) return;                            // periode forming belum mulai
+  if(now>=openTs+dur) scheduleRollRefresh();         // periode sudah lewat → tarik candle complete (jangan skip bar)
+  if(!formingBar || formingBar.timestamp!==openTs){
+    formingBar={timestamp:openTs, open:last.close, high:Math.max(last.close,mid), low:Math.min(last.close,mid), close:mid, volume:0};
   } else {
     formingBar.close=mid;
     if(mid>formingBar.high) formingBar.high=mid;
@@ -2602,4 +2613,17 @@ loadInit();  // auto-load tanggal hari ini saat dibuka
 refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
 setLiveDot(); connectPriceStream();                   // harga realtime via SSE
 initPriceTimer();                                     // countdown candle berikutnya
+
+// Dropdown zona waktu — pengaruhi chart X-axis + semua label waktu (nyTime).
+function applyTimezone(v){
+  chartTZ = resolveTZ(v);
+  localStorage.setItem('br_tz', v);
+  try{ chart.setTimezone(chartTZ); }catch(e){}
+  try{ if(T!=null){ lastLen=-1; render(true); } }catch(e){}   // segarkan label overlay (garis vertikal dll)
+  try{ updatePriceTimer(); }catch(e){}
+}
+{ const sel=$('#tzSel'); const saved=localStorage.getItem('br_tz')||'America/New_York';
+  if(![...sel.options].some(o=>o.value===saved)) localStorage.removeItem('br_tz');
+  sel.value=[...sel.options].some(o=>o.value===saved)?saved:'America/New_York';
+  sel.onchange=()=>applyTimezone(sel.value); }
 </script>
