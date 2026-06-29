@@ -1,7 +1,7 @@
-// Endpoint HTTP untuk live trading. Semua di belakang basicAuth (sudah membungkus
-// mux di main.go). Endpoint yang mengubah state (order/close) tambahan dijaga oleh
-// requireLive(). Browser memanggil endpoint ini saat mode LIVE; kredensial broker
-// tetap di server.
+// Endpoint HTTP untuk live trading. Semua di balik requireUser (sesi cookie,
+// didaftarkan di registerAPI). Endpoint yang mengubah state (order/close) tambahan
+// dijaga requireLive(). Browser memanggil endpoint ini saat mode LIVE; kredensial
+// broker tetap di server.
 package main
 
 import (
@@ -22,11 +22,12 @@ var (
 )
 
 // registerAPI mendaftarkan handler live ke mux. Dipanggil dari main().
+// Semua di balik requireUser (sesi) — pengganti basic-auth lama.
 func registerAPI(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/account", handleAccount)
-	mux.HandleFunc("GET /api/positions", handlePositions)
-	mux.HandleFunc("POST /api/order", requireLive(handleOrder))
-	mux.HandleFunc("GET /api/prices", handlePrices)
+	mux.HandleFunc("GET /api/account", requireUser(handleAccount))
+	mux.HandleFunc("GET /api/positions", requireUser(handlePositions))
+	mux.HandleFunc("POST /api/order", requireUser(requireLive(handleOrder)))
+	mux.HandleFunc("GET /api/prices", requireUser(handlePrices))
 }
 
 // handlePrices = SSE harga realtime. Read-only (tak butuh LIVE_TRADING_ENABLED),

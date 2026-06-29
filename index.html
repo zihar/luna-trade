@@ -42,6 +42,29 @@
   button.tool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent)}
   .grow{flex:1}
   .status{font-size:12px;color:var(--muted)}
+  /* --- auth (Fase 2a-i): user di toolbar + overlay login/register --- */
+  .auth-user{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .auth-email{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .auth-logout{height:30px;padding:0 10px;border-radius:7px;background:var(--btn);color:var(--txt);
+               border:1px solid var(--border);cursor:pointer;font-size:12px}
+  .auth-logout:hover{background:var(--btn-hover)}
+  .auth-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+                background:rgba(8,8,11,.72);backdrop-filter:blur(6px)}
+  .auth-card{width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--border);
+             border-radius:14px;box-shadow:var(--shadow);padding:24px 22px;display:flex;flex-direction:column;gap:14px}
+  .auth-brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600;color:var(--txt)}
+  .auth-tabs{display:flex;gap:4px;background:var(--inset);border-radius:9px;padding:3px}
+  .auth-tab{flex:1;height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted);
+            cursor:pointer;font-size:13px;font-weight:500}
+  .auth-tab.active{background:var(--panel);color:var(--txt);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .auth-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .auth-field input{height:38px;padding:0 11px;border-radius:8px;background:var(--inset);
+                    border:1px solid var(--border);color:var(--txt);font-size:14px;outline:none}
+  .auth-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+  .auth-err{min-height:16px;font-size:12px;color:var(--red)}
+  .auth-submit{height:40px;border:0;border-radius:9px;background:var(--accent);color:#fff;
+               font-size:14px;font-weight:600;cursor:pointer}
+  .auth-submit:disabled{opacity:.6;cursor:default}
   .main{flex:1;display:flex;min-height:0}
   .chartwrap{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
   .tfbar{display:flex;gap:5px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
@@ -2618,12 +2641,91 @@ $('#riskPct').value  = localStorage.getItem('br_riskPct')||1;
 $('#balance').addEventListener('input',()=>{ localStorage.setItem('br_balance',$('#balance').value); renderSizing(); renderAcct(); refreshLotSuggestion(); });
 $('#riskPct').addEventListener('input', ()=>{ localStorage.setItem('br_riskPct',$('#riskPct').value);  renderSizing(); refreshLotSuggestion(); });
 ['slPips','rr','pipSize'].forEach(id=>$('#'+id).addEventListener('input',()=>{ renderSizing(); refreshLotSuggestion(); }));
-loadAlerts(); renderAlertList(); renderWatch();
-loadJournal(); renderStats(); renderJournal(); renderAcct();
-loadInit();  // auto-load tanggal hari ini saat dibuka
-refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
-setLiveDot(); connectPriceStream();                   // harga realtime via SSE
-initPriceTimer();                                     // countdown candle berikutnya
+// bootApp = semua inisialisasi yang menyentuh data server (candle, SSE, quotes).
+// Dipisah jadi fungsi supaya HANYA dijalankan setelah sesi tervalidasi.
+function bootApp(){
+  loadAlerts(); renderAlertList(); renderWatch();
+  loadJournal(); renderStats(); renderJournal(); renderAcct();
+  loadInit();  // auto-load tanggal hari ini saat dibuka
+  refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
+  setLiveDot(); connectPriceStream();                   // harga realtime via SSE
+  initPriceTimer();                                     // countdown candle berikutnya
+}
+
+// ===================== auth (Fase 2a-i) =====================
+// Tampilkan email + tombol Logout di toolbar saat sudah login.
+function onAuthed(u){
+  const email = (u && u.email) ? u.email : '';
+  let el = document.getElementById('authUser');
+  if(!el){
+    const bar = document.querySelector('.toolbar');
+    el = document.createElement('span');
+    el.id = 'authUser'; el.className = 'auth-user';
+    el.innerHTML = '<span class="auth-email"></span><button id="logoutBtn" class="auth-logout" title="Keluar dari akun">Logout</button>';
+    bar.insertBefore(el, bar.querySelector('.grow'));
+    document.getElementById('logoutBtn').onclick = doLogout;
+  }
+  el.querySelector('.auth-email').textContent = email;
+}
+async function doLogout(){
+  try{ await fetch('/api/auth/logout',{method:'POST'}); }catch(e){}
+  location.reload();
+}
+// Overlay login/register — muncul bila /api/auth/me balas 401.
+function showAuthOverlay(){
+  if(document.getElementById('authOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'authOverlay'; ov.className = 'auth-overlay';
+  ov.innerHTML =
+    '<form class="auth-card" id="authForm">'+
+    '  <div class="auth-brand"><img src="/assets/favicon-32x32.png" width="28" height="28" alt="">Luna Trade</div>'+
+    '  <div class="auth-tabs">'+
+    '    <button type="button" class="auth-tab active" data-mode="login">Masuk</button>'+
+    '    <button type="button" class="auth-tab" data-mode="register">Daftar</button>'+
+    '  </div>'+
+    '  <label class="auth-field auth-name" style="display:none">Nama<input type="text" id="authName" autocomplete="name"></label>'+
+    '  <label class="auth-field">Email<input type="email" id="authEmail" autocomplete="email" required></label>'+
+    '  <label class="auth-field">Password<input type="password" id="authPass" autocomplete="current-password" required minlength="8"></label>'+
+    '  <div class="auth-err" id="authErr"></div>'+
+    '  <button type="submit" class="auth-submit" id="authSubmit">Masuk</button>'+
+    '</form>';
+  document.body.appendChild(ov);
+  let mode = 'login';
+  const tabs = ov.querySelectorAll('.auth-tab');
+  const nameField = ov.querySelector('.auth-name');
+  const submit = ov.querySelector('#authSubmit');
+  const err = ov.querySelector('#authErr');
+  const pass = ov.querySelector('#authPass');
+  tabs.forEach(t=>t.onclick=()=>{
+    mode = t.dataset.mode;
+    tabs.forEach(x=>x.classList.toggle('active', x===t));
+    nameField.style.display = mode==='register' ? '' : 'none';
+    submit.textContent = mode==='register' ? 'Daftar' : 'Masuk';
+    pass.autocomplete = mode==='register' ? 'new-password' : 'current-password';
+    err.textContent = '';
+  });
+  ov.querySelector('#authForm').onsubmit = async (e)=>{
+    e.preventDefault(); err.textContent=''; submit.disabled=true;
+    const body = { email: ov.querySelector('#authEmail').value.trim(), password: pass.value };
+    if(mode==='register') body.name = ov.querySelector('#authName').value.trim();
+    try{
+      const r = await fetch('/api/auth/'+mode, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const d = await r.json().catch(()=>({}));
+      if(r.ok){ location.reload(); return; }   // sesi terset → reload → bootApp jalan
+      err.textContent = d.error || 'Gagal — coba lagi';
+    }catch(_){ err.textContent = 'Tidak bisa terhubung ke server'; }
+    submit.disabled = false;
+  };
+  ov.querySelector('#authEmail').focus();
+}
+// Gerbang: cek sesi dulu. Authed → tampilkan user + bootApp. Tak authed → overlay.
+(async function authGate(){
+  try{
+    const r = await fetch('/api/auth/me');
+    if(r.ok){ onAuthed(await r.json()); bootApp(); }
+    else { showAuthOverlay(); }
+  }catch(e){ showAuthOverlay(); }
+})();
 
 // Dropdown zona waktu — pengaruhi chart X-axis + semua label waktu (nyTime).
 function applyTimezone(v){

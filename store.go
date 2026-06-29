@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"log"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -46,7 +47,10 @@ func (s *Store) Close() error { return s.db.Close() }
 
 // migrate membuat semua tabel bila belum ada (idempotent).
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(schema)
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(authSchema)
 	return err
 }
 
@@ -112,6 +116,123 @@ CREATE TABLE IF NOT EXISTS order_audit (
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_order_audit_tag
   ON order_audit(client_tag) WHERE client_tag IS NOT NULL AND client_tag <> '';
 `
+
+// authSchema = tabel multi-user (Fase 2a-i). Terpisah dari `schema` agar jelas
+// ini lapisan auth/akun, bukan jurnal trading.
+const authSchema = `
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT,                      -- NULL/'' untuk user Google-only (2a-ii)
+  google_sub    TEXT UNIQUE,               -- NULL untuk user password-only
+  display_name  TEXT,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,             -- 32-byte acak (hex)
+  user_id    INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS paper_accounts (
+  user_id  INTEGER PRIMARY KEY,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  balance  REAL NOT NULL                   -- cash/realized; init 10000 saat register
+);
+`
+
+// User = baris tabel users (subset yang dipakai auth).
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash string
+	DisplayName  string
+}
+
+// CreateUser membuat user + paper_account(initBalance) dalam satu transaksi.
+// Gagal di salah satu → keduanya batal. Email duplikat → error UNIQUE (dideteksi pemanggil).
+func (s *Store) CreateUser(email, passwordHash, displayName string, initBalance float64) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(
+		`INSERT INTO users (email,password_hash,display_name) VALUES (?,?,?)`,
+		email, passwordHash, displayName,
+	)
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	if _, err := tx.Exec(`INSERT INTO paper_accounts (user_id,balance) VALUES (?,?)`, id, initBalance); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// GetUserByEmail → user (nil bila tak ada).
+func (s *Store) GetUserByEmail(email string) (*User, error) {
+	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE email=?`, email)
+}
+
+// GetUserByID → user (nil bila tak ada).
+func (s *Store) GetUserByID(id int64) (*User, error) {
+	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE id=?`, id)
+}
+
+func (s *Store) scanUser(query string, arg any) (*User, error) {
+	var u User
+	var pw, dn sql.NullString
+	err := s.db.QueryRow(query, arg).Scan(&u.ID, &u.Email, &pw, &dn)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	u.PasswordHash, u.DisplayName = pw.String, dn.String
+	return &u, nil
+}
+
+// CreateSession menyimpan satu sesi (token unik, dgn expiry).
+func (s *Store) CreateSession(token string, userID int64, expiresAt time.Time) error {
+	_, err := s.db.Exec(
+		`INSERT INTO sessions (token,user_id,expires_at) VALUES (?,?,?)`,
+		token, userID, expiresAt.UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+// SessionUser melihat user dari token sesi; ok=false bila tak ada / kedaluwarsa.
+// Expiry dicek di Go (parse RFC3339) agar tak bergantung format string SQLite.
+func (s *Store) SessionUser(token string) (userID int64, ok bool, err error) {
+	var exp string
+	err = s.db.QueryRow(`SELECT user_id,expires_at FROM sessions WHERE token=?`, token).Scan(&userID, &exp)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	t, perr := time.Parse(time.RFC3339, exp)
+	if perr != nil || time.Now().After(t) {
+		return 0, false, nil
+	}
+	return userID, true, nil
+}
+
+// DeleteSession menghapus sesi (logout / revoke).
+func (s *Store) DeleteSession(token string) error {
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE token=?`, token)
+	return err
+}
 
 // logf util kecil supaya pemanggil store bisa lapor sekali di startup.
 func (s *Store) logReady(path string) {

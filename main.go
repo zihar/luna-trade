@@ -4,14 +4,14 @@
 // ke OANDA dengan token disisipkan dari env (aman, tak pernah sampai ke browser).
 //
 // Jalankan:
-//   export OANDA_TOKEN=xxxxxxxx     # personal access token v20
-//   export OANDA_ENV=practice       # practice | live (default practice)
-//   go run .                        # → http://localhost:8765
+//
+//	export OANDA_TOKEN=xxxxxxxx     # personal access token v20
+//	export OANDA_ENV=practice       # practice | live (default practice)
+//	go run .                        # → http://localhost:8765
 package main
 
 import (
 	"bufio"
-	"crypto/subtle"
 	"io"
 	"log"
 	"net/http"
@@ -83,10 +83,6 @@ func main() {
 
 	// Konfigurasi + connector broker aktif (single-user).
 	cfg = loadConfig()
-	// Live trading mengeksekusi uang nyata → basic-auth WAJIB nyala lebih dulu.
-	if cfg.LiveEnabled && (cfg.BasicAuthUser == "" || cfg.BasicAuthPass == "") {
-		log.Fatal("LIVE_TRADING_ENABLED=1 tapi BASIC_AUTH_USER/PASS kosong — aktifkan basic-auth dulu")
-	}
 	conn = buildConnector(cfg)
 	// Account ID wajib untuk endpoint akun/posisi/order. Live tanpa account ID = pasti
 	// salah konfig → fail-fast. Tanpa live, chart + /api/candles tetap jalan (token saja),
@@ -106,34 +102,16 @@ func main() {
 	log.Printf("Connector aktif: %s (live trading: %v, stream: %d instrumen)", cfg.Broker, cfg.LiveEnabled, len(streamInsts))
 
 	mux := http.NewServeMux()
+	// Shell statik (index.html, assets/) publik; data di balik sesi (requireUser).
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
-	mux.HandleFunc("/api/candles", candlesHandler(token))
+	// Endpoint auth publik (register/login/logout/me).
+	registerAuth(mux)
+	// /api/candles butuh login (data harga historis di-gate sesi).
+	mux.HandleFunc("/api/candles", requireUser(candlesHandler(token)))
 	registerAPI(mux)
 
 	log.Printf("Luna Trade (OANDA %s) → http://localhost%s", oandaEnv(), addr)
-	log.Fatal(http.ListenAndServe(addr, basicAuth(mux)))
-}
-
-// basicAuth membungkus handler dengan HTTP Basic Auth bila BASIC_AUTH_USER dan
-// BASIC_AUTH_PASS di-set. Kalau salah satu kosong (mis. dev lokal), auth
-// dilewati. Pakai ConstantTimeCompare supaya tak bocor lewat timing attack.
-func basicAuth(h http.Handler) http.Handler {
-	user := os.Getenv("BASIC_AUTH_USER")
-	pass := os.Getenv("BASIC_AUTH_PASS")
-	if user == "" || pass == "" {
-		return h
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, p, ok := r.BasicAuth()
-		if !ok ||
-			subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Luna Trade"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
 // noCache mencegah browser men-cache aset (terutama index.html) supaya
@@ -153,7 +131,8 @@ func oandaEnv() string {
 }
 
 // GET /api/candles?instrument=EUR_USD&granularity=H1&count=5000&to=2025-06-15T00:00:00Z
-//   atau ...&from=2025-06-15T00:00:00Z&count=500  (forward / auto-extend)
+//
+//	atau ...&from=2025-06-15T00:00:00Z&count=500  (forward / auto-extend)
 func candlesHandler(token string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()

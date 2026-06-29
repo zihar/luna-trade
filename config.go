@@ -27,14 +27,14 @@ type BrokerCreds struct {
 
 // Config = setelan server runtime.
 type Config struct {
-	Broker             string   // connector aktif: oanda | tradelocker
-	LiveEnabled        bool     // gate global endpoint order
-	MaxOrderUnits      float64  // cap ukuran per order
-	WhitelistInstr     []string // instrumen yang boleh ditradingkan
-	StreamInstruments  []string // instrumen yang di-stream harga realtime (SSE)
-	BasicAuthUser      string
-	BasicAuthPass      string
-	Creds              BrokerCreds
+	Broker            string   // connector aktif: oanda | tradelocker
+	LiveEnabled       bool     // gate global endpoint order
+	MaxOrderUnits     float64  // cap ukuran per order
+	WhitelistInstr    []string // instrumen yang boleh ditradingkan
+	StreamInstruments []string // instrumen yang di-stream harga realtime (SSE)
+	BasicAuthUser     string
+	BasicAuthPass     string
+	Creds             BrokerCreds
 }
 
 // loadConfig membaca semua env yang relevan (loadDotEnv sudah dipanggil di main).
