@@ -42,12 +42,27 @@
   button.tool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent)}
   .grow{flex:1}
   .status{font-size:12px;color:var(--muted)}
-  /* --- auth (Fase 2a-i): user di toolbar + overlay login/register --- */
-  .auth-user{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-  .auth-email{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .auth-logout{height:30px;padding:0 10px;border-radius:7px;background:var(--btn);color:var(--txt);
-               border:1px solid var(--border);cursor:pointer;font-size:12px}
-  .auth-logout:hover{background:var(--btn-hover)}
+  /* --- auth (Fase 2a): avatar akun di pojok kanan + dropdown + overlay login/register --- */
+  .user-menu{position:relative;display:inline-flex;align-items:center;margin-left:2px}
+  .user-avatar{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--accent);
+               color:#fff;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
+               text-transform:uppercase;padding:0}
+  .user-avatar:hover{filter:brightness(1.1)}
+  .user-pop{position:absolute;top:38px;right:0;width:236px;background:var(--panel);border:1px solid var(--border);
+            border-radius:11px;box-shadow:var(--shadow);padding:12px;display:none;flex-direction:column;gap:10px;z-index:1000}
+  .user-pop.open{display:flex}
+  .user-pop-head{display:flex;align-items:center;gap:10px}
+  .user-av-lg{width:38px;height:38px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:15px;
+              display:flex;align-items:center;justify-content:center;text-transform:uppercase;flex:0 0 auto}
+  .user-pop-id{min-width:0}
+  .user-pop-name{font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-pop-email{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-pop-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);
+                padding-top:9px;border-top:1px solid var(--line)}
+  .user-pop-row b{color:var(--txt);font-weight:600}
+  .user-pop-logout{height:34px;border:1px solid var(--border);border-radius:8px;background:var(--btn);color:var(--txt);
+                   cursor:pointer;font-size:13px;font-weight:500;margin-top:2px}
+  .user-pop-logout:hover{background:var(--btn-hover)}
   .auth-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
                 background:rgba(8,8,11,.72);backdrop-filter:blur(6px)}
   .auth-card{width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--border);
@@ -2827,20 +2842,47 @@ function bootApp(){
   applyPaperMode();                                     // boot = realtime → akun live server
 }
 
-// ===================== auth (Fase 2a-i) =====================
-// Tampilkan email + tombol Logout di toolbar saat sudah login.
+// ===================== auth (Fase 2a) =====================
+// Avatar akun di pojok kanan toolbar; klik → dropdown (info + saldo + Logout).
+function userInitials(name, email){
+  const src=(name||email||'?').trim();
+  const parts=src.split(/\s+/).filter(Boolean);
+  if(parts.length>=2) return (parts[0][0]+parts[1][0]);
+  return (src[0]||'?');
+}
 function onAuthed(u){
   const email = (u && u.email) ? u.email : '';
-  let el = document.getElementById('authUser');
+  const name  = (u && u.name)  ? u.name  : email;
+  let el = document.getElementById('userMenu');
   if(!el){
     const bar = document.querySelector('.toolbar');
-    el = document.createElement('span');
-    el.id = 'authUser'; el.className = 'auth-user';
-    el.innerHTML = '<span class="auth-email"></span><button id="logoutBtn" class="auth-logout" title="Keluar dari akun">Logout</button>';
-    bar.insertBefore(el, bar.querySelector('.grow'));
-    document.getElementById('logoutBtn').onclick = doLogout;
+    el = document.createElement('div'); el.id='userMenu'; el.className='user-menu';
+    el.innerHTML =
+      '<button class="user-avatar" id="userAvatar" title="Akun"></button>'+
+      '<div class="user-pop" id="userPop">'+
+      '  <div class="user-pop-head"><div class="user-av-lg" id="userAvLg"></div>'+
+      '    <div class="user-pop-id"><div class="user-pop-name" id="userPopName"></div><div class="user-pop-email" id="userPopEmail"></div></div></div>'+
+      '  <div class="user-pop-row"><span>Akun</span><b>Demo · Paper</b></div>'+
+      '  <div class="user-pop-row"><span>Saldo</span><b id="userPopBal">—</b></div>'+
+      '  <button class="user-pop-logout" id="logoutBtn">Logout</button>'+
+      '</div>';
+    bar.appendChild(el);   // setelah .grow → tertarik ke pojok kanan
+    const pop=el.querySelector('#userPop'), av=el.querySelector('#userAvatar');
+    av.onclick=(e)=>{ e.stopPropagation();
+      const open=!pop.classList.contains('open');
+      if(open){ const b=SP.account&&SP.account.balance;
+        document.getElementById('userPopBal').textContent = (b!=null)?('$'+(+b).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})):'—'; }
+      pop.classList.toggle('open',open);
+    };
+    pop.addEventListener('click',e=>e.stopPropagation());
+    document.addEventListener('click',()=>pop.classList.remove('open'));
+    el.querySelector('#logoutBtn').onclick = doLogout;
   }
-  el.querySelector('.auth-email').textContent = email;
+  const ini=userInitials(name,email);
+  el.querySelector('#userAvatar').textContent=ini;
+  el.querySelector('#userAvLg').textContent=ini;
+  el.querySelector('#userPopName').textContent=name||'—';
+  el.querySelector('#userPopEmail').textContent=email;
 }
 async function doLogout(){
   try{ await fetch('/api/auth/logout',{method:'POST'}); }catch(e){}
