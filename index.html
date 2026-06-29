@@ -2197,11 +2197,17 @@ function pushFormingCandle(){
   if(!live || marketClosed()) return;
   const arr=tfData[currentTF]; if(!arr||!arr.length) return;
   const mid=liveMid(); if(mid==null) return;
-  const dur=DUR[currentTF], last=arr[arr.length-1], openTs=last.timestamp+dur, now=Date.now();
-  if(now<openTs) return;                       // belum masuk periode forming
-  if(now>=openTs+dur){ scheduleRollRefresh(); return; } // periode lewat → tunggu candle complete
-  if(!formingBar || formingBar.timestamp!==openTs){
-    formingBar={timestamp:openTs, open:mid, high:mid, low:mid, close:mid, volume:0};
+  const dur=DUR[currentTF], last=arr[arr.length-1], now=Date.now();
+  const baseOpen=last.timestamp+dur;            // periode tepat setelah candle complete terakhir
+  if(now<baseOpen) return;                       // periode forming belum mulai
+  // periode yang SEDANG berjalan (grid dari candle terakhir) — selalu ada bar utk menit kini,
+  // tak menunggu liveRefresh → hilangkan jeda/gap saat pergantian bar.
+  const curOpen=baseOpen + Math.floor((now-baseOpen)/dur)*dur;
+  if(!formingBar || formingBar.timestamp!==curOpen){
+    // open = close periode sebelumnya → candle nyambung, tak ada loncatan
+    const prevClose=(formingBar && formingBar.timestamp<curOpen)?formingBar.close:last.close;
+    formingBar={timestamp:curOpen, open:prevClose, high:Math.max(prevClose,mid), low:Math.min(prevClose,mid), close:mid, volume:0};
+    if(curOpen>baseOpen) scheduleRollRefresh();   // ada periode yg sudah tutup → tarik OHLC otoritatif
   } else {
     formingBar.close=mid;
     if(mid>formingBar.high) formingBar.high=mid;
