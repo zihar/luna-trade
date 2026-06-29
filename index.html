@@ -625,6 +625,8 @@ let alerts = [];         // price alert: {sym,price,id} (Fase 1d)
 let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)
 let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (Lapis 4)
 let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
+let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
+let rollRefreshPending = false;
 let journal = [];
 let drawIds = [];        // overlay drawing
 const extending = {};
@@ -1238,6 +1240,7 @@ async function switchTF(tf){
   }
   const futSnap=snapshotFuturePoints();         // rekam waktu wall-clock titik future (TF lama)
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
+  clearFormingBar();                            // candle berjalan TF lama tak berlaku
   lastLen=-1; render(true);
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
   setStatus('TF → '+tf);
@@ -1257,6 +1260,7 @@ function render(full){
   renderAcct();
   updateOrderBtns();
   refreshLotSuggestion();
+  if(live) pushFormingCandle();   // re-append candle berjalan setelah data di-redraw
   updatePriceTimer();
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
@@ -1383,6 +1387,8 @@ function stopLive(){
   live=false; clearTimeout(liveTimer); liveTimer=null;
   $('#liveBtn').classList.remove('active'); $('#liveBtn').textContent='🟢 Live';
   $('#liveBtn').title='Auto-refresh latest candle — interval adapts to TF';
+  clearFormingBar();
+  if(T!=null){ lastLen=-1; render(true); }   // buang candle berjalan dari chart
   updatePriceTimer();
 }
 // setTimeout (bukan setInterval) agar interval ikut berubah saat TF diganti
@@ -2111,7 +2117,7 @@ function queuePriceRender(){
   if(priceRenderQueued) return; priceRenderQueued=true;
   requestAnimationFrame(()=>{ priceRenderQueued=false;
     if(!$('#watchlist').classList.contains('hidden')) renderWatch();
-    if(live) renderOrderPanel();   // order panel pakai harga live hanya saat mode Live
+    if(live){ pushFormingCandle(); renderOrderPanel(); updatePriceTimer(); }  // gerak chart+panel tiap tick (Live)
   });
 }
 function connectPriceStream(){
@@ -2164,7 +2170,9 @@ function updatePriceTimer(){
   const c=currentCandle(), end=nextCandleEnd();
   // hanya saat mode Live (realtime) — sembunyikan di replay/tanpa data
   if(!live || c==null || end==null){ el.style.display='none'; return; }
-  let p=chart.convertToPixel({timestamp:c.timestamp, value:c.close},{paneId:'candle_pane',absolute:true});
+  // ikuti harga candle berjalan (bergerak tiap tick) bila ada
+  const bar=(formingBar && formingBar.timestamp>c.timestamp)?formingBar:c;
+  let p=chart.convertToPixel({timestamp:bar.timestamp, value:bar.close},{paneId:'candle_pane',absolute:true});
   if(Array.isArray(p)) p=p[0];
   if(!p || p.y==null){ el.style.display='none'; return; }
   // pasar tutup / libur → sembunyikan (countdown tak relevan)
@@ -2174,6 +2182,35 @@ function updatePriceTimer(){
   el.style.top=y+'px';
   el.style.display='block';
 }
+// ===================== forming candle (live, gerak tiap tick) =====================
+function liveMid(){ const t=liveTicks[inst]; return (t && isFinite(t.bid) && isFinite(t.ask))?(t.bid+t.ask)/2:null; }
+// fetch candle complete yg baru tutup, agar periode forming berikutnya bisa mulai (debounce).
+function scheduleRollRefresh(){
+  if(rollRefreshPending || !live) return;
+  rollRefreshPending=true;
+  setTimeout(async()=>{ rollRefreshPending=false; if(live){ try{ await liveRefresh(); }catch(e){} } }, 800);
+}
+// Update/append candle berjalan dari harga stream. Hanya saat Live & pasar buka.
+// Periode forming = tepat setelah candle complete terakhir (grid = DUR). Begitu periode
+// lewat, biarkan liveRefresh menarik candle complete (OHLC otoritatif) lalu mulai periode baru.
+function pushFormingCandle(){
+  if(!live || marketClosed()) return;
+  const arr=tfData[currentTF]; if(!arr||!arr.length) return;
+  const mid=liveMid(); if(mid==null) return;
+  const dur=DUR[currentTF], last=arr[arr.length-1], openTs=last.timestamp+dur, now=Date.now();
+  if(now<openTs) return;                       // belum masuk periode forming
+  if(now>=openTs+dur){ scheduleRollRefresh(); return; } // periode lewat → tunggu candle complete
+  if(!formingBar || formingBar.timestamp!==openTs){
+    formingBar={timestamp:openTs, open:mid, high:mid, low:mid, close:mid, volume:0};
+  } else {
+    formingBar.close=mid;
+    if(mid>formingBar.high) formingBar.high=mid;
+    if(mid<formingBar.low)  formingBar.low=mid;
+  }
+  try{ chart.updateData(formingBar); }catch(e){}
+}
+function clearFormingBar(){ formingBar=null; }
+
 function initPriceTimer(){
   priceTimerEl=document.createElement('div');
   priceTimerEl.className='price-timer'; priceTimerEl.id='priceTimer';
