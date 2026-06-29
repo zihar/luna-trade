@@ -1675,21 +1675,151 @@ const ReplayBroker = {
   closeMarket(){ if(trade){ const c=currentCandle(); if(c) closeTrade(c.close,c.timestamp); } else if(pending){ cancelPending(); } },
   hasOpen(){ return !!trade; },
 };
-const LiveBroker = {
-  mode:'live',
-  market(){ setStatus('LIVE mode not active yet (Phase 2).',true); },
-  closeMarket(){ setStatus('LIVE mode not active yet (Phase 2).',true); },
-  hasOpen(){ return false; },
+// ===================== Live Paper account (server, Fase 2b) =====================
+// Saat BUKAN Bar Replay → akun aktif = saldo dummy server per-user. Order MARKET
+// dikirim ke server; account bar + Positions/Closed ditarik dari server (polling).
+// Saat Bar Replay → semua client-side (kode lama), server tak disentuh.
+const SP = { account:null, positions:[], closed:[], timer:null };
+function spActive(){ return !replayMode; }   // live-paper aktif saat bukan replay
+
+async function spSync(){
+  if(!spActive()) return;
+  try{
+    const [a,p,j] = await Promise.all([
+      fetch('/api/account').then(r=>r.ok?r.json():null),
+      fetch('/api/positions').then(r=>r.ok?r.json():null),
+      fetch('/api/journal').then(r=>r.ok?r.json():null),
+    ]);
+    if(a) SP.account=a;
+    if(p) SP.positions=p.positions||[];
+    if(j) SP.closed=j.trades||[];
+  }catch(e){}
+  try{ renderAcct(); renderTrades(); }catch(e){}
+}
+function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(spSync,1500); }
+function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
+
+// formatter sadar-instrumen (posisi server bisa beda pair dari chart aktif)
+function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('JPY')?3 : i.includes('XAU')?3 : 5; }
+function fmtFor(i,v){ return v==null||isNaN(v)?'—':(+v).toFixed(decimalsFor(i)); }
+function unitsPerFor(i){ return (i.includes('BTC')||i.includes('XAU'))?1:100000; }
+function lotLabelFor(i,u){ if(i.includes('BTC')) return u.toFixed(4)+' BTC'; if(i.includes('XAU')) return u.toFixed(1)+' oz'; return (u/100000).toFixed(2)+' lot'; }
+
+function uuid(){ try{ return crypto.randomUUID(); }catch(e){ return String(Date.now())+Math.random().toString(16).slice(2); } }
+const ServerPaperBroker = {
+  mode:'paper-live',
+  async market(dir){
+    const units = currentLots()*unitsPer();
+    if(!(units>0)){ setStatus('Lot harus > 0.',true); return; }
+    const btn=$('#execBtn'); btn.disabled=true;
+    try{
+      const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({instrument:inst, side:dir==='long'?'buy':'sell', units, clientTag:uuid()})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) setStatus(d.error||'Order gagal',true);
+      else { toast('✓ '+(dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry)); await spSync(); }
+    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
+    btn.disabled=false;
+  },
+  closeMarket(){ spCloseAll(); },
+  hasOpen(){ return SP.positions.length>0; },
 };
-// Akun aktif = Paper (ReplayBroker). LiveBroker (eksekusi nyata OANDA) menyusul
-// Phase 2 → badge #acctBadge jadi toggle Paper/Live. Saat Bar Replay aktif, akun
-// dikunci ke Paper (tak boleh kirim order nyata ke masa lalu).
+async function spClose(id){
+  try{
+    const r=await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) setStatus(d.error||'Close gagal',true);
+    else { toast('Closed #'+id+'  '+((d.pnlCcy>=0?'+':'')+usdFmt(d.pnlCcy))); await spSync(); }
+  }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
+}
+async function spCloseAll(){ for(const p of SP.positions.slice()){ await spClose(p.id); } }
+
+function spRenderAcct(){
+  const a=SP.account, usd=v=>'$'+(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(!a){ $('#acBal').textContent='—'; const o=$('#acOpen'); o.textContent='$0.00'; o.className=''; $('#acEq').textContent='—'; $('#acMargin').textContent='$0.00'; $('#acFree').textContent='—'; return; }
+  $('#acBal').textContent=usd(a.balance);
+  const o=$('#acOpen'); o.textContent=(a.unrealizedPl>=0?'+':'-')+usd(Math.abs(a.unrealizedPl)); o.className=a.unrealizedPl>=0?'pos':'neg';
+  $('#acEq').textContent=usd(a.equity);
+  $('#acMargin').textContent=usd(a.marginUsed);
+  $('#acFree').textContent=usd(a.marginAvailable);
+}
+function spRenderTrades(){
+  $('#tpNPos').textContent = SP.positions.length;
+  $('#tpNPend').textContent = 0;
+  document.querySelectorAll('#tpTabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===activeTradeTab));
+  const isStats = activeTradeTab==='stats';
+  $('#paneTable').hidden = isStats; $('#paneStats').hidden = !isStats;
+  if(isStats){ spRenderStats(); return; }
+  const head=$('#tpHead'), body=$('#tpBody');
+  if(activeTradeTab==='positions'){
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Margin','Profit & Loss','Actions']);
+    if(!SP.positions.length){ body.innerHTML=emptyRow(7,'No open positions'); return; }
+    body.innerHTML=SP.positions.map(p=>`<tr>
+      <td><b>${p.instrument.replace('_','')}</b></td>
+      <td class="${sideCls(p.dir)}">${sideTxt(p.dir)}</td>
+      <td>${lotLabelFor(p.instrument,p.units)}</td>
+      <td>${fmtFor(p.instrument,p.entry)} / ${fmtFor(p.instrument,p.price)}</td>
+      <td>${usdFmt(p.margin)}</td>
+      <td class="${p.unrealizedPl>=0?'t-pos':'t-neg'}">${p.unrealizedPl>=0?'+':''}${usdFmt(p.unrealizedPl)}</td>
+      <td class="t-act"><button data-sp-close="${p.id}">Close</button></td></tr>`).join('');
+  } else if(activeTradeTab==='pending'){
+    head.innerHTML=thRow(['Instrument','Side','Type','Entry','Size','Actions']);
+    body.innerHTML=emptyRow(6,'No pending orders (akun live: market-only)');
+  } else { // closed
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry','Exit','Profit & Loss','Closed (NY)']);
+    if(!SP.closed.length){ body.innerHTML=emptyRow(7,'No closed positions'); return; }
+    body.innerHTML=SP.closed.map(t=>`<tr>
+      <td><b>${t.instrument.replace('_','')}</b></td>
+      <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}</td>
+      <td>${lotLabelFor(t.instrument,t.units)}</td>
+      <td>${fmtFor(t.instrument,t.entry)}</td>
+      <td>${fmtFor(t.instrument,t.exit)}</td>
+      <td class="${t.pnlCcy>=0?'t-pos':'t-neg'}">${t.pnlCcy>=0?'+':''}${usdFmt(t.pnlCcy)}</td>
+      <td style="color:var(--muted)">${nyTime(t.exitTime||t.openTime).slice(5)}</td></tr>`).join('');
+  }
+}
+function spRenderStats(){
+  const J=SP.closed, n=J.length, wins=J.filter(t=>t.pnlCcy>0).length;
+  const gW=J.filter(t=>t.pnlCcy>0).reduce((s,t)=>s+t.pnlCcy,0);
+  const gL=Math.abs(J.filter(t=>t.pnlCcy<0).reduce((s,t)=>s+t.pnlCcy,0));
+  const net=J.reduce((s,t)=>s+t.pnlCcy,0);
+  $('#stTrades').textContent=n;
+  $('#stWin').textContent=n?Math.round(wins/n*100)+'%':'—';
+  const rEl=$('#stR'); rEl.textContent='—'; rEl.className='v';                 // R butuh SL (n/a di paper market)
+  $('#stPF').textContent=gL?(gW/gL).toFixed(2):(gW?'∞':'—');
+  const netEl=$('#stNet'); if(n){ netEl.textContent=(net>=0?'+$':'-$')+Math.abs(net).toFixed(2); netEl.className='v '+(net>=0?'pos':'neg'); } else { netEl.textContent='—'; netEl.className='v'; }
+  const recs=J.slice().reverse().filter(t=>t.balanceAfter!=null);             // SP.closed terbaru dulu → kronologis
+  let dd=0; if(recs.length){ let peak=recs[0].balanceAfter-(recs[0].pnlCcy||0); recs.forEach(t=>{ peak=Math.max(peak,t.balanceAfter); dd=Math.max(dd,peak-t.balanceAfter); }); }
+  $('#stDD').textContent=recs.length?'$'+dd.toFixed(2):'—';
+  $('#stExp').textContent='—';
+  // equity curve dari balanceAfter (kronologis)
+  const cv=$('#equityCurve'); if(cv){ const ctx=cv.getContext('2d'), dpr=window.devicePixelRatio||1, w=cv.clientWidth||300, h=cv.clientHeight||96;
+    cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+    if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px ui-monospace'; ctx.fillText('Belum ada trade selesai.',8,h/2); }
+    else { const start=recs[0].balanceAfter-(recs[0].pnlCcy||0), pts=[start,...recs.map(r=>r.balanceAfter)];
+      const mn=Math.min(...pts), mx=Math.max(...pts), rng=(mx-mn)||1, X=i=>2+i/(pts.length-1||1)*(w-4), Y=v=>h-5-(v-mn)/rng*(h-10);
+      ctx.strokeStyle=getCSS('--border'); ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(0,Y(start)); ctx.lineTo(w,Y(start)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle=getCSS('--accent'); ctx.lineWidth=1.6; ctx.beginPath(); pts.forEach((v,i)=> i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v))); ctx.stroke(); }
+  }
+}
+// applyPaperMode mengaktifkan broker + render path sesuai mode (replay vs live).
+function applyPaperMode(){
+  if(replayMode){ broker=ReplayBroker; spStopPolling(); }
+  else { broker=ServerPaperBroker; spStartPolling(); }
+  try{ renderAcct(); renderTrades(); }catch(e){}
+}
 let broker = ReplayBroker;
 
 // dispatch BUY/SELL menurut jenis order (market via broker, atau pending lokal)
 let orderDir = 'short';   // arah terpilih di tab Sell/Buy (default Sell, ala TradeLocker)
 function ordType(){ const b=document.querySelector('#ordType button.on'); return b?b.dataset.t:'market'; }
-function submitOrder(dir){ if(ordType()==='pending') placePending(dir); else broker.market(dir); }
+function submitOrder(dir){
+  if(spActive()){   // akun live: market-only (pending belum didukung server)
+    if(ordType()==='pending'){ setStatus('Pending belum didukung di akun live (market-only).',true); return; }
+    broker.market(dir); return;
+  }
+  if(ordType()==='pending') placePending(dir); else broker.market(dir);
+}
 // tab Sell | Buy → pilih arah
 document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
   orderDir=b.dataset.d;
@@ -1698,7 +1828,7 @@ document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
 });
 // tombol eksekusi besar (SELL/BUY 0.xx @ harga)
 $('#execBtn').onclick=()=>submitOrder(orderDir);
-$('#closeAllBtn').onclick=()=>{ try{ if(trade) broker.closeMarket(); }catch(e){} try{ if(pending) cancelPending(); }catch(e){} };
+$('#closeAllBtn').onclick=()=>{ if(spActive()){ spCloseAll(); return; } try{ if(trade) broker.closeMarket(); }catch(e){} try{ if(pending) cancelPending(); }catch(e){} };
 // tab Market | Pending
 document.querySelectorAll('#ordType button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#ordType button').forEach(x=>x.classList.toggle('on',x===b));
@@ -1953,6 +2083,7 @@ $('#chart').addEventListener('mousemove',e=>{
 
 // ===================== stats & journal =====================
 function renderStats(){
+  if(spActive()){ spRenderStats(); return; }   // statistik live = server
   const n=journal.length, wins=journal.filter(t=>t.r>0).length;
   const totR=journal.reduce((s,t)=>s+t.r,0);
   const gW=journal.filter(t=>t.r>0).reduce((s,t)=>s+t.r,0);
@@ -2001,6 +2132,7 @@ function drawEquity(){
 function getCSS(v){ return getComputedStyle(document.body).getPropertyValue(v).trim()||'#4a71ff'; }
 // bar metrik akun: Balance (realized) · Open P/L (floating) · Equity
 function renderAcct(){
+  if(spActive()){ spRenderAcct(); return; }   // akun live = server
   const bal=+$('#balance').value||0;
   let openPnl=0;
   if(trade){ const cur=currentCandle(); if(cur) openPnl=pnlUsd(trade.dir,trade.entry,cur.close,trade.units||0); }
@@ -2022,6 +2154,7 @@ function thRow(cols){ return '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>
 function emptyRow(span,msg){ return `<tr><td class="tp-empty" colspan="${span}">${msg}</td></tr>`; }
 
 function renderTrades(){
+  if(spActive()){ spRenderTrades(); return; }   // posisi/closed live = server
   // jumlah di tab
   $('#tpNPos').textContent  = trade?1:0;
   $('#tpNPend').textContent = pending?1:0;
@@ -2092,9 +2225,11 @@ $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data
   else if(a==='partial') partialClose(0.5);
   else if(a==='cancel') cancelPending();
 });
+// aksi tutup posisi akun live (server) per baris
+$('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-sp-close]'); if(b) spClose(+b.dataset.spClose); });
 function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal)); }
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
-$('#resetBtn').onclick=()=>{ if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
+$('#resetBtn').onclick=()=>{ if(spActive()){ setStatus('Reset hanya berlaku di Bar Replay — akun live tak bisa dihapus.',true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
@@ -2478,6 +2613,7 @@ function setReplayUI(on){
   replayBtn.classList.toggle('on', on);
   replayBtn.textContent = on ? '⏹ Exit Replay' : '⏮ Bar Replay';
   replayBtn.title = on ? 'Exit replay → back to realtime' : 'Pick replay start point directly on the chart';
+  applyPaperMode();   // replay → client-side; realtime → akun live server
 }
 function exitReplay(){
   pickMode=false;
@@ -2655,6 +2791,7 @@ function bootApp(){
   refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
   setLiveDot(); connectPriceStream();                   // harga realtime via SSE
   initPriceTimer();                                     // countdown candle berikutnya
+  applyPaperMode();                                     // boot = realtime → akun live server
 }
 
 // ===================== auth (Fase 2a-i) =====================
