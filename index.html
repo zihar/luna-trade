@@ -1085,6 +1085,11 @@ klinecharts.registerOverlay({
 });
 
 // ===================== chart init (1 chart besar) =====================
+// Font & ukuran label sumbu/crosshair — disamakan dgn label hover-future (.axis-time):
+// 10px Inter, minimalis. Konsisten sebelum & sesudah candle terakhir.
+const AXIS_FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+const chTextStyle = bg => ({ backgroundColor:bg, color:'#fff', size:10, family:AXIS_FONT, weight:'bold',
+  borderRadius:4, paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3 });
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
@@ -1093,9 +1098,9 @@ const darkStyles = {
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
     tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'} },
   },
-  xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b'}, tickLine:{color:'#434346'} },
-  yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b'}, tickLine:{color:'#434346'} },
-  crosshair:{ horizontal:{ text:{backgroundColor:'#4a71ff'} }, vertical:{ text:{backgroundColor:'#4a71ff'} } },
+  xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
+  yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
+  crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
   overlay:{ text:{color:'#fff', backgroundColor:'rgba(27,27,31,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
 const lightStyles = {
@@ -1106,9 +1111,9 @@ const lightStyles = {
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
     tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'} },
   },
-  xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280'}, tickLine:{color:'#d6dbe2'} },
-  yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280'}, tickLine:{color:'#d6dbe2'} },
-  crosshair:{ horizontal:{ text:{backgroundColor:'#2563eb'} }, vertical:{ text:{backgroundColor:'#2563eb'} } },
+  xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
+  yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
+  crosshair:{ horizontal:{ text:chTextStyle('#2563eb') }, vertical:{ text:chTextStyle('#2563eb') } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ});
