@@ -671,6 +671,8 @@ let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (La
 let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
 let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
+let formingSeed = null;      // candle incomplete OANDA (OHLC otoritatif periode berjalan) → seed wick
+let formingTimer = null;     // poll seed forming dari OANDA (lebih sering dari liveRefresh)
 let rollRefreshPending = false;
 let journal = [];
 let drawIds = [];        // overlay drawing
@@ -1291,7 +1293,8 @@ async function switchTF(tf){
   }
   const futSnap=snapshotFuturePoints();         // rekam waktu wall-clock titik future (TF lama)
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
-  clearFormingBar();                            // candle berjalan TF lama tak berlaku
+  clearFormingBar(); formingSeed=null;          // candle berjalan TF lama tak berlaku
+  if(live) fetchFormingSeed();                   // seed OHLC periode utk TF baru secepatnya
   lastLen=-1; render(true);
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
   setStatus('TF → '+tf);
@@ -1430,13 +1433,32 @@ function startLive(){
   if(T==null) return;
   live=true;
   scheduleLive();
+  fetchFormingSeed();                                   // seed OHLC periode berjalan secepatnya
+  clearInterval(formingTimer); formingTimer=setInterval(fetchFormingSeed, 5000);
   updatePriceTimer();
 }
 function stopLive(){
   live=false; clearTimeout(liveTimer); liveTimer=null;
+  clearInterval(formingTimer); formingTimer=null; formingSeed=null;
   clearFormingBar();
   if(T!=null){ lastLen=-1; render(true); }   // buang candle berjalan dari chart
   updatePriceTimer();
+}
+// Ambil candle INCOMPLETE OANDA (count=2 → [complete terakhir, forming]) sbg basis OHLC
+// periode berjalan. Ini memuat high/low yang sudah terjadi SEBELUM klien mulai streaming
+// (mis. wick atas di awal jam) — yang tak bisa direkonstruksi dari tick mid saja.
+async function fetchFormingSeed(){
+  if(!live || marketClosed()) return;
+  const tf=currentTF, sym=inst;
+  try{
+    const r=await fetch(`/api/candles?instrument=${encodeURIComponent(sym)}&granularity=${GRAN[tf]||tf}&count=2`);
+    const j=await r.json();
+    if(tf!==currentTF || sym!==inst || !j.candles) return;     // TF/pair keburu ganti
+    const inc=j.candles.find(c=>c.complete===false);
+    formingSeed = inc ? {tf, inst:sym, candle:{
+      timestamp:Date.parse(inc.time), open:+inc.mid.o, high:+inc.mid.h, low:+inc.mid.l, close:+inc.mid.c, volume:+(inc.volume||0)
+    }} : null;
+  }catch(e){}
 }
 // setTimeout (bukan setInterval) agar interval ikut berubah saat TF diganti
 function scheduleLive(){
@@ -2407,12 +2429,23 @@ function pushFormingCandle(){
   const openTs=last.timestamp+dur;
   if(now<openTs) return;                            // periode forming belum mulai
   if(now>=openTs+dur) scheduleRollRefresh();         // periode sudah lewat → tarik candle complete (jangan skip bar)
+  // Basis OHLC: candle incomplete OANDA utk periode ini (high/low otoritatif, memuat
+  // wick awal-periode) bila tersedia; jika tidak → sintesis dari close terakhir.
+  const seed = (formingSeed && formingSeed.tf===currentTF && formingSeed.inst===inst
+                && formingSeed.candle.timestamp===openTs) ? formingSeed.candle : null;
   if(!formingBar || formingBar.timestamp!==openTs){
-    formingBar={timestamp:openTs, open:last.close, high:Math.max(last.close,mid), low:Math.min(last.close,mid), close:mid, volume:0};
+    const o = seed ? seed.open : last.close;
+    const hi = seed ? seed.high : last.close;
+    const lo = seed ? seed.low  : last.close;
+    formingBar={timestamp:openTs, open:o, high:Math.max(hi,mid), low:Math.min(lo,mid), close:mid, volume:seed?seed.volume:0};
   } else {
     formingBar.close=mid;
-    if(mid>formingBar.high) formingBar.high=mid;
-    if(mid<formingBar.low)  formingBar.low=mid;
+    // gabungkan ekstrem OANDA (otoritatif) + tick live — high/low monotonik dlm periode
+    const hi = seed ? Math.max(seed.high, formingBar.high) : formingBar.high;
+    const lo = seed ? Math.min(seed.low,  formingBar.low)  : formingBar.low;
+    formingBar.high = Math.max(hi, mid);
+    formingBar.low  = Math.min(lo, mid);
+    if(seed) formingBar.open = seed.open;            // open otoritatif dari OANDA
   }
   try{ chart.updateData(formingBar); }catch(e){}
 }
