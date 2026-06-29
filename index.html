@@ -52,6 +52,10 @@
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
+  /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
+  .axis-time{ position:absolute; bottom:3px; z-index:6; pointer-events:none; display:none;
+    transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
+    white-space:nowrap; padding:3px 6px; border-radius:4px; }
   .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
            display:flex;flex-direction:column;overflow-y:auto}
   .panel{padding:12px;border-bottom:1px solid var(--border)}
@@ -625,6 +629,7 @@ let alerts = [];         // price alert: {sym,price,id} (Fase 1d)
 let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)
 let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (Lapis 4)
 let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
+let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
 let rollRefreshPending = false;
 let journal = [];
@@ -2177,11 +2182,32 @@ function updatePriceTimer(){
   if(!p || p.y==null){ el.style.display='none'; return; }
   // pasar tutup / libur → sembunyikan (countdown tak relevan)
   if(marketClosed()){ el.style.display='none'; return; }
-  const H=$('#chart').clientHeight||0, y=Math.max(0,Math.min(p.y, H-22));   // jaga tetap di area chart
+  // taruh DI BAWAH label harga klinecharts (jangan tumpang tindih); clamp di area chart
+  const H=$('#chart').clientHeight||0, y=Math.max(0,Math.min(p.y+12, H-22));
   el.textContent='⏱ '+fmtCountdown(end-Date.now());
   el.style.top=y+'px';
   el.style.display='block';
 }
+// Label waktu di sumbu-X saat hover area future (candle belum terbentuk). klinecharts
+// hanya menandai waktu di atas bar yang ADA; area kosong di kanan tak diberi label →
+// hitung waktu proyeksi dari grid bar terakhir & tampilkan label sendiri.
+function updateAxisTime(e){
+  const el=axisTimeEl; if(!el) return;
+  const rect=$('#chart').getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  if(x<0||x>rect.width||y<0||y>rect.height){ el.style.display='none'; return; }
+  let cc=chart.convertFromPixel({x,y:0},{paneId:'candle_pane'}); if(Array.isArray(cc)) cc=cc[0];
+  const di=cc&&cc.dataIndex!=null?cc.dataIndex:null;
+  const dl=chart.getDataList(); if(di==null||!dl.length){ el.style.display='none'; return; }
+  const lastIdx=dl.length-1;
+  if(di<=lastIdx+0.5){ el.style.display='none'; return; }  // di atas bar nyata → klinecharts sudah menandai
+  const off=Math.round(di-lastIdx);                         // berapa bar ke depan
+  const ts=dl[lastIdx].timestamp + off*DUR[currentTF];
+  el.textContent=nyTime(ts);
+  el.style.left=x+'px';
+  el.style.display='block';
+}
+
 // ===================== forming candle (live, gerak tiap tick) =====================
 function liveMid(){ const t=liveTicks[inst]; return (t && isFinite(t.bid) && isFinite(t.ask))?(t.bid+t.ask)/2:null; }
 // fetch candle complete yg baru tutup, agar periode forming berikutnya bisa mulai (debounce).
@@ -2221,6 +2247,11 @@ function initPriceTimer(){
   priceTimerEl=document.createElement('div');
   priceTimerEl.className='price-timer'; priceTimerEl.id='priceTimer';
   $('#chart').appendChild(priceTimerEl);
+  axisTimeEl=document.createElement('div');
+  axisTimeEl.className='axis-time'; axisTimeEl.id='axisTime';
+  $('#chart').appendChild(axisTimeEl);
+  $('#chart').addEventListener('mousemove', updateAxisTime);
+  $('#chart').addEventListener('mouseleave', ()=>{ if(axisTimeEl) axisTimeEl.style.display='none'; });
   setInterval(updatePriceTimer, 1000);                       // detak tiap detik
   try{ chart.subscribeAction('onScroll', updatePriceTimer); }catch(e){}
   try{ chart.subscribeAction('onZoom',   updatePriceTimer); }catch(e){}
