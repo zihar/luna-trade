@@ -53,7 +53,7 @@
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
   /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
-  .axis-time{ position:absolute; bottom:3px; z-index:6; pointer-events:none; display:none;
+  .axis-time{ position:absolute; z-index:6; pointer-events:none; display:none;
     transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
     white-space:nowrap; padding:3px 6px; border-radius:4px; }
   .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
@@ -1113,7 +1113,7 @@ const lightStyles = {
   },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
-  crosshair:{ horizontal:{ text:chTextStyle('#2563eb') }, vertical:{ text:chTextStyle('#2563eb') } },
+  crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'} },
 };
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ});
@@ -2216,8 +2216,12 @@ function updateAxisTime(e){
   const ts=dl[lastIdx].timestamp + off*DUR[currentTF];
   el.textContent=nyTime(ts);
   el.style.left=x+'px';
+  // top-align ke atas band sumbu-X — sama persis dgn pill crosshair klinecharts
+  el.style.top=chartAxisTop()+'px';
   el.style.display='block';
 }
+// top band sumbu-X = tinggi pane candle (= canvas tertinggi di #chart)
+function chartAxisTop(){ let h=0; document.querySelectorAll('#chart canvas').forEach(c=>{ if(c.offsetHeight>h) h=c.offsetHeight; }); return h; }
 
 // ===================== forming candle (live, gerak tiap tick) =====================
 function liveMid(){ const t=liveTicks[inst]; return (t && isFinite(t.bid) && isFinite(t.ask))?(t.bid+t.ask)/2:null; }
