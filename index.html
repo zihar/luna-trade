@@ -213,8 +213,20 @@
     font-size:11px; font-weight:700; letter-spacing:.04em; }
   .acct-badge.demo{ color:var(--accent); }
   .acct-badge.live{ color:var(--green); }
-  .tzsel{ height:30px; padding:2px 8px; border-radius:7px; background:var(--btn); border:1px solid var(--border);
-    color:var(--txt); font-size:11px; cursor:pointer; }
+  /* jam + pemilih timezone di pojok kanan-bawah chart (ala TradingView) */
+  .tz-clock{ position:absolute; bottom:3px; right:3px; z-index:7; cursor:pointer; user-select:none;
+    background:var(--btn); border:1px solid var(--border); color:var(--muted);
+    font:600 10px/1 var(--mono); padding:4px 7px; border-radius:5px; white-space:nowrap; }
+  .tz-clock:hover{ color:var(--txt); }
+  .tz-menu{ position:absolute; bottom:30px; right:3px; z-index:30; display:none;
+    background:var(--panel); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow);
+    max-height:55vh; overflow:auto; min-width:210px; padding:4px; }
+  .tz-menu.open{ display:block; }
+  .tz-item{ display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:6px;
+    font-size:12px; color:var(--txt); cursor:pointer; white-space:nowrap; }
+  .tz-item:hover{ background:var(--btn-hover); }
+  .tz-item .ck{ width:13px; color:var(--accent); }
+  .tz-item .off{ color:var(--muted); font-family:var(--mono); font-size:11px; min-width:62px; }
   /* kontrol playback hanya tampil saat mode Bar Replay aktif */
   #replayCtrls{ display:contents; }
   .replaybar:not(.replaying) #replayCtrls{ display:none; }
@@ -436,16 +448,6 @@
   </select>
   <span class="vsep"></span>
   <span class="acct-badge demo" id="acctBadge" title="Demo account (simulated, no real money) — real OANDA execution comes in Phase 2">● DEMO</span>
-  <span class="vsep"></span>
-  <select id="tzSel" class="tzsel" title="Display timezone (all times)">
-    <option value="America/New_York">New York</option>
-    <option value="UTC">UTC</option>
-    <option value="Europe/London">London</option>
-    <option value="Asia/Tokyo">Tokyo</option>
-    <option value="Asia/Singapore">Singapore</option>
-    <option value="Asia/Jakarta">Jakarta</option>
-    <option value="__local">Local</option>
-  </select>
   <span class="vsep"></span>
   <button id="themeBtn" title="Toggle dark/light theme">☀️</button>
   <span class="grow"></span>
@@ -2621,9 +2623,40 @@ function applyTimezone(v){
   try{ chart.setTimezone(chartTZ); }catch(e){}
   try{ if(T!=null){ lastLen=-1; render(true); } }catch(e){}   // segarkan label overlay (garis vertikal dll)
   try{ updatePriceTimer(); }catch(e){}
+  try{ updateTzClock(); }catch(e){}
 }
-{ const sel=$('#tzSel'); const saved=localStorage.getItem('br_tz')||'America/New_York';
-  if(![...sel.options].some(o=>o.value===saved)) localStorage.removeItem('br_tz');
-  sel.value=[...sel.options].some(o=>o.value===saved)?saved:'America/New_York';
-  sel.onchange=()=>applyTimezone(sel.value); }
+// ---- jam + pemilih timezone di pojok kanan-bawah chart (ala TradingView) ----
+const TZ_LIST=[
+  {tz:'America/New_York',name:'New York'},{tz:'America/Chicago',name:'Chicago'},
+  {tz:'America/Sao_Paulo',name:'Sao Paulo'},{tz:'UTC',name:'UTC'},
+  {tz:'Europe/London',name:'London'},{tz:'Europe/Berlin',name:'Frankfurt'},
+  {tz:'Europe/Moscow',name:'Moscow'},{tz:'Asia/Dubai',name:'Dubai'},
+  {tz:'Asia/Kolkata',name:'Mumbai'},{tz:'Asia/Singapore',name:'Singapore'},
+  {tz:'Asia/Hong_Kong',name:'Hong Kong'},{tz:'Asia/Tokyo',name:'Tokyo'},
+  {tz:'Asia/Jakarta',name:'Jakarta'},{tz:'Australia/Sydney',name:'Sydney'},
+];
+function tzOffsetLabel(tz){
+  try{ const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,timeZoneName:'shortOffset'})
+    .formatToParts(new Date()).find(x=>x.type==='timeZoneName'); return (p?p.value:'UTC').replace('GMT','UTC'); }
+  catch(e){ return 'UTC'; }
+}
+function tzClockText(tz){
+  try{ return new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date()); }
+  catch(e){ return '--:--:--'; }
+}
+const tzClock=document.createElement('div'); tzClock.className='tz-clock'; tzClock.id='tzClock';
+const tzMenu=document.createElement('div');  tzMenu.className='tz-menu';  tzMenu.id='tzMenu';
+$('#chart').appendChild(tzClock); $('#chart').appendChild(tzMenu);
+function updateTzClock(){ tzClock.textContent = tzClockText(chartTZ)+' '+tzOffsetLabel(chartTZ); }
+function buildTzMenu(){
+  const localTz=Intl.DateTimeFormat().resolvedOptions().timeZone||NY_TZ;
+  const items=TZ_LIST.concat([{tz:localTz,name:'Local',raw:'__local'}]);
+  tzMenu.innerHTML=items.map(it=>`<div class="tz-item" data-tz="${it.raw||it.tz}">
+      <span class="ck">${chartTZ===it.tz?'✓':''}</span><span class="off">(${tzOffsetLabel(it.tz)})</span><span>${it.name}</span></div>`).join('');
+  tzMenu.querySelectorAll('.tz-item').forEach(el=>el.onclick=()=>{ applyTimezone(el.dataset.tz); tzMenu.classList.remove('open'); });
+}
+tzClock.onclick=(e)=>{ e.stopPropagation(); const open=!tzMenu.classList.contains('open'); if(open) buildTzMenu(); tzMenu.classList.toggle('open',open); };
+tzMenu.addEventListener('click',e=>e.stopPropagation());
+document.addEventListener('click',()=>tzMenu.classList.remove('open'));
+updateTzClock(); setInterval(updateTzClock,1000);
 </script>
