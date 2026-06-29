@@ -86,6 +86,15 @@ func (h *Hub) Unsubscribe(ch chan Tick) {
 	}
 }
 
+// Last mengembalikan snapshot harga terakhir untuk satu instrumen (thread-safe).
+// Dipakai paper engine untuk menilai/menutup posisi server-side.
+func (h *Hub) Last(inst Instrument) (Tick, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	t, ok := h.last[inst]
+	return t, ok
+}
+
 // runUpstream membaca SATU stream broker dan menyebarkannya ke semua subscriber.
 func (h *Hub) runUpstream(ctx context.Context) {
 	in := make(chan Tick, 64)

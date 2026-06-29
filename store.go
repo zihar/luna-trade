@@ -8,7 +8,9 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -280,6 +282,154 @@ func (s *Store) SessionUser(token string) (userID int64, ok bool, err error) {
 func (s *Store) DeleteSession(token string) error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE token=?`, token)
 	return err
+}
+
+// ===================== Paper engine per-user (Fase 2b) =====================
+// Posisi paper memakai tabel `journal` dgn mode='paper', broker='paper',
+// user_id = id user. Posisi terbuka = exit IS NULL. Saldo cash di paper_accounts;
+// equity/margin dihitung on-the-fly di paper.go (tak ditulis per tick).
+
+// PaperTrade = posisi paper terbuka (subset journal).
+type PaperTrade struct {
+	ID         int64   `json:"id"`
+	Instrument string  `json:"instrument"`
+	Dir        string  `json:"dir"` // long | short
+	Entry      float64 `json:"entry"`
+	Units      float64 `json:"units"`
+	OpenTime   string  `json:"openTime"`
+}
+
+// ClosedPaperTrade = baris journal paper yang sudah ditutup (utk riwayat).
+type ClosedPaperTrade struct {
+	PaperTrade
+	Exit         float64 `json:"exit"`
+	PnLCcy       float64 `json:"pnlCcy"`
+	BalanceAfter float64 `json:"balanceAfter"`
+	ExitTime     string  `json:"exitTime"`
+}
+
+func uidStr(userID int64) string { return strconv.FormatInt(userID, 10) }
+
+// PaperBalance mengembalikan saldo cash (realized) paper user.
+func (s *Store) PaperBalance(userID int64) (float64, error) {
+	var bal float64
+	err := s.db.QueryRow(`SELECT balance FROM paper_accounts WHERE user_id=?`, userID).Scan(&bal)
+	return bal, err
+}
+
+// OpenPaperTrade menyisipkan posisi paper terbuka (exit NULL) → balikan id-nya.
+func (s *Store) OpenPaperTrade(userID int64, instrument, dir string, entry, units float64, openTime string) (int64, error) {
+	res, err := s.db.Exec(
+		`INSERT INTO journal (user_id,broker,mode,instrument,dir,entry,units,open_time)
+		 VALUES (?, 'paper', 'paper', ?, ?, ?, ?, ?)`,
+		uidStr(userID), instrument, dir, entry, units, openTime,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// OpenPaperTrades = semua posisi paper terbuka milik user.
+func (s *Store) OpenPaperTrades(userID int64) ([]PaperTrade, error) {
+	rows, err := s.db.Query(
+		`SELECT id,instrument,dir,entry,units,open_time FROM journal
+		 WHERE user_id=? AND mode='paper' AND exit IS NULL ORDER BY id`,
+		uidStr(userID),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PaperTrade
+	for rows.Next() {
+		var t PaperTrade
+		if err := rows.Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// GetPaperTrade mengambil satu posisi paper TERBUKA milik user (nil bila tak ada).
+func (s *Store) GetPaperTrade(userID, id int64) (*PaperTrade, error) {
+	var t PaperTrade
+	err := s.db.QueryRow(
+		`SELECT id,instrument,dir,entry,units,open_time FROM journal
+		 WHERE id=? AND user_id=? AND mode='paper' AND exit IS NULL`,
+		id, uidStr(userID),
+	).Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// ClosePaperTrade merealisasikan P&L: update saldo (sekali) + tutup baris journal,
+// dalam satu transaksi. Balikan saldo baru. Gagal bila posisi bukan milik user / sudah tutup.
+func (s *Store) ClosePaperTrade(userID, id int64, exit, pnlCcy float64, exitTime string) (newBalance float64, err error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Guard + tutup baris journal (atomik dgn update saldo).
+	res, err := tx.Exec(
+		`UPDATE journal SET exit=?, pnl_ccy=?, exit_time=?
+		 WHERE id=? AND user_id=? AND mode='paper' AND exit IS NULL`,
+		exit, pnlCcy, exitTime, id, uidStr(userID),
+	)
+	if err != nil {
+		return 0, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return 0, errors.New("posisi tidak ditemukan atau sudah ditutup")
+	}
+	if _, err = tx.Exec(`UPDATE paper_accounts SET balance=balance+? WHERE user_id=?`, pnlCcy, userID); err != nil {
+		return 0, err
+	}
+	if err = tx.QueryRow(`SELECT balance FROM paper_accounts WHERE user_id=?`, userID).Scan(&newBalance); err != nil {
+		return 0, err
+	}
+	if _, err = tx.Exec(`UPDATE journal SET balance_after=? WHERE id=?`, newBalance, id); err != nil {
+		return 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return newBalance, nil
+}
+
+// ClosedPaperTrades = riwayat posisi paper tertutup milik user (terbaru dulu).
+func (s *Store) ClosedPaperTrades(userID int64) ([]ClosedPaperTrade, error) {
+	rows, err := s.db.Query(
+		`SELECT id,instrument,dir,entry,units,open_time,exit,pnl_ccy,balance_after,exit_time
+		 FROM journal WHERE user_id=? AND mode='paper' AND exit IS NOT NULL
+		 ORDER BY exit_time DESC, id DESC`,
+		uidStr(userID),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ClosedPaperTrade
+	for rows.Next() {
+		var t ClosedPaperTrade
+		var exit, pnl, balAfter sql.NullFloat64
+		var exitTime sql.NullString
+		if err := rows.Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime,
+			&exit, &pnl, &balAfter, &exitTime); err != nil {
+			return nil, err
+		}
+		t.Exit, t.PnLCcy, t.BalanceAfter, t.ExitTime = exit.Float64, pnl.Float64, balAfter.Float64, exitTime.String
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 // logf util kecil supaya pemanggil store bisa lapor sekali di startup.

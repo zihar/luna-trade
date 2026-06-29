@@ -185,6 +185,12 @@ func requireUser(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// userIDFromCtx mengambil userID yang disuntik requireUser ke context.
+func userIDFromCtx(r *http.Request) (int64, bool) {
+	uid, ok := r.Context().Value(userIDCtxKey).(int64)
+	return uid, ok
+}
+
 // sessionUserID membaca cookie sesi → validasi (termasuk expiry) di store.
 func sessionUserID(r *http.Request) (int64, bool) {
 	c, err := r.Cookie(sessionCookie)
