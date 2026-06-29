@@ -48,6 +48,7 @@
                color:#fff;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
                text-transform:uppercase;padding:0}
   .user-avatar:hover{filter:brightness(1.1)}
+  .user-avatar img,.user-av-lg img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
   .user-pop{position:absolute;top:38px;right:0;width:236px;background:var(--panel);border:1px solid var(--border);
             border-radius:11px;box-shadow:var(--shadow);padding:12px;display:none;flex-direction:column;gap:10px;z-index:1000}
   .user-pop.open{display:flex}
@@ -2850,9 +2851,19 @@ function userInitials(name, email){
   if(parts.length>=2) return (parts[0][0]+parts[1][0]);
   return (src[0]||'?');
 }
+// isi avatar: foto Google bila ada (fallback inisial bila kosong / gagal muat)
+function setAvatar(elm, pic, ini){
+  elm.textContent='';
+  if(pic){
+    const img=document.createElement('img'); img.src=pic; img.alt=''; img.referrerPolicy='no-referrer';
+    img.onerror=()=>{ elm.textContent=ini; };
+    elm.appendChild(img);
+  } else { elm.textContent=ini; }
+}
 function onAuthed(u){
   const email = (u && u.email) ? u.email : '';
   const name  = (u && u.name)  ? u.name  : email;
+  const pic   = (u && u.picture) ? u.picture : '';
   let el = document.getElementById('userMenu');
   if(!el){
     const bar = document.querySelector('.toolbar');
@@ -2879,8 +2890,8 @@ function onAuthed(u){
     el.querySelector('#logoutBtn').onclick = doLogout;
   }
   const ini=userInitials(name,email);
-  el.querySelector('#userAvatar').textContent=ini;
-  el.querySelector('#userAvLg').textContent=ini;
+  setAvatar(el.querySelector('#userAvatar'), pic, ini);
+  setAvatar(el.querySelector('#userAvLg'), pic, ini);
   el.querySelector('#userPopName').textContent=name||'—';
   el.querySelector('#userPopEmail').textContent=email;
 }

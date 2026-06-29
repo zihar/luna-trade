@@ -52,8 +52,20 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(schema); err != nil {
 		return err
 	}
-	_, err := s.db.Exec(authSchema)
-	return err
+	if _, err := s.db.Exec(authSchema); err != nil {
+		return err
+	}
+	// Kolom tambahan (idempotent) — utk DB lama yg tabelnya sudah ada.
+	s.addColumnIfMissing("users", "picture", "TEXT")
+	return nil
+}
+
+// addColumnIfMissing menjalankan ALTER TABLE ADD COLUMN; abaikan jika kolom sudah ada.
+func (s *Store) addColumnIfMissing(table, col, typ string) {
+	if _, err := s.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + typ); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		log.Printf("migrate: add %s.%s: %v", table, col, err)
+	}
 }
 
 const schema = `
@@ -152,6 +164,7 @@ type User struct {
 	Email        string
 	PasswordHash string
 	DisplayName  string
+	Picture      string // URL foto profil (Google); kosong utk user password
 }
 
 // CreateUser membuat user + paper_account(initBalance) dalam satu transaksi.
@@ -181,31 +194,31 @@ func (s *Store) CreateUser(email, passwordHash, displayName string, initBalance 
 
 // GetUserByEmail → user (nil bila tak ada).
 func (s *Store) GetUserByEmail(email string) (*User, error) {
-	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE email=?`, email)
+	return s.scanUser(`SELECT id,email,password_hash,display_name,picture FROM users WHERE email=?`, email)
 }
 
 // GetUserByID → user (nil bila tak ada).
 func (s *Store) GetUserByID(id int64) (*User, error) {
-	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE id=?`, id)
+	return s.scanUser(`SELECT id,email,password_hash,display_name,picture FROM users WHERE id=?`, id)
 }
 
 func (s *Store) scanUser(query string, arg any) (*User, error) {
 	var u User
-	var pw, dn sql.NullString
-	err := s.db.QueryRow(query, arg).Scan(&u.ID, &u.Email, &pw, &dn)
+	var pw, dn, pic sql.NullString
+	err := s.db.QueryRow(query, arg).Scan(&u.ID, &u.Email, &pw, &dn, &pic)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	u.PasswordHash, u.DisplayName = pw.String, dn.String
+	u.PasswordHash, u.DisplayName, u.Picture = pw.String, dn.String, pic.String
 	return &u, nil
 }
 
 // GetUserByGoogleSub → user via subject Google (nil bila tak ada).
 func (s *Store) GetUserByGoogleSub(sub string) (*User, error) {
-	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE google_sub=?`, sub)
+	return s.scanUser(`SELECT id,email,password_hash,display_name,picture FROM users WHERE google_sub=?`, sub)
 }
 
 // UpsertGoogleUser = find-or-create utk login Google:
@@ -214,19 +227,21 @@ func (s *Store) GetUserByGoogleSub(sub string) (*User, error) {
 //  3. tak ada → buat user baru (password_hash NULL) + paper_account(initBalance).
 //
 // Aman dari ras karena seluruh akses store di-serialkan SetMaxOpenConns(1).
-func (s *Store) UpsertGoogleUser(sub, email, name string, initBalance float64) (int64, error) {
+func (s *Store) UpsertGoogleUser(sub, email, name, picture string, initBalance float64) (int64, error) {
 	if u, err := s.GetUserByGoogleSub(sub); err != nil {
 		return 0, err
 	} else if u != nil {
+		// Segarkan foto (& isi nama bila kosong) tiap login Google.
+		_, _ = s.db.Exec(`UPDATE users SET display_name=COALESCE(NULLIF(display_name,''),?), picture=? WHERE id=?`, name, picture, u.ID)
 		return u.ID, nil
 	}
 	if u, err := s.GetUserByEmail(email); err != nil {
 		return 0, err
 	} else if u != nil {
-		// Tautkan akun email lama ke Google; isi display_name bila masih kosong.
+		// Tautkan akun email lama ke Google; isi display_name bila kosong + foto.
 		if _, err := s.db.Exec(
-			`UPDATE users SET google_sub=?, display_name=COALESCE(NULLIF(display_name,''),?) WHERE id=?`,
-			sub, name, u.ID,
+			`UPDATE users SET google_sub=?, display_name=COALESCE(NULLIF(display_name,''),?), picture=? WHERE id=?`,
+			sub, name, picture, u.ID,
 		); err != nil {
 			return 0, err
 		}
@@ -237,7 +252,7 @@ func (s *Store) UpsertGoogleUser(sub, email, name string, initBalance float64) (
 		return 0, err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`INSERT INTO users (email,google_sub,display_name) VALUES (?,?,?)`, email, sub, name)
+	res, err := tx.Exec(`INSERT INTO users (email,google_sub,display_name,picture) VALUES (?,?,?,?)`, email, sub, name, picture)
 	if err != nil {
 		return 0, err
 	}

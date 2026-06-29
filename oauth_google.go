@@ -113,7 +113,7 @@ func handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = info.Email
 	}
-	uid, err := store.UpsertGoogleUser(info.Sub, strings.ToLower(info.Email), name, paperInitBalance)
+	uid, err := store.UpsertGoogleUser(info.Sub, strings.ToLower(info.Email), name, info.Picture, paperInitBalance)
 	if err != nil {
 		log.Printf("google oauth: upsert user gagal: %v", err)
 		redirectAuthError(w, r, "gagal membuat akun")
@@ -177,9 +177,10 @@ func googleExchangeCode(ctx context.Context, code string) (string, error) {
 }
 
 type googleProfile struct {
-	Sub   string `json:"sub"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Sub     string `json:"sub"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Picture string `json:"picture"`
 }
 
 // googleUserInfo mengambil profil (sub/email/name) memakai access token.
