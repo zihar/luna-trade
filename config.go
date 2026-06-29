@@ -35,6 +35,16 @@ type Config struct {
 	BasicAuthUser     string
 	BasicAuthPass     string
 	Creds             BrokerCreds
+
+	// Google OAuth (Fase 2a-ii) — kosong = fitur login Google nonaktif.
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+}
+
+// GoogleEnabled true bila ketiga kredensial Google terisi.
+func (c Config) GoogleEnabled() bool {
+	return c.GoogleClientID != "" && c.GoogleClientSecret != "" && c.GoogleRedirectURL != ""
 }
 
 // loadConfig membaca semua env yang relevan (loadDotEnv sudah dipanggil di main).
@@ -86,6 +96,9 @@ func loadConfig() Config {
 		Server:    os.Getenv("TRADELOCKER_SERVER"),
 		TLEnv:     envOr("TRADELOCKER_ENV", "demo"),
 	}
+	c.GoogleClientID = os.Getenv("GOOGLE_CLIENT_ID")
+	c.GoogleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+	c.GoogleRedirectURL = os.Getenv("GOOGLE_REDIRECT_URL")
 	return c
 }
 

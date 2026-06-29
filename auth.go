@@ -48,6 +48,12 @@ func registerAuth(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/auth/login", handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", handleLogout)
 	mux.HandleFunc("GET /api/auth/me", handleMe)
+	mux.HandleFunc("GET /api/auth/config", handleAuthConfig)
+}
+
+// GET /api/auth/config — kapabilitas auth utk FE (mis. tampilkan tombol Google?).
+func handleAuthConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"google": cfg.GoogleEnabled()})
 }
 
 type credsBody struct {

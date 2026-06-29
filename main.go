@@ -104,8 +104,9 @@ func main() {
 	mux := http.NewServeMux()
 	// Shell statik (index.html, assets/) publik; data di balik sesi (requireUser).
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
-	// Endpoint auth publik (register/login/logout/me).
+	// Endpoint auth publik (register/login/logout/me + Google OAuth).
 	registerAuth(mux)
+	registerGoogleOAuth(mux)
 	// /api/candles butuh login (data harga historis di-gate sesi).
 	mux.HandleFunc("/api/candles", requireUser(candlesHandler(token)))
 	registerAPI(mux)

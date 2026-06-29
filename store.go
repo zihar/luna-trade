@@ -201,6 +201,54 @@ func (s *Store) scanUser(query string, arg any) (*User, error) {
 	return &u, nil
 }
 
+// GetUserByGoogleSub → user via subject Google (nil bila tak ada).
+func (s *Store) GetUserByGoogleSub(sub string) (*User, error) {
+	return s.scanUser(`SELECT id,email,password_hash,display_name FROM users WHERE google_sub=?`, sub)
+}
+
+// UpsertGoogleUser = find-or-create utk login Google:
+//  1. cocok google_sub → pakai user itu.
+//  2. cocok email (user password lama) → tautkan google_sub ke user itu.
+//  3. tak ada → buat user baru (password_hash NULL) + paper_account(initBalance).
+//
+// Aman dari ras karena seluruh akses store di-serialkan SetMaxOpenConns(1).
+func (s *Store) UpsertGoogleUser(sub, email, name string, initBalance float64) (int64, error) {
+	if u, err := s.GetUserByGoogleSub(sub); err != nil {
+		return 0, err
+	} else if u != nil {
+		return u.ID, nil
+	}
+	if u, err := s.GetUserByEmail(email); err != nil {
+		return 0, err
+	} else if u != nil {
+		// Tautkan akun email lama ke Google; isi display_name bila masih kosong.
+		if _, err := s.db.Exec(
+			`UPDATE users SET google_sub=?, display_name=COALESCE(NULLIF(display_name,''),?) WHERE id=?`,
+			sub, name, u.ID,
+		); err != nil {
+			return 0, err
+		}
+		return u.ID, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`INSERT INTO users (email,google_sub,display_name) VALUES (?,?,?)`, email, sub, name)
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	if _, err := tx.Exec(`INSERT INTO paper_accounts (user_id,balance) VALUES (?,?)`, id, initBalance); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 // CreateSession menyimpan satu sesi (token unik, dgn expiry).
 func (s *Store) CreateSession(token string, userID int64, expiresAt time.Time) error {
 	_, err := s.db.Exec(
