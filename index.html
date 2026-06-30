@@ -1187,8 +1187,8 @@ const chTextStyle = bg => ({ backgroundColor:bg, color:'#fff', size:10, family:A
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
-    bar:{ upColor:'#54c88c',downColor:'#ff3b3b',noChangeColor:'#89898b',
-          upBorderColor:'#54c88c',downBorderColor:'#ff3b3b',upWickColor:'#54c88c',downWickColor:'#ff3b3b'},
+    bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#89898b',
+          upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
     tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'} },
   },
@@ -1200,8 +1200,8 @@ const darkStyles = {
 const lightStyles = {
   grid:{ horizontal:{color:'#eceff3'}, vertical:{color:'#eceff3'} },
   candle:{
-    bar:{ upColor:'#54c88c',downColor:'#ff3b3b',noChangeColor:'#999',
-          upBorderColor:'#54c88c',downBorderColor:'#ff3b3b',upWickColor:'#54c88c',downWickColor:'#ff3b3b'},
+    bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#999',
+          upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
     tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'} },
   },
@@ -2796,8 +2796,10 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); h
 
 // ===================== setting chart (⚙ rail): candle, background, grid =====================
 // bg & grid disimpan PER-TEMA (light/dark) supaya setting global tetap berfungsi di kedua tema
-const CHART_DEFAULT={up:'#4ec4ae',down:'#ff3b3b',bgDark:'#101013',gridDark:'#1f1f24',bgLight:'#ffffff',gridLight:'#eceff3'};
+const CHART_DEFAULT={up:'#089981',down:'#f23645',upBorder:'#089981',downBorder:'#f23645',bgDark:'#101013',gridDark:'#1f1f24',bgLight:'#ffffff',gridLight:'#eceff3'};
 let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
+// style bar candle dari chartCfg (border fallback ke warna body utk cfg lama tanpa key border)
+function candleBarCfg(){ return {upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.upBorder||chartCfg.up,downBorderColor:chartCfg.downBorder||chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}; }
 // migrasi skema lama {bg,grid} (dulu dipakai utk dark) → kunci per-tema
 if('bg' in chartCfg){ chartCfg.bgDark=chartCfg.bg; delete chartCfg.bg; }
 if('grid' in chartCfg){ chartCfg.gridDark=chartCfg.grid; delete chartCfg.grid; }
@@ -2808,8 +2810,9 @@ function applyChartCfg(){
   const grid = light ? chartCfg.gridLight : chartCfg.gridDark;
   try{ chart.setStyles({
     grid:{horizontal:{color:grid},vertical:{color:grid}},
-    candle:{bar:{upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.up,downBorderColor:chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}},
+    candle:{bar:candleBarCfg()},
   }); }catch(e){}
+  try{ secondaries.forEach(sc=>sc.chart.setStyles({grid:{horizontal:{color:grid},vertical:{color:grid}},candle:{bar:candleBarCfg()}})); }catch(e){}
   const c=document.querySelector('.center'), ch=document.getElementById('chart');
   if(c) c.style.background=bg; if(ch) ch.style.background=bg;
 }
@@ -2822,7 +2825,7 @@ function showChartSet(){
   // bg & grid → edit kunci tema yang sedang aktif
   const light=document.body.classList.contains('light'), thm=light?'light':'dark';
   const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
-  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
+  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
   const r=gearBtn.getBoundingClientRect();
   chartSet.style.left=Math.min(r.right+8,window.innerWidth-220)+'px';
   chartSet.style.top=Math.max(8,Math.min(r.top,window.innerHeight-280))+'px';
@@ -2907,6 +2910,7 @@ function makeSecondary(slot){
 
   const light=document.body.classList.contains('light');
   const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ});
+  try{ c.setStyles({candle:{bar:candleBarCfg()}}); }catch(e){}   // ikut warna candle kustom user
   attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
 
