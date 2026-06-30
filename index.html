@@ -433,7 +433,8 @@
   .fibpop.show{ display:block; }
   .fibpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 7px; }
   .fp-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-  .fp-row input{ flex:1; width:100%; }
+  .fp-row input[type=number]{ flex:1; width:100%; }
+  .fp-color{ flex:0 0 auto; width:28px; height:26px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; }
   .fp-x{ width:26px; padding:5px 0; font-size:12px; color:var(--muted); }
   .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
   .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
@@ -1018,11 +1019,19 @@ klinecharts.registerOverlay({
 // custom overlay: Fibonacci 0 · 0.5 · 1 (lebar = selebar tarikan, arah ikut tarik)
 // level Fibonacci yang bisa diatur (tambah/hapus/ubah nilai) — global, tersimpan di localStorage
 const FIB_DEFAULT=[0,0.5,1];
-let fibLevels; try{ fibLevels=JSON.parse(localStorage.getItem('br_fibLevels')); if(!Array.isArray(fibLevels)||!fibLevels.length) fibLevels=FIB_DEFAULT.slice(); }catch(e){ fibLevels=FIB_DEFAULT.slice(); }
-// warna per-level ala TradingView (level umum di-map; lainnya pakai palet berputar)
+// warna per-level ala TradingView (level umum di-map; lainnya pakai palet berputar) — dipakai sbg warna default
 const FIB_COLORS={0:'#787b86',0.236:'#f23645',0.382:'#ff9800',0.5:'#4caf50',0.618:'#089981',0.786:'#00bcd4',1:'#787b86',1.272:'#f23645',1.414:'#ff9800',1.618:'#4caf50',2:'#787b86',2.618:'#089981'};
 const FIB_PALETTE=['#787b86','#f23645','#ff9800','#4caf50','#089981','#00bcd4','#2962ff','#9c27b0'];
 function fibColor(Lv,i){ return FIB_COLORS[Lv]!=null?FIB_COLORS[Lv]:FIB_PALETTE[i%FIB_PALETTE.length]; }
+// tiap level: {value, color}. color bisa diatur user; default ikut fibColor()
+function defaultFibLevels(){ return FIB_DEFAULT.map((v,i)=>({value:v,color:fibColor(v,i)})); }
+let fibLevels;
+try{
+  const raw=JSON.parse(localStorage.getItem('br_fibLevels'));
+  if(!Array.isArray(raw)||!raw.length) fibLevels=defaultFibLevels();
+  // migrasi skema lama (array angka) → array objek {value,color}
+  else fibLevels=raw.map((it,i)=> (typeof it==='number') ? {value:it,color:fibColor(it,i)} : {value:+it.value,color:it.color||fibColor(+it.value,i)});
+}catch(e){ fibLevels=defaultFibLevels(); }
 function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
 function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
 
@@ -1041,9 +1050,10 @@ klinecharts.registerOverlay({
     const st=dstyle(overlay);
     const d=priceDecimals();
     // hitung posisi y, harga & warna tiap level, urut dari atas ke bawah
-    const rows=fibLevels.map((Lv,i)=>{
+    const rows=fibLevels.map((lv,i)=>{
+      const Lv=lv.value;
       const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
-      return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: fibColor(Lv,i) };
+      return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: lv.color||fibColor(Lv,i) };
     }).sort((a,b)=>a.y-b.y);
     const figs=[];
     // background terisi antar level (warna = level batas atasnya, transparan ~12%)
@@ -1069,6 +1079,8 @@ function posFigures(dir){
     if(!coordinates.length||pts[0].value==null) return [];
     const dec=priceDecimals();
     const pip=parseFloat(document.getElementById('pipSize').value)||0.0001;
+    const units=currentLots()*unitsPer();   // ukuran posisi dari lot di order panel
+    const amtStr=v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     const C=subBarCoords(overlay,coordinates);
     const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
@@ -1091,7 +1103,8 @@ function posFigures(dir){
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
     box(yE,yT,POS_GBG); line(yT,POS_GREEN); line(yE,'#9aa4b2');
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
-    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p ('+tpPct.toFixed(3)+'%)', POS_GREEN, 'left', tBase);
+    const tpAmt=Math.abs(pnlUsd(dir,entry,tp,units));   // reward $ bila TP kena
+    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p ('+tpPct.toFixed(3)+'%)   Amount: '+amtStr(tpAmt), POS_GREEN, 'left', tBase);
 
     if(haveSL){
       const sl=pts[2].value, yS=C[2].y;
@@ -2770,10 +2783,11 @@ function showObjPopup(o, cx, cy){
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  objPop.innerHTML=`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`
+  const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
+  objPop.innerHTML=(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
-    +`<div class="pp-act">${o.name==='fib3'?'<button id="ppFib">⚙ Level</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
+    +`<div class="pp-act">${isFib?'<button id="ppFib">⚙ Level &amp; Warna</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
   objPop.style.top =Math.min(cy,window.innerHeight-220)+'px';
   objPop.classList.add('show');
@@ -2790,16 +2804,17 @@ document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
 function showFibPop(cx,cy){
-  const rows=fibLevels.map((v,i)=>`<div class="fp-row"><input type="number" step="0.001" value="${v}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
+  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Warna level"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
   fibPop.innerHTML=`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
     +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
   fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
   fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
   fibPop.classList.add('show');
-  fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i]=v; saveFibLevels(); } });
-  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[0]; saveFibLevels(); showFibPop(cx,cy); });
-  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push(0.618); saveFibLevels(); showFibPop(cx,cy); };
-  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=FIB_DEFAULT.slice(); saveFibLevels(); showFibPop(cx,cy); };
+  fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
+  fibPop.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
+  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(cx,cy); });
+  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(cx,cy); };
+  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(cx,cy); };
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
