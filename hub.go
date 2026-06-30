@@ -115,10 +115,23 @@ func (h *Hub) runUpstream(ctx context.Context) {
 func (h *Hub) broadcast(t Tick) {
 	h.mu.Lock()
 	h.last[t.Instrument] = t // simpan snapshot utk subscriber berikutnya
+	// DXY tak ada di OANDA: tiap kali komponen update, hitung ulang & siarkan
+	// tick DXY sintetis (lihat dxy.go) → chart DXY gerak mulus per-tick.
+	send := [2]Tick{t}
+	n := 1
+	if isDXYComponent(t.Instrument) {
+		if dt, ok := synthDXYTick(h.last); ok {
+			h.last[dxyInstrument] = dt
+			send[1] = dt
+			n = 2
+		}
+	}
 	for ch := range h.subs {
-		select {
-		case ch <- t:
-		default:
+		for _, tk := range send[:n] {
+			select {
+			case ch <- tk:
+			default:
+			}
 		}
 	}
 	h.mu.Unlock()

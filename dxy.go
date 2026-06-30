@@ -37,6 +37,41 @@ var dxyComps = []struct {
 	{"USD_CHF", 0.036},
 }
 
+const dxyInstrument = Instrument("DXY")
+
+// isDXYComponent: true bila instrumen termasuk salah satu komponen DXY.
+func isDXYComponent(inst Instrument) bool {
+	for _, c := range dxyComps {
+		if Instrument(c.inst) == inst {
+			return true
+		}
+	}
+	return false
+}
+
+// synthDXYTick menghitung tick DXY dari mid 6 komponen pada snapshot `last`.
+// ok=false bila ada komponen yang belum punya harga (DXY belum bisa dihitung).
+func synthDXYTick(last map[Instrument]Tick) (Tick, bool) {
+	val := dxyConst
+	var latest string
+	for _, c := range dxyComps {
+		t, ok := last[Instrument(c.inst)]
+		if !ok {
+			return Tick{}, false
+		}
+		mid := (t.Bid + t.Ask) / 2
+		if mid <= 0 {
+			return Tick{}, false
+		}
+		val *= math.Pow(mid, c.exp)
+		if t.Time > latest {
+			latest = t.Time
+		}
+	}
+	// DXY = indeks (tak ada spread nyata) → bid=ask=nilai.
+	return Tick{Instrument: dxyInstrument, Bid: val, Ask: val, Time: latest}, true
+}
+
 type oandaCandle struct {
 	Time string `json:"time"`
 	Mid  struct {

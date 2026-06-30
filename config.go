@@ -84,6 +84,9 @@ func loadConfig() Config {
 		c.StreamInstruments = []string{
 			"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD",
 			"XAU_USD", "XAG_USD", "GBP_JPY", "EUR_JPY", "BTC_USD",
+			// USD_SEK & USD_CHF: bukan utk ditampilkan, tapi komponen DXY sintetis
+			// (lihat dxy.go) — di-stream agar tick DXY bisa dihitung realtime.
+			"USD_SEK", "USD_CHF",
 		}
 	}
 	c.Creds = BrokerCreds{
