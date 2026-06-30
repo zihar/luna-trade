@@ -2097,10 +2097,11 @@ function tfDefaultRisk(){
   }
   return (parseFloat($('#slPips').value)||20)*(parseFloat($('#pipSize').value)||0.0001); // fallback
 }
-// 5 titik: 0 Entry · 1 TP · 2 SL · 3 handle-lebar-kiri · 4 handle-lebar-kanan.
+// 6 titik: 0 Entry-kiri(tengah) · 1 TP-kanan · 2 SL-kanan · 3 TP-kiri · 4 SL-kiri · 5 Entry-kanan(tengah).
+// Pojok (1,2,3,4) = drag 2 arah; tengah (0,5) = horizontal saja. Level TP/SL dibaca dari pts[1]/pts[2].
 function expandPosition(o){
   if(!o || (o.name!=='longPosition' && o.name!=='shortPosition')) return;
-  if(!o.points || o.points.length>=5) return;          // sudah di-expand
+  if(!o.points || o.points.length>=6) return;          // sudah di-expand
   const p0=o.points[0]; if(!p0 || p0.value==null) return;
   const dir=o.name==='longPosition'?'long':'short';
   const entry=p0.value;
@@ -2111,25 +2112,35 @@ function expandPosition(o){
   const Lxa=keyOf(p0), li=revealed(currentTF).length-1, Rxa=(fidxOf(p0)+15>li)?{dataIndex:fidxOf(p0)+15}:{timestamp:tsOf(p0)+15*DUR[currentTF]};
   try{ chart.overrideOverlay({ id:o.id, points:[
     Object.assign({value:entry},Lxa), Object.assign({value:tp},Rxa), Object.assign({value:sl},Rxa),
-    Object.assign({value:tp},Lxa),    Object.assign({value:entry},Rxa) ] }); }
+    Object.assign({value:tp},Lxa),    Object.assign({value:sl},Lxa),  Object.assign({value:entry},Rxa) ] }); }
   catch(e){ setStatus('Position expand error: '+e.message,true); }
 }
-// Entry/TP/SL = drag vertikal (level); handle kiri/kanan = drag horizontal (lebar waktu).
+// Pojok TP/SL = drag 2 arah (level + lebar), level di-clamp tak melewati Entry (titik tengah).
+// Handle tengah (Entry kiri/kanan) = horizontal saja (level Entry tetap).
 function posPressedMove(t){
   const pts=t.points, k=t.performPointIndex, pp=t.performPoint;
-  if(!pts||pts.length<5||pp==null) return;
-  let entry=pts[0].value, tp=pts[1].value, sl=pts[2].value;
-  let tL=keyOf(pts[0]), tR=keyOf(pts[1]);
-  if(k===0) entry=pp.value;            // Entry: hanya level
-  else if(k===1) tp=pp.value;          // TP: hanya level
-  else if(k===2) sl=pp.value;          // SL: hanya level
-  else if(k===3) tL=keyOf(pp);         // handle kiri: hanya lebar
-  else if(k===4) tR=keyOf(pp);         // handle kanan: hanya lebar
-  pts[0]=Object.assign({value:entry}, tL);
-  pts[1]=Object.assign({value:tp}, tR);
-  pts[2]=Object.assign({value:sl}, tR);
-  pts[3]=Object.assign({value:tp}, tL);     // di sisi kiri, sejajar garis TP (tak menimpa Entry)
-  pts[4]=Object.assign({value:entry}, tR);  // di sisi kanan, sejajar garis Entry
+  if(!pts||pts.length<6||pp==null) return;
+  // klinecharts SUDAH mengubah titik yg di-drag sebelum handler ini → baca nilai stabil
+  // dari titik KEMBAR yg tak di-drag (entry di 0&5, tp di 1&3, sl di 2&4).
+  const entry = (k===0)?pts[5].value : pts[0].value;
+  const tpRef = (k===1)?pts[3].value : pts[1].value;
+  const slRef = (k===2)?pts[4].value : pts[2].value;
+  const tpSide=Math.sign(tpRef-entry)||1, slSide=Math.sign(slRef-entry)||-1;
+  const clamp=(v,side)=> side>0 ? Math.max(v,entry) : Math.min(v,entry);  // TP/SL tak boleh seberangi Entry
+  let tp=tpRef, sl=slRef;
+  if(k===1||k===3) tp=clamp(pp.value,tpSide);   // pojok TP: ubah level (clamp)
+  if(k===2||k===4) sl=clamp(pp.value,slSide);   // pojok SL: ubah level (clamp)
+  // x: titik kiri = 0,3,4 · titik kanan = 1,2,5. Yg di-drag pakai pp; sisi lain pakai titik stabil.
+  const leftSet=(k===0||k===3||k===4);
+  let tL = leftSet ? keyOf(pp) : keyOf(pts[3]);   // pts[3]=TP-kiri (titik kiri stabil)
+  let tR = leftSet ? keyOf(pts[1]) : keyOf(pp);   // pts[1]=TP-kanan (titik kanan stabil)
+  if(fidxOf(tL)>fidxOf(tR)){ const tmp=tL; tL=tR; tR=tmp; }   // jaga kiri < kanan
+  pts[0]=Object.assign({value:entry}, tL);   // Entry-kiri (tengah)
+  pts[1]=Object.assign({value:tp},    tR);   // TP-kanan (pojok)
+  pts[2]=Object.assign({value:sl},    tR);   // SL-kanan (pojok)
+  pts[3]=Object.assign({value:tp},    tL);   // TP-kiri (pojok)
+  pts[4]=Object.assign({value:sl},    tL);   // SL-kiri (pojok)
+  pts[5]=Object.assign({value:entry}, tR);   // Entry-kanan (tengah)
 }
 
 const DRAW_TOOLS=[
