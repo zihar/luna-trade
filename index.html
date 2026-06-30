@@ -1079,8 +1079,7 @@ function posFigures(dir){
     if(!coordinates.length||pts[0].value==null) return [];
     const dec=priceDecimals();
     const pip=parseFloat(document.getElementById('pipSize').value)||0.0001;
-    const units=currentLots()*unitsPer();   // ukuran posisi dari lot di order panel
-    const amtStr=v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const tickN=d=>Math.round(d*Math.pow(10,dec));   // jumlah tick = Δharga ÷ (10^-desimal)
     const C=subBarCoords(overlay,coordinates);
     const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
@@ -1103,8 +1102,7 @@ function posFigures(dir){
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
     box(yE,yT,POS_GBG); line(yT,POS_GREEN); line(yE,'#9aa4b2');
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
-    const tpAmt=Math.abs(pnlUsd(dir,entry,tp,units));   // reward $ bila TP kena
-    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p ('+tpPct.toFixed(3)+'%)   Amount: '+amtStr(tpAmt), POS_GREEN, 'left', tBase);
+    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', POS_GREEN, 'left', tBase);
 
     if(haveSL){
       const sl=pts[2].value, yS=C[2].y;
@@ -1112,8 +1110,7 @@ function posFigures(dir){
       const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
       box(yE,yS,POS_RBG); line(yS,POS_RED);
       const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
-      const slAmt=Math.abs(pnlUsd(dir,entry,sl,units));   // risk $ bila SL kena
-      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p ('+slPct.toFixed(3)+'%)   Amount: '+amtStr(slAmt), POS_RED, 'left', sBase);
+      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p · '+tickN(Math.abs(entry-sl))+'t ('+slPct.toFixed(3)+'%)', POS_RED, 'left', sBase);
       pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
     } else {
       pill(xL, yE, 'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']', 'rgba(20,28,40,0.92)', 'left', 'middle');
