@@ -1087,12 +1087,12 @@ function posFigures(dir){
     const F=[];
     const line=(y,c)=>F.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:c,size:1}});
     const box =(y1,y2,c)=>F.push({type:'rect',attrs:{x:xL,y:Math.min(y1,y2),width:xR-xL,height:Math.abs(y2-y1)},styles:{style:'fill',color:c}});
+    // Teks pill & handle hanya tampil saat posisi DIPILIH (klik) atau di-HOVER; selain itu hilang
+    // (cuma body + garis Entry yang tersisa). posRerender() di hook select/hover memaksa toggle.
+    const showH = (overlay.id===selectedId || overlay.id===hoverId);
     // pill ala TV: teks putih + background berwarna + sudut membulat
-    const pill=(x,y,text,bg,align,baseline)=>F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
-      styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}});
-    // handle persegi membulat — tampil HANYA saat posisi dipilih (klik); hilang saat klik di tempat
-    // lain. posRerender() di hook onSelected/onDeselected memaksa toggle seketika. Drag via titik default.
-    const showH = (overlay.id===selectedId);
+    const pill=(x,y,text,bg,align,baseline)=>{ if(showH) F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
+      styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}}); };
     const handle=(x,y)=>{ if(showH) F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'rgba(24,32,48,0.92)',borderColor:'#4a8bff',borderSize:1.5,borderRadius:3}}); };
 
     const entry=pts[0].value, yE=C[0].y;
@@ -1102,7 +1102,7 @@ function posFigures(dir){
 
     const tp=pts[1].value, yT=C[1].y;
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
-    box(yE,yT,POS_GBG); line(yT,POS_GREEN); line(yE,'#9aa4b2');
+    box(yE,yT,POS_GBG); line(yE,'#9aa4b2');   // body target + garis Entry (garis TP atas dihapus)
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
     pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', POS_GREEN, 'left', tBase);
 
@@ -1110,7 +1110,7 @@ function posFigures(dir){
       const sl=pts[2].value, yS=C[2].y;
       const slPips=Math.round(Math.abs(entry-sl)/pip), slPct=(Math.abs(entry-sl)/entry*100);
       const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
-      box(yE,yS,POS_RBG); line(yS,POS_RED);
+      box(yE,yS,POS_RBG);   // body stop (garis SL bawah dihapus)
       const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
       pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p · '+tickN(Math.abs(entry-sl))+'t ('+slPct.toFixed(3)+'%)', POS_RED, 'left', sBase);
       pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
@@ -2010,8 +2010,8 @@ function delHooks(){ return {
     if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} posRerender(e.overlay); return false; },
-  onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; return false; },
-  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} } return false; },
+  onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
+  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; return false; },
 };}
 function createDraw(name,btn,extra){
