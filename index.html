@@ -1080,7 +1080,10 @@ function posFigures(dir){
     if(!coordinates.length||pts[0].value==null) return [];
     const dec=priceDecimals();
     const pip=parseFloat(document.getElementById('pipSize').value)||0.0001;
-    const tickN=d=>Math.round(d*Math.pow(10,dec));   // jumlah tick = Δharga ÷ (10^-desimal)
+    // mintick utk hitung jumlah tick: emas (XAU) pakai 0.01 spt TV (TV emas 2 desimal,
+    // Luna 3) → tick tak 10× lebih banyak; instrumen lain pakai 10^-desimal.
+    const tkSize = inst.includes('XAU') ? 0.01 : Math.pow(10,-dec);
+    const tickN=d=>Math.round(d/tkSize);
     const C=subBarCoords(overlay,coordinates);
     const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
