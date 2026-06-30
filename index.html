@@ -1991,8 +1991,9 @@ function updateOpenTradeBox(){
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
-// paksa render ulang overlay posisi saat select/deselect → handle muncul/hilang seketika
-function posRerender(o){ try{ if(o&&(o.name==='longPosition'||o.name==='shortPosition')) chart.overrideOverlay({id:o.id,points:o.points}); }catch(_){} }
+// paksa render ulang overlay posisi saat select/hover → handle & teks muncul/hilang seketika.
+// HANYA utk posisi yg sudah lengkap (6 titik) & tidak sedang digambar — jangan ganggu proses draw.
+function posRerender(o){ try{ if(o&&(o.name==='longPosition'||o.name==='shortPosition')&&o.id!==inProgressId&&o.points&&o.points.length>=6) chart.overrideOverlay({id:o.id,points:o.points}); }catch(_){} }
 function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
