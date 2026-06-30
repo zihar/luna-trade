@@ -974,7 +974,7 @@ klinecharts.registerOverlay({
     const st=dstyle(overlay);
     const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))}];
     const t=overlay&&overlay.extendData;
-    if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my,text:String(t),align:'center',baseline:'middle'},
+    if(t){ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; figs.push({type:'text',attrs:{x:mx,y:my-4,text:String(t),align:'center',baseline:'bottom'},
       styles:{color:drawTextColor,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
   }
