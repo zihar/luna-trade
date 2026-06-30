@@ -393,6 +393,9 @@
   .cp-tf:hover{ color:var(--txt); }
   .cp-tf.on{ color:var(--txt); background:var(--border); }
   .cp-last{ margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .cp-act{ margin-left:6px; font-size:13px; line-height:1; padding:2px 5px; background:transparent;
+           border:1px solid var(--border); border-radius:5px; color:var(--muted); cursor:pointer; }
+  .cp-act:hover{ color:var(--accent); border-color:var(--accent); }
   #layoutbtns{ display:inline-flex; gap:3px; }
   #layoutbtns button{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:22px;
                       padding:0; background:transparent; border:1px solid var(--border); border-radius:5px;
@@ -2896,7 +2899,9 @@ function makeSecondary(slot){
   const tfs=document.createElement('span'); tfs.className='cp-tfs';
   TF_LIST.forEach(tf=>{ const b=document.createElement('button'); b.className='cp-tf'; b.dataset.tf=tf; b.textContent=TF_LABEL[tf]||tf; tfs.appendChild(b); });
   const last=document.createElement('span'); last.className='cp-last';
-  hd.appendChild(sel); hd.appendChild(tfs); hd.appendChild(last);
+  const act=document.createElement('button'); act.className='cp-act'; act.textContent='⌖';
+  act.title='Jadikan panel aktif (trading & drawing pindah ke sini)';
+  hd.appendChild(sel); hd.appendChild(tfs); hd.appendChild(last); hd.appendChild(act);
   const cdiv=document.createElement('div'); cdiv.className='cp-chart';
   panel.appendChild(hd); panel.appendChild(cdiv);
 
@@ -2952,20 +2957,41 @@ function makeSecondary(slot){
 
   sel.onchange=()=>{ sc.sym=sel.value; sc.load(); persistSec(); };
   tfs.querySelectorAll('button').forEach(b=> b.onclick=()=>{ sc.tf=b.dataset.tf; sc.highlightTF(); sc.load(); persistSec(); });
-  hd.ondblclick=(e)=>{ if(e.target===sel || e.target.closest('.cp-tf')) return; focusIntoPrimary(sc.sym,sc.tf); };
+  act.onclick=()=>activatePanel(sc);
+  hd.ondblclick=(e)=>{ if(e.target===sel || e.target.closest('.cp-tf') || e.target===act) return; activatePanel(sc); };
   return sc;
 }
 
-// muat simbol+TF panel sekunder ke chart utama (cara "mengaktifkan" untuk trading/drawing)
+// muat simbol+TF ke chart utama (panel penuh: trading/drawing/replay)
 function focusIntoPrimary(sym,tf){
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
   $('#instrument').value=sym; guessPip(); renderWatch(); loadInit(true);
+}
+// tukar dua node bersaudara di DOM (posisi grid ikut DOM order)
+function swapNodes(a,b){
+  if(!a||!b||a===b) return;
+  const m=document.createComment(''); a.parentNode.insertBefore(m,a);
+  b.parentNode.insertBefore(a,b); m.parentNode.insertBefore(b,m); m.remove();
+}
+function markActivePanel(){
+  document.querySelectorAll('#chartgrid .cpanel').forEach(p=>p.classList.toggle('active', p.classList.contains('cpanel-pri')));
+}
+// jadikan panel sekunder `sc` sebagai panel AKTIF: panel utama (penuh) pindah ke
+// posisi sc & ambil simbol/TF-nya; sc bertukar tempat & menampilkan simbol lama utama.
+function activatePanel(sc){
+  const grid=$('#chartgrid'), pri=grid.querySelector('.cpanel-pri'); if(!pri) return;
+  const oldInst=inst, oldTF=currentTF, newInst=sc.sym, newTF=sc.tf;
+  swapNodes(pri, sc.panel);
+  sc.setSymTF(oldInst, oldTF); sc.load(); persistSec();   // sekunder ambil simbol lama panel utama
+  focusIntoPrimary(newInst, newTF);                        // panel utama ambil simbol panel terpilih
+  markActivePanel(); resizeAllCharts();
 }
 function resizeAllCharts(){ requestAnimationFrame(()=>{ try{chart.resize();}catch(e){} secondaries.forEach(sc=>{try{sc.chart.resize();}catch(e){}}); try{updatePriceTimer();}catch(e){} }); }
 
 function setLayout(n){
   chartLayout=n; localStorage.setItem('br_layout',n);
   const grid=$('#chartgrid'); grid.className='lay-'+n;
+  const pri=grid.querySelector('.cpanel-pri'); if(pri) grid.insertBefore(pri, grid.firstChild);  // panel utama balik ke kiri-atas saat ganti layout
   const need=n-1, saved=savedSecConfig();
   while(secondaries.length>need){ secondaries.pop().dispose(); }
   while(secondaries.length<need){
@@ -2975,7 +3001,7 @@ function setLayout(n){
   }
   persistSec();
   $('#layoutbtns').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
-  resizeAllCharts();
+  markActivePanel(); resizeAllCharts();
 }
 
 function initMultiChart(){
