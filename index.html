@@ -1061,6 +1061,8 @@ klinecharts.registerOverlay({
 
 // custom overlay: Long / Short position (ala TV) — 3 titik independen: Entry, TP, SL.
 // TP & SL bisa di-drag sendiri-sendiri; RR dihitung live dari jaraknya.
+// Warna ala TradingView untuk position tool
+const POS_GREEN='#089981', POS_RED='#f23645', POS_GBG='rgba(8,153,129,0.12)', POS_RBG='rgba(242,54,69,0.12)';
 function posFigures(dir){
   return ({overlay,coordinates,bounding})=>{
     const pts=overlay.points;
@@ -1070,30 +1072,39 @@ function posFigures(dir){
     const C=subBarCoords(overlay,coordinates);
     const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
-    if(xR<=xL) xR=(bounding&&bounding.width)?bounding.width:xL+140;
+    if(xR<=xL) xR=(bounding&&bounding.width)?bounding.width:xL+160;
     const F=[];
     const line=(y,c)=>F.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:c,size:1}});
     const box =(y1,y2,c)=>F.push({type:'rect',attrs:{x:xL,y:Math.min(y1,y2),width:xR-xL,height:Math.abs(y2-y1)},styles:{style:'fill',color:c}});
-    const txt =(y,t,c,bl)=>F.push({type:'text',attrs:{x:xL+4,y,text:t,align:'left',baseline:bl||'bottom'},styles:{color:c,size:10}});
+    // pill ala TV: teks putih + background berwarna + sudut membulat
+    const pill=(x,y,text,bg,align,baseline)=>F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
+      styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}});
+    // handle persegi membulat SELALU tampil (drag tetap ditangani klinecharts via titik default)
+    const handle=(x,y)=>F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'rgba(24,32,48,0.92)',borderColor:'#4a8bff',borderSize:1.5,borderRadius:3}});
 
     const entry=pts[0].value, yE=C[0].y;
     const haveTP = pts.length>1 && pts[1] && pts[1].value!=null && coordinates.length>1;
     const haveSL = pts.length>2 && pts[2] && pts[2].value!=null && coordinates.length>2;
-    if(!haveTP){ line(yE,'#4a71ff'); txt(yE,'Entry '+entry.toFixed(dec),'#4a71ff'); return F; }
+    if(!haveTP){ line(yE,'#9aa4b2'); pill(xL,yE,'Entry '+entry.toFixed(dec),'rgba(20,28,40,0.92)'); handle(C[0].x,yE); return F; }
 
     const tp=pts[1].value, yT=C[1].y;
-    box(yE,yT,'rgba(84,200,140,0.16)'); line(yT,'#54c88c'); line(yE,'#4a71ff');
-    txt(yT,'TP '+tp.toFixed(dec)+'  ('+Math.round(Math.abs(tp-entry)/pip)+'p)','#54c88c');
-    if(!haveSL){
-      txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  — klik SL','#4a71ff');
-      return F;
+    const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
+    box(yE,yT,POS_GBG); line(yT,POS_GREEN); line(yE,'#9aa4b2');
+    const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
+    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p ('+tpPct.toFixed(3)+'%)', POS_GREEN, 'left', tBase);
+
+    if(haveSL){
+      const sl=pts[2].value, yS=C[2].y;
+      const slPips=Math.round(Math.abs(entry-sl)/pip), slPct=(Math.abs(entry-sl)/entry*100);
+      const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
+      box(yE,yS,POS_RBG); line(yS,POS_RED);
+      const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
+      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p ('+slPct.toFixed(3)+'%)', POS_RED, 'left', sBase);
+      pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
+    } else {
+      pill(xL, yE, 'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']', 'rgba(20,28,40,0.92)', 'left', 'middle');
     }
-    const sl=pts[2].value, yS=C[2].y;
-    const riskDist=Math.abs(entry-sl), rewDist=Math.abs(tp-entry);
-    const rr=riskDist?(rewDist/riskDist):0;
-    box(yE,yS,'rgba(255,111,111,0.16)'); line(yS,'#ff6f6f');
-    txt(yE,'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']  RR 1:'+rr.toFixed(2),'#4a71ff');
-    txt(yS,'SL '+sl.toFixed(dec)+'  ('+Math.round(riskDist/pip)+'p)','#ff6f6f','top');
+    C.forEach(c=>handle(c.x,c.y));   // handle di tiap titik draggable
     return F;
   };
 }
