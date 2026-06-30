@@ -1090,8 +1090,10 @@ function posFigures(dir){
     // pill ala TV: teks putih + background berwarna + sudut membulat
     const pill=(x,y,text,bg,align,baseline)=>F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
       styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}});
-    // handle persegi membulat SELALU tampil (drag tetap ditangani klinecharts via titik default)
-    const handle=(x,y)=>F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'rgba(24,32,48,0.92)',borderColor:'#4a8bff',borderSize:1.5,borderRadius:3}});
+    // handle persegi membulat — tampil HANYA saat posisi dipilih (klik); hilang saat klik di tempat
+    // lain. posRerender() di hook onSelected/onDeselected memaksa toggle seketika. Drag via titik default.
+    const showH = (overlay.id===selectedId);
+    const handle=(x,y)=>{ if(showH) F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'rgba(24,32,48,0.92)',borderColor:'#4a8bff',borderSize:1.5,borderRadius:3}}); };
 
     const entry=pts[0].value, yE=C[0].y;
     const haveTP = pts.length>1 && pts[1] && pts[1].value!=null && coordinates.length>1;
@@ -1989,6 +1991,8 @@ function updateOpenTradeBox(){
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
+// paksa render ulang overlay posisi saat select/deselect → handle muncul/hilang seketika
+function posRerender(o){ try{ if(o&&(o.name==='longPosition'||o.name==='shortPosition')) chart.overrideOverlay({id:o.id,points:o.points}); }catch(_){} }
 function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
@@ -2004,8 +2008,8 @@ function delHooks(){ return {
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
     if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
-  onSelected:(e)=>{ selectedId=e.overlay.id; return false; },
-  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} return false; },
+  onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
+  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} posRerender(e.overlay); return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; return false; },
