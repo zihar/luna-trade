@@ -583,7 +583,23 @@
     border:1px solid var(--border); color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.04em; flex:0 0 auto; }
   .op3-chip:hover{ color:var(--txt); border-color:var(--btn-border-hover); }
   /* aktif = halus & netral; border-color WAJIB di-set utk override global `button.on` (biru) */
-  .op3-chip.on{ color:var(--txt); background:var(--btn-hover); border-color:var(--btn-border-hover); }
+  /* chip aktif: warna jelas per fungsi (SL merah, TP hijau, RISK accent) */
+  #chipSL.on{ color:var(--red); border-color:var(--red); background:rgba(255,111,111,.14); }
+  #chipTP.on{ color:var(--green); border-color:var(--green); background:rgba(84,200,140,.14); }
+  #chipRisk.on{ color:var(--accent); border-color:var(--accent); background:rgba(74,113,255,.14); }
+  /* editor "stage" simple: baris per chip aktif */
+  .op3-stage{ display:flex; flex-direction:column; gap:5px; }
+  .op3-stage:not(:has(> .op3-stage-row:not([hidden]))){ display:none; }   /* tak ada baris aktif → tak makan ruang */
+  .op3-stage-row{ display:flex; align-items:center; gap:8px; }
+  .op3-stage-row[hidden]{ display:none; }
+  .op3-stage-lbl{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; min-width:62px; }
+  .op3-stage-lbl.sl{ color:var(--red); } .op3-stage-lbl.tp{ color:var(--green); } .op3-stage-lbl.risk{ color:var(--accent); }
+  .op3-stage-step{ display:flex; align-items:center; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:var(--inset); }
+  .op3-stage-step button{ width:23px; height:21px; padding:0; border:0; border-radius:0; background:transparent; color:var(--muted); font-size:14px; line-height:1; }
+  .op3-stage-step button:hover{ color:var(--txt); background:var(--btn-hover); }
+  .op3-stage-step .v{ min-width:40px; text-align:center; font-size:11px; font-weight:700; color:var(--txt); }
+  .op3-stage-out{ margin-left:auto; font-size:10px; color:var(--muted); }
+  .op3-stage-out.pos{ color:var(--green); } .op3-stage-out.neg{ color:var(--red); }
   /* mode simple: Init. Margin jadi garis pembatas section + pegangan geser panel */
   .op3-margin-c{ display:flex; align-items:center; gap:9px; text-align:center; cursor:move; touch-action:none; }
   .op3-margin-c::before, .op3-margin-c::after{ content:""; flex:1; height:1px; background:var(--line); }
@@ -729,6 +745,24 @@
             <button type="button" class="op3-chip" id="chipTP" title="Take Profit">TP</button>
             <button type="button" class="op-chev" id="op2Expand" title="Expand detail">⌄</button>
             <button type="button" class="op-chev op-x" title="Close order panel">✕</button>
+          </div>
+          <!-- editor "stage" (muncul saat chip aktif) -->
+          <div class="op3-stage" id="opStage">
+            <div class="op3-stage-row" id="stageRisk" hidden>
+              <span class="op3-stage-lbl risk">Risk</span>
+              <div class="op3-stage-step"><button type="button" data-stg="riskPct" data-d="-1">−</button><span class="v" id="stgRiskV">1%</span><button type="button" data-stg="riskPct" data-d="1">+</button></div>
+              <span class="op3-stage-out" id="stgRiskOut">—</span>
+            </div>
+            <div class="op3-stage-row" id="stageSL" hidden>
+              <span class="op3-stage-lbl sl">Stop Loss</span>
+              <div class="op3-stage-step"><button type="button" data-stg="slPips" data-d="-1">−</button><span class="v" id="stgSLV">100</span><button type="button" data-stg="slPips" data-d="1">+</button></div>
+              <span class="op3-stage-out neg" id="stgSLOut">—</span>
+            </div>
+            <div class="op3-stage-row" id="stageTP" hidden>
+              <span class="op3-stage-lbl tp">Take Profit</span>
+              <div class="op3-stage-step"><button type="button" data-stg="tpPips" data-d="-1">−</button><span class="v" id="stgTPV">200</span><button type="button" data-stg="tpPips" data-d="1">+</button></div>
+              <span class="op3-stage-out pos" id="stgTPOut">—</span>
+            </div>
           </div>
           <div class="op3-margin op3-margin-c" id="op2Margin">Init. Margin: —</div>
           <div class="op3-deal">
@@ -1669,20 +1703,31 @@ function renderOrderPanel(){
   // dim kolom SL/TP saat nonaktif
   document.querySelectorAll('.tl-cell.sl').forEach(c=>c.classList.toggle('off',!slOn));
   document.querySelectorAll('.tl-cell.tp').forEach(c=>c.classList.toggle('off',!tpOn));
-  // grid Price / Ticks / P&L / Balance (Ticks = input, sisanya read-only)
+  const set=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
+  // editor "stage" (simple): tampil/sembunyi baris + nilai ticks/risk
+  const sgRisk=$('#stageRisk'), sgSL=$('#stageSL'), sgTP=$('#stageTP');
+  if(sgRisk) sgRisk.hidden=!$('#riskOn').checked;
+  if(sgSL) sgSL.hidden=!slOn;
+  if(sgTP) sgTP.hidden=!tpOn;
+  set('#stgRiskV', (+$('#riskPct').value||0)+'%');
+  set('#stgSLV', String(slp)); set('#stgTPV', String(+$('#tpPips').value||0));
+  const sug=suggestLotsFromRisk(); set('#stgRiskOut', sug!=null?('≈ '+sug.toFixed(lotDec())+' '+lotUnitName()):'—');
+  // grid Price / Ticks / P&L / Balance + output stage SL/TP
   if(entry!=null){
     const slDist=slp*pip, sl=isSell?entry+slDist:entry-slDist, tp=isSell?entry-slDist*rr:entry+slDist*rr;
     const loss=Math.abs(pnlUsd(orderDir,entry,sl,units)), rew=Math.abs(pnlUsd(orderDir,entry,tp,units));
-    const set=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
     set('#slPrice', fmtPx(sl)); set('#tpPrice', fmtPx(tp));
     set('#slPnl', '−'+loss.toFixed(2)); set('#slPct', '−'+(bal?(loss/bal*100).toFixed(2):'0.00'));
     set('#tpPnl', '+'+rew.toFixed(2)); set('#tpPct', '+'+(bal?(rew/bal*100).toFixed(2):'0.00'));
+    set('#stgSLOut', `${fmtPx(sl)} · −${usdGrp(loss)} / −${bal?(loss/bal*100).toFixed(2):'0.00'}%`);
+    set('#stgTPOut', `${fmtPx(tp)} · +${usdGrp(rew)} / +${bal?(rew/bal*100).toFixed(2):'0.00'}%`);
   }
   // Init. Margin (tampil di simple & expand)
   document.querySelectorAll('.op3-margin').forEach(mEl=>{
     if(cur){ const margin=units*cur.close*quoteToUsd(cur.close)/100;   // leverage 100
       mEl.innerHTML=`<span class="mtxt">Init. Margin: <b>~${usdGrp(margin)}</b> <span class="muted">(${bal?(margin/bal*100).toFixed(2):'0.00'}%)</span></span>`;
     } else mEl.innerHTML='<span class="mtxt">Init. Margin: —</span>'; });
+  try{ drawDraftLines(); }catch(e){}   // garis draft SL/TP di chart (sebelum order)
 }
 
 // ===================== replay control =====================
@@ -1876,10 +1921,46 @@ function openTrade(dir){
   trade={dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
          trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
          time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
-  drawTradeLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
+  clearDraftLines(); drawTradeLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)
 function moveLine(id,value){ if(id==null) return; try{ chart.overrideOverlay({id, points:[{value}]}); }catch(e){} }
+
+// ===== garis draft SL/TP (preview sebelum order; bisa di-drag) =====
+let draft={sl:null,tp:null};
+function clearDraftLines(){ ['sl','tp'].forEach(k=>{ if(draft[k]){ try{chart.removeOverlay(draft[k]);}catch(e){} draft[k]=null; } }); }
+function draftInfo(kind,price,entry,units){
+  const bal=+$('#balance').value||0, pnl=Math.abs(pnlUsd(orderDir,entry,price,units)), pct=bal?pnl/bal*100:0;
+  return kind==='sl'
+    ? {color:'#ff6f6f', text:`SL ${fmtPx(price)}   -${usdGrp(pnl)} / -${pct.toFixed(2)}%`}
+    : {color:'#54c88c', text:`TP ${fmtPx(price)}   +${usdGrp(pnl)} / +${pct.toFixed(2)}%`};
+}
+function draftLevel(kind,price,info){
+  return chart.createOverlay({ name:'tradeLevel', points:[{value:price}], extendData:{kind,color:info.color,label:info.text},
+    onPressedMoving:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
+      const ba=curBidAsk(), cur=currentCandle(), entry= ba?(orderDir==='short'?ba.bid:ba.ask):(cur?cur.close:null);
+      if(entry==null) return false;
+      const pip=+$('#pipSize').value||instSpec().pip, ticks=Math.max(1, Math.round(Math.abs(v-entry)/pip));
+      $(kind==='sl'?'#slPips':'#tpPips').value=ticks; renderOrderPanel(); try{renderSizing();}catch(_){}
+      return false; },
+  });
+}
+function drawDraftLines(){
+  if(trade || pending || T==null){ clearDraftLines(); return; }
+  const cur=currentCandle(), ba=curBidAsk(); if(!cur){ clearDraftLines(); return; }
+  const isSell=orderDir==='short', entry= ba?(isSell?ba.bid:ba.ask):cur.close;
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal(), dist=slp*pip, units=currentLots()*unitsPer();
+  const slPrice=($('#slOn').checked && slp>0) ? (isSell?entry+dist:entry-dist) : null;
+  const tpPrice=($('#tpOn').checked && slp>0) ? (isSell?entry-dist*rr:entry+dist*rr) : null;
+  const upd=(kind,price)=>{
+    if(price==null){ if(draft[kind]){ try{chart.removeOverlay(draft[kind]);}catch(e){} draft[kind]=null; } return; }
+    const info=draftInfo(kind,price,entry,units);
+    let alive=false; try{ alive=draft[kind]&&!!chart.getOverlayById(draft[kind]); }catch(e){ alive=!!draft[kind]; }
+    if(!alive) draft[kind]=draftLevel(kind,price,info);
+    else { try{ chart.overrideOverlay({id:draft[kind], points:[{value:price}], extendData:{kind,color:info.color,label:info.text}}); }catch(e){} }
+  };
+  upd('sl',slPrice); upd('tp',tpPrice);
+}
 function hline(value,color,onMove){
   return chart.createOverlay({
     name:'horizontalStraightLine', points:[{value}],
@@ -1952,7 +2033,7 @@ function placePending(dir){
   pending={dir,type,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
            lineEntry:null,lineSL:null,lineTP:null};
-  drawPendingLines(); updateOpenTradeBox();
+  clearDraftLines(); drawPendingLines(); updateOpenTradeBox();
   setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting for price to be touched.');
 }
 function drawPendingLines(){
@@ -2219,6 +2300,15 @@ $('#opTypePill').onclick=()=>{
 $('#chipRisk').onclick=()=>{ const c=$('#riskOn'); c.checked=!c.checked; c.onchange(); renderOrderPanel(); };
 $('#chipSL').onclick=()=>{ const c=$('#slOn'); c.checked=!c.checked; renderOrderPanel(); };
 $('#chipTP').onclick=()=>{ const c=$('#tpOn'); c.checked=!c.checked; renderOrderPanel(); };
+// stepper editor stage (simple): ubah input kanonik (slPips/tpPips/riskPct) + re-render
+document.querySelectorAll('.op3-stage-step button').forEach(b=>b.onclick=()=>{
+  const key=b.dataset.stg, dir=+b.dataset.d, isPct=key==='riskPct', step=isPct?0.1:1;
+  const el=$('#'+key); if(!el) return;
+  let v=(+el.value||0)+dir*step; v=Math.max(isPct?0.1:1, v);
+  el.value = isPct? v.toFixed(1) : String(Math.round(v));
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+  renderOrderPanel(); renderSizing();
+});
 function updateOpenTradeBox(){
   renderSizing();
   try{renderTrades();}catch(e){}
