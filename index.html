@@ -437,6 +437,10 @@
   .fp-row input[type=number]{ flex:1; width:100%; }
   .fp-color{ flex:0 0 auto; width:28px; height:26px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; }
   .fp-x{ width:26px; padding:5px 0; font-size:12px; color:var(--muted); }
+  .fp-bg{ display:flex; align-items:center; gap:7px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; font-size:11px; }
+  .fp-bg label{ display:flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
+  .fp-bg input[type=range]{ flex:1; min-width:0; }
+  .fp-bg #fpBgVal{ flex:0 0 auto; color:var(--muted); width:32px; text-align:right; }
   .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
   .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
 
@@ -1035,38 +1039,62 @@ try{
 }catch(e){ fibLevels=defaultFibLevels(); }
 function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
 function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
+// background isian antar level: default MATI; bisa diaktifkan + atur transparansi (opacity %) via editor
+let fibBg;
+try{ const raw=JSON.parse(localStorage.getItem('br_fibBg')); fibBg=(raw&&typeof raw==='object')?{on:!!raw.on,opacity:Math.max(0,Math.min(100,(+raw.opacity||12)))}:{on:false,opacity:12}; }
+catch(e){ fibBg={on:false,opacity:12}; }
+function saveFibBg(){ try{localStorage.setItem('br_fibBg',JSON.stringify(fibBg));}catch(e){} redrawFibs(); }
+function alphaHex(pct){ const a=Math.max(0,Math.min(255,Math.round(pct/100*255))); return a.toString(16).padStart(2,'0'); }
 
+// hitung posisi y, harga & warna tiap level fib (urut atas→bawah) + batas x
+function fibRowsOf(overlay,coordinates){
+  const C=subBarCoords(overlay,coordinates);
+  const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
+  const xL=Math.min(...xs), xR=Math.max(...xs), yTop=Math.min(...ys), yBot=Math.max(...ys);
+  const vals=overlay.points.map(p=>p.value).filter(v=>v!=null);
+  if(vals.length<2) return null;
+  const vTop=Math.max(...vals), vBot=Math.min(...vals);
+  const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
+  const rows=fibLevels.map((lv,i)=>{
+    const Lv=lv.value;
+    const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
+    return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: lv.color||fibColor(Lv,i) };
+  }).sort((a,b)=>a.y-b.y);
+  return {rows,xL,xR};
+}
 klinecharts.registerOverlay({
   name:'fib3', totalStep:3, needDefaultPointFigure:true,
+  needDefaultYAxisFigure:false,   // penanda harga (Y) kita render sendiri, hanya saat aktif
   performEventPressedMove:boxPressedMove,
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
-    const C=subBarCoords(overlay,coordinates);
-    const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
-    const xL=Math.min(...xs), xR=Math.max(...xs), yTop=Math.min(...ys), yBot=Math.max(...ys);
-    const vals=overlay.points.map(p=>p.value).filter(v=>v!=null);
-    if(vals.length<2) return [];
-    const vTop=Math.max(...vals), vBot=Math.min(...vals);
-    const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
+    const R=fibRowsOf(overlay,coordinates); if(!R) return [];
+    const {rows,xL,xR}=R;
     const st=dstyle(overlay);
-    const d=priceDecimals();
-    // hitung posisi y, harga & warna tiap level, urut dari atas ke bawah
-    const rows=fibLevels.map((lv,i)=>{
-      const Lv=lv.value;
-      const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
-      return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: lv.color||fibColor(Lv,i) };
-    }).sort((a,b)=>a.y-b.y);
     const figs=[];
-    // background terisi antar level (warna = level batas atasnya, transparan ~12%)
-    for(let i=0;i<rows.length-1;i++){
-      figs.push({type:'rect',attrs:{x:xL,y:rows[i].y,width:xR-xL,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+'1f',borderColor:'transparent'}});
+    // background terisi antar level (warna = level batas atasnya) — default mati, opacity diatur di editor
+    if(fibBg.on){ const ah=alphaHex(fibBg.opacity);
+      for(let i=0;i<rows.length-1;i++){
+        figs.push({type:'rect',attrs:{x:xL,y:rows[i].y,width:xR-xL,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+ah,borderColor:'transparent'}});
+      }
     }
-    // garis + label "%+harga" tiap level (warna per-level)
+    // garis + label persentase (harga dihilangkan dari garis → muncul di sumbu Y saat aktif)
+    // persentase ditaruh di pinggir kiri & sejajar tengah garis (bukan di atas garis)
     rows.forEach(r=>{
       figs.push({type:'line',attrs:{coordinates:[{x:xL,y:r.y},{x:xR,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
-      figs.push({type:'text',attrs:{x:xL+2,y:r.y-2,text:(r.Lv*100).toFixed(2)+'% ('+r.price.toFixed(d)+')',align:'left',baseline:'bottom'},styles:{color:r.color,size:10}});
+      figs.push({type:'text',attrs:{x:xL+3,y:r.y,text:(r.Lv*100).toFixed(2)+'%',align:'left',baseline:'middle'},styles:{color:r.color,size:10}});
     });
     return figs;
+  },
+  // penanda harga di sumbu Y untuk tiap level — hanya saat fib aktif (terpilih/hover)
+  createYAxisFigures:({overlay,coordinates,bounding,yAxis})=>{
+    if(coordinates.length<2) return [];
+    if(overlay.id!==selectedId && overlay.id!==hoverId) return [];
+    const R=fibRowsOf(overlay,coordinates); if(!R) return [];
+    const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
+    return R.rows.map(r=>({type:'text', ignoreEvent:true,
+      attrs:{x:fromZero?0:bounding.width, y:r.y, text:fmtPx(r.price), align:fromZero?'left':'right', baseline:'middle'},
+      styles:{color:'#fff', backgroundColor:r.color, borderColor:'rgba(0,0,0,0)'}}));
   }
 });
 
@@ -1999,7 +2027,11 @@ let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
 // paksa render ulang overlay posisi saat select/hover → handle & teks muncul/hilang seketika.
 // HANYA utk posisi yg sudah lengkap (6 titik) & tidak sedang digambar — jangan ganggu proses draw.
-function posRerender(o){ try{ if(o&&(o.name==='longPosition'||o.name==='shortPosition')&&o.id!==inProgressId&&o.points&&o.points.length>=6) chart.overrideOverlay({id:o.id,points:o.points}); }catch(_){} }
+function posRerender(o){ try{
+  if(!o||o.id===inProgressId||!o.points) return;
+  if((o.name==='longPosition'||o.name==='shortPosition')&&o.points.length>=6) chart.overrideOverlay({id:o.id,points:o.points});
+  else if(o.name==='fib3'&&o.points.length>=2) chart.overrideOverlay({id:o.id,points:o.points});  // toggle penanda harga Y saat aktif
+}catch(_){} }
 function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
@@ -2834,6 +2866,8 @@ const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.
 function showFibPop(cx,cy){
   const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Warna level"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
   fibPop.innerHTML=`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
+    +`<div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Background</label>`
+    +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div>`
     +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
   fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
   fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
@@ -2841,6 +2875,9 @@ function showFibPop(cx,cy){
   fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
   fibPop.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
   fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(cx,cy); });
+  const bgOn=fibPop.querySelector('#fpBgOn'), bgOp=fibPop.querySelector('#fpBgOp'), bgVal=fibPop.querySelector('#fpBgVal');
+  bgOn.onchange=()=>{ fibBg.on=bgOn.checked; bgOp.disabled=!fibBg.on; saveFibBg(); };
+  bgOp.oninput=()=>{ fibBg.opacity=+bgOp.value; bgVal.textContent=fibBg.opacity+'%'; saveFibBg(); };
   fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(cx,cy); };
   fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(cx,cy); };
 }
