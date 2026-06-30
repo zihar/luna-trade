@@ -55,6 +55,9 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(authSchema); err != nil {
 		return err
 	}
+	if _, err := s.db.Exec(analyticsSchema); err != nil {
+		return err
+	}
 	// Kolom tambahan (idempotent) — utk DB lama yg tabelnya sudah ada.
 	s.addColumnIfMissing("users", "picture", "TEXT")
 	return nil
@@ -532,4 +535,58 @@ func (s *Store) CloseJournal(brokerTradeID string, exit, pnlCcy, balanceAfter fl
 		exit, pnlCcy, balanceAfter, exitTime, brokerTradeID,
 	)
 	return err
+}
+
+// ===================== analytics (event usage fitur per user) =====================
+
+const analyticsSchema = `
+CREATE TABLE IF NOT EXISTS events (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  name    TEXT    NOT NULL,            -- nama event/fitur, mis. 'draw','order','layout'
+  props   TEXT,                        -- JSON properti opsional (instrument, tool, dst)
+  ts      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_events_name_ts ON events(name, ts);
+CREATE INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts);
+`
+
+// LogEvent menyimpan satu event pemakaian fitur. propsJSON boleh "" / "{}".
+func (s *Store) LogEvent(userID int64, name, propsJSON string) error {
+	_, err := s.db.Exec(`INSERT INTO events (user_id,name,props) VALUES (?,?,?)`, userID, name, propsJSON)
+	return err
+}
+
+// FeatureStat = ringkasan pemakaian satu fitur.
+type FeatureStat struct {
+	Name   string `json:"name"`
+	Count  int    `json:"count"`  // total event
+	Users  int    `json:"users"`  // user unik yang memakai
+}
+
+// FeatureUsage = pemakaian per fitur sejak `sinceISO` (RFC3339), urut terpopuler.
+func (s *Store) FeatureUsage(sinceISO string) ([]FeatureStat, error) {
+	rows, err := s.db.Query(
+		`SELECT name, COUNT(*) c, COUNT(DISTINCT user_id) u
+		 FROM events WHERE ts>=? GROUP BY name ORDER BY c DESC`, sinceISO)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FeatureStat
+	for rows.Next() {
+		var f FeatureStat
+		if err := rows.Scan(&f.Name, &f.Count, &f.Users); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// ActiveUsers = jumlah user unik yang punya event sejak `sinceISO`.
+func (s *Store) ActiveUsers(sinceISO string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM events WHERE ts>=?`, sinceISO).Scan(&n)
+	return n, err
 }

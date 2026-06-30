@@ -709,6 +709,8 @@ const NY_TZ = 'America/New_York';
 function resolveTZ(v){ return v==='__local' ? (Intl.DateTimeFormat().resolvedOptions().timeZone||NY_TZ) : (v||NY_TZ); }
 let chartTZ = resolveTZ(localStorage.getItem('br_tz'));
 const $ = s => document.querySelector(s);
+// analytics DIY: kirim event pemakaian fitur ke server (fire-and-forget; aman bila gagal/blm login)
+function track(name, props){ try{ fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,props:props||{}}),keepalive:true}).catch(()=>{}); }catch(e){} }
 
 // ===================== state =====================
 let inst = 'EUR_USD';
@@ -1418,6 +1420,7 @@ function reanchorFuturePoints(snap){
   }catch(e){} });
 }
 async function switchTF(tf){
+  track('timeframe',{tf});
   if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load first.'); return; }
   if(!tfData[tf]){
     setStatus('Fetching '+tf+' …');
@@ -1685,6 +1688,7 @@ function renderSizing(){
 function openTrade(dir){
   if(T==null||trade) return;
   const cur=currentCandle(); if(!cur) return;
+  track('order',{dir,inst});
   const ba=curBidAsk();
   const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // eksekusi di bid (sell) / ask (buy)
   const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=+$('#rr').value;
@@ -1757,6 +1761,7 @@ function onNewBar(c){ checkPending(c); checkTrade(c); checkAlerts(c); }
 // ---------- pending order (limit/stop) ----------
 function placePending(dir){
   if(T==null){ setStatus('Load first.',true); return; }
+  track('pending',{dir,inst});
   if(trade){ setStatus('Close position first (one position at a time).',true); return; }
   if(pending){ setStatus("There's already a pending — cancel it first.",true); return; }
   const cur=currentCandle(); if(!cur) return;
@@ -2066,6 +2071,7 @@ function delHooks(){ return {
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); return false; },
 };}
 function createDraw(name,btn,extra){
+  track('draw',{tool:name});
   try{
     pendingClicks=[];
     if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }   // mau gambar baru → tampilkan lagi
@@ -2509,7 +2515,7 @@ function renderWatch(){
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
-function selectSymbol(s){ if(s===inst) return; $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
 
 // ===================== live price stream (SSE /api/prices) =====================
 // Satu EventSource → semua simbol watchlist. Throttle render via rAF (tick bisa
@@ -2706,6 +2712,7 @@ function renderAlertList(){
 }
 function addAlert(){
   const p=+$('#alertPrice').value; if(!p){ setStatus('Enter the alert level price first.',true); return; }
+  track('alert',{inst});
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
   alerts.push({sym:inst,price:p,id:null}); $('#alertPrice').value='';
   saveAlerts(); drawAlertLines(); renderAlertList();
@@ -2864,6 +2871,7 @@ function exitReplay(){
 replayBtn.onclick=()=>{
   if(replayMode){ exitReplay(); return; }              // sedang replay → keluar ke realtime
   if(T==null){ setStatus('Load first.',true); return; }
+  track('replay',{inst});
   pickMode=!pickMode; replayBtn.classList.toggle('on',pickMode);
   if(pickMode){
     chart.applyNewData(tfData[currentTF]); lastLen=tfData[currentTF].length;  // tampilkan semua bar
@@ -3008,7 +3016,7 @@ $('#chart').addEventListener('contextmenu',e=>{
     items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
   items.push({label:'↺ Reset chart view', fn:resetChartView});
-  items.push({label:'⚙ Setting chart', fn:()=>showChartSet(e.clientX, e.clientY)});   // paling bawah
+  items.push({label:'⚙ Setting chart', fn:()=>{ track('chart_settings'); showChartSet(e.clientX, e.clientY); }});   // paling bawah
   showCtx(e.clientX, e.clientY, items);
 });
 window.addEventListener('click',hideCtx);
@@ -3164,7 +3172,7 @@ function initMultiChart(){
     1:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1"/></svg>',
     2:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="5" height="11" rx="1"/><rect x="9" y="2.5" width="5" height="11" rx="1"/></svg>',
     4:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="5" height="5" rx="1"/><rect x="9" y="2.5" width="5" height="5" rx="1"/><rect x="2" y="8.5" width="5" height="5" rx="1"/><rect x="9" y="8.5" width="5" height="5" rx="1"/></svg>'};
-  [1,2,4].forEach(n=>{ const b=document.createElement('button'); b.dataset.n=n; b.title=n+' chart'; b.innerHTML=ICON[n]; b.onclick=()=>setLayout(n); LB.appendChild(b); });
+  [1,2,4].forEach(n=>{ const b=document.createElement('button'); b.dataset.n=n; b.title=n+' chart'; b.innerHTML=ICON[n]; b.onclick=()=>{ track('layout',{n}); setLayout(n); }; LB.appendChild(b); });
   let n=parseInt(localStorage.getItem('br_layout'),10); if(![1,2,4].includes(n)) n=1;
   setLayout(n);
 }
@@ -3180,6 +3188,7 @@ function bootApp(){
   initPriceTimer();                                     // countdown candle berikutnya
   initMultiChart();                                     // panel chart sekunder (multi-chart)
   applyPaperMode();                                     // boot = realtime → akun live server
+  track('app_open',{inst});                             // analytics: sesi dibuka
 }
 
 // ===================== auth (Fase 2a) =====================
