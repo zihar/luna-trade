@@ -11,13 +11,15 @@
 <script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <style>
   :root{
-    --bg:#101013; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
+    --bg:#0e0f14; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
+    --hdr:#a3a3aa; --luna-glow:#aeb9e8;   /* hdr: label tabel sedikit lebih terang · luna-glow: aksen brand bulan */
     --green:#54c88c; --red:#ff6f6f; --accent:#4a71ff;
     --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#1b2f2a; --tint-sell:#3d1a1e;
     --inset:#0e0e11; --btn:#1b1b1f; --btn-hover:#26262b; --btn-border-hover:#3a3a40; --line:#26262b;
   }
   body.light{
     --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
+    --hdr:#5a6273; --luna-glow:#5b6cc4;
     --green:#1a9d6e; --red:#d8504e; --accent:#3a5fe0;
     --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#e3f3ec; --tint-sell:#fbe9e9;
     --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
@@ -96,7 +98,11 @@
                 background:rgba(8,8,11,.72);backdrop-filter:blur(6px)}
   .auth-card{width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--border);
              border-radius:14px;box-shadow:var(--shadow);padding:24px 22px;display:flex;flex-direction:column;gap:14px}
-  .auth-brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600;color:var(--txt)}
+  .auth-brand{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:18px;font-weight:700;
+              color:var(--txt);letter-spacing:-.012em;text-align:center;margin-bottom:2px}
+  .auth-brand .glyph{width:34px;height:34px;color:var(--luna-glow);filter:drop-shadow(0 0 12px rgba(174,185,232,.55))}
+  .auth-brand .glyph .luna-disc{fill:currentColor}
+  .auth-tagline{font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
   .auth-tabs{display:flex;gap:4px;background:var(--inset);border-radius:9px;padding:3px}
   .auth-tab{flex:1;height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted);
             cursor:pointer;font-size:13px;font-weight:500}
@@ -196,7 +202,7 @@
   .tp-tablewrap{overflow:auto;max-height:100%}
   .tp-table{width:100%;border-collapse:collapse;font-size:12px}
   .tp-table thead th{position:sticky;top:0;background:var(--panel);z-index:1;
-    font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.44px;text-transform:capitalize;
+    font-size:11px;font-weight:600;color:var(--hdr);letter-spacing:.44px;text-transform:capitalize;
     text-align:left;padding:9px 10px;white-space:nowrap}
   .tp-table tbody td{padding:9px 10px;color:var(--txt);white-space:nowrap;font-variant-numeric:tabular-nums}
   .tp-table tbody tr:hover{background:var(--btn-hover)}
@@ -204,7 +210,12 @@
   .tp-table .t-side-sell{color:var(--red);font-weight:600}
   .tp-table .t-pos{color:var(--green)} .tp-table .t-neg{color:var(--red)}
   .tp-table .t-act button{font-size:11px;padding:3px 9px;margin-right:5px}
-  .tp-empty{padding:22px 12px;color:var(--muted);font-size:12px;text-align:center}
+  .tp-empty{padding:30px 12px;color:var(--muted);font-size:12px;text-align:center}
+  .tp-empty-ic,.tp-empty-t,.tp-empty-h{text-align:center}
+  .tp-empty-ic{font-size:20px;line-height:1;color:var(--luna-glow);opacity:.6;margin-bottom:9px;
+    filter:drop-shadow(0 0 7px rgba(174,185,232,.35))}
+  .tp-empty-t{color:var(--txt);font-weight:600;font-size:12.5px;opacity:.82}
+  .tp-empty-h{margin-top:4px;color:var(--muted);font-size:11px;max-width:340px;margin-left:auto;margin-right:auto}
   .bp-section{display:flex;flex-direction:column;gap:8px;min-width:0;padding:11px 12px}
   .bp-title{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .bp-trade{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
@@ -247,9 +258,10 @@
   ::selection{ background:var(--accent); color:#fff; }
 
   /* wordmark */
-  .brand{ display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:14px; color:var(--txt); }
-  .brand .glyph{ width:24px; height:24px; border-radius:6px; object-fit:cover; display:block;
-                 box-shadow:0 0 0 1px var(--border); }
+  .brand{ display:inline-flex; align-items:center; gap:9px; font-weight:700; font-size:14px; color:var(--txt); letter-spacing:-.012em; }
+  .brand .glyph{ width:22px; height:22px; display:block; color:var(--luna-glow);
+                 filter:drop-shadow(0 0 6px rgba(174,185,232,.5)); }
+  .brand .glyph .luna-disc{ fill:currentColor; }
   .vsep{ width:1px; height:20px; background:var(--border); }
 
   /* toggle jadi ghost button */
@@ -336,20 +348,22 @@
 
   /* watchlist (Markets) — gaya tabel TradeLocker */
   .watchlist{ width:360px; background:var(--panel); border-left:1px solid var(--border);
-              display:flex; flex-direction:column; overflow-y:auto; flex:none; }
+              display:flex; flex-direction:column; overflow:hidden; min-height:0; flex:none; }
   .watchlist.hidden{ display:none; }
+  /* daftar instrumen = bagian yg scroll; order panel docked tetap kebagian ruang di bawah */
+  #wlRows{ flex:1 1 0; min-height:64px; overflow-y:auto; }
   .wl-head{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
             padding:9px 11px 6px; display:flex; align-items:center; gap:7px; }
   .wl-head::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
   .wl-live{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--muted); opacity:.45; }
   .wl-live.on{ background:var(--green); opacity:1; box-shadow:0 0 5px var(--green); }
-  .wl-row{ display:grid; grid-template-columns:minmax(56px,1fr) 56px 56px 40px 54px 54px; gap:3px; align-items:center;
-           padding:0 8px; height:36px; cursor:pointer; font-size:12px; }
+  .wl-row{ display:grid; grid-template-columns:minmax(46px,1fr) 58px 58px 44px 50px 50px; gap:6px; align-items:center;
+           padding:0 11px 0 12px; height:36px; cursor:pointer; font-size:12px; }
   .wl-row:hover{ background:var(--btn-hover); }
   .wl-row.on{ background:rgba(74,113,255,.16); }
   .wl-row > span{ font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums; }
-  .wl-hdr{ color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.44px; text-transform:capitalize;
-           cursor:default; height:auto; padding:10px 8px 8px; position:sticky; top:0; background:var(--panel); z-index:1; }
+  .wl-hdr{ color:var(--hdr); font-size:11px; font-weight:600; letter-spacing:.44px; text-transform:capitalize;
+           cursor:default; height:auto; padding:10px 11px 8px 12px; position:sticky; top:0; background:var(--panel); z-index:1; }
   .wl-hdr:hover{ background:var(--panel); }
   .wl-hdr > span{ font-family:inherit; }
   .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); }
@@ -420,7 +434,7 @@
   .cp-tf{ font-size:10px; padding:1px 5px; background:transparent; border:1px solid transparent;
           color:var(--muted); border-radius:4px; cursor:pointer; }
   .cp-tf:hover{ color:var(--txt); }
-  .cp-tf.on{ color:var(--txt); background:var(--border); }
+  .cp-tf.on{ color:var(--accent); background:rgba(74,113,255,.16); }
   .cp-last{ margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
   .cp-act{ margin-left:6px; font-size:13px; line-height:1; padding:2px 5px; background:transparent;
            border:1px solid var(--border); border-radius:5px; color:var(--muted); cursor:pointer; }
@@ -474,6 +488,8 @@
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
   .orderpanel{ border-top:1px solid var(--border); padding:3px 9px 6px; }
+  /* docked: jangan diciutkan oleh daftar Markets; scroll internal saat expand agar SL/TP & exec terjangkau */
+  .orderpanel[data-dock="docked"]{ flex:0 0 auto; max-height:64%; overflow-y:auto; }
   .orderpanel[data-dock="floating"]{ cursor:move; }   /* seluruh area (incl. tepi atas) = drag handle; kontrol di-skip via JS */
   #openTradeBox:empty{ display:none; }   /* jangan makan gap saat tak ada posisi (hilangkan ruang kosong atas) */
   .orderpanel .bp-title{ margin-bottom:8px; }
@@ -604,7 +620,7 @@
 </style>
 
 <div class="toolbar">
-  <span class="brand"><img class="glyph" src="/assets/favicon-32x32.png" alt="Luna Trade" width="24" height="24">Luna&nbsp;Trade</span>
+  <span class="brand"><svg class="glyph" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><mask id="lunaCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaCut)"/></svg>Luna&nbsp;Trade</span>
   <span class="vsep"></span>
   <select id="instrument">
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
@@ -633,7 +649,6 @@
   </aside>
   <div class="center">
     <div class="tfbar">
-      <span class="status" style="margin-right:4px">TF:</span>
       <span id="tfbtns"></span>
       <span class="sep"></span>
       <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
@@ -1377,13 +1392,18 @@ klinecharts.registerOverlay({
 const AXIS_FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
 const chTextStyle = bg => ({ backgroundColor:bg, color:'#fff', size:10, family:AXIS_FONT, weight:'bold',
   borderRadius:4, paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3 });
+// legend candle tanpa Volume (forex/backtester selalu 0) → lebih pendek, tak wrap di panel sempit
+const TOOLTIP_LEGEND = [
+  { title:'O', value:'{open}' }, { title:'H', value:'{high}' },
+  { title:'L', value:'{low}' }, { title:'C', value:'{close}' },
+];
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
     bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#89898b',
           upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
-    tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'} },
+    tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'}, custom:TOOLTIP_LEGEND },
   },
   xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
@@ -1399,7 +1419,7 @@ const lightStyles = {
     bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#999',
           upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
-    tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'} },
+    tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'}, custom:TOOLTIP_LEGEND },
   },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
@@ -2080,7 +2100,7 @@ function spRenderTrades(){
   const head=$('#tpHead'), body=$('#tpBody');
   if(activeTradeTab==='positions'){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','SL / TP','Margin','Profit & Loss','Actions']);
-    if(!SP.positions.length){ body.innerHTML=emptyRow(8,'No open positions'); return; }
+    if(!SP.positions.length){ body.innerHTML=emptyRow(8,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
     body.innerHTML=SP.positions.map(p=>`<tr>
       <td><b>${p.instrument.replace('_','')}</b></td>
       <td class="${sideCls(p.dir)}">${sideTxt(p.dir)}</td>
@@ -2092,10 +2112,10 @@ function spRenderTrades(){
       <td class="t-act"><button data-sp-close="${p.id}">Close</button></td></tr>`).join('');
   } else if(activeTradeTab==='pending'){
     head.innerHTML=thRow(['Instrument','Side','Type','Entry','Size','Actions']);
-    body.innerHTML=emptyRow(6,'No pending orders (akun live: market-only)');
+    body.innerHTML=emptyRow(6,'No pending orders','Live accounts are market-only — pending orders aren\'t available here.');
   } else { // closed
     head.innerHTML=thRow(['Instrument','Side','Size','Entry','Exit','Profit & Loss','Closed (NY)']);
-    if(!SP.closed.length){ body.innerHTML=emptyRow(7,'No closed positions'); return; }
+    if(!SP.closed.length){ body.innerHTML=emptyRow(7,'No closed positions','Trades you close will show up here.'); return; }
     body.innerHTML=SP.closed.map(t=>`<tr>
       <td><b>${t.instrument.replace('_','')}</b></td>
       <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}</td>
@@ -2574,7 +2594,10 @@ const usdFmt = v => (v<0?'-$':'$')+Math.abs(v).toLocaleString('en-US',{minimumFr
 const sideCls = d => d==='long'?'t-side-buy':'t-side-sell';
 const sideTxt = d => d==='long'?'Buy':'Sell';
 function thRow(cols){ return '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>'; }
-function emptyRow(span,msg){ return `<tr><td class="tp-empty" colspan="${span}">${msg}</td></tr>`; }
+function emptyRow(span,title,hint,icon){ return `<tr><td class="tp-empty" colspan="${span}">`+
+  (icon?`<div class="tp-empty-ic">${icon}</div>`:'')+
+  `<div class="tp-empty-t">${title}</div>`+
+  (hint?`<div class="tp-empty-h">${hint}</div>`:'')+`</td></tr>`; }
 
 function renderTrades(){
   if(spActive()){ spRenderTrades(); return; }   // posisi/closed live = server
@@ -2593,7 +2616,7 @@ function renderTrades(){
   const cur=currentCandle();
   if(activeTradeTab==='positions'){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Stop Loss','Take Profit','Margin','Profit & Loss','Actions']);
-    if(!trade){ body.innerHTML=emptyRow(9,'No open positions'); return; }
+    if(!trade){ body.innerHTML=emptyRow(9,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
     const mkt=cur?cur.close:trade.entry;
     const pl=pnlUsd(trade.dir,trade.entry,mkt,trade.units||0);
     const margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100;
@@ -2609,7 +2632,7 @@ function renderTrades(){
       <td class="t-act"><button data-act="partial">Close ½</button><button data-act="close">Close</button></td></tr>`;
   } else if(activeTradeTab==='pending'){
     head.innerHTML=thRow(['Instrument','Side','Type','Entry','Stop Loss','Take Profit','Size','Actions']);
-    if(!pending){ body.innerHTML=emptyRow(8,'No pending orders'); return; }
+    if(!pending){ body.innerHTML=emptyRow(8,'No pending orders','Switch the order ticket to Pending to place one away from price.'); return; }
     body.innerHTML=`<tr>
       <td><b>${sym}</b></td>
       <td class="${sideCls(pending.dir)}">${sideTxt(pending.dir)}</td>
@@ -2621,7 +2644,7 @@ function renderTrades(){
       <td class="t-act"><button data-act="cancel">Cancel</button></td></tr>`;
   } else { // closed
     head.innerHTML=thRow(['Instrument','Side','Size','Entry','Exit','R','Profit & Loss','Closed (NY)']);
-    if(!journal.length){ body.innerHTML=emptyRow(8,'No closed positions'); return; }
+    if(!journal.length){ body.innerHTML=emptyRow(8,'No closed positions','Trades you close will show up here.'); return; }
     body.innerHTML=journal.slice().reverse().map(t=>`<tr>
       <td><b>${sym}</b></td>
       <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}${t.partial?' ½':''}</td>
@@ -2683,6 +2706,14 @@ async function refreshQuotes(){
   renderWatch();
 }
 function pipOf(s){ return Math.pow(10, -(symDecimals(s)-1)); }   // pip per simbol (FX 1e-4, JPY 1e-2, dst)
+// batas atas spread indikatif (dalam pip) per instrumen. Closeout spread broker utk metal/kripto
+// bisa sangat lebar (mis. XAU ~$20, BTC ~$443) → menyesatkan di backtester. FX yg sudah tight tak terdampak.
+function maxSpreadPips(s){
+  if(s.includes('XAU')) return 50;     // emas ~ s/d $0.50
+  if(s.includes('XAG')) return 40;     // perak
+  if(s.includes('BTC')) return 80;     // kripto ~ s/d $80
+  return 30;                            // FX major/minor & JPY (real biasanya 1–15, jadi aman)
+}
 function renderWatch(){
   const box=$('#wlRows'); if(!box) return;
   const hdr=`<div class="wl-row wl-hdr">
@@ -2694,6 +2725,9 @@ function renderWatch(){
     let bid, ask, sprd;
     if(lt){ bid=lt.bid; ask=lt.ask; sprd=ask-bid; }                 // bid/ask realtime
     else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
+    // clamp spread yg tak wajar (closeout broker metal/kripto) → indikatif, di-tengah-kan pada mid
+    const cap=maxSpreadPips(s)*pip;
+    if(sprd>cap){ const mid=(bid+ask)/2; sprd=cap; bid=mid-cap/2; ask=mid+cap/2; }
     const chg=q?q.chg:0, up=chg>=0;
     const hi=q&&q.hi!=null?q.hi.toFixed(dec):'—', lo=q&&q.lo!=null?q.lo.toFixed(dec):'—';
     return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(chg>=0?'+':'')+chg.toFixed(2)}% today">
@@ -3503,7 +3537,7 @@ function showAuthOverlay(){
   ov.id = 'authOverlay'; ov.className = 'auth-overlay';
   ov.innerHTML =
     '<form class="auth-card" id="authForm">'+
-    '  <div class="auth-brand"><img src="/assets/favicon-32x32.png" width="28" height="28" alt="">Luna Trade</div>'+
+    '  <div class="auth-brand"><svg class="glyph" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><mask id="lunaCut2"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaCut2)"/></svg><span>Luna Trade</span><span class="auth-tagline">Practice the markets, one replay at a time.</span></div>'+
     '  <div class="auth-tabs">'+
     '    <button type="button" class="auth-tab active" data-mode="login">Masuk</button>'+
     '    <button type="button" class="auth-tab" data-mode="register">Daftar</button>'+
