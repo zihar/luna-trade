@@ -1229,8 +1229,8 @@ applyTheme(localStorage.getItem('br_theme')||'dark');
 // KLineCharts tak punya API zoom-harga; kita terjemahkan wheel -> drag vertikal di sumbu
 // (gesture skala harga bawaan KLineCharts).
 const AXIS_ZONE = 70; // lebar perkiraan sumbu harga (px) dari tepi kanan chart
-(function priceWheelZoom(){
-  const el=$('#chart');
+// Pasang zoom-harga via scroll wheel ke satu elemen chart (panel utama & sekunder).
+function attachPriceWheelZoom(el){
   el.addEventListener('wheel',(e)=>{
     const rect=el.getBoundingClientRect();
     const xInAxis = (e.clientX-rect.left) > (rect.width-AXIS_ZONE);
@@ -1244,7 +1244,8 @@ const AXIS_ZONE = 70; // lebar perkiraan sumbu harga (px) dari tepi kanan chart
     tgt.dispatchEvent(mk('mousemove',cy+delta,1));
     tgt.dispatchEvent(mk('mouseup',cy+delta,0));
   },{passive:false,capture:true});
-})();
+}
+attachPriceWheelZoom($('#chart'));
 
 // ===================== TF buttons =====================
 const tfWrap = $('#tfbtns');
@@ -2901,6 +2902,7 @@ function makeSecondary(slot){
 
   const light=document.body.classList.contains('light');
   const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ});
+  attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
 
   const sc={ slot, panel, chart:c, el:cdiv, selEl:sel, tfsEl:tfs, lastEl:last,
