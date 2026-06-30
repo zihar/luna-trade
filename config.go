@@ -83,7 +83,7 @@ func loadConfig() Config {
 		// Markets ter-update realtime, termasuk BTC_USD (crypto, trading 24/7).
 		c.StreamInstruments = []string{
 			"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD",
-			"XAU_USD", "GBP_JPY", "EUR_JPY", "BTC_USD",
+			"XAU_USD", "XAG_USD", "GBP_JPY", "EUR_JPY", "BTC_USD",
 		}
 	}
 	c.Creds = BrokerCreds{

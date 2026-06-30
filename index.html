@@ -487,7 +487,9 @@
   <select id="instrument">
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
     <option>AUD_USD</option><option>USD_CAD</option><option>XAU_USD</option>
+    <option>XAG_USD</option>
     <option>GBP_JPY</option><option>EUR_JPY</option>
+    <option>DXY</option>
     <option>BTC_USD</option>
   </select>
   <span class="vsep"></span>
@@ -695,7 +697,7 @@ let drawIds = [];        // overlay drawing
 const extending = {};
 
 // ===================== util =====================
-function priceDecimals(){ return inst.includes('BTC')?1 : inst.includes('JPY')?3 : inst.includes('XAU')?3 : 5; }
+function priceDecimals(){ return inst.includes('BTC')?1 : inst.includes('DXY')?3 : inst.includes('JPY')?3 : (inst.includes('XAU')||inst.includes('XAG'))?3 : 5; }
 function fmt(p){ return p==null||isNaN(p)?'—':(+p).toFixed(priceDecimals()); }
 function nyTime(ms){
   try{
@@ -983,6 +985,10 @@ klinecharts.registerOverlay({
 // level Fibonacci yang bisa diatur (tambah/hapus/ubah nilai) — global, tersimpan di localStorage
 const FIB_DEFAULT=[0,0.5,1];
 let fibLevels; try{ fibLevels=JSON.parse(localStorage.getItem('br_fibLevels')); if(!Array.isArray(fibLevels)||!fibLevels.length) fibLevels=FIB_DEFAULT.slice(); }catch(e){ fibLevels=FIB_DEFAULT.slice(); }
+// warna per-level ala TradingView (level umum di-map; lainnya pakai palet berputar)
+const FIB_COLORS={0:'#787b86',0.236:'#f23645',0.382:'#ff9800',0.5:'#4caf50',0.618:'#089981',0.786:'#00bcd4',1:'#787b86',1.272:'#f23645',1.414:'#ff9800',1.618:'#4caf50',2:'#787b86',2.618:'#089981'};
+const FIB_PALETTE=['#787b86','#f23645','#ff9800','#4caf50','#089981','#00bcd4','#2962ff','#9c27b0'];
+function fibColor(Lv,i){ return FIB_COLORS[Lv]!=null?FIB_COLORS[Lv]:FIB_PALETTE[i%FIB_PALETTE.length]; }
 function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
 function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
 
@@ -999,13 +1005,21 @@ klinecharts.registerOverlay({
     const vTop=Math.max(...vals), vBot=Math.min(...vals);
     const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
     const st=dstyle(overlay);
-    const figs=[];
-    fibLevels.forEach(Lv=>{
+    const d=priceDecimals();
+    // hitung posisi y, harga & warna tiap level, urut dari atas ke bawah
+    const rows=fibLevels.map((Lv,i)=>{
       const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
-      const y = yTop + (yBot-yTop)*f;
-      const price = vTop + (vBot-vTop)*f;
-      figs.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))});
-      figs.push({type:'text',attrs:{x:xL+2,y:y-2,text:Lv+'  '+price.toFixed(priceDecimals()),align:'left',baseline:'bottom'},styles:{color:st.color,size:10}});
+      return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: fibColor(Lv,i) };
+    }).sort((a,b)=>a.y-b.y);
+    const figs=[];
+    // background terisi antar level (warna = level batas atasnya, transparan ~12%)
+    for(let i=0;i<rows.length-1;i++){
+      figs.push({type:'rect',attrs:{x:xL,y:rows[i].y,width:xR-xL,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+'1f',borderColor:'transparent'}});
+    }
+    // garis + label "%+harga" tiap level (warna per-level)
+    rows.forEach(r=>{
+      figs.push({type:'line',attrs:{coordinates:[{x:xL,y:r.y},{x:xR,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
+      figs.push({type:'text',attrs:{x:xL+2,y:r.y-2,text:(r.Lv*100).toFixed(2)+'% ('+r.price.toFixed(d)+')',align:'left',baseline:'bottom'},styles:{color:r.color,size:10}});
     });
     return figs;
   }
@@ -1232,7 +1246,7 @@ guessPip(); highlightTF();
 $('#instrument').onchange = ()=>{ guessPip(); renderWatch(); loadInit(true); };
 function guessPip(){
   const s=$('#instrument').value;
-  $('#pipSize').value = s.includes('BTC')?1 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : 0.0001;
+  $('#pipSize').value = s.includes('BTC')?1 : s.includes('DXY')?0.01 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : s.includes('XAG')?0.001 : 0.0001;
   lotsManual=false;   // saran lot otomatis menyesuaikan instrumen baru
 }
 
@@ -1334,10 +1348,10 @@ function render(full){
   updatePriceTimer();
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
-function unitsPer(){ return inst.includes('BTC')||inst.includes('XAU') ? 1 : 100000; }
-function lotUnitName(){ return inst.includes('BTC')?'BTC' : inst.includes('XAU')?'oz' : 'lots'; }
-function lotStepSize(){ return inst.includes('XAU')?1 : inst.includes('BTC')?0.01 : 0.01; }
-function lotDec(){ return inst.includes('BTC')?4 : inst.includes('XAU')?1 : 2; }
+function unitsPer(){ return inst.includes('BTC')||inst.includes('XAU')||inst.includes('XAG') ? 1 : 100000; }
+function lotUnitName(){ return inst.includes('BTC')?'BTC' : (inst.includes('XAU')||inst.includes('XAG'))?'oz' : 'lots'; }
+function lotStepSize(){ return (inst.includes('XAU')||inst.includes('XAG'))?1 : inst.includes('BTC')?0.01 : 0.01; }
+function lotDec(){ return inst.includes('BTC')?4 : (inst.includes('XAU')||inst.includes('XAG'))?1 : 2; }
 function currentLots(){ return Math.max(0,+$('#lotInput').value||0); }
 function setLots(v){ const el=$('#lotInput'); if(el){ el.value=Math.max(0,v).toFixed(lotDec()); } renderOrderPanel(); try{renderSizing();}catch(e){} }
 // bid/ask: mode Live + stream tersambung → harga pasar NYATA; selain itu (replay/paper) sintetis dari candle.
@@ -1511,7 +1525,8 @@ const INSTRUMENT = {
   EUR_USD:{pip:0.0001,quote:'USD'}, GBP_USD:{pip:0.0001,quote:'USD'}, AUD_USD:{pip:0.0001,quote:'USD'},
   USD_CAD:{pip:0.0001,quote:'CAD'}, USD_JPY:{pip:0.01,quote:'JPY'},
   GBP_JPY:{pip:0.01,quote:'JPY'},   EUR_JPY:{pip:0.01,quote:'JPY'},
-  XAU_USD:{pip:0.1,quote:'USD'},    BTC_USD:{pip:1,quote:'USD'},
+  XAU_USD:{pip:0.1,quote:'USD'},    XAG_USD:{pip:0.001,quote:'USD'},   BTC_USD:{pip:1,quote:'USD'},
+  DXY:{pip:0.01,quote:'USD'},
 };
 const APPROX_USDJPY = 157;   // fallback cross JPY (akun USD; cross-rate penuh menyusul di Fase 2)
 function instSpec(){ return INSTRUMENT[inst] || {pip:+$('#pipSize').value||0.0001, quote:'USD'}; }
@@ -1536,7 +1551,7 @@ function pnlUsd(dir,entry,exit,units){
 }
 function lotLabel(units){
   if(inst.includes('BTC')) return units.toFixed(4)+' BTC';
-  if(inst.includes('XAU')) return units.toFixed(1)+' oz';
+  if(inst.includes('XAU')||inst.includes('XAG')) return units.toFixed(1)+' oz';
   return (units/100000).toFixed(2)+' lot';
 }
 // readout ukuran posisi: pakai trade aktif kalau ada, kalau tidak → preview dari input
@@ -1738,10 +1753,10 @@ function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(s
 function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
 
 // formatter sadar-instrumen (posisi server bisa beda pair dari chart aktif)
-function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('JPY')?3 : i.includes('XAU')?3 : 5; }
+function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('DXY')?3 : i.includes('JPY')?3 : (i.includes('XAU')||i.includes('XAG'))?3 : 5; }
 function fmtFor(i,v){ return v==null||isNaN(v)?'—':(+v).toFixed(decimalsFor(i)); }
-function unitsPerFor(i){ return (i.includes('BTC')||i.includes('XAU'))?1:100000; }
-function lotLabelFor(i,u){ if(i.includes('BTC')) return u.toFixed(4)+' BTC'; if(i.includes('XAU')) return u.toFixed(1)+' oz'; return (u/100000).toFixed(2)+' lot'; }
+function unitsPerFor(i){ return (i.includes('BTC')||i.includes('XAU')||i.includes('XAG'))?1:100000; }
+function lotLabelFor(i,u){ if(i.includes('BTC')) return u.toFixed(4)+' BTC'; if(i.includes('XAU')||i.includes('XAG')) return u.toFixed(1)+' oz'; return (u/100000).toFixed(2)+' lot'; }
 
 function uuid(){ try{ return crypto.randomUUID(); }catch(e){ return String(Date.now())+Math.random().toString(16).slice(2); } }
 const ServerPaperBroker = {
@@ -2276,7 +2291,7 @@ function resetTrade(){
 
 // ===================== watchlist & price alert (Fase 1d) =====================
 const WATCH_SYMS = [...document.querySelectorAll('#instrument option')].map(o=>o.value);
-function symDecimals(s){ return s.includes('BTC')?1 : s.includes('JPY')?3 : s.includes('XAU')?3 : 5; }
+function symDecimals(s){ return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
 // toast feedback ringan (alert berbunyi / pending tereksekusi) — terlihat tanpa mengandalkan setStatus
 let toastTimer=null;
 function toast(msg){
