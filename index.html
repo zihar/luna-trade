@@ -1112,7 +1112,8 @@ function posFigures(dir){
       const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
       box(yE,yS,POS_RBG); line(yS,POS_RED);
       const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
-      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p ('+slPct.toFixed(3)+'%)', POS_RED, 'left', sBase);
+      const slAmt=Math.abs(pnlUsd(dir,entry,sl,units));   // risk $ bila SL kena
+      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p ('+slPct.toFixed(3)+'%)   Amount: '+amtStr(slAmt), POS_RED, 'left', sBase);
       pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
     } else {
       pill(xL, yE, 'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']', 'rgba(20,28,40,0.92)', 'left', 'middle');
