@@ -375,6 +375,31 @@
   #watchlist{ grid-area:markets; width:auto; flex:initial; }
   #bottompanel{ grid-area:trades; max-height:none; overflow:auto; }
   .center #chart{ flex:1; min-height:0; }
+  /* ===== multi-chart grid ===== */
+  #chartgrid{ flex:1; min-height:0; min-width:0; display:grid; gap:1px; background:var(--border); }
+  #chartgrid.lay-1{ grid-template-columns:1fr; grid-template-rows:1fr; }
+  #chartgrid.lay-2{ grid-template-columns:1fr 1fr; grid-template-rows:1fr; }
+  #chartgrid.lay-4{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+  .cpanel{ display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--bg); position:relative; }
+  .cpanel.active{ box-shadow: inset 0 0 0 1px var(--accent); }
+  .cpanel > #chart, .cpanel .cp-chart{ flex:1; min-height:0; min-width:0; }
+  .cpanel-hd{ display:flex; align-items:center; gap:6px; padding:3px 7px; border-bottom:1px solid var(--border);
+              background:var(--panel); font-size:11px; cursor:default; }
+  .cp-sym{ font-size:11px; padding:2px 5px; background:var(--panel-2); color:var(--txt);
+           border:1px solid var(--border); border-radius:5px; }
+  .cp-tfs{ display:inline-flex; gap:2px; }
+  .cp-tf{ font-size:10px; padding:1px 5px; background:transparent; border:1px solid transparent;
+          color:var(--muted); border-radius:4px; cursor:pointer; }
+  .cp-tf:hover{ color:var(--txt); }
+  .cp-tf.on{ color:var(--txt); background:var(--border); }
+  .cp-last{ margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+  #layoutbtns{ display:inline-flex; gap:3px; }
+  #layoutbtns button{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:22px;
+                      padding:0; background:transparent; border:1px solid var(--border); border-radius:5px;
+                      color:var(--muted); cursor:pointer; }
+  #layoutbtns button:hover{ color:var(--txt); }
+  #layoutbtns button.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
+  #layoutbtns button svg{ width:14px; height:14px; }
   .railbtn{ width:38px; height:38px; display:flex; align-items:center; justify-content:center;
             padding:0; font-size:15px; color:var(--muted); background:transparent; border-color:transparent; border-radius:9px; }
   .railbtn svg{ width:19px; height:19px; }
@@ -515,8 +540,12 @@
       <span id="tfbtns"></span>
       <span class="sep"></span>
       <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
+      <span class="grow" style="flex:1"></span>
+      <span id="layoutbtns" title="Layout chart"></span>
     </div>
-    <div id="chart"></div>
+    <div id="chartgrid" class="lay-1">
+      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"></div></div>
+    </div>
   </div>
   <div class="rh rh-markets" id="rhMarkets" title="Drag to resize Markets width"></div>
   <div class="rh rh-trades" id="rhTrades" title="Drag to resize Trades height"></div>
@@ -690,6 +719,8 @@ let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
 let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
 let formingSeed = null;      // candle incomplete OANDA (OHLC otoritatif periode berjalan) → seed wick
+let secondaries = [];        // panel chart sekunder (multi-chart, view-only) — diisi setLayout()
+let chartLayout = 1;         // jumlah panel: 1 | 2 | 4
 let formingTimer = null;     // poll seed forming dari OANDA (lebih sering dari liveRefresh)
 let rollRefreshPending = false;
 let journal = [];
@@ -1185,6 +1216,7 @@ function applyTheme(t){
   document.body.classList.toggle('light', light);
   drawTextColor = light?'#1e242e':'#e8edf2';
   try{ chart.setStyles(light?lightStyles:darkStyles); }catch(e){}
+  try{ secondaries.forEach(sc=>sc.chart.setStyles(light?lightStyles:darkStyles)); }catch(e){}
   try{ applyChartCfg(); }catch(e){}   // pertahankan warna chart kustom user di atas tema
   const b=$('#themeBtn'); if(b){ b.textContent = light?'🌙':'☀️'; b.title = light?'Ke mode gelap':'Ke mode terang'; }
   localStorage.setItem('br_theme', t);
@@ -2350,6 +2382,7 @@ function queuePriceRender(){
   requestAnimationFrame(()=>{ priceRenderQueued=false;
     if(!$('#watchlist').classList.contains('hidden')) renderWatch();
     if(live){ pushFormingCandle(); renderOrderPanel(); updatePriceTimer(); }  // gerak chart+panel tiap tick (Live)
+    secondaries.forEach(sc=>{ try{ sc.tick(); }catch(e){} });                  // panel sekunder gerak tiap tick
   });
 }
 function connectPriceStream(){
@@ -2846,6 +2879,114 @@ $('#riskPct').value  = localStorage.getItem('br_riskPct')||1;
 $('#balance').addEventListener('input',()=>{ localStorage.setItem('br_balance',$('#balance').value); renderSizing(); renderAcct(); refreshLotSuggestion(); });
 $('#riskPct').addEventListener('input', ()=>{ localStorage.setItem('br_riskPct',$('#riskPct').value);  renderSizing(); refreshLotSuggestion(); });
 ['slPips','rr','pipSize'].forEach(id=>$('#'+id).addEventListener('input',()=>{ renderSizing(); refreshLotSuggestion(); }));
+// ===================== multi-chart (panel sekunder, view-only) =====================
+// Panel utama (#chart, slot 0) = chart penuh (trading/drawing/replay). Panel sekunder
+// (slot 1..) = chart ringan: hanya tampilkan candle + lilin live simbol/TF sendiri.
+// Tanpa drawing/trading. Double-click header → muat simbol+TF-nya ke panel utama.
+const SEC_DEFAULTS=['GBP_USD','USD_JPY','XAU_USD'];
+function savedSecConfig(){ try{ const a=JSON.parse(localStorage.getItem('br_sec')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function persistSec(){ try{ localStorage.setItem('br_sec', JSON.stringify(secondaries.map(s=>({sym:s.sym,tf:s.tf})))); }catch(e){} }
+
+function makeSecondary(slot){
+  const panel=document.createElement('div'); panel.className='cpanel'; panel.dataset.slot=slot;
+  const hd=document.createElement('div'); hd.className='cpanel-hd';
+  const sel=document.createElement('select'); sel.className='cp-sym';
+  WATCH_SYMS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s.replace('_','/'); sel.appendChild(o); });
+  const tfs=document.createElement('span'); tfs.className='cp-tfs';
+  TF_LIST.forEach(tf=>{ const b=document.createElement('button'); b.className='cp-tf'; b.dataset.tf=tf; b.textContent=TF_LABEL[tf]||tf; tfs.appendChild(b); });
+  const last=document.createElement('span'); last.className='cp-last';
+  hd.appendChild(sel); hd.appendChild(tfs); hd.appendChild(last);
+  const cdiv=document.createElement('div'); cdiv.className='cp-chart';
+  panel.appendChild(hd); panel.appendChild(cdiv);
+
+  const light=document.body.classList.contains('light');
+  const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ});
+  const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
+
+  const sc={ slot, panel, chart:c, el:cdiv, selEl:sel, tfsEl:tfs, lastEl:last,
+    sym:'EUR_USD', tf:'M15', data:[], forming:null, ro, rollTimer:null,
+    highlightTF(){ tfs.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.tf===this.tf)); },
+    setSymTF(sym,tf){ this.sym=sym; this.tf=tf; },
+    async load(){
+      sel.value=this.sym; this.highlightTF(); this.forming=null;
+      try{
+        const u=`/api/candles?instrument=${encodeURIComponent(this.sym)}&granularity=${GRAN[this.tf]||this.tf}&count=2000`;
+        const r=await fetch(u); const j=await r.json();
+        if(!j.candles) return;
+        this.data=j.candles.filter(x=>x.complete).map(x=>({timestamp:Date.parse(x.time),open:+x.mid.o,high:+x.mid.h,low:+x.mid.l,close:+x.mid.c,volume:+(x.volume||0)})).sort((a,b)=>a.timestamp-b.timestamp);
+        try{ this.chart.setPriceVolumePrecision(decimalsFor(this.sym),0); }catch(e){}
+        this.chart.applyNewData(this.data);
+      }catch(e){}
+    },
+    tick(){
+      const t=liveTicks[this.sym]; if(!t) return;
+      const mid=(t.bid+t.ask)/2; if(!isFinite(mid)) return;
+      this.lastEl.textContent=mid.toFixed(decimalsFor(this.sym));
+      if(!this.data.length) return;
+      const last=this.data[this.data.length-1];
+      const dur=DUR[this.tf], now=Date.now(), openTs=last.timestamp+dur;
+      if(now<openTs) return;                       // periode forming belum mulai
+      if(now>=openTs+dur){ this.scheduleRoll(); }   // periode lewat → tarik candle complete
+      if(!this.forming || this.forming.timestamp!==openTs){
+        this.forming={timestamp:openTs,open:last.close,high:Math.max(last.close,mid),low:Math.min(last.close,mid),close:mid,volume:0};
+      } else {
+        this.forming.close=mid; this.forming.high=Math.max(this.forming.high,mid); this.forming.low=Math.min(this.forming.low,mid);
+      }
+      try{ this.chart.updateData(this.forming); }catch(e){}
+    },
+    scheduleRoll(){ if(this.rollTimer) return; this.rollTimer=setTimeout(()=>{ this.rollTimer=null; this.roll(); },1500); },
+    async roll(){
+      try{
+        const u=`/api/candles?instrument=${encodeURIComponent(this.sym)}&granularity=${GRAN[this.tf]||this.tf}&count=3`;
+        const r=await fetch(u); const j=await r.json(); if(!j.candles) return;
+        const fresh=j.candles.filter(x=>x.complete).map(x=>({timestamp:Date.parse(x.time),open:+x.mid.o,high:+x.mid.h,low:+x.mid.l,close:+x.mid.c,volume:+(x.volume||0)})).sort((a,b)=>a.timestamp-b.timestamp);
+        const lastTs=this.data.length?this.data[this.data.length-1].timestamp:0; let added=false;
+        fresh.forEach(c=>{ if(c.timestamp>lastTs){ this.data.push(c); try{this.chart.updateData(c);}catch(e){} added=true; } });
+        if(added) this.forming=null;
+      }catch(e){}
+    },
+    dispose(){ try{this.ro.disconnect();}catch(e){} if(this.rollTimer)clearTimeout(this.rollTimer); try{klinecharts.dispose(this.el);}catch(e){} try{this.panel.remove();}catch(e){} }
+  };
+
+  sel.onchange=()=>{ sc.sym=sel.value; sc.load(); persistSec(); };
+  tfs.querySelectorAll('button').forEach(b=> b.onclick=()=>{ sc.tf=b.dataset.tf; sc.highlightTF(); sc.load(); persistSec(); });
+  hd.ondblclick=(e)=>{ if(e.target===sel || e.target.closest('.cp-tf')) return; focusIntoPrimary(sc.sym,sc.tf); };
+  return sc;
+}
+
+// muat simbol+TF panel sekunder ke chart utama (cara "mengaktifkan" untuk trading/drawing)
+function focusIntoPrimary(sym,tf){
+  currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
+  $('#instrument').value=sym; guessPip(); renderWatch(); loadInit(true);
+}
+function resizeAllCharts(){ requestAnimationFrame(()=>{ try{chart.resize();}catch(e){} secondaries.forEach(sc=>{try{sc.chart.resize();}catch(e){}}); try{updatePriceTimer();}catch(e){} }); }
+
+function setLayout(n){
+  chartLayout=n; localStorage.setItem('br_layout',n);
+  const grid=$('#chartgrid'); grid.className='lay-'+n;
+  const need=n-1, saved=savedSecConfig();
+  while(secondaries.length>need){ secondaries.pop().dispose(); }
+  while(secondaries.length<need){
+    const idx=secondaries.length, sc=makeSecondary(idx);
+    grid.appendChild(sc.panel); secondaries.push(sc);
+    const cfg=saved[idx]||{}; sc.setSymTF(cfg.sym||SEC_DEFAULTS[idx]||'EUR_USD', cfg.tf||currentTF); sc.load();
+  }
+  persistSec();
+  $('#layoutbtns').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
+  resizeAllCharts();
+}
+
+function initMultiChart(){
+  const LB=$('#layoutbtns');
+  const ICON={
+    1:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1"/></svg>',
+    2:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="5" height="11" rx="1"/><rect x="9" y="2.5" width="5" height="11" rx="1"/></svg>',
+    4:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="5" height="5" rx="1"/><rect x="9" y="2.5" width="5" height="5" rx="1"/><rect x="2" y="8.5" width="5" height="5" rx="1"/><rect x="9" y="8.5" width="5" height="5" rx="1"/></svg>'};
+  [1,2,4].forEach(n=>{ const b=document.createElement('button'); b.dataset.n=n; b.title=n+' chart'; b.innerHTML=ICON[n]; b.onclick=()=>setLayout(n); LB.appendChild(b); });
+  let n=parseInt(localStorage.getItem('br_layout'),10); if(![1,2,4].includes(n)) n=1;
+  setLayout(n);
+}
+
 // bootApp = semua inisialisasi yang menyentuh data server (candle, SSE, quotes).
 // Dipisah jadi fungsi supaya HANYA dijalankan setelah sesi tervalidasi.
 function bootApp(){
@@ -2855,6 +2996,7 @@ function bootApp(){
   refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
   setLiveDot(); connectPriceStream();                   // harga realtime via SSE
   initPriceTimer();                                     // countdown candle berikutnya
+  initMultiChart();                                     // panel chart sekunder (multi-chart)
   applyPaperMode();                                     // boot = realtime → akun live server
 }
 
