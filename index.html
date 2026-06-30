@@ -801,7 +801,11 @@ function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
 function keyOf(p){ return (p&&p.timestamp!=null)?{timestamp:p.timestamp}:{dataIndex:p&&p.dataIndex}; }
 // float index untuk ordering kiri/kanan & titik tengah
 function fidxOf(p){ if(p&&p.dataIndex!=null) return p.dataIndex; const li=revealed(currentTF).length-1, xLast=idxToPx(li), xx=tsToPx(p&&p.timestamp); return (xLast!=null&&xx!=null)? li+(xx-xLast)/barSpacePx() : li; }
-function midAnchor(a,b){ if(a.timestamp!=null&&b.timestamp!=null) return {timestamp:Math.round((a.timestamp+b.timestamp)/2)}; return {dataIndex:(fidxOf(a)+fidxOf(b))/2}; }
+// titik tengah handle (TC/BC/ML/MR) → SELALU di tengah PIKSEL, bukan tengah timestamp.
+// Posisi x di chart linear thd indeks bar (dataIndex), sedang timestamp tak rata per-piksel
+// (ada gap akhir pekan & area future saat box memanjang ke kanan). fidxOf() memetakan
+// timestamp → indeks bar pecahan yg konsisten dgn piksel, jadi midpoint-nya presisi.
+function midAnchor(a,b){ return {dataIndex:(fidxOf(a)+fidxOf(b))/2}; }
 // snap waktu sub-bar (hasil pxToTime) ke timestamp bar TERDEKAT — dipakai garis vertikal
 // supaya penanda waktu = waktu candle yg diklik, dan garis nempel pas di bar itu (jadi
 // bisa diklik ulang utk select/hapus). Di luar rentang bar (mis. area future) dibiarkan.
