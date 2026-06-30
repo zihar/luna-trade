@@ -590,3 +590,63 @@ func (s *Store) ActiveUsers(sinceISO string) (int, error) {
 	err := s.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM events WHERE ts>=?`, sinceISO).Scan(&n)
 	return n, err
 }
+
+// NameCount = pasangan nama-fitur + jumlah (rincian per user).
+type NameCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// UserActivity = aktivitas satu user (total event, terakhir aktif, rincian fitur).
+type UserActivity struct {
+	Email    string      `json:"email"`
+	Events   int         `json:"events"`
+	LastSeen string      `json:"last_seen"`
+	Features []NameCount `json:"features"`
+}
+
+// UserActivities = per-user (siapa pakai fitur apa) sejak `sinceISO`, urut paling aktif.
+func (s *Store) UserActivities(sinceISO string) ([]UserActivity, error) {
+	rows, err := s.db.Query(
+		`SELECT u.email, e.name, COUNT(*) c, MAX(e.ts) last
+		 FROM events e JOIN users u ON u.id=e.user_id
+		 WHERE e.ts>=? GROUP BY u.email, e.name ORDER BY c DESC`, sinceISO)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	idx := map[string]*UserActivity{}
+	var order []*UserActivity
+	for rows.Next() {
+		var email, name, last string
+		var c int
+		if err := rows.Scan(&email, &name, &c, &last); err != nil {
+			return nil, err
+		}
+		ua := idx[email]
+		if ua == nil {
+			ua = &UserActivity{Email: email}
+			idx[email] = ua
+			order = append(order, ua)
+		}
+		ua.Events += c
+		ua.Features = append(ua.Features, NameCount{Name: name, Count: c})
+		if last > ua.LastSeen {
+			ua.LastSeen = last
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// urut user paling aktif dulu (simple insertion sort — jumlah user kecil)
+	out := make([]UserActivity, 0, len(order))
+	for _, ua := range order {
+		out = append(out, *ua)
+	}
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j].Events > out[j-1].Events; j-- {
+			out[j], out[j-1] = out[j-1], out[j]
+		}
+	}
+	return out, nil
+}

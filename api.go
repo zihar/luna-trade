@@ -112,10 +112,12 @@ func handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	a1, _ := store.ActiveUsers(since(1))
 	a7, _ := store.ActiveUsers(since(7))
 	a30, _ := store.ActiveUsers(since(30))
+	users, _ := store.UserActivities(since(days))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"days":          days,
-		"features":      feats,
-		"active_users":  map[string]int{"d1": a1, "d7": a7, "d30": a30},
+		"days":         days,
+		"features":     feats,
+		"users":        users,
+		"active_users": map[string]int{"d1": a1, "d7": a7, "d30": a30},
 	})
 }
 
