@@ -910,6 +910,7 @@ function setObjStyle(id, patch){
     if(BUILTIN_LINE[o.name]) chart.overrideOverlay({id, styles:klineLineStyles(dstyle(o))});
     else chart.overrideOverlay({id, points:o.points});
   }catch(e){}
+  scheduleSaveDraws();
 }
 // klinecharts hanya kenal 'solid'/'dashed' → 'dotted' & 'dashed' dipetakan ke dashedValue [dash,gap]
 const DASHV={ dashed:[10,8], dotted:[2,7] };
@@ -934,6 +935,7 @@ function boxPressedMove(t){
   if(k===4||k===5||k===6) B=pp.value;         // sisi bawah
   if(fidxOf(Lxa)>fidxOf(Rxa)){ const tmp=Lxa; Lxa=Rxa; Rxa=tmp; }   // jaga kiri<kanan saat lewat sisi seberang
   writeBox(pts,Lxa,Rxa,T,B);
+  scheduleSaveDraws();
 }
 // setelah 2 klik (2 titik) → mekarkan jadi 8 titik handle
 function expandBox(o){
@@ -1353,6 +1355,7 @@ async function loadInit(latest){
   localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
+  suppressDrawSave=true; clearTimeout(drawSaveTimer);   // clear+reload jangan timpa storage (restore di akhir)
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
   setStatus('Fetching '+inst+' '+currentTF+' …');
@@ -1362,7 +1365,7 @@ async function loadInit(latest){
     const c = await fetchCandles(currentTF,opt);
     if(!c.length) throw new Error('data kosong');
     tfData[currentTF]=c;
-  }catch(e){ setStatus('Failed to load: '+e.message,true); return; }
+  }catch(e){ suppressDrawSave=false; setStatus('Failed to load: '+e.message,true); return; }
   const a=tfData[currentTF];
   T = a[a.length-1].timestamp + DUR[currentTF];
   lastLen=-1;
@@ -1370,6 +1373,8 @@ async function loadInit(latest){
   render(true);
   setReplayUI(false);   // Load → kembali ke realtime (keluar mode replay bila aktif)
   startLive();          // live = default
+  restoreDraws();       // munculkan kembali gambar tersimpan utk instrumen ini
+  suppressDrawSave=false; clearTimeout(drawSaveTimer);
 }
 
 async function fetchCandles(tf,{count,to,from}){
@@ -2034,6 +2039,7 @@ function posRerender(o){ try{
 }catch(_){} }
 function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
+    if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
     try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
       const pts=pendingClicks.slice(0,n).map(p=> p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value});
       // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + garis bisa diklik/hapus)
@@ -2043,7 +2049,7 @@ function delHooks(){ return {
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
     if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke high/low M5 presisi (async, on-demand)
-    inProgressId=null; disarmIcons(); return false; },
+    inProgressId=null; disarmIcons(); scheduleSaveDraws(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
   onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
@@ -2053,7 +2059,7 @@ function delHooks(){ return {
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} posRerender(e.overlay); return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} posRerender(e.overlay); } return false; },
-  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; return false; },
+  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); return false; },
 };}
 function createDraw(name,btn,extra){
   try{
@@ -2067,6 +2073,45 @@ function createDraw(name,btn,extra){
   }catch(e){ setStatus('Drawing error: '+e.message,true); }
 }
 function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(id);}catch(e){} }); drawIds=[]; selectedId=hoverId=null; }
+
+// ===================== persist gambar ke localStorage (per instrumen) =====================
+// Titik disimpan sbg waktu wall-clock (vt) + value → tahan refresh/ganti TF. Saat restore, titik di
+// area future (vt > candle terakhir) dipetakan ke dataIndex spt reanchorFuturePoints(). suppressDrawSave
+// menahan penyimpanan & efek-samping onDrawEnd selama proses clear/restore programatik.
+let suppressDrawSave=false, drawSaveTimer=null;
+const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,horizontalStraightLine:1,verticalStraightLine:1};
+function drawsKey(){ return 'br_draws_'+inst; }
+function serializeDraws(){
+  const out=[];
+  drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);
+    if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
+    out.push({ name:o.name, points:o.points.map(p=>({vt:tsOf(p), value:p.value})),
+      extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
+  }catch(e){} });
+  return out;
+}
+function saveDraws(){ if(suppressDrawSave) return; try{ localStorage.setItem(drawsKey(), JSON.stringify(serializeDraws())); }catch(e){} }
+function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
+function restoreDraws(){
+  let arr; try{ arr=JSON.parse(localStorage.getItem(drawsKey())); }catch(e){ arr=null; }
+  if(!Array.isArray(arr)||!arr.length) return;
+  const a=revealed(currentTF), li=a.length-1, lt=li>=0?a[li].timestamp:null, dur=DUR[currentTF];
+  const prev=suppressDrawSave; suppressDrawSave=true;
+  arr.forEach(d=>{ try{
+    if(!PERSIST_DRAW[d.name]||!Array.isArray(d.points)||!d.points.length) return;
+    const pts=d.points.map(pt=> pt.vt==null ? {value:pt.value}
+      : (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // future → dataIndex
+      : {timestamp:pt.vt, value:pt.value});
+    const base={name:d.name, points:pts};
+    if(d.extendData!=null) base.extendData=d.extendData;
+    if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
+    const id=chart.createOverlay(Object.assign(base,delHooks()));
+    if(id){ drawIds.push(id);
+      if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
+  }catch(e){} });
+  suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+}
+window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
 
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
 // waktu sub-bar; bila magnet aktif, snap ke high/low candle terdekat.
@@ -2126,6 +2171,7 @@ function openOverlayTextEditor(o, removeIfEmpty){
       const v=ta.value;
       if(v.trim()===''){ if(removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} } else { try{chart.overrideOverlay({id:o.id,extendData:''});}catch(e){} } }
       else { try{chart.overrideOverlay({id:o.id,extendData:v});}catch(e){} }
+      scheduleSaveDraws();
     }else if(fresh && removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru (khusus Text)
     else { try{ const ov=chart.getOverlayById(o.id); if(ov) chart.overrideOverlay({id:o.id,points:ov.points}); }catch(e){} }  // batal edit: tampilkan lagi teks lama
   };
@@ -2193,6 +2239,7 @@ function posPressedMove(t){
   pts[3]=Object.assign({value:tp},    tL);   // TP-kiri (pojok)
   pts[4]=Object.assign({value:sl},    tL);   // SL-kiri (pojok)
   pts[5]=Object.assign({value:entry}, tR);   // Entry-kanan (tengah)
+  scheduleSaveDraws();
 }
 
 const DRAW_TOOLS=[
@@ -2909,24 +2956,22 @@ function applyChartCfg(){
   if(c) c.style.background=bg; if(ch) ch.style.background=bg;
 }
 function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
-const gearBtn=document.createElement('button'); gearBtn.className='railbtn'; gearBtn.id='chartSetBtn'; gearBtn.title='Setting chart'; gearBtn.textContent='⚙';
-{ const _rail=document.getElementById('rail'); const _rs=_rail.querySelector('.railspacer'); _rail.insertBefore(gearBtn,_rs); }
+// Setting chart dibuka dari menu klik-kanan canvas (lihat handler contextmenu), di posisi kursor.
 const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
-function showChartSet(){
+function showChartSet(cx,cy){
   const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
   // bg & grid → edit kunci tema yang sedang aktif
   const light=document.body.classList.contains('light'), thm=light?'light':'dark';
   const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
-  chartSet.innerHTML=row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
-  const r=gearBtn.getBoundingClientRect();
-  chartSet.style.left=Math.min(r.right+8,window.innerWidth-220)+'px';
-  chartSet.style.top=Math.max(8,Math.min(r.top,window.innerHeight-280))+'px';
+  chartSet.innerHTML=`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
+    +row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
+  chartSet.style.left=Math.min(cx,window.innerWidth-220)+'px';
+  chartSet.style.top=Math.max(8,Math.min(cy,window.innerHeight-320))+'px';
   chartSet.classList.add('show');
   chartSet.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
-  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(); };
+  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(cx,cy); };
 }
-gearBtn.onclick=(e)=>{ e.stopPropagation(); chartSet.classList.contains('show')?chartSet.classList.remove('show'):showChartSet(); };
-document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)&&e.target!==gearBtn) chartSet.classList.remove('show'); }, true);
+document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)) chartSet.classList.remove('show'); }, true);
 applyChartCfg();   // terapkan cfg tersimpan saat startup
 
 // ===================== context menu: reset chart view =====================
@@ -2958,6 +3003,7 @@ $('#chart').addEventListener('contextmenu',e=>{
     if(nearIdx>=0) items.push({label:`✕ Delete alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
     items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
+  items.push({label:'⚙ Setting chart', fn:()=>showChartSet(e.clientX, e.clientY)});
   items.push({label:'↺ Reset chart view', fn:resetChartView});
   showCtx(e.clientX, e.clientY, items);
 });
