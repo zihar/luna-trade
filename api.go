@@ -64,6 +64,20 @@ func handleTrack(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// isAnalyticsAdmin true bila email ada di env ANALYTICS_ADMIN (daftar dipisah koma).
+func isAnalyticsAdmin(email string) bool {
+	admins := os.Getenv("ANALYTICS_ADMIN")
+	if strings.TrimSpace(admins) == "" || email == "" {
+		return false
+	}
+	for _, e := range strings.Split(admins, ",") {
+		if strings.EqualFold(strings.TrimSpace(e), email) {
+			return true
+		}
+	}
+	return false
+}
+
 // handleAnalytics mengembalikan ringkasan pemakaian fitur. Hanya utk admin: email user
 // login harus ada di env ANALYTICS_ADMIN (dipisah koma). Kalau env kosong → 403.
 func handleAnalytics(w http.ResponseWriter, r *http.Request) {
@@ -72,24 +86,12 @@ func handleAnalytics(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "perlu login")
 		return
 	}
-	admins := os.Getenv("ANALYTICS_ADMIN")
-	if store == nil || strings.TrimSpace(admins) == "" {
+	if store == nil || strings.TrimSpace(os.Getenv("ANALYTICS_ADMIN")) == "" {
 		writeErr(w, http.StatusForbidden, "analytics tidak diaktifkan (set ANALYTICS_ADMIN)")
 		return
 	}
 	u, err := store.GetUserByID(uid)
-	if err != nil || u == nil {
-		writeErr(w, http.StatusForbidden, "akses ditolak")
-		return
-	}
-	allowed := false
-	for _, e := range strings.Split(admins, ",") {
-		if strings.EqualFold(strings.TrimSpace(e), u.Email) {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
+	if err != nil || u == nil || !isAnalyticsAdmin(u.Email) {
 		writeErr(w, http.StatusForbidden, "akses ditolak")
 		return
 	}

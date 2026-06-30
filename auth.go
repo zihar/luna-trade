@@ -168,7 +168,7 @@ func handleMe(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "sesi tidak valid")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"email": u.Email, "name": u.DisplayName, "picture": u.Picture})
+	writeJSON(w, http.StatusOK, map[string]any{"email": u.Email, "name": u.DisplayName, "picture": u.Picture, "is_admin": isAnalyticsAdmin(u.Email)})
 }
 
 // requireUser membungkus handler: tolak 401 bila tak ada sesi valid, jika valid
