@@ -3003,8 +3003,8 @@ $('#chart').addEventListener('contextmenu',e=>{
     if(nearIdx>=0) items.push({label:`✕ Delete alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
     items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
-  items.push({label:'⚙ Setting chart', fn:()=>showChartSet(e.clientX, e.clientY)});
   items.push({label:'↺ Reset chart view', fn:resetChartView});
+  items.push({label:'⚙ Setting chart', fn:()=>showChartSet(e.clientX, e.clientY)});   // paling bawah
   showCtx(e.clientX, e.clientY, items);
 });
 window.addEventListener('click',hideCtx);
