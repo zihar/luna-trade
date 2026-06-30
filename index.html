@@ -473,11 +473,12 @@
   .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
-  .orderpanel{ border-top:1px solid var(--border); padding:7px 10px; }
+  .orderpanel{ border-top:1px solid var(--border); padding:3px 9px 6px; }
+  .orderpanel[data-dock="floating"] .op2{ cursor:move; }   /* seluruh area = drag handle (kontrol di-skip via JS) */
   #openTradeBox:empty{ display:none; }   /* jangan makan gap saat tak ada posisi (hilangkan ruang kosong atas) */
   .orderpanel .bp-title{ margin-bottom:8px; }
   /* order panel — ticket modern minimalis ala TradeLocker */
-  .op2{ display:flex; flex-direction:column; gap:8px; }
+  .op2{ display:flex; flex-direction:column; gap:6px; }
   .op2-sym{ font-size:11.5px; font-weight:700; color:var(--txt); }
   /* header satu baris (simple) & header expand */
   .op-shead{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:move; touch-action:none; }
@@ -496,22 +497,38 @@
   .op3-seg button.on{ background:var(--btn); color:var(--txt); border-color:var(--border); }
   .op3-dir button.dir-sell.on{ color:var(--red); border-color:var(--red); background:rgba(255,111,111,.12); }
   .op3-dir button.dir-buy.on{ color:var(--green); border-color:var(--green); background:rgba(84,200,140,.12); }
-  /* detail (expanded) */
-  .op3-sltp{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .op3-card{ background:var(--inset); border:1px solid var(--border); border-radius:8px; padding:7px 8px;
-    display:flex; flex-direction:column; gap:3px; }
-  .op3-card-h{ display:flex; align-items:center; justify-content:space-between; font-size:9.5px;
-    font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;
-    margin:-7px -8px 1px; padding:5px 8px; border-radius:8px 8px 0 0; }
-  .op3-card.on .op3-card-h{ background:var(--accent); color:#fff; }
-  .op3-card-in{ display:flex; align-items:baseline; gap:4px; }
-  .op3-card-in input{ width:100%; border:0; background:transparent; padding:0; height:auto;
-    font-size:13px; font-weight:700; color:var(--txt); }
-  .op3-card-in span{ font-size:8.5px; color:var(--muted); }
-  .op3-card-sub{ font-size:9.5px; }
-  .op3-card-sub.pos{ color:var(--green); } .op3-card-sub.neg{ color:var(--red); }
-  .op3-misc{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .op3-misc .chk{ align-self:center; }
+  /* ===== SL/TP grid ala TradeLocker ===== */
+  .op-hidden{ display:none; }
+  .tl-sltp{ display:flex; flex-direction:column; gap:6px; }
+  /* baris header: Trail | Stop Loss[✓] | Take Profit[✓] */
+  .tl-head{ display:grid; grid-template-columns:auto 1fr 1fr; gap:6px; }
+  .tl-trail{ height:30px; padding:0 9px; border-radius:6px; background:var(--inset); border:1px solid var(--border);
+    color:var(--muted); font-size:10px; font-weight:600; }
+  .tl-trail.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tl-toggle{ display:flex; align-items:center; justify-content:space-between; gap:6px; height:30px; padding:0 9px;
+    border-radius:6px; background:var(--inset); border:1px solid var(--border); color:var(--muted);
+    font-size:11px; font-weight:600; cursor:pointer; }
+  .tl-toggle.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tl-toggle input{ accent-color:#fff; }
+  /* grid 3 kolom: SL | label | TP, baris Price/Ticks/P&L */
+  .tl-grid{ display:grid; grid-template-columns:1fr auto 1fr; column-gap:0; }
+  .tl-cell{ padding:6px 9px; min-width:0; }
+  .tl-cell.sl{ border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  .tl-cell.tp{ border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  .tl-cell.r-top{ border-top:1px solid var(--border); border-radius:8px 8px 0 0; }
+  .tl-cell.r-bot{ border-bottom:1px solid var(--border); border-radius:0 0 8px 8px; }
+  .tl-cell.r-mid{ border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .tl-px{ font-size:13px; font-weight:700; color:var(--accent); }
+  .tl-tick{ border:1px solid var(--border); border-radius:5px; padding:2px 7px; background:var(--inset); }
+  .tl-tick input{ width:100%; border:0; background:transparent; padding:0; height:auto; font-size:13px; font-weight:700; color:var(--txt); }
+  .tl-kv{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; font-size:12px; font-weight:600; }
+  .tl-kv i{ font-style:normal; font-size:9px; color:var(--muted); }
+  .tl-kv.pos{ color:var(--green); } .tl-kv.neg{ color:var(--red); }
+  /* kolom label tengah */
+  .tl-lbl{ display:flex; align-items:center; justify-content:center; padding:0 11px; font-size:10px; color:var(--muted); white-space:nowrap; }
+  .tl-lbl.two{ flex-direction:column; gap:3px; justify-content:center; }
+  /* kolom dinonaktifkan */
+  .tl-sltp .off{ opacity:.4; }
   .op3-pend{ }
   /* margin */
   .op3-margin{ font-size:10px; color:var(--muted); text-align:right; }
@@ -526,17 +543,19 @@
   .op2-step button{ width:32px; padding:0; font-size:15px; font-weight:400; line-height:1; border:0; border-radius:0;
     background:var(--btn); color:var(--muted); }
   .op2-step button:hover{ background:var(--btn-hover); color:var(--txt); }
-  .op2-step-val{ display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:3px 2px; min-width:52px; }
+  .op2-step-val{ display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:2px 2px; min-width:52px; }
   .op2-step-val input{ width:100%; border:0; background:transparent; text-align:center;
     font-size:12px; font-weight:700; padding:0; height:auto; color:var(--txt); }
   .op2-step-val span{ font-size:8px; color:var(--muted); text-transform:lowercase; letter-spacing:.04em; }
   /* execute button */
-  .op3-exec{ height:38px; border:0; border-radius:8px; font-size:12px; font-weight:700; color:#15151a; cursor:pointer; }
+  .op3-exec{ height:35px; border:0; border-radius:8px; font-size:12px; font-weight:700; color:#15151a; cursor:pointer; }
   .op3-exec.dir-sell{ background:var(--red); } .op3-exec.dir-buy{ background:var(--green); }
   .op3-exec:hover{ filter:brightness(1.08); }
   /* ===== dua mode: simple (compact) ↔ expand ===== */
-  .op-simple{ display:flex; flex-direction:column; gap:8px; }
-  .op-expand{ display:none; flex-direction:column; gap:8px; }
+  .op-simple{ display:flex; flex-direction:column; gap:6px; }
+  .op-expand{ display:none; flex-direction:column; gap:6px; }
+  /* header flush ke tepi atas + jadi drag-handle penuh */
+  .op-shead, .op-ehead{ padding-top:2px; }
   .op2.expanded .op-simple{ display:none; }
   .op2.expanded .op-expand{ display:flex; }
   .op2-flag{ font-size:15px; line-height:1; margin-right:1px; }
@@ -564,8 +583,8 @@
   .op3-adv>*+*{ margin-top:9px; }
   /* baris transaksi: [SELL bid] [stepper] [BUY ask] */
   .op3-deal{ display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:stretch; }
-  .op3-deal-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
-    min-height:44px; border:0; border-radius:8px; cursor:pointer; padding:5px 4px; }
+  .op3-deal-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0;
+    min-height:36px; border:0; border-radius:8px; cursor:pointer; padding:3px 4px; }
   .op3-deal-btn.dir-sell{ background:var(--sell); color:#3d0c0c; }
   .op3-deal-btn.dir-buy{ background:var(--buy); color:#06291b; }
   .op3-deal-btn:hover{ filter:brightness(1.07); }
@@ -729,34 +748,45 @@
             <button class="dir-buy" data-d="long">Buy</button>
           </div>
           <div class="fld op3-pend" id="pendEntryFld" style="display:none"><label>Pending Entry</label><input id="pendEntry" type="number" step="0.0001"></div>
-          <div class="op3-sltp">
-            <div class="op3-card" id="slCard">
-              <label class="op3-card-h">Stop Loss<input type="checkbox" id="slOn" checked></label>
-              <div class="op3-card-in"><input id="slPips" type="number" value="100" min="1" step="1"><span>pips</span></div>
-              <div class="op3-card-sub neg" id="slSub">—</div>
+
+          <!-- SL/TP grid ala TradeLocker: header biru + Price/Ticks/P&L/Balance sejajar -->
+          <div class="tl-sltp">
+            <div class="tl-head">
+              <button type="button" class="tl-trail" id="trailBtn" title="Trailing stop">Trail</button>
+              <label class="tl-toggle" id="slCard">Stop Loss<input type="checkbox" id="slOn" checked></label>
+              <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn" checked></label>
             </div>
-            <div class="op3-card" id="tpCard">
-              <label class="op3-card-h">Take Profit<input type="checkbox" id="tpOn" checked></label>
-              <div class="op3-card-in"><input id="rr" type="number" value="2" min="0.1" step="0.5"><span>RR</span></div>
-              <div class="op3-card-sub pos" id="tpSub">—</div>
+            <div class="tl-grid">
+              <!-- Price -->
+              <div class="tl-cell sl r-top"><div class="tl-px" id="slPrice">—</div></div>
+              <div class="tl-lbl r-top">Price</div>
+              <div class="tl-cell tp r-top"><div class="tl-px" id="tpPrice">—</div></div>
+              <!-- Ticks (editable) -->
+              <div class="tl-cell sl r-mid"><div class="tl-tick"><input id="slPips" type="number" value="100" min="1" step="1"></div></div>
+              <div class="tl-lbl r-mid">Ticks</div>
+              <div class="tl-cell tp r-mid"><div class="tl-tick"><input id="tpPips" type="number" value="200" min="1" step="1"></div></div>
+              <!-- P&L / Balance -->
+              <div class="tl-cell sl r-bot"><div class="tl-kv neg"><span id="slPnl">—</span><i>$</i></div><div class="tl-kv neg"><span id="slPct">—</span><i>%</i></div></div>
+              <div class="tl-lbl r-bot two"><span>P&L</span><span>Balance</span></div>
+              <div class="tl-cell tp r-bot"><div class="tl-kv pos"><span id="tpPnl">—</span><i>$</i></div><div class="tl-kv pos"><span id="tpPct">—</span><i>%</i></div></div>
             </div>
           </div>
-          <details class="op3-adv">
-            <summary>Advanced</summary>
-            <div class="op3-misc">
-              <div class="fld"><label>Balance ($)</label><input id="balance" type="number" value="10000" min="0" step="100"></div>
-              <div class="fld"><label>Pip size</label><input id="pipSize" type="number" value="0.0001" step="0.0001"></div>
-              <label class="chk"><input type="checkbox" id="trailOn"> Trail SL</label>
-              <div class="fld"><label>Trail (pips)</label><input id="trailPips" type="number" value="50" min="1" step="1"></div>
-            </div>
-            <div id="sizingBox" class="sizing"></div>
-          </details>
+
           <div class="op3-margin">Init. Margin: —</div>
           <div class="op3-size">
             <label class="op3-risk"><input type="checkbox" id="riskOn" checked> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
             <div class="op3-size-stepslot" id="expStepSlot"></div>
           </div>
           <button class="op3-exec dir-sell" id="execBtn">SELL</button>
+
+          <!-- plumbing tersembunyi (dipakai engine, tak ditampilkan) -->
+          <div class="op-hidden">
+            <input id="balance" type="number" value="10000" min="0" step="100">
+            <input id="pipSize" type="number" value="0.0001" step="0.0001">
+            <input type="checkbox" id="trailOn">
+            <input id="trailPips" type="number" value="50" min="1" step="1">
+            <div id="sizingBox"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1559,6 +1589,8 @@ function render(full){
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
 // logam (XAU/XAG): 1 lot = 100 oz (konvensi TradeLocker). units di-kawat tetap = oz (1 oz = 1 unit).
 function unitsPer(){ return inst.includes('BTC')?1 : (inst.includes('XAU')||inst.includes('XAG'))?100 : 100000; }
+// TP berbasis jarak (ticks) ala TradeLocker: RR diturunkan dari tpPips/slPips
+function rrVal(){ const sp=+$('#slPips').value||0, tpp=+$('#tpPips').value||0; return sp>0 ? tpp/sp : 0; }
 function lotUnitName(){ return inst.includes('BTC')?'BTC' : 'lots'; }
 function lotStepSize(){ return inst.includes('BTC')?0.01 : 0.01; }
 function lotDec(){ return inst.includes('BTC')?4 : 2; }
@@ -1591,7 +1623,7 @@ function renderOrderPanel(){
   document.querySelectorAll('.j-flag').forEach(f=>f.textContent=flag);
   const lu=$('#lotUnit'); if(lu) lu.textContent=lotUnitName();
   const cur=currentCandle(), ba=curBidAsk();
-  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=+$('#rr').value||0;
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal();
   const bal=+$('#balance').value||0, lots=currentLots(), units=lots*unitsPer();
   const isSell=orderDir==='short';
   // entry acuan: harga eksekusi (ask utk buy, bid utk sell)
@@ -1608,17 +1640,23 @@ function renderOrderPanel(){
   const pill=$('#opTypePill'); if(pill) pill.textContent=(ordType()==='pending'?'PENDING':'MARKET')+' ⇄';
   const syncChip=(id,on)=>{ const c=$(id); if(c) c.classList.toggle('on',on); };
   syncChip('#chipRisk',$('#riskOn').checked); syncChip('#chipSL',$('#slOn').checked); syncChip('#chipTP',$('#tpOn').checked);
-  // header kartu SL/TP biru saat aktif (expand)
-  const slc=$('#slCard'), tpc=$('#tpCard');
-  if(slc) slc.classList.toggle('on',$('#slOn').checked);
-  if(tpc) tpc.classList.toggle('on',$('#tpOn').checked);
-  // SL/TP sub-label ($ / %)
+  // header SL/TP biru saat aktif + Trail toggle
+  const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
+  const slc=$('#slCard'), tpc=$('#tpCard'), trb=$('#trailBtn');
+  if(slc) slc.classList.toggle('on',slOn);
+  if(tpc) tpc.classList.toggle('on',tpOn);
+  if(trb) trb.classList.toggle('on',$('#trailOn').checked);
+  // dim kolom SL/TP saat nonaktif
+  document.querySelectorAll('.tl-cell.sl').forEach(c=>c.classList.toggle('off',!slOn));
+  document.querySelectorAll('.tl-cell.tp').forEach(c=>c.classList.toggle('off',!tpOn));
+  // grid Price / Ticks / P&L / Balance (Ticks = input, sisanya read-only)
   if(entry!=null){
     const slDist=slp*pip, sl=isSell?entry+slDist:entry-slDist, tp=isSell?entry-slDist*rr:entry+slDist*rr;
     const loss=Math.abs(pnlUsd(orderDir,entry,sl,units)), rew=Math.abs(pnlUsd(orderDir,entry,tp,units));
-    const slEl=$('#slSub'), tpEl=$('#tpSub');
-    if(slEl) slEl.textContent = $('#slOn').checked ? `${fmtPx(sl)} · −${usdGrp(loss)} / −${bal?(loss/bal*100).toFixed(2):'0.00'}%` : 'nonaktif';
-    if(tpEl) tpEl.textContent = $('#tpOn').checked ? `${fmtPx(tp)} · +${usdGrp(rew)} / +${bal?(rew/bal*100).toFixed(2):'0.00'}%` : 'nonaktif';
+    const set=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
+    set('#slPrice', fmtPx(sl)); set('#tpPrice', fmtPx(tp));
+    set('#slPnl', '−'+loss.toFixed(2)); set('#slPct', '−'+(bal?(loss/bal*100).toFixed(2):'0.00'));
+    set('#tpPnl', '+'+rew.toFixed(2)); set('#tpPct', '+'+(bal?(rew/bal*100).toFixed(2):'0.00'));
   }
   // Init. Margin (tampil di simple & expand)
   document.querySelectorAll('.op3-margin').forEach(mEl=>{
@@ -1787,7 +1825,7 @@ function renderSizing(){
   if(trade){ entry=trade.entry; sl=trade.sl; tp=trade.tp; dir=trade.dir; }
   else{
     const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
-    const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rr=+$('#rr').value;
+    const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rr=rrVal();
     entry=cur.close; dir='long'; sl=entry-slp*pip; tp=entry+slp*pip*rr;
   }
   const units = trade ? (trade.units||0) : currentLots()*unitsPer();   // sizing berbasis lot
@@ -1810,7 +1848,7 @@ function openTrade(dir){
   track('order',{dir,inst});
   const ba=curBidAsk();
   const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // eksekusi di bid (sell) / ask (buy)
-  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=+$('#rr').value;
+  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal();
   const dist=slp*pip;
   const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
   const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
@@ -1886,7 +1924,7 @@ function placePending(dir){
   const cur=currentCandle(); if(!cur) return;
   const entry=+$('#pendEntry').value;
   if(!entry){ setStatus('Enter the pending Entry price first.',true); return; }
-  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=+$('#rr').value, dist=slp*pip;
+  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal(), dist=slp*pip;
   const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
   const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
   const tp = tpOn ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
@@ -2119,7 +2157,8 @@ document.querySelectorAll('#ordType button').forEach(b=>b.onclick=()=>{
 });
 // Risk checkbox → sizing by Risk% (lot auto) vs manual lot
 $('#riskOn').onchange=()=>{ lotsManual=!$('#riskOn').checked; if(!lotsManual) refreshLotSuggestion(); renderSizing(); };
-$('#slOn').onchange=$('#tpOn').onchange=()=>renderOrderPanel();
+$('#slOn').onchange=$('#tpOn').onchange=()=>renderOrderPanel();   // klik label (#slCard/#tpCard) toggle native
+$('#trailBtn').onclick=()=>{ const c=$('#trailOn'); c.checked=!c.checked; renderOrderPanel(); };
 // lot stepper
 function bumpLot(dir){ lotsManual=true; $('#riskOn').checked=false; const st=lotStepSize();
   setLots(Math.max(st, +(currentLots()+dir*st).toFixed(6))); }
@@ -2926,17 +2965,16 @@ $('#bottomToggle').onclick=toggleTrades;
 $('#marketsClose').onclick=toggleMarkets;     // sembunyikan dari header Markets
 document.querySelectorAll('.op-x').forEach(b=>b.onclick=toggleOrder);   // tutup dari header (sejajar chevron)
 
-// --- drag order panel lewat header (op-shead / op-ehead), bukan titlebar ---
+// --- drag order panel dari mana saja KECUALI kontrol (tombol/input/label/stepper) ---
 (function(){ const op=$('#orderpanel'); if(!op) return;
-  let drag=false,sx,sy,ox,oy,cap=null;
+  let drag=false,sx,sy,ox,oy;
   op.addEventListener('pointerdown',e=>{
-    const bar=e.target.closest('.op-shead,.op-ehead,.op3-margin-c'); if(!bar) return;
-    if(e.target.closest('button,input')) return;        // klik kontrol = bukan drag
+    if(e.target.closest('button,input,select,a,label,.op2-step')) return;   // kontrol = bukan drag
     if(op.dataset.dock!=='floating'){ setOrderDock(true,true); }
     const r=op.getBoundingClientRect();
-    drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top; cap=bar;
+    drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
     op.style.left=ox+'px'; op.style.top=oy+'px';
-    bar.setPointerCapture(e.pointerId); e.preventDefault();
+    op.setPointerCapture(e.pointerId); e.preventDefault();
   });
   op.addEventListener('pointermove',e=>{ if(!drag) return;
     let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
@@ -3177,7 +3215,7 @@ $('#balance').value = localStorage.getItem('br_balance')||10000;
 $('#riskPct').value  = localStorage.getItem('br_riskPct')||1;
 $('#balance').addEventListener('input',()=>{ localStorage.setItem('br_balance',$('#balance').value); renderSizing(); renderAcct(); refreshLotSuggestion(); });
 $('#riskPct').addEventListener('input', ()=>{ localStorage.setItem('br_riskPct',$('#riskPct').value);  renderSizing(); refreshLotSuggestion(); });
-['slPips','rr','pipSize'].forEach(id=>$('#'+id).addEventListener('input',()=>{ renderSizing(); refreshLotSuggestion(); }));
+['slPips','tpPips','pipSize'].forEach(id=>$('#'+id).addEventListener('input',()=>{ renderOrderPanel(); renderSizing(); refreshLotSuggestion(); }));
 // ===================== multi-chart (panel sekunder, view-only) =====================
 // Panel utama (#chart, slot 0) = chart penuh (trading/drawing/replay). Panel sekunder
 // (slot 1..) = chart ringan: hanya tampilkan candle + lilin live simbol/TF sendiri.
