@@ -60,6 +60,8 @@ func (s *Store) migrate() error {
 	}
 	// Kolom tambahan (idempotent) — utk DB lama yg tabelnya sudah ada.
 	s.addColumnIfMissing("users", "picture", "TEXT")
+	s.addColumnIfMissing("journal", "sl", "REAL") // SL/TP paper (server-side)
+	s.addColumnIfMissing("journal", "tp", "REAL")
 	return nil
 }
 
@@ -88,7 +90,9 @@ CREATE TABLE IF NOT EXISTS journal (
   partial         INTEGER NOT NULL DEFAULT 0,
   open_time       TEXT NOT NULL,
   exit_time       TEXT,
-  broker_trade_id TEXT
+  broker_trade_id TEXT,
+  sl              REAL,                     -- stop loss price (paper); NULL = tak ada
+  tp              REAL                      -- take profit price (paper); NULL = tak ada
 );
 CREATE INDEX IF NOT EXISTS idx_journal_user ON journal(user_id, exit_time);
 
@@ -309,12 +313,14 @@ func (s *Store) DeleteSession(token string) error {
 
 // PaperTrade = posisi paper terbuka (subset journal).
 type PaperTrade struct {
-	ID         int64   `json:"id"`
-	Instrument string  `json:"instrument"`
-	Dir        string  `json:"dir"` // long | short
-	Entry      float64 `json:"entry"`
-	Units      float64 `json:"units"`
-	OpenTime   string  `json:"openTime"`
+	ID         int64    `json:"id"`
+	Instrument string   `json:"instrument"`
+	Dir        string   `json:"dir"` // long | short
+	Entry      float64  `json:"entry"`
+	Units      float64  `json:"units"`
+	OpenTime   string   `json:"openTime"`
+	SL         *float64 `json:"sl,omitempty"` // stop loss price (nil = tak ada)
+	TP         *float64 `json:"tp,omitempty"` // take profit price (nil = tak ada)
 }
 
 // ClosedPaperTrade = baris journal paper yang sudah ditutup (utk riwayat).
@@ -336,11 +342,11 @@ func (s *Store) PaperBalance(userID int64) (float64, error) {
 }
 
 // OpenPaperTrade menyisipkan posisi paper terbuka (exit NULL) → balikan id-nya.
-func (s *Store) OpenPaperTrade(userID int64, instrument, dir string, entry, units float64, openTime string) (int64, error) {
+func (s *Store) OpenPaperTrade(userID int64, instrument, dir string, entry, units float64, openTime string, sl, tp *float64) (int64, error) {
 	res, err := s.db.Exec(
-		`INSERT INTO journal (user_id,broker,mode,instrument,dir,entry,units,open_time)
-		 VALUES (?, 'paper', 'paper', ?, ?, ?, ?, ?)`,
-		uidStr(userID), instrument, dir, entry, units, openTime,
+		`INSERT INTO journal (user_id,broker,mode,instrument,dir,entry,units,open_time,sl,tp)
+		 VALUES (?, 'paper', 'paper', ?, ?, ?, ?, ?, ?, ?)`,
+		uidStr(userID), instrument, dir, entry, units, openTime, sl, tp,
 	)
 	if err != nil {
 		return 0, err
@@ -351,7 +357,7 @@ func (s *Store) OpenPaperTrade(userID int64, instrument, dir string, entry, unit
 // OpenPaperTrades = semua posisi paper terbuka milik user.
 func (s *Store) OpenPaperTrades(userID int64) ([]PaperTrade, error) {
 	rows, err := s.db.Query(
-		`SELECT id,instrument,dir,entry,units,open_time FROM journal
+		`SELECT id,instrument,dir,entry,units,open_time,sl,tp FROM journal
 		 WHERE user_id=? AND mode='paper' AND exit IS NULL ORDER BY id`,
 		uidStr(userID),
 	)
@@ -362,7 +368,7 @@ func (s *Store) OpenPaperTrades(userID int64) ([]PaperTrade, error) {
 	var out []PaperTrade
 	for rows.Next() {
 		var t PaperTrade
-		if err := rows.Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime); err != nil {
+		if err := rows.Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime, &t.SL, &t.TP); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -374,10 +380,10 @@ func (s *Store) OpenPaperTrades(userID int64) ([]PaperTrade, error) {
 func (s *Store) GetPaperTrade(userID, id int64) (*PaperTrade, error) {
 	var t PaperTrade
 	err := s.db.QueryRow(
-		`SELECT id,instrument,dir,entry,units,open_time FROM journal
+		`SELECT id,instrument,dir,entry,units,open_time,sl,tp FROM journal
 		 WHERE id=? AND user_id=? AND mode='paper' AND exit IS NULL`,
 		id, uidStr(userID),
-	).Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime)
+	).Scan(&t.ID, &t.Instrument, &t.Dir, &t.Entry, &t.Units, &t.OpenTime, &t.SL, &t.TP)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -385,6 +391,36 @@ func (s *Store) GetPaperTrade(userID, id int64) (*PaperTrade, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// PaperOpenSLTP = posisi paper terbuka (lintas user) yg punya SL atau TP — utk monitor.
+type PaperOpenSLTP struct {
+	UserID int64
+	PaperTrade
+}
+
+// AllOpenPaperSLTP mengembalikan semua posisi paper terbuka milik SEMUA user yang
+// memiliki SL dan/atau TP. Dipakai goroutine monitor utk auto-close server-side.
+func (s *Store) AllOpenPaperSLTP() ([]PaperOpenSLTP, error) {
+	rows, err := s.db.Query(
+		`SELECT user_id,id,instrument,dir,entry,units,open_time,sl,tp FROM journal
+		 WHERE mode='paper' AND exit IS NULL AND (sl IS NOT NULL OR tp IS NOT NULL)`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PaperOpenSLTP
+	for rows.Next() {
+		var p PaperOpenSLTP
+		var uid string
+		if err := rows.Scan(&uid, &p.ID, &p.Instrument, &p.Dir, &p.Entry, &p.Units, &p.OpenTime, &p.SL, &p.TP); err != nil {
+			return nil, err
+		}
+		p.UserID, _ = strconv.ParseInt(uid, 10, 64)
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // ClosePaperTrade merealisasikan P&L: update saldo (sekali) + tutup baris journal,

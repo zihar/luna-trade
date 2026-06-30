@@ -204,7 +204,7 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	openTime := time.Now().UTC().Format(time.RFC3339)
-	tradeID, err := store.OpenPaperTrade(uid, string(req.Instrument), dir, entry, req.Units, openTime)
+	tradeID, err := store.OpenPaperTrade(uid, string(req.Instrument), dir, entry, req.Units, openTime, req.SL, req.TP)
 	if claimed {
 		status := http.StatusOK
 		if err != nil {
@@ -220,7 +220,7 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, paperPositionView{
 		PaperTrade: PaperTrade{
 			ID: tradeID, Instrument: string(req.Instrument), Dir: dir,
-			Entry: entry, Units: req.Units, OpenTime: openTime,
+			Entry: entry, Units: req.Units, OpenTime: openTime, SL: req.SL, TP: req.TP,
 		},
 		Price:  entry,
 		Margin: marginUSD(string(req.Instrument), entry, req.Units),
