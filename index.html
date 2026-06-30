@@ -2045,6 +2045,7 @@ function delHooks(){ return {
     if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke high/low M5 presisi (async, on-demand)
     inProgressId=null; disarmIcons(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
+  onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
     if(n==='text'){ hideAddTextNow(); editTextOverlay(o); }            // teks: klik 2x → langsung edit (style via klik-kanan)
     else if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
