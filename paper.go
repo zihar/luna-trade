@@ -9,6 +9,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -96,6 +98,72 @@ func markPrice(inst, dir string) (float64, bool) {
 		return t.Bid, t.Bid > 0
 	}
 	return t.Ask, t.Ask > 0
+}
+
+// validateSLTP menolak SL/TP yang sudah di dalam spread (short dinilai di ask, long di
+// bid) agar posisi tak langsung stop-out. nil = valid (atau harga belum tersedia).
+func validateSLTP(inst Instrument, dir string, sl, tp *float64) error {
+	tick, ok := hub.Last(inst)
+	if !ok {
+		return nil
+	}
+	if dir == "short" {
+		if sl != nil && *sl <= tick.Ask {
+			return errors.New("Stop Loss di dalam spread — taruh di atas harga Ask")
+		}
+		if tp != nil && *tp >= tick.Ask {
+			return errors.New("Take Profit di dalam spread — taruh di bawah harga Ask")
+		}
+	} else {
+		if sl != nil && *sl >= tick.Bid {
+			return errors.New("Stop Loss di dalam spread — taruh di bawah harga Bid")
+		}
+		if tp != nil && *tp <= tick.Bid {
+			return errors.New("Take Profit di dalam spread — taruh di atas harga Bid")
+		}
+	}
+	return nil
+}
+
+// POST /api/position/sltp → ubah SL/TP posisi paper terbuka milik user.
+func handlePaperModify(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		ID int64    `json:"id"`
+		SL *float64 `json:"sl"`
+		TP *float64 `json:"tp"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "gagal baca body")
+		return
+	}
+	if req.ID == 0 {
+		writeErr(w, http.StatusBadRequest, "id posisi wajib")
+		return
+	}
+	pos, err := store.GetPaperTrade(uid, req.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "gagal baca posisi")
+		return
+	}
+	if pos == nil {
+		writeErr(w, http.StatusNotFound, "posisi tidak ditemukan atau sudah ditutup")
+		return
+	}
+	if err := validateSLTP(Instrument(pos.Instrument), pos.Dir, req.SL, req.TP); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := store.UpdatePaperSLTP(uid, req.ID, req.SL, req.TP); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	mp, _ := markPrice(pos.Instrument, pos.Dir)
+	writeJSON(w, http.StatusOK, paperPositionView{
+		PaperTrade: PaperTrade{ID: pos.ID, Instrument: pos.Instrument, Dir: pos.Dir,
+			Entry: pos.Entry, Units: pos.Units, OpenTime: pos.OpenTime, SL: req.SL, TP: req.TP},
+		Price: mp,
+	})
 }
 
 // paperPositionView = posisi terbuka + valuasi live untuk FE.
@@ -187,29 +255,10 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 		dir = "short"
 	}
 
-	// Validasi SL/TP terhadap sisi exit (short dinilai di ask, long di bid). Tolak bila
-	// sudah terlanggar saat buka (mis. SL di dalam spread) agar tak membuka posisi yang
-	// pasti langsung stop-out. Pesan jelas supaya user perlebar jaraknya.
-	if tick, ok := hub.Last(req.Instrument); ok {
-		if dir == "short" {
-			if req.SL != nil && *req.SL <= tick.Ask {
-				writeErr(w, http.StatusBadRequest, "Stop Loss di dalam spread — taruh di atas harga Ask")
-				return
-			}
-			if req.TP != nil && *req.TP >= tick.Ask {
-				writeErr(w, http.StatusBadRequest, "Take Profit di dalam spread — taruh di bawah harga Ask")
-				return
-			}
-		} else {
-			if req.SL != nil && *req.SL >= tick.Bid {
-				writeErr(w, http.StatusBadRequest, "Stop Loss di dalam spread — taruh di bawah harga Bid")
-				return
-			}
-			if req.TP != nil && *req.TP <= tick.Bid {
-				writeErr(w, http.StatusBadRequest, "Take Profit di dalam spread — taruh di atas harga Bid")
-				return
-			}
-		}
+	// Tolak SL/TP yang sudah di dalam spread saat buka (biar tak langsung stop-out).
+	if err := validateSLTP(req.Instrument, dir, req.SL, req.TP); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// Idempotency: klaim clientTag dulu (cegah dobel akibat double-click/retry).

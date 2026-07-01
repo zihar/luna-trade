@@ -461,6 +461,25 @@
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
+  /* popup Kelola posisi (edit SL/TP dari klik garis) */
+  /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
+  .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
+  .pos-edit2 .pe-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+  .pos-edit2 .pe-pen{ color:var(--muted); font-size:13px; }
+  .pos-edit2 .pe-title{ font-size:12.5px; font-weight:700; flex:1; }
+  .pos-edit2 .pe-dir{ font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.05em; }
+  .pos-edit2 .pe-dir.sell{ color:var(--red); background:rgba(255,111,111,.14); }
+  .pos-edit2 .pe-dir.buy{ color:var(--green); background:rgba(84,200,140,.14); }
+  .pos-edit2 .pe-inst{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--inset);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:12px; margin-bottom:11px; }
+  .pos-edit2 .pe-inst-l{ display:flex; align-items:center; gap:7px; }
+  .pos-edit2 .pe-inst-r{ font-family:var(--mono); color:var(--muted); }
+  .pos-edit2 .pe-inst-r .t-pos{ color:var(--green); } .pos-edit2 .pe-inst-r .t-neg{ color:var(--red); }
+  .pos-edit2 .tl-tick input{ text-align:left; }
+  .pos-edit2 .pe-act{ display:flex; gap:8px; margin-top:12px; }
+  .pos-edit2 .pe-act button{ flex:1; height:40px; font-size:13px; font-weight:600; border-radius:9px; }
+  .pos-edit2 #peConfirm{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pos-edit2 #peConfirm:hover{ filter:brightness(1.08); }
   .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
   .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
   .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
@@ -624,6 +643,14 @@
   .op3-deal-lbl{ font-size:8.5px; font-weight:700; letter-spacing:.1em; opacity:.8; }
   .op3-deal-mid{ display:flex; align-items:stretch; min-width:96px; }
   .op3-deal-mid .op2-step{ flex:1; }
+  /* mode satu-arah (SL/TP/Risk ON): stepper kiri + satu tombol eksekusi */
+  .op3-deal-one{ display:grid; grid-template-columns:minmax(96px,118px) 1fr; gap:8px; align-items:stretch; }
+  .op3-deal-one .op3-exec{ height:auto; min-height:38px; font-size:13px; }
+  /* toggle arah (pill seperti Market/Pending) — warna ikut arah */
+  .dir-pill.dir-sell{ color:var(--red); border-color:rgba(255,111,111,.55); }
+  .dir-pill.dir-buy{ color:var(--green); border-color:rgba(84,200,140,.55); }
+  /* [hidden] harus menang atas display:grid/flex author di atas */
+  .op3-deal[hidden], .op3-deal-one[hidden], .op3-pill[hidden]{ display:none; }
   /* expand: slot stepper di baris size */
   .op3-size-stepslot{ display:flex; flex:1; align-items:stretch; }
   .op3-size-stepslot .op2-step{ flex:1; }
@@ -739,6 +766,7 @@
             <span class="op2-flag j-flag"></span>
             <span class="op2-sym j-sym">EURUSD</span>
             <button type="button" class="op3-pill" id="opTypePill" title="Market / Pending">MARKET ⇄</button>
+            <button type="button" class="op3-pill dir-pill dir-sell" id="dirPill" title="Buy / Sell" hidden>SELL ⇄</button>
             <span class="grow"></span>
             <button type="button" class="op3-chip" id="chipRisk" title="Risk % sizing">RISK</button>
             <button type="button" class="op3-chip" id="chipSL" title="Stop Loss">SL</button>
@@ -765,10 +793,11 @@
             </div>
           </div>
           <div class="op3-margin op3-margin-c" id="op2Margin">Init. Margin: —</div>
-          <div class="op3-deal">
+          <!-- tanpa SL/TP/Risk: dua tombol satu-klik SELL | BUY -->
+          <div class="op3-deal" id="dealTwo">
             <button type="button" class="op3-deal-btn dir-sell" id="dealSell"><span class="op3-deal-px" id="dealSellPx">—</span><span class="op3-deal-lbl">SELL</span></button>
             <div class="op3-deal-mid" id="dealStepSlot">
-              <!-- stepper bersama (#lotStepper) hidup di sini saat simple, dipindah ke #expStepSlot saat expand -->
+              <!-- stepper bersama (#lotStepper) hidup di sini saat simple, dipindah ke slot mode aktif -->
               <div class="op2-step" id="lotStepper">
                 <button type="button" id="lotDown" title="Decrease lot">−</button>
                 <div class="op2-step-val"><input id="lotInput" type="text" inputmode="decimal" value="0.10"><span id="lotUnit">lots</span></div>
@@ -776,6 +805,11 @@
               </div>
             </div>
             <button type="button" class="op3-deal-btn dir-buy" id="dealBuy"><span class="op3-deal-px" id="dealBuyPx">—</span><span class="op3-deal-lbl">BUY</span></button>
+          </div>
+          <!-- dengan SL/TP/Risk ON: satu arah (toggle #dirPill) → stepper + satu tombol eksekusi -->
+          <div class="op3-deal-one" id="dealOneWrap" hidden>
+            <div class="op3-deal-mid" id="oneStepSlot"></div>
+            <button type="button" class="op3-exec dir-sell" id="dealOne">SELL</button>
           </div>
         </div>
 
@@ -802,8 +836,8 @@
           <div class="tl-sltp">
             <div class="tl-head">
               <button type="button" class="tl-trail" id="trailBtn" title="Trailing stop">Trail</button>
-              <label class="tl-toggle" id="slCard">Stop Loss<input type="checkbox" id="slOn" checked></label>
-              <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn" checked></label>
+              <label class="tl-toggle" id="slCard">Stop Loss<input type="checkbox" id="slOn"></label>
+              <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn"></label>
             </div>
             <div class="tl-grid">
               <!-- Price -->
@@ -823,7 +857,7 @@
 
           <div class="op3-margin">Init. Margin: —</div>
           <div class="op3-size">
-            <label class="op3-risk"><input type="checkbox" id="riskOn" checked> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
+            <label class="op3-risk"><input type="checkbox" id="riskOn"> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
             <div class="op3-size-stepslot" id="expStepSlot"></div>
           </div>
           <button class="op3-exec dir-sell" id="execBtn">SELL</button>
@@ -919,6 +953,30 @@ function nyTime(ms){
     return new Intl.DateTimeFormat('en-CA',{timeZone:chartTZ,year:'numeric',month:'2-digit',day:'2-digit',
       hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms)).replace(',','');
   }catch(e){ return new Date(ms).toISOString().slice(0,16).replace('T',' '); }
+}
+// label tanggal crosshair sumbu-X: "Tue 30 Jun '26 10:00" (ada hari) — hormati timezone chart.
+function crosshairDate(ms){
+  try{
+    const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',
+      year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(ms));
+    const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
+    return `${g('weekday')} ${g('day')} ${g('month')} '${g('year')} ${g('hour')}:${g('minute')}`;
+  }catch(e){ return nyTime(ms); }
+}
+// tick sumbu-X (klinecharts): hormati pola `format` (granularitas) + timezone chart.
+function axisTickDate(ms, pattern){
+  try{
+    const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ms));
+    const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
+    return String(pattern||'YYYY-MM-DD HH:mm').replace('YYYY',g('year')).replace('MM',g('month'))
+      .replace('DD',g('day')).replace('HH',g('hour')).replace('mm',g('minute')).replace('ss',g('second'));
+  }catch(e){ return nyTime(ms); }
+}
+// dipakai di klinecharts.init(customApi.formatDate). FormatDateType klinecharts: 0=Tooltip,
+// 1=Crosshair, 2=XAxis. Tick sumbu (2) → ringkas hormati pola; crosshair/tooltip (0/1) → ada hari.
+function chartFormatDate(_dtf, timestamp, format, type){
+  return (type===2 || type==='xAxis') ? axisTickDate(timestamp, format) : crosshairDate(timestamp);
 }
 // candle terungkap = yang sudah CLOSED pada cursor T (anti-lookahead), via binary search
 function revealed(tf){
@@ -1418,12 +1476,17 @@ klinecharts.registerOverlay({
   name:'tradeLevel', totalStep:2, needDefaultPointFigure:true,
   createPointFigures:({overlay,coordinates,bounding})=>{
     if(!coordinates.length) return [];
-    const y=coordinates[0].y, d=overlay.extendData||{}, c=d.color||'#888';
+    const y=coordinates[0].y, d=overlay.extendData||{}, c=d.color||'#888', lc=d.lineColor||c;
     const xR=(bounding&&bounding.width)?bounding.width:600;
-    return [
-      {type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:c,size:1,style:'dashed'}},
-      {type:'text',attrs:{x:6,y:y-3,text:d.label||'',align:'left',baseline:'bottom'},styles:{color:c,size:10}},
-    ];
+    const figs=[{type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:lc,size:1,style:'dashed'}}];
+    if(d.pill){   // pill terisi (kotak kecil ujung kiri) — mis. P&L posisi berjalan
+      figs.push({type:'text',attrs:{x:4,y,text:d.label||'',align:'left',baseline:'middle'},
+        styles:{color:'#0e0f14',backgroundColor:c,size:10,weight:'bold',borderRadius:4,
+                paddingLeft:7,paddingRight:7,paddingTop:3,paddingBottom:3}});
+    } else {
+      figs.push({type:'text',attrs:{x:6,y:y-3,text:d.label||'',align:'left',baseline:'bottom'},styles:{color:c,size:10}});
+    }
+    return figs;
   },
 });
 
@@ -1470,7 +1533,7 @@ const lightStyles = {
     point:{ color:'rgba(0,0,0,0)', borderColor:'#3a5fe0', borderSize:1.5, radius:3,
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
 };
-const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ});
+const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
 
 // ===================== tema gelap/terang =====================
@@ -1670,7 +1733,7 @@ function suggestLotsFromRisk(){
   const u=unitsFromRisk(bal,rp,cur.close,cur.close-slp*pip);
   return u/unitsPer();
 }
-function refreshLotSuggestion(){ if(lotsManual||trade) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
+function refreshLotSuggestion(){ if(lotsManual||trade||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
 // harga dgn pemisah ribuan (ala TradeLocker): 4,117.74 / 1.14088
 function fmtPx(p){ if(p==null||isNaN(p)) return '—';
   return (+p).toLocaleString('en-US',{minimumFractionDigits:priceDecimals(),maximumFractionDigits:priceDecimals()}); }
@@ -1697,6 +1760,19 @@ function renderOrderPanel(){
   const dsx=$('#dealSellPx'), dbx=$('#dealBuyPx'), fb=cur?fmtPx(cur.close):'—';
   if(dsx) dsx.textContent = ba ? fmtPx(ba.bid) : fb;
   if(dbx) dbx.textContent = ba ? fmtPx(ba.ask) : fb;
+  // simple: SL/TP/Risk OFF → dua tombol SELL|BUY; ada yg ON → satu arah (dir-pill + satu tombol)
+  const anyStage = $('#riskOn').checked || $('#slOn').checked || $('#tpOn').checked;
+  const dealTwo=$('#dealTwo'), dealOneWrap=$('#dealOneWrap'), dirPill=$('#dirPill');
+  if(dealTwo && dealOneWrap){
+    const expanded=!!$('#orderForm').querySelector('.op2.expanded');
+    dealTwo.hidden=anyStage; dealOneWrap.hidden=!anyStage;
+    const step=$('#lotStepper'), slot = expanded ? $('#expStepSlot') : (anyStage ? $('#oneStepSlot') : $('#dealStepSlot'));
+    if(step && slot && step.parentElement!==slot) slot.appendChild(step);
+    if(dirPill){ dirPill.className='op3-pill dir-pill '+(isSell?'dir-sell':'dir-buy'); dirPill.textContent=(isSell?'SELL':'BUY')+' ⇄'; dirPill.hidden=!anyStage; }
+    const one=$('#dealOne');
+    if(one){ one.className='op3-exec dir-'+(isSell?'sell':'buy');
+      one.textContent = entry!=null ? `${isSell?'SELL':'BUY'} ${lots.toFixed(lotDec())} @ ${fmtPx(entry)}` : (isSell?'SELL':'BUY'); }
+  }
   // chips & pill (simple) — cermin dari state kanonik
   const pill=$('#opTypePill'); if(pill) pill.textContent=(ordType()==='pending'?'PENDING':'MARKET')+' ⇄';
   const syncChip=(id,on)=>{ const c=$(id); if(c) c.classList.toggle('on',on); };
@@ -2007,6 +2083,139 @@ function drawTradeLines(){
   trade.lineSL   = trade.sl!=null ? tradeLevel('sl',trade.sl) : null;
   trade.lineTP   = trade.tp!=null ? tradeLevel('tp',trade.tp) : null;
 }
+
+// ===== garis posisi PAPER on-chart (per posisi, instrumen aktif) =====
+// pakai ulang POS_GREEN/POS_RED (warna candle, dideklarasi di atas); biru entry literal
+let paperLines={};   // posId -> {entry,sl,tp}
+function clearPaperLines(){ Object.values(paperLines).forEach(rec=>['entry','sl','tp'].forEach(k=>{ if(rec[k]){try{chart.removeOverlay(rec[k]);}catch(e){}} })); paperLines={}; }
+function posPnlStr(v){ return (v>=0?'+':'-')+'$'+Math.abs(+v||0).toFixed(2); }
+function posLineInfo(p,kind,val){
+  const dec=decimalsFor(p.instrument), bal=+$('#balance').value||0, units=p.units||0;
+  if(kind==='entry'){ const pnl=+p.unrealizedPl||0;
+    return {pill:true, lineColor:'#4a71ff', color:pnl>=0?POS_GREEN:POS_RED,
+      label:`${p.dir==='short'?'▼':'▲'} ${lotLabelFor(p.instrument,units)} · ${posPnlStr(pnl)}`}; }
+  if(kind==='sl'){ const v=val!=null?val:p.sl, loss=Math.abs(pnlUsd(p.dir,p.entry,v,units)), pct=bal?loss/bal*100:0;
+    return {lineColor:POS_RED, color:POS_RED, label:`SL ${(+v).toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
+  const v=val!=null?val:p.tp, rew=Math.abs(pnlUsd(p.dir,p.entry,v,units)), pctt=bal?rew/bal*100:0;
+  return {lineColor:POS_GREEN, color:POS_GREEN, label:`TP ${(+v).toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
+}
+function posExtend(p,kind,val){ const i=posLineInfo(p,kind,val); return {posId:p.id,kind,color:i.color,lineColor:i.lineColor,label:i.label,pill:!!i.pill}; }
+// buat overlay garis posisi; draggable hanya utk SL/TP saat mode edit (staged)
+function posLevel(p,kind,draggable){
+  const value = kind==='entry'?p.entry : kind==='sl'?p.sl : p.tp;
+  return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable,
+    extendData:posExtend(p,kind,value),
+    onClick:()=>{ openPositionEditor(p.id); return false; },
+    onPressedMoving: !draggable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null||!editPos) return false;
+      editPos[kind]=v; renderPosEdit();   // staged: perbarui panel + label, TIDAK simpan
+      try{chart.overrideOverlay({id:e.overlay.id, extendData:posExtend(editPos,kind,v)});}catch(_){}
+      return false; },
+  });
+}
+function drawPaperLines(){
+  if(typeof spActive!=='function'||!spActive()){ clearPaperLines(); return; }
+  const cur=(SP.positions||[]).filter(p=>p.instrument===inst);
+  const keep=new Set(cur.map(p=>p.id));
+  Object.keys(paperLines).forEach(idStr=>{ if(!keep.has(+idStr)){ ['entry','sl','tp'].forEach(k=>{ if(paperLines[idStr][k]){try{chart.removeOverlay(paperLines[idStr][k]);}catch(e){}} }); delete paperLines[idStr]; if(+idStr===editingPosId) closePositionEditor(); } });
+  cur.forEach(p=>{
+    const rec=paperLines[p.id]||(paperLines[p.id]={entry:null,sl:null,tp:null});
+    // entry pill (selalu ada, P&L live)
+    if(rec.entry) try{chart.overrideOverlay({id:rec.entry, points:[{value:p.entry}], extendData:posExtend(p,'entry')});}catch(e){}
+    else rec.entry=posLevel(p,'entry',false);
+    // posisi yg sedang diedit: garis SL/TP staged dikelola panel/drag → jangan disentuh di sini,
+    // hanya segarkan harga pasar/P&L di panel
+    if(editingPosId===p.id){ if(editPos){ editPos.price=+p.price; renderPosEdit(); } return; }
+    // lainnya: garis SL/TP = state server (view, terkunci; klik → buka editor)
+    ['sl','tp'].forEach(k=>{ const has=p[k]!=null;
+      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k,false); }
+      else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; }
+    });
+  });
+}
+// ===== Edit Open Position (staged, ala TradeLocker): panel + garis SL/TP draggable =====
+let editingPosId=null, editPos=null, posEditEl=null;
+function closePositionEditor(){
+  const wasId=editingPosId; editingPosId=null; editPos=null;
+  if(posEditEl) posEditEl.classList.remove('show');
+  if(wasId!=null && paperLines[wasId]){ ['sl','tp'].forEach(k=>{ if(paperLines[wasId][k]){try{chart.removeOverlay(paperLines[wasId][k]);}catch(e){} paperLines[wasId][k]=null; } }); }
+  drawPaperLines();   // gambar ulang dari state server (batalkan staged)
+}
+function buildPosEditPanel(){
+  if(posEditEl) return;
+  posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
+  posEditEl.innerHTML=
+    `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Tutup">✕</button></div>`+
+    `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag">🏳️</span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
+    `<div class="tl-sltp"><div class="tl-head">`+
+      `<button type="button" class="tl-trail" id="peTrail" title="Trailing (segera)">Trail</button>`+
+      `<label class="tl-toggle" id="peSLtog">Stop Loss<input type="checkbox" id="peSLon"></label>`+
+      `<label class="tl-toggle" id="peTPtog">Take Profit<input type="checkbox" id="peTPon"></label></div>`+
+    `<div class="tl-grid">`+
+      `<div class="tl-cell sl r-top"><div class="tl-tick"><input id="peSLprice" type="number" step="any"></div></div><div class="tl-lbl r-top">Price</div><div class="tl-cell tp r-top"><div class="tl-tick"><input id="peTPprice" type="number" step="any"></div></div>`+
+      `<div class="tl-cell sl r-mid"><div class="tl-px" id="peSLticks">—</div></div><div class="tl-lbl r-mid">Ticks</div><div class="tl-cell tp r-mid"><div class="tl-px" id="peTPticks">—</div></div>`+
+      `<div class="tl-cell sl r-bot"><div class="tl-kv neg"><span id="peSLpnl">—</span><i>$</i></div><div class="tl-kv neg"><span id="peSLpct">—</span><i>%</i></div></div><div class="tl-lbl r-bot two"><span>P&L</span><span>Balance</span></div><div class="tl-cell tp r-bot"><div class="tl-kv pos"><span id="peTPpnl">—</span><i>$</i></div><div class="tl-kv pos"><span id="peTPpct">—</span><i>%</i></div></div>`+
+    `</div></div>`+
+    `<div class="pe-act"><button id="peDiscard">Discard</button><button id="peConfirm" class="primary">Confirm</button></div>`;
+  document.body.appendChild(posEditEl);
+  const $$=s=>posEditEl.querySelector(s);
+  $$('#peClose').onclick=closePositionEditor; $$('#peDiscard').onclick=closePositionEditor; $$('#peConfirm').onclick=commitPosSLTP;
+  $$('#peSLon').onchange=()=>{ if(editPos){ editPos.slOn=$$('#peSLon').checked; drawStagedLines(); renderPosEdit(); } };
+  $$('#peTPon').onchange=()=>{ if(editPos){ editPos.tpOn=$$('#peTPon').checked; drawStagedLines(); renderPosEdit(); } };
+  $$('#peSLprice').oninput=()=>{ if(editPos){ const v=+$$('#peSLprice').value; if(isFinite(v)&&v>0){ editPos.sl=v; drawStagedLines(); renderPosEdit(true); } } };
+  $$('#peTPprice').oninput=()=>{ if(editPos){ const v=+$$('#peTPprice').value; if(isFinite(v)&&v>0){ editPos.tp=v; drawStagedLines(); renderPosEdit(true); } } };
+  $$('#peTrail').onclick=()=>{ if(editPos){ editPos.trail=!editPos.trail; renderPosEdit(); } };
+}
+function drawStagedLines(){
+  if(!editPos) return; const rec=paperLines[editPos.id]||(paperLines[editPos.id]={entry:null,sl:null,tp:null});
+  ['sl','tp'].forEach(k=>{ const on=editPos[k+'On'];
+    if(on && editPos[k]!=null){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:editPos[k]}], extendData:posExtend(editPos,k,editPos[k])});}catch(e){} else rec[k]=posLevel(editPos,k,true); }
+    else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; } });
+}
+function renderPosEdit(skipPriceInputs){
+  if(!editPos || !posEditEl) return;
+  const $$=s=>posEditEl.querySelector(s);
+  const dec=decimalsFor(editPos.instrument), pip=pipOf(editPos.instrument), bal=+$('#balance').value||0, isSell=editPos.dir==='short';
+  $$('#peDir').textContent=isSell?'SELL':'BUY'; $$('#peDir').className='pe-dir '+(isSell?'sell':'buy');
+  $$('#peFlag').textContent = editPos.instrument.includes('XAU')?'🥇':editPos.instrument.includes('XAG')?'🥈':editPos.instrument.includes('BTC')?'₿':editPos.instrument==='DXY'?'💵':'🏳️';
+  $$('#peSym').textContent=editPos.instrument.replace('_','');
+  const mkt=+editPos.price, mktCls=(isSell? mkt<=editPos.entry : mkt>=editPos.entry)?'t-pos':'t-neg';
+  $$('#peInstR').innerHTML=`${lotLabelFor(editPos.instrument,editPos.units)} / ${(+editPos.entry).toFixed(dec)} → <span class="${mktCls}">${mkt.toFixed(dec)}</span>`;
+  $$('#peSLon').checked=editPos.slOn; $$('#peTPon').checked=editPos.tpOn;
+  $$('#peSLtog').classList.toggle('on',editPos.slOn); $$('#peTPtog').classList.toggle('on',editPos.tpOn);
+  $$('#peTrail').classList.toggle('on',editPos.trail);
+  posEditEl.querySelectorAll('.tl-cell.sl').forEach(c=>c.classList.toggle('off',!editPos.slOn));
+  posEditEl.querySelectorAll('.tl-cell.tp').forEach(c=>c.classList.toggle('off',!editPos.tpOn));
+  if(!skipPriceInputs){ $$('#peSLprice').value=(+editPos.sl).toFixed(dec); $$('#peTPprice').value=(+editPos.tp).toFixed(dec); }
+  $$('#peSLticks').textContent=Math.round(Math.abs(editPos.sl-editPos.entry)/pip);
+  $$('#peTPticks').textContent=Math.round(Math.abs(editPos.tp-editPos.entry)/pip);
+  const slLoss=Math.abs(pnlUsd(editPos.dir,editPos.entry,editPos.sl,editPos.units)), tpRew=Math.abs(pnlUsd(editPos.dir,editPos.entry,editPos.tp,editPos.units));
+  $$('#peSLpnl').textContent='−'+slLoss.toFixed(2); $$('#peSLpct').textContent='−'+(bal?(slLoss/bal*100).toFixed(2):'0.00');
+  $$('#peTPpnl').textContent='+'+tpRew.toFixed(2); $$('#peTPpct').textContent='+'+(bal?(tpRew/bal*100).toFixed(2):'0.00');
+}
+function commitPosSLTP(){
+  if(!editPos) return;
+  const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
+  fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(async r=>{ const d=await r.json().catch(()=>({}));
+      if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah SL/TP')); return; }
+      toast('✓ SL/TP diperbarui'); closePositionEditor(); await spSync(); drawPaperLines(); })
+    .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
+}
+function openPositionEditor(id){
+  const p=(SP.positions||[]).find(x=>x.id===id); if(!p) return;
+  const pip=pipOf(p.instrument), isSell=p.dir==='short', hasNone=(p.sl==null&&p.tp==null);
+  editingPosId=id;
+  editPos={ id, dir:p.dir, instrument:p.instrument, entry:+p.entry, units:p.units, price:+p.price,
+    slOn: p.sl!=null||hasNone, tpOn: p.tp!=null||hasNone, trail:false,
+    sl: p.sl!=null?+p.sl : (isSell? +p.entry+100*pip : +p.entry-100*pip),
+    tp: p.tp!=null?+p.tp : (isSell? +p.entry-200*pip : +p.entry+200*pip) };
+  const rec=paperLines[id]||(paperLines[id]={entry:null,sl:null,tp:null});
+  ['sl','tp'].forEach(k=>{ if(rec[k]){try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null;} });
+  buildPosEditPanel(); drawStagedLines();
+  const x=Math.min(lastPtr.x+8, innerWidth-330), y=Math.min(lastPtr.y+8, innerHeight-330);
+  posEditEl.style.left=Math.max(8,x)+'px'; posEditEl.style.top=Math.max(8,y)+'px';
+  posEditEl.classList.add('show'); renderPosEdit();
+}
 function recalcRisk(){
   if(!trade) return;
   // lot tetap (sizing berbasis lot ala TradeLocker) — geser SL hanya ubah jarak risiko/$ & R, bukan ukuran lot
@@ -2125,7 +2334,7 @@ async function spSync(){
     if(p) SP.positions=p.positions||[];
     if(j) SP.closed=j.trades||[];
   }catch(e){}
-  try{ renderAcct(); renderTrades(); }catch(e){}
+  try{ renderAcct(); renderTrades(); drawPaperLines(); }catch(e){}
 }
 function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(spSync,1500); }
 function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
@@ -2300,6 +2509,11 @@ $('#op2Collapse').onclick=()=>setOpExpanded(false);
 // mode simple: dua tombol harga = eksekusi satu klik
 $('#dealSell').onclick=()=>submitOrder('short');
 $('#dealBuy').onclick=()=>submitOrder('long');
+// toggle arah (muncul saat SL/TP/Risk ON) + tombol eksekusi satu-arah
+$('#dirPill').onclick=()=>{ orderDir = orderDir==='short'?'long':'short';
+  document.querySelectorAll('#dirSeg button').forEach(x=>x.classList.toggle('on',x.dataset.d===orderDir));
+  renderOrderPanel(); try{drawDraftLines();}catch(e){} };
+$('#dealOne').onclick=()=>submitOrder(orderDir);
 // mode simple: pill Market/Pending menyetir state kanonik (#ordType)
 $('#opTypePill').onclick=()=>{
   const pend=ordType()!=='pending';
@@ -2854,7 +3068,7 @@ function renderWatch(){
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); try{drawPaperLines();}catch(e){} loadInit(true); }
 
 // ===================== live price stream (SSE /api/prices) =====================
 // Satu EventSource → semua simbol watchlist. Throttle render via rAF (tick bisa
@@ -2948,7 +3162,7 @@ function updateAxisTime(e){
   if(di<=lastIdx+0.5){ el.style.display='none'; return; }  // di atas bar nyata → klinecharts sudah menandai
   const off=Math.round(di-lastIdx);                         // berapa bar ke depan
   const ts=dl[lastIdx].timestamp + off*DUR[currentTF];
-  el.textContent=nyTime(ts);
+  el.textContent=crosshairDate(ts);
   el.style.left=x+'px';
   // top-align ke atas band sumbu-X — sama persis dgn pill crosshair klinecharts
   el.style.top=chartAxisTop()+'px';
@@ -3396,7 +3610,7 @@ function makeSecondary(slot){
   panel.appendChild(hd); panel.appendChild(cdiv);
 
   const light=document.body.classList.contains('light');
-  const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ});
+  const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
   try{ c.setStyles({candle:{bar:candleBarCfg()}}); }catch(e){}   // ikut warna candle kustom user
   attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);

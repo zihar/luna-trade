@@ -393,6 +393,21 @@ func (s *Store) GetPaperTrade(userID, id int64) (*PaperTrade, error) {
 	return &t, nil
 }
 
+// UpdatePaperSLTP memperbarui SL/TP posisi paper TERBUKA milik user (nil = hapus level).
+func (s *Store) UpdatePaperSLTP(userID, id int64, sl, tp *float64) error {
+	res, err := s.db.Exec(
+		`UPDATE journal SET sl=?, tp=? WHERE id=? AND user_id=? AND mode='paper' AND exit IS NULL`,
+		sl, tp, id, uidStr(userID),
+	)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("posisi tidak ditemukan atau sudah ditutup")
+	}
+	return nil
+}
+
 // PaperOpenSLTP = posisi paper terbuka (lintas user) yg punya SL atau TP — utk monitor.
 type PaperOpenSLTP struct {
 	UserID int64
