@@ -462,14 +462,24 @@
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
   /* popup Kelola posisi (edit SL/TP dari klik garis) */
-  .pos-edit{ min-width:212px; }
-  .pos-edit .pe-head{ font-size:12px; font-weight:600; }
-  .pos-edit .pe-head .t-pos{ color:var(--green); } .pos-edit .pe-head .t-neg{ color:var(--red); }
-  .pos-edit .pe-sub{ font-size:10px; color:var(--muted); margin:2px 0 10px; font-family:var(--mono); }
-  .pos-edit .pe-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; font-size:11px; color:var(--muted); }
-  .pos-edit .pe-row input{ width:112px; text-align:right; font-family:var(--mono); }
-  .pos-edit .pe-act{ display:flex; gap:6px; margin-top:4px; }
-  .pos-edit .pe-act button{ flex:1; font-size:11px; padding:6px 0; }
+  /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
+  .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
+  .pos-edit2 .pe-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+  .pos-edit2 .pe-pen{ color:var(--muted); font-size:13px; }
+  .pos-edit2 .pe-title{ font-size:12.5px; font-weight:700; flex:1; }
+  .pos-edit2 .pe-dir{ font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.05em; }
+  .pos-edit2 .pe-dir.sell{ color:var(--red); background:rgba(255,111,111,.14); }
+  .pos-edit2 .pe-dir.buy{ color:var(--green); background:rgba(84,200,140,.14); }
+  .pos-edit2 .pe-inst{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--inset);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:12px; margin-bottom:11px; }
+  .pos-edit2 .pe-inst-l{ display:flex; align-items:center; gap:7px; }
+  .pos-edit2 .pe-inst-r{ font-family:var(--mono); color:var(--muted); }
+  .pos-edit2 .pe-inst-r .t-pos{ color:var(--green); } .pos-edit2 .pe-inst-r .t-neg{ color:var(--red); }
+  .pos-edit2 .tl-tick input{ text-align:left; }
+  .pos-edit2 .pe-act{ display:flex; gap:8px; margin-top:12px; }
+  .pos-edit2 .pe-act button{ flex:1; height:40px; font-size:13px; font-weight:600; border-radius:9px; }
+  .pos-edit2 #peConfirm{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pos-edit2 #peConfirm:hover{ filter:brightness(1.08); }
   .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
   .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
   .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
@@ -2090,72 +2100,121 @@ function posLineInfo(p,kind,val){
   return {lineColor:POS_GREEN, color:POS_GREEN, label:`TP ${(+v).toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
 }
 function posExtend(p,kind,val){ const i=posLineInfo(p,kind,val); return {posId:p.id,kind,color:i.color,lineColor:i.lineColor,label:i.label,pill:!!i.pill}; }
-function savePosSLTP(id,kind,value){
-  const pos=SP.positions.find(x=>x.id===id); if(!pos) return;
-  const body={id, sl: kind==='sl'?value:(pos.sl!=null?pos.sl:null), tp: kind==='tp'?value:(pos.tp!=null?pos.tp:null)};
-  fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok) toast('⚠ '+(d.error||'Gagal ubah SL/TP'));
-      else toast('✓ '+(kind==='sl'?'Stop Loss':'Take Profit')+' diperbarui');
-      await spSync(); drawPaperLines(); })
-    .catch(()=>{ toast('⚠ Tidak bisa terhubung ke server'); drawPaperLines(); });
-}
-function posLevel(p,kind){
+// buat overlay garis posisi; draggable hanya utk SL/TP saat mode edit (staged)
+function posLevel(p,kind,draggable){
   const value = kind==='entry'?p.entry : kind==='sl'?p.sl : p.tp;
-  const editable = kind!=='entry';
-  return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!editable,
-    extendData:posExtend(p,kind),
+  return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable,
+    extendData:posExtend(p,kind,value),
     onClick:()=>{ openPositionEditor(p.id); return false; },
-    onPressedMoving: !editable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
-      const pos=SP.positions.find(x=>x.id===p.id)||p;
-      try{chart.overrideOverlay({id:e.overlay.id, extendData:posExtend(pos,kind,v)});}catch(_){}
+    onPressedMoving: !draggable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null||!editPos) return false;
+      editPos[kind]=v; renderPosEdit();   // staged: perbarui panel + label, TIDAK simpan
+      try{chart.overrideOverlay({id:e.overlay.id, extendData:posExtend(editPos,kind,v)});}catch(_){}
       return false; },
-    onPressedMoveEnd: !editable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v!=null) savePosSLTP(p.id,kind,v); return false; },
   });
 }
 function drawPaperLines(){
   if(typeof spActive!=='function'||!spActive()){ clearPaperLines(); return; }
   const cur=(SP.positions||[]).filter(p=>p.instrument===inst);
   const keep=new Set(cur.map(p=>p.id));
-  Object.keys(paperLines).forEach(idStr=>{ if(!keep.has(+idStr)){ ['entry','sl','tp'].forEach(k=>{ if(paperLines[idStr][k]){try{chart.removeOverlay(paperLines[idStr][k]);}catch(e){}} }); delete paperLines[idStr]; } });
+  Object.keys(paperLines).forEach(idStr=>{ if(!keep.has(+idStr)){ ['entry','sl','tp'].forEach(k=>{ if(paperLines[idStr][k]){try{chart.removeOverlay(paperLines[idStr][k]);}catch(e){}} }); delete paperLines[idStr]; if(+idStr===editingPosId) closePositionEditor(); } });
   cur.forEach(p=>{
     const rec=paperLines[p.id]||(paperLines[p.id]={entry:null,sl:null,tp:null});
-    // entry (selalu ada)
+    // entry pill (selalu ada, P&L live)
     if(rec.entry) try{chart.overrideOverlay({id:rec.entry, points:[{value:p.entry}], extendData:posExtend(p,'entry')});}catch(e){}
-    else rec.entry=posLevel(p,'entry');
-    // sl/tp — buat/perbarui/hapus sesuai ada-tidaknya
+    else rec.entry=posLevel(p,'entry',false);
+    // posisi yg sedang diedit: garis SL/TP staged dikelola panel/drag → jangan disentuh di sini,
+    // hanya segarkan harga pasar/P&L di panel
+    if(editingPosId===p.id){ if(editPos){ editPos.price=+p.price; renderPosEdit(); } return; }
+    // lainnya: garis SL/TP = state server (view, terkunci; klik → buka editor)
     ['sl','tp'].forEach(k=>{ const has=p[k]!=null;
-      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k); }
+      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k,false); }
       else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; }
     });
   });
 }
-// popup "Kelola posisi" — klik garis/pill posisi → edit SL/TP (ketik) lalu Simpan
-let posEditEl=null;
-function closePositionEditor(){ if(posEditEl) posEditEl.classList.remove('show'); }
+// ===== Edit Open Position (staged, ala TradeLocker): panel + garis SL/TP draggable =====
+let editingPosId=null, editPos=null, posEditEl=null;
+function closePositionEditor(){
+  const wasId=editingPosId; editingPosId=null; editPos=null;
+  if(posEditEl) posEditEl.classList.remove('show');
+  if(wasId!=null && paperLines[wasId]){ ['sl','tp'].forEach(k=>{ if(paperLines[wasId][k]){try{chart.removeOverlay(paperLines[wasId][k]);}catch(e){} paperLines[wasId][k]=null; } }); }
+  drawPaperLines();   // gambar ulang dari state server (batalkan staged)
+}
+function buildPosEditPanel(){
+  if(posEditEl) return;
+  posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
+  posEditEl.innerHTML=
+    `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Tutup">✕</button></div>`+
+    `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag">🏳️</span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
+    `<div class="tl-sltp"><div class="tl-head">`+
+      `<button type="button" class="tl-trail" id="peTrail" title="Trailing (segera)">Trail</button>`+
+      `<label class="tl-toggle" id="peSLtog">Stop Loss<input type="checkbox" id="peSLon"></label>`+
+      `<label class="tl-toggle" id="peTPtog">Take Profit<input type="checkbox" id="peTPon"></label></div>`+
+    `<div class="tl-grid">`+
+      `<div class="tl-cell sl r-top"><div class="tl-tick"><input id="peSLprice" type="number" step="any"></div></div><div class="tl-lbl r-top">Price</div><div class="tl-cell tp r-top"><div class="tl-tick"><input id="peTPprice" type="number" step="any"></div></div>`+
+      `<div class="tl-cell sl r-mid"><div class="tl-px" id="peSLticks">—</div></div><div class="tl-lbl r-mid">Ticks</div><div class="tl-cell tp r-mid"><div class="tl-px" id="peTPticks">—</div></div>`+
+      `<div class="tl-cell sl r-bot"><div class="tl-kv neg"><span id="peSLpnl">—</span><i>$</i></div><div class="tl-kv neg"><span id="peSLpct">—</span><i>%</i></div></div><div class="tl-lbl r-bot two"><span>P&L</span><span>Balance</span></div><div class="tl-cell tp r-bot"><div class="tl-kv pos"><span id="peTPpnl">—</span><i>$</i></div><div class="tl-kv pos"><span id="peTPpct">—</span><i>%</i></div></div>`+
+    `</div></div>`+
+    `<div class="pe-act"><button id="peDiscard">Discard</button><button id="peConfirm" class="primary">Confirm</button></div>`;
+  document.body.appendChild(posEditEl);
+  const $$=s=>posEditEl.querySelector(s);
+  $$('#peClose').onclick=closePositionEditor; $$('#peDiscard').onclick=closePositionEditor; $$('#peConfirm').onclick=commitPosSLTP;
+  $$('#peSLon').onchange=()=>{ if(editPos){ editPos.slOn=$$('#peSLon').checked; drawStagedLines(); renderPosEdit(); } };
+  $$('#peTPon').onchange=()=>{ if(editPos){ editPos.tpOn=$$('#peTPon').checked; drawStagedLines(); renderPosEdit(); } };
+  $$('#peSLprice').oninput=()=>{ if(editPos){ const v=+$$('#peSLprice').value; if(isFinite(v)&&v>0){ editPos.sl=v; drawStagedLines(); renderPosEdit(true); } } };
+  $$('#peTPprice').oninput=()=>{ if(editPos){ const v=+$$('#peTPprice').value; if(isFinite(v)&&v>0){ editPos.tp=v; drawStagedLines(); renderPosEdit(true); } } };
+  $$('#peTrail').onclick=()=>{ if(editPos){ editPos.trail=!editPos.trail; renderPosEdit(); } };
+}
+function drawStagedLines(){
+  if(!editPos) return; const rec=paperLines[editPos.id]||(paperLines[editPos.id]={entry:null,sl:null,tp:null});
+  ['sl','tp'].forEach(k=>{ const on=editPos[k+'On'];
+    if(on && editPos[k]!=null){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:editPos[k]}], extendData:posExtend(editPos,k,editPos[k])});}catch(e){} else rec[k]=posLevel(editPos,k,true); }
+    else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; } });
+}
+function renderPosEdit(skipPriceInputs){
+  if(!editPos || !posEditEl) return;
+  const $$=s=>posEditEl.querySelector(s);
+  const dec=decimalsFor(editPos.instrument), pip=pipOf(editPos.instrument), bal=+$('#balance').value||0, isSell=editPos.dir==='short';
+  $$('#peDir').textContent=isSell?'SELL':'BUY'; $$('#peDir').className='pe-dir '+(isSell?'sell':'buy');
+  $$('#peFlag').textContent = editPos.instrument.includes('XAU')?'🥇':editPos.instrument.includes('XAG')?'🥈':editPos.instrument.includes('BTC')?'₿':editPos.instrument==='DXY'?'💵':'🏳️';
+  $$('#peSym').textContent=editPos.instrument.replace('_','');
+  const mkt=+editPos.price, mktCls=(isSell? mkt<=editPos.entry : mkt>=editPos.entry)?'t-pos':'t-neg';
+  $$('#peInstR').innerHTML=`${lotLabelFor(editPos.instrument,editPos.units)} / ${(+editPos.entry).toFixed(dec)} → <span class="${mktCls}">${mkt.toFixed(dec)}</span>`;
+  $$('#peSLon').checked=editPos.slOn; $$('#peTPon').checked=editPos.tpOn;
+  $$('#peSLtog').classList.toggle('on',editPos.slOn); $$('#peTPtog').classList.toggle('on',editPos.tpOn);
+  $$('#peTrail').classList.toggle('on',editPos.trail);
+  posEditEl.querySelectorAll('.tl-cell.sl').forEach(c=>c.classList.toggle('off',!editPos.slOn));
+  posEditEl.querySelectorAll('.tl-cell.tp').forEach(c=>c.classList.toggle('off',!editPos.tpOn));
+  if(!skipPriceInputs){ $$('#peSLprice').value=(+editPos.sl).toFixed(dec); $$('#peTPprice').value=(+editPos.tp).toFixed(dec); }
+  $$('#peSLticks').textContent=Math.round(Math.abs(editPos.sl-editPos.entry)/pip);
+  $$('#peTPticks').textContent=Math.round(Math.abs(editPos.tp-editPos.entry)/pip);
+  const slLoss=Math.abs(pnlUsd(editPos.dir,editPos.entry,editPos.sl,editPos.units)), tpRew=Math.abs(pnlUsd(editPos.dir,editPos.entry,editPos.tp,editPos.units));
+  $$('#peSLpnl').textContent='−'+slLoss.toFixed(2); $$('#peSLpct').textContent='−'+(bal?(slLoss/bal*100).toFixed(2):'0.00');
+  $$('#peTPpnl').textContent='+'+tpRew.toFixed(2); $$('#peTPpct').textContent='+'+(bal?(tpRew/bal*100).toFixed(2):'0.00');
+}
+function commitPosSLTP(){
+  if(!editPos) return;
+  const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
+  fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(async r=>{ const d=await r.json().catch(()=>({}));
+      if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah SL/TP')); return; }
+      toast('✓ SL/TP diperbarui'); closePositionEditor(); await spSync(); drawPaperLines(); })
+    .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
+}
 function openPositionEditor(id){
   const p=(SP.positions||[]).find(x=>x.id===id); if(!p) return;
-  if(!posEditEl){ posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit'; document.body.appendChild(posEditEl); }
-  const dec=decimalsFor(p.instrument), sym=p.instrument.replace('_','');
-  posEditEl.innerHTML=
-    `<div class="pe-head"><b>${sym}</b> <span class="${p.dir==='short'?'t-neg':'t-pos'}">${p.dir==='short'?'Sell':'Buy'}</span> · ${lotLabelFor(p.instrument,p.units)}</div>`+
-    `<div class="pe-sub">Entry ${(+p.entry).toFixed(dec)} · Market ${(+p.price).toFixed(dec)}</div>`+
-    `<label class="pe-row"><span>Stop Loss</span><input id="peSL" type="number" step="any" value="${p.sl!=null?(+p.sl).toFixed(dec):''}" placeholder="—"></label>`+
-    `<label class="pe-row"><span>Take Profit</span><input id="peTP" type="number" step="any" value="${p.tp!=null?(+p.tp).toFixed(dec):''}" placeholder="—"></label>`+
-    `<div class="pe-act"><button id="peCancel">Batal</button><button id="peSave" class="primary">Simpan</button></div>`;
-  const x=Math.min(lastPtr.x+8, innerWidth-236), y=Math.min(lastPtr.y+8, innerHeight-200);
+  const pip=pipOf(p.instrument), isSell=p.dir==='short', hasNone=(p.sl==null&&p.tp==null);
+  editingPosId=id;
+  editPos={ id, dir:p.dir, instrument:p.instrument, entry:+p.entry, units:p.units, price:+p.price,
+    slOn: p.sl!=null||hasNone, tpOn: p.tp!=null||hasNone, trail:false,
+    sl: p.sl!=null?+p.sl : (isSell? +p.entry+100*pip : +p.entry-100*pip),
+    tp: p.tp!=null?+p.tp : (isSell? +p.entry-200*pip : +p.entry+200*pip) };
+  const rec=paperLines[id]||(paperLines[id]={entry:null,sl:null,tp:null});
+  ['sl','tp'].forEach(k=>{ if(rec[k]){try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null;} });
+  buildPosEditPanel(); drawStagedLines();
+  const x=Math.min(lastPtr.x+8, innerWidth-330), y=Math.min(lastPtr.y+8, innerHeight-330);
   posEditEl.style.left=Math.max(8,x)+'px'; posEditEl.style.top=Math.max(8,y)+'px';
-  posEditEl.classList.add('show');
-  posEditEl.querySelector('#peCancel').onclick=closePositionEditor;
-  posEditEl.querySelector('#peSave').onclick=()=>{
-    const slv=posEditEl.querySelector('#peSL').value.trim(), tpv=posEditEl.querySelector('#peTP').value.trim();
-    const body={id, sl: slv===''?null:+slv, tp: tpv===''?null:+tpv};
-    fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(async r=>{ const d=await r.json().catch(()=>({}));
-        if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah SL/TP')); return; }
-        toast('✓ SL/TP diperbarui'); closePositionEditor(); await spSync(); drawPaperLines(); })
-      .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
-  };
+  posEditEl.classList.add('show'); renderPosEdit();
 }
 function recalcRisk(){
   if(!trade) return;
