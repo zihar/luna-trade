@@ -633,6 +633,14 @@
   .op3-deal-lbl{ font-size:8.5px; font-weight:700; letter-spacing:.1em; opacity:.8; }
   .op3-deal-mid{ display:flex; align-items:stretch; min-width:96px; }
   .op3-deal-mid .op2-step{ flex:1; }
+  /* mode satu-arah (SL/TP/Risk ON): stepper kiri + satu tombol eksekusi */
+  .op3-deal-one{ display:grid; grid-template-columns:minmax(96px,118px) 1fr; gap:8px; align-items:stretch; }
+  .op3-deal-one .op3-exec{ height:auto; min-height:38px; font-size:13px; }
+  /* toggle arah (pill seperti Market/Pending) — warna ikut arah */
+  .dir-pill.dir-sell{ color:var(--red); border-color:rgba(255,111,111,.55); }
+  .dir-pill.dir-buy{ color:var(--green); border-color:rgba(84,200,140,.55); }
+  /* [hidden] harus menang atas display:grid/flex author di atas */
+  .op3-deal[hidden], .op3-deal-one[hidden], .op3-pill[hidden]{ display:none; }
   /* expand: slot stepper di baris size */
   .op3-size-stepslot{ display:flex; flex:1; align-items:stretch; }
   .op3-size-stepslot .op2-step{ flex:1; }
@@ -748,6 +756,7 @@
             <span class="op2-flag j-flag"></span>
             <span class="op2-sym j-sym">EURUSD</span>
             <button type="button" class="op3-pill" id="opTypePill" title="Market / Pending">MARKET ⇄</button>
+            <button type="button" class="op3-pill dir-pill dir-sell" id="dirPill" title="Buy / Sell" hidden>SELL ⇄</button>
             <span class="grow"></span>
             <button type="button" class="op3-chip" id="chipRisk" title="Risk % sizing">RISK</button>
             <button type="button" class="op3-chip" id="chipSL" title="Stop Loss">SL</button>
@@ -774,10 +783,11 @@
             </div>
           </div>
           <div class="op3-margin op3-margin-c" id="op2Margin">Init. Margin: —</div>
-          <div class="op3-deal">
+          <!-- tanpa SL/TP/Risk: dua tombol satu-klik SELL | BUY -->
+          <div class="op3-deal" id="dealTwo">
             <button type="button" class="op3-deal-btn dir-sell" id="dealSell"><span class="op3-deal-px" id="dealSellPx">—</span><span class="op3-deal-lbl">SELL</span></button>
             <div class="op3-deal-mid" id="dealStepSlot">
-              <!-- stepper bersama (#lotStepper) hidup di sini saat simple, dipindah ke #expStepSlot saat expand -->
+              <!-- stepper bersama (#lotStepper) hidup di sini saat simple, dipindah ke slot mode aktif -->
               <div class="op2-step" id="lotStepper">
                 <button type="button" id="lotDown" title="Decrease lot">−</button>
                 <div class="op2-step-val"><input id="lotInput" type="text" inputmode="decimal" value="0.10"><span id="lotUnit">lots</span></div>
@@ -785,6 +795,11 @@
               </div>
             </div>
             <button type="button" class="op3-deal-btn dir-buy" id="dealBuy"><span class="op3-deal-px" id="dealBuyPx">—</span><span class="op3-deal-lbl">BUY</span></button>
+          </div>
+          <!-- dengan SL/TP/Risk ON: satu arah (toggle #dirPill) → stepper + satu tombol eksekusi -->
+          <div class="op3-deal-one" id="dealOneWrap" hidden>
+            <div class="op3-deal-mid" id="oneStepSlot"></div>
+            <button type="button" class="op3-exec dir-sell" id="dealOne">SELL</button>
           </div>
         </div>
 
@@ -811,8 +826,8 @@
           <div class="tl-sltp">
             <div class="tl-head">
               <button type="button" class="tl-trail" id="trailBtn" title="Trailing stop">Trail</button>
-              <label class="tl-toggle" id="slCard">Stop Loss<input type="checkbox" id="slOn" checked></label>
-              <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn" checked></label>
+              <label class="tl-toggle" id="slCard">Stop Loss<input type="checkbox" id="slOn"></label>
+              <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn"></label>
             </div>
             <div class="tl-grid">
               <!-- Price -->
@@ -832,7 +847,7 @@
 
           <div class="op3-margin">Init. Margin: —</div>
           <div class="op3-size">
-            <label class="op3-risk"><input type="checkbox" id="riskOn" checked> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
+            <label class="op3-risk"><input type="checkbox" id="riskOn"> Risk <input id="riskPct" class="op3-riskpct" type="number" value="1" min="0.1" step="0.1">%</label>
             <div class="op3-size-stepslot" id="expStepSlot"></div>
           </div>
           <button class="op3-exec dir-sell" id="execBtn">SELL</button>
@@ -1708,7 +1723,7 @@ function suggestLotsFromRisk(){
   const u=unitsFromRisk(bal,rp,cur.close,cur.close-slp*pip);
   return u/unitsPer();
 }
-function refreshLotSuggestion(){ if(lotsManual||trade) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
+function refreshLotSuggestion(){ if(lotsManual||trade||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
 // harga dgn pemisah ribuan (ala TradeLocker): 4,117.74 / 1.14088
 function fmtPx(p){ if(p==null||isNaN(p)) return '—';
   return (+p).toLocaleString('en-US',{minimumFractionDigits:priceDecimals(),maximumFractionDigits:priceDecimals()}); }
@@ -1735,6 +1750,19 @@ function renderOrderPanel(){
   const dsx=$('#dealSellPx'), dbx=$('#dealBuyPx'), fb=cur?fmtPx(cur.close):'—';
   if(dsx) dsx.textContent = ba ? fmtPx(ba.bid) : fb;
   if(dbx) dbx.textContent = ba ? fmtPx(ba.ask) : fb;
+  // simple: SL/TP/Risk OFF → dua tombol SELL|BUY; ada yg ON → satu arah (dir-pill + satu tombol)
+  const anyStage = $('#riskOn').checked || $('#slOn').checked || $('#tpOn').checked;
+  const dealTwo=$('#dealTwo'), dealOneWrap=$('#dealOneWrap'), dirPill=$('#dirPill');
+  if(dealTwo && dealOneWrap){
+    const expanded=!!$('#orderForm').querySelector('.op2.expanded');
+    dealTwo.hidden=anyStage; dealOneWrap.hidden=!anyStage;
+    const step=$('#lotStepper'), slot = expanded ? $('#expStepSlot') : (anyStage ? $('#oneStepSlot') : $('#dealStepSlot'));
+    if(step && slot && step.parentElement!==slot) slot.appendChild(step);
+    if(dirPill){ dirPill.className='op3-pill dir-pill '+(isSell?'dir-sell':'dir-buy'); dirPill.textContent=(isSell?'SELL':'BUY')+' ⇄'; dirPill.hidden=!anyStage; }
+    const one=$('#dealOne');
+    if(one){ one.className='op3-exec dir-'+(isSell?'sell':'buy');
+      one.textContent = entry!=null ? `${isSell?'SELL':'BUY'} ${lots.toFixed(lotDec())} @ ${fmtPx(entry)}` : (isSell?'SELL':'BUY'); }
+  }
   // chips & pill (simple) — cermin dari state kanonik
   const pill=$('#opTypePill'); if(pill) pill.textContent=(ordType()==='pending'?'PENDING':'MARKET')+' ⇄';
   const syncChip=(id,on)=>{ const c=$(id); if(c) c.classList.toggle('on',on); };
@@ -2422,6 +2450,11 @@ $('#op2Collapse').onclick=()=>setOpExpanded(false);
 // mode simple: dua tombol harga = eksekusi satu klik
 $('#dealSell').onclick=()=>submitOrder('short');
 $('#dealBuy').onclick=()=>submitOrder('long');
+// toggle arah (muncul saat SL/TP/Risk ON) + tombol eksekusi satu-arah
+$('#dirPill').onclick=()=>{ orderDir = orderDir==='short'?'long':'short';
+  document.querySelectorAll('#dirSeg button').forEach(x=>x.classList.toggle('on',x.dataset.d===orderDir));
+  renderOrderPanel(); try{drawDraftLines();}catch(e){} };
+$('#dealOne').onclick=()=>submitOrder(orderDir);
 // mode simple: pill Market/Pending menyetir state kanonik (#ordType)
 $('#opTypePill').onclick=()=>{
   const pend=ordType()!=='pending';
