@@ -2828,14 +2828,14 @@ const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className=
 function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Show all drawings':'Hide all drawings'; _hd.classList.toggle('armed',drawsHidden); }
 syncHideDrawBtn();
 _hd.onclick=()=>{ drawsHidden=!drawsHidden; applyDrawsVisibility(); syncHideDrawBtn(); };
-_dt.appendChild(_hd);
-const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Delete all drawings'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings; _dt.appendChild(_tr);
+const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Delete all drawings'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings;
 // toggle Magnet (snap ke high/low candle) — ala TradingView
 const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
 const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap point to candle high/low (on/off)'; _mag.innerHTML=MAGNET_SVG;
 if(magnetOn) _mag.classList.add('armed');
 _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); };
-_dt.appendChild(_mag);
+// urutan tombol bawah (atas→bawah): magnet, hide, trash
+_dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
 // ===================== "+ Add text" pada trendline & rect (ala TradingView) =====================
 // Garis dipilih (klik) → hover garisnya → tombol "+ Add text" muncul DI ATAS kursor (tak menutupi garis).
