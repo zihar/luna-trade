@@ -1,5 +1,12 @@
 # Fix: posisi Sell (paper) stop-out instan pada instrumen spread lebar
 
+> **STATUS: SELESAI & TERVERIFIKASI (2026-07-01).** Implementasi: `hub.go` (clampSpread di
+> broadcast), `paper_monitor.go` (grace 2s), `paper.go` (validasi SL/TP tolak di dalam
+> spread), `index.html` (clearDraftLines + toast + suppress preview saat ada posisi paper).
+> Verifikasi CDP: XAU sell → posisi bertahan (journal exit NULL, spread ter-clamp $0.50,
+> P&L −$4.90 normal, bukan −$197); SL/TP di dalam spread → HTTP 400 pesan jelas; draft
+> preview hilang saat panel tutup / ada posisi. Server sudah di-rebuild & restart.
+
 ## Context
 User pasang SL & TP lalu klik Sell (XAU/Gold, mode paper — default `replayMode=false`),
 posisi "tak terbuka", hanya tersisa garis SL/TP di chart. Investigasi (data `luna.db`)

@@ -1954,9 +1954,11 @@ function draftLevel(kind,price,info){
 }
 function drawDraftLines(){
   // preview SL/TP hanya saat panel order terbuka & sedang menyiapkan order —
-  // jangan mengotori chart saat panel tertutup / sudah ada posisi/pending
+  // jangan mengotori chart saat panel tertutup / sudah ada posisi (lokal replay ATAU
+  // paper server pada instrumen ini) / ada pending
   const op=$('#orderpanel');
-  if(trade || pending || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
+  const hasPaperPos = (typeof spActive==='function' && spActive() && Array.isArray(SP.positions) && SP.positions.some(p=>p.instrument===inst));
+  if(trade || pending || hasPaperPos || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
   const cur=currentCandle(), ba=curBidAsk(); if(!cur){ clearDraftLines(); return; }
   const isSell=orderDir==='short', entry= ba?(isSell?ba.bid:ba.ask):cur.close;
   const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal(), dist=slp*pip, units=currentLots()*unitsPer();
@@ -2149,15 +2151,15 @@ const ServerPaperBroker = {
       if($('#slOn').checked) body.sl=+(dir==='long'?entry-dist:entry+dist).toFixed(priceDecimals());
       if($('#tpOn').checked) body.tp=+(dir==='long'?entry+dist*rr:entry-dist*rr).toFixed(priceDecimals());
     }
-    const btn=$('#execBtn'); btn.disabled=true;
+    const btn=$('#execBtn'); if(btn) btn.disabled=true;
     try{
       const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(body)});
       const d=await r.json().catch(()=>({}));
-      if(!r.ok) setStatus(d.error||'Order gagal',true);
-      else { toast('✓ '+(dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry)); await spSync(); }
-    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
-    btn.disabled=false;
+      if(!r.ok){ setStatus(d.error||'Order gagal',true); toast('⚠ '+(d.error||'Order gagal')); }
+      else { clearDraftLines(); toast('✓ '+(dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry)); await spSync(); }
+    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); toast('⚠ Tidak bisa terhubung ke server'); }
+    if(btn) btn.disabled=false;
   },
   closeMarket(){ spCloseAll(); },
   hasOpen(){ return SP.positions.length>0; },

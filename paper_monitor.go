@@ -59,6 +59,11 @@ func checkPaperSLTP(t Tick, cache []PaperOpenSLTP) bool {
 		if !strings.EqualFold(p.Instrument, string(t.Instrument)) {
 			continue
 		}
+		// grace: jangan auto-close di ~tick pembukaan — cegah stop-out instan akibat
+		// sisa spread saat entry (SL/TP baru "bernafas" setelah beberapa detik).
+		if ot, err := time.Parse(time.RFC3339, p.OpenTime); err == nil && time.Since(ot) < 2*time.Second {
+			continue
+		}
 		var exit float64
 		hit := false
 		if p.Dir == "long" {

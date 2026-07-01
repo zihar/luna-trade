@@ -187,6 +187,31 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 		dir = "short"
 	}
 
+	// Validasi SL/TP terhadap sisi exit (short dinilai di ask, long di bid). Tolak bila
+	// sudah terlanggar saat buka (mis. SL di dalam spread) agar tak membuka posisi yang
+	// pasti langsung stop-out. Pesan jelas supaya user perlebar jaraknya.
+	if tick, ok := hub.Last(req.Instrument); ok {
+		if dir == "short" {
+			if req.SL != nil && *req.SL <= tick.Ask {
+				writeErr(w, http.StatusBadRequest, "Stop Loss di dalam spread — taruh di atas harga Ask")
+				return
+			}
+			if req.TP != nil && *req.TP >= tick.Ask {
+				writeErr(w, http.StatusBadRequest, "Take Profit di dalam spread — taruh di bawah harga Ask")
+				return
+			}
+		} else {
+			if req.SL != nil && *req.SL >= tick.Bid {
+				writeErr(w, http.StatusBadRequest, "Stop Loss di dalam spread — taruh di bawah harga Bid")
+				return
+			}
+			if req.TP != nil && *req.TP <= tick.Bid {
+				writeErr(w, http.StatusBadRequest, "Take Profit di dalam spread — taruh di atas harga Bid")
+				return
+			}
+		}
+	}
+
 	// Idempotency: klaim clientTag dulu (cegah dobel akibat double-click/retry).
 	var auditID int64
 	var claimed bool
