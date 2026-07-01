@@ -2355,11 +2355,6 @@ function delHooks(){ return {
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
-    // diagnostik opsional (aktifkan: localStorage.br_debugDraw='1') → tangkap flip di sesi live
-    if(o && localStorage.getItem('br_debugDraw')==='1'){ try{
-      const pxy=p=>{const k=p.timestamp!=null?{timestamp:p.timestamp}:{dataIndex:p.dataIndex};k.value=p.value;let c=chart.convertToPixel(k,{paneId:'candle_pane',absolute:true});if(Array.isArray(c))c=c[0];return c?(Math.round(c.x)+','+Math.round(c.y)):null;};
-      console.log('[draw]',o.name,'captured',JSON.stringify(pendingClicks.map(pxy)),'final',JSON.stringify((o.points||[]).map(pxy))); }catch(_){}
-    }
     // Tempelkan klik presisi ke titik final by-index (klik & titik urut sama), lalu JARING
     // PENGAMAN: klinecharts kadang menaruh titik di area future TANPA anchor (timestamp &
     // dataIndex null) → tergambar ke tepi kiri chart (x=0) = "kelempar". Titik anchorless
@@ -2373,9 +2368,6 @@ function delHooks(){ return {
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});
-      if(localStorage.getItem('br_debugDraw')==='1'){ try{ const li=revealed(currentTF).length-1;
-        console.log('[pts]',o.name,'pc='+pendingClicks.length,'li='+li,JSON.stringify(o.points.map(p=>({ts:p.timestamp,idx:p.dataIndex,val:p.value})))); }catch(_){}
-      }
       chart.overrideOverlay({id:o.id, points:o.points}); } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
