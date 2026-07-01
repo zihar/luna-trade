@@ -461,6 +461,15 @@
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
+  /* popup Kelola posisi (edit SL/TP dari klik garis) */
+  .pos-edit{ min-width:212px; }
+  .pos-edit .pe-head{ font-size:12px; font-weight:600; }
+  .pos-edit .pe-head .t-pos{ color:var(--green); } .pos-edit .pe-head .t-neg{ color:var(--red); }
+  .pos-edit .pe-sub{ font-size:10px; color:var(--muted); margin:2px 0 10px; font-family:var(--mono); }
+  .pos-edit .pe-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; font-size:11px; color:var(--muted); }
+  .pos-edit .pe-row input{ width:112px; text-align:right; font-family:var(--mono); }
+  .pos-edit .pe-act{ display:flex; gap:6px; margin-top:4px; }
+  .pos-edit .pe-act button{ flex:1; font-size:11px; padding:6px 0; }
   .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
   .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
   .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
@@ -1442,12 +1451,17 @@ klinecharts.registerOverlay({
   name:'tradeLevel', totalStep:2, needDefaultPointFigure:true,
   createPointFigures:({overlay,coordinates,bounding})=>{
     if(!coordinates.length) return [];
-    const y=coordinates[0].y, d=overlay.extendData||{}, c=d.color||'#888';
+    const y=coordinates[0].y, d=overlay.extendData||{}, c=d.color||'#888', lc=d.lineColor||c;
     const xR=(bounding&&bounding.width)?bounding.width:600;
-    return [
-      {type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:c,size:1,style:'dashed'}},
-      {type:'text',attrs:{x:6,y:y-3,text:d.label||'',align:'left',baseline:'bottom'},styles:{color:c,size:10}},
-    ];
+    const figs=[{type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:lc,size:1,style:'dashed'}}];
+    if(d.pill){   // pill terisi (kotak kecil ujung kiri) — mis. P&L posisi berjalan
+      figs.push({type:'text',attrs:{x:4,y,text:d.label||'',align:'left',baseline:'middle'},
+        styles:{color:'#0e0f14',backgroundColor:c,size:10,weight:'bold',borderRadius:4,
+                paddingLeft:7,paddingRight:7,paddingTop:3,paddingBottom:3}});
+    } else {
+      figs.push({type:'text',attrs:{x:6,y:y-3,text:d.label||'',align:'left',baseline:'bottom'},styles:{color:c,size:10}});
+    }
+    return figs;
   },
 });
 
@@ -2031,6 +2045,90 @@ function drawTradeLines(){
   trade.lineSL   = trade.sl!=null ? tradeLevel('sl',trade.sl) : null;
   trade.lineTP   = trade.tp!=null ? tradeLevel('tp',trade.tp) : null;
 }
+
+// ===== garis posisi PAPER on-chart (per posisi, instrumen aktif) =====
+// pakai ulang POS_GREEN/POS_RED (warna candle, dideklarasi di atas); biru entry literal
+let paperLines={};   // posId -> {entry,sl,tp}
+function clearPaperLines(){ Object.values(paperLines).forEach(rec=>['entry','sl','tp'].forEach(k=>{ if(rec[k]){try{chart.removeOverlay(rec[k]);}catch(e){}} })); paperLines={}; }
+function posPnlStr(v){ return (v>=0?'+':'-')+'$'+Math.abs(+v||0).toFixed(2); }
+function posLineInfo(p,kind,val){
+  const dec=decimalsFor(p.instrument), bal=+$('#balance').value||0, units=p.units||0;
+  if(kind==='entry'){ const pnl=+p.unrealizedPl||0;
+    return {pill:true, lineColor:'#4a71ff', color:pnl>=0?POS_GREEN:POS_RED,
+      label:`${p.dir==='short'?'▼':'▲'} ${lotLabelFor(p.instrument,units)} · ${posPnlStr(pnl)}`}; }
+  if(kind==='sl'){ const v=val!=null?val:p.sl, loss=Math.abs(pnlUsd(p.dir,p.entry,v,units)), pct=bal?loss/bal*100:0;
+    return {lineColor:POS_RED, color:POS_RED, label:`SL ${(+v).toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
+  const v=val!=null?val:p.tp, rew=Math.abs(pnlUsd(p.dir,p.entry,v,units)), pctt=bal?rew/bal*100:0;
+  return {lineColor:POS_GREEN, color:POS_GREEN, label:`TP ${(+v).toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
+}
+function posExtend(p,kind,val){ const i=posLineInfo(p,kind,val); return {posId:p.id,kind,color:i.color,lineColor:i.lineColor,label:i.label,pill:!!i.pill}; }
+function savePosSLTP(id,kind,value){
+  const pos=SP.positions.find(x=>x.id===id); if(!pos) return;
+  const body={id, sl: kind==='sl'?value:(pos.sl!=null?pos.sl:null), tp: kind==='tp'?value:(pos.tp!=null?pos.tp:null)};
+  fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(async r=>{ const d=await r.json().catch(()=>({}));
+      if(!r.ok) toast('⚠ '+(d.error||'Gagal ubah SL/TP'));
+      else toast('✓ '+(kind==='sl'?'Stop Loss':'Take Profit')+' diperbarui');
+      await spSync(); drawPaperLines(); })
+    .catch(()=>{ toast('⚠ Tidak bisa terhubung ke server'); drawPaperLines(); });
+}
+function posLevel(p,kind){
+  const value = kind==='entry'?p.entry : kind==='sl'?p.sl : p.tp;
+  const editable = kind!=='entry';
+  return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!editable,
+    extendData:posExtend(p,kind),
+    onClick:()=>{ openPositionEditor(p.id); return false; },
+    onPressedMoving: !editable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
+      const pos=SP.positions.find(x=>x.id===p.id)||p;
+      try{chart.overrideOverlay({id:e.overlay.id, extendData:posExtend(pos,kind,v)});}catch(_){}
+      return false; },
+    onPressedMoveEnd: !editable?undefined:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v!=null) savePosSLTP(p.id,kind,v); return false; },
+  });
+}
+function drawPaperLines(){
+  if(typeof spActive!=='function'||!spActive()){ clearPaperLines(); return; }
+  const cur=(SP.positions||[]).filter(p=>p.instrument===inst);
+  const keep=new Set(cur.map(p=>p.id));
+  Object.keys(paperLines).forEach(idStr=>{ if(!keep.has(+idStr)){ ['entry','sl','tp'].forEach(k=>{ if(paperLines[idStr][k]){try{chart.removeOverlay(paperLines[idStr][k]);}catch(e){}} }); delete paperLines[idStr]; } });
+  cur.forEach(p=>{
+    const rec=paperLines[p.id]||(paperLines[p.id]={entry:null,sl:null,tp:null});
+    // entry (selalu ada)
+    if(rec.entry) try{chart.overrideOverlay({id:rec.entry, points:[{value:p.entry}], extendData:posExtend(p,'entry')});}catch(e){}
+    else rec.entry=posLevel(p,'entry');
+    // sl/tp — buat/perbarui/hapus sesuai ada-tidaknya
+    ['sl','tp'].forEach(k=>{ const has=p[k]!=null;
+      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k); }
+      else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; }
+    });
+  });
+}
+// popup "Kelola posisi" — klik garis/pill posisi → edit SL/TP (ketik) lalu Simpan
+let posEditEl=null;
+function closePositionEditor(){ if(posEditEl) posEditEl.classList.remove('show'); }
+function openPositionEditor(id){
+  const p=(SP.positions||[]).find(x=>x.id===id); if(!p) return;
+  if(!posEditEl){ posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit'; document.body.appendChild(posEditEl); }
+  const dec=decimalsFor(p.instrument), sym=p.instrument.replace('_','');
+  posEditEl.innerHTML=
+    `<div class="pe-head"><b>${sym}</b> <span class="${p.dir==='short'?'t-neg':'t-pos'}">${p.dir==='short'?'Sell':'Buy'}</span> · ${lotLabelFor(p.instrument,p.units)}</div>`+
+    `<div class="pe-sub">Entry ${(+p.entry).toFixed(dec)} · Market ${(+p.price).toFixed(dec)}</div>`+
+    `<label class="pe-row"><span>Stop Loss</span><input id="peSL" type="number" step="any" value="${p.sl!=null?(+p.sl).toFixed(dec):''}" placeholder="—"></label>`+
+    `<label class="pe-row"><span>Take Profit</span><input id="peTP" type="number" step="any" value="${p.tp!=null?(+p.tp).toFixed(dec):''}" placeholder="—"></label>`+
+    `<div class="pe-act"><button id="peCancel">Batal</button><button id="peSave" class="primary">Simpan</button></div>`;
+  const x=Math.min(lastPtr.x+8, innerWidth-236), y=Math.min(lastPtr.y+8, innerHeight-200);
+  posEditEl.style.left=Math.max(8,x)+'px'; posEditEl.style.top=Math.max(8,y)+'px';
+  posEditEl.classList.add('show');
+  posEditEl.querySelector('#peCancel').onclick=closePositionEditor;
+  posEditEl.querySelector('#peSave').onclick=()=>{
+    const slv=posEditEl.querySelector('#peSL').value.trim(), tpv=posEditEl.querySelector('#peTP').value.trim();
+    const body={id, sl: slv===''?null:+slv, tp: tpv===''?null:+tpv};
+    fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(async r=>{ const d=await r.json().catch(()=>({}));
+        if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah SL/TP')); return; }
+        toast('✓ SL/TP diperbarui'); closePositionEditor(); await spSync(); drawPaperLines(); })
+      .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
+  };
+}
 function recalcRisk(){
   if(!trade) return;
   // lot tetap (sizing berbasis lot ala TradeLocker) — geser SL hanya ubah jarak risiko/$ & R, bukan ukuran lot
@@ -2149,7 +2247,7 @@ async function spSync(){
     if(p) SP.positions=p.positions||[];
     if(j) SP.closed=j.trades||[];
   }catch(e){}
-  try{ renderAcct(); renderTrades(); }catch(e){}
+  try{ renderAcct(); renderTrades(); drawPaperLines(); }catch(e){}
 }
 function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(spSync,1500); }
 function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
@@ -2878,7 +2976,7 @@ function renderWatch(){
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); loadInit(true); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); try{drawPaperLines();}catch(e){} loadInit(true); }
 
 // ===================== live price stream (SSE /api/prices) =====================
 // Satu EventSource → semua simbol watchlist. Throttle render via rAF (tick bisa

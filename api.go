@@ -27,6 +27,7 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/positions", requireUser(handlePaperPositions))
 	mux.HandleFunc("POST /api/order", requireUser(handlePaperOrder))
 	mux.HandleFunc("POST /api/close", requireUser(handlePaperClose))
+	mux.HandleFunc("POST /api/position/sltp", requireUser(handlePaperModify))
 	mux.HandleFunc("GET /api/journal", requireUser(handlePaperJournal))
 	mux.HandleFunc("GET /api/prices", requireUser(handlePrices))
 	mux.HandleFunc("POST /api/track", requireUser(handleTrack))         // analytics: catat event fitur
