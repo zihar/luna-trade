@@ -2353,23 +2353,26 @@ function delHooks(){ return {
       const pxy=p=>{const k=p.timestamp!=null?{timestamp:p.timestamp}:{dataIndex:p.dataIndex};k.value=p.value;let c=chart.convertToPixel(k,{paneId:'candle_pane',absolute:true});if(Array.isArray(c))c=c[0];return c?(Math.round(c.x)+','+Math.round(c.y)):null;};
       console.log('[draw]',o.name,'captured',JSON.stringify(pendingClicks.map(pxy)),'final',JSON.stringify((o.points||[]).map(pxy))); }catch(_){}
     }
-    // Tempelkan tiap klik presisi ke titik final klinecharts TERDEKAT (bukan by-index): kebal
-    // terhadap mousedown "nyasar" (klik kena overlay lain / diabaikan) yang dulu menggeser array
-    // → ujung garis "kelempar ke kiri". Titik tanpa pasangan → biarkan native klinecharts.
+    // Tempelkan klik presisi ke titik final. Kasus normal (jumlah klik == jumlah titik) →
+    // map BY-INDEX (paling andal; titik future memakai anchor dataIndex klik → tak ter-klamp
+    // ke bar terakhir / tak flip). Bila jumlah beda (ada mousedown nyasar) → fallback pencocokan
+    // TERDEKAT by-piksel supaya klik nyasar tak menggeser titik.
     try{ if(o&&o.points&&pendingClicks.length){
-      const pxy=(p)=>{ if(!p) return null; const key=p.timestamp!=null?{timestamp:p.timestamp}:(p.dataIndex!=null?{dataIndex:p.dataIndex}:null); if(!key) return null; key.value=p.value;
-        let c=chart.convertToPixel(key,{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c?{x:c.x,y:c.y}:null; };
-      const tol=Math.max(12, barSpacePx()*0.9), used=new Array(pendingClicks.length).fill(false);
-      o.points.forEach((pt,i)=>{ const tp=pxy(pt); if(!tp) return;
-        let best=-1, bestD=tol*tol;
-        pendingClicks.forEach((pc,j)=>{ if(used[j]) return; const cp=pxy(pc); if(!cp) return;
-          const dx=cp.x-tp.x, dy=cp.y-tp.y, d=dx*dx+dy*dy; if(d<bestD){ bestD=d; best=j; } });
-        if(best<0) return; used[best]=true; const pc=pendingClicks[best];
-        const np = pc.timestamp!=null?{timestamp:pc.timestamp,value:pc.value}:{dataIndex:pc.dataIndex,value:pc.value};
-        // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + bisa diklik/hapus)
-        if(o.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
-        o.points[i]=np;
-      });
+      const toPt=(pc)=>{ const np = pc.timestamp!=null?{timestamp:pc.timestamp,value:pc.value}:{dataIndex:pc.dataIndex,value:pc.value};
+        if(o.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp); return np; };
+      if(pendingClicks.length===o.points.length){
+        for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]);   // by-index
+      } else {
+        const pxy=(p)=>{ if(!p) return null; const key=p.timestamp!=null?{timestamp:p.timestamp}:(p.dataIndex!=null?{dataIndex:p.dataIndex}:null); if(!key) return null; key.value=p.value;
+          let c=chart.convertToPixel(key,{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c?{x:c.x,y:c.y}:null; };
+        const tol=Math.max(24, barSpacePx()*1.5), used=new Array(pendingClicks.length).fill(false);
+        o.points.forEach((pt,i)=>{ const tp=pxy(pt); if(!tp) return;
+          let best=-1, bestD=tol*tol;
+          pendingClicks.forEach((pc,j)=>{ if(used[j]) return; const cp=pxy(pc); if(!cp) return;
+            const dx=cp.x-tp.x, dy=cp.y-tp.y, d=dx*dx+dy*dy; if(d<bestD){ bestD=d; best=j; } });
+          if(best<0) return; used[best]=true; o.points[i]=toPt(pendingClicks[best]);
+        });
+      }
       chart.overrideOverlay({id:o.id, points:o.points}); } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
