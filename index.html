@@ -960,11 +960,16 @@ function pxToValue(y){ let c=chart.convertFromPixel({x:10,y},{paneId:'candle_pan
 function idxToPx(idx){ let p=chart.convertToPixel({dataIndex:idx,value:0},{paneId:'candle_pane',absolute:true}); if(Array.isArray(p))p=p[0]; return p?p.x:null; }
 function tsToPx(t){ let p=chart.convertToPixel({timestamp:t,value:0},{paneId:'candle_pane',absolute:true}); if(Array.isArray(p))p=p[0]; return p?p.x:null; }
 function barSpacePx(){ const li=revealed(currentTF).length-1; const a=idxToPx(li), b=idxToPx(li-1); return (a!=null&&b!=null&&a!==b)?(a-b):8; }
-// pixel-x → anchor durable: dalam-data → timestamp presisi sub-bar; future → dataIndex fractional
+// pixel-x → anchor durable: dalam-data → timestamp presisi sub-bar; future → dataIndex fractional.
+// dataIndex diambil dari convertFromPixel (mesin koordinat chart sendiri) → DIJAMIN inverse dgn
+// convertToPixel saat render, jadi titik selalu tergambar tepat di posisi klik. (Perhitungan manual
+// li+((x-xLast)/bs) dulu memakai li=revealed() yg di mode Live beda 1 dgn dataList chart karena
+// forming bar → bisa meleset jauh / "kelempar ke kiri". Pakai chart lgsg = konsisten & anti-drift.)
 function xAnchorFromPx(x){
   const arr=revealed(currentTF); if(!arr.length) return null;
-  const li=arr.length-1, xLast=idxToPx(li), bs=barSpacePx();
-  const floatIdx = (xLast!=null)? li + (x-xLast)/bs : li;
+  const li=arr.length-1;
+  let c=chart.convertFromPixel({x,y:0},{paneId:'candle_pane'}); if(Array.isArray(c)) c=c[0];
+  const floatIdx = (c && c.dataIndex!=null) ? c.dataIndex : li;
   if(floatIdx <= li + 0.0001){ const t=pxToTime(x); return t!=null?{timestamp:t}:null; }   // in-range
   return {dataIndex: floatIdx};                                                              // future
 }
