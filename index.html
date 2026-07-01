@@ -1686,7 +1686,13 @@ function reanchorFuturePoints(snap){
 async function switchTF(tf){
   track('timeframe',{tf});
   if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load first.'); return; }
-  if(!tfData[tf]){
+  // (re)fetch bila belum ada ATAU cache tak mencakup kursor T: T sebelum bar pertama →
+  // revealed() kosong (chart blank); T melewati bar terakhir → cache basi, bar depan hilang.
+  const dur=DUR[tf], a=tfData[tf];
+  const needFetch = !a || !a.length
+      || T < a[0].timestamp + dur
+      || T > a[a.length-1].timestamp + dur;
+  if(needFetch){
     setStatus('Fetching '+tf+' …');
     try{ tfData[tf]=await fetchCandles(tf,{count:5000,to:new Date(T).toISOString()}); }
     catch(e){ setStatus('Failed TF '+tf+': '+e.message,true); return; }
