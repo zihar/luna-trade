@@ -2345,17 +2345,31 @@ function posRerender(o){ try{
   else if(o.name==='fib3'&&o.points.length>=2) chart.overrideOverlay({id:o.id,points:o.points});  // toggle penanda harga Y saat aktif
 }catch(_){} }
 function delHooks(){ return {
+  onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
-    try{ if(o&&pendingClicks.length){ const n=Math.min(pendingClicks.length,(o.points||[]).length);
-      const pts=pendingClicks.slice(0,n).map(p=> p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value});
-      // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + garis bisa diklik/hapus)
-      if(o.name==='verticalStraightLine') pts.forEach(p=>{ if(p.timestamp!=null) p.timestamp=snapTimeToBar(p.timestamp); });
-      for(let k=0;k<n;k++) o.points[k]=pts[k];
-      // override pakai o.points (penuh), BUKAN pts (terpotong n). Bila klik presisi yg tertangkap
-      // < jumlah titik overlay (mis. trendline dibuat sekali tarik → cuma 1 mousedown tertangkap,
-      // tapi klinecharts sudah menaruh 2 titik), pakai pts yg pendek akan MENGHAPUS titik sisa →
-      // ujung garis "kelempar" ke kiri/collapse. o.points pertahankan titik klinecharts utk sisanya.
+    // diagnostik opsional (aktifkan: localStorage.br_debugDraw='1') → tangkap flip di sesi live
+    if(o && localStorage.getItem('br_debugDraw')==='1'){ try{
+      const pxy=p=>{const k=p.timestamp!=null?{timestamp:p.timestamp}:{dataIndex:p.dataIndex};k.value=p.value;let c=chart.convertToPixel(k,{paneId:'candle_pane',absolute:true});if(Array.isArray(c))c=c[0];return c?Math.round(c.x):null;};
+      console.log('[draw]',o.name,'captured',pendingClicks.map(pxy),'final',(o.points||[]).map(pxy)); }catch(_){}
+    }
+    // Tempelkan tiap klik presisi ke titik final klinecharts TERDEKAT (bukan by-index): kebal
+    // terhadap mousedown "nyasar" (klik kena overlay lain / diabaikan) yang dulu menggeser array
+    // → ujung garis "kelempar ke kiri". Titik tanpa pasangan → biarkan native klinecharts.
+    try{ if(o&&o.points&&pendingClicks.length){
+      const pxy=(p)=>{ if(!p) return null; const key=p.timestamp!=null?{timestamp:p.timestamp}:(p.dataIndex!=null?{dataIndex:p.dataIndex}:null); if(!key) return null; key.value=p.value;
+        let c=chart.convertToPixel(key,{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c?{x:c.x,y:c.y}:null; };
+      const tol=Math.max(12, barSpacePx()*0.9), used=new Array(pendingClicks.length).fill(false);
+      o.points.forEach((pt,i)=>{ const tp=pxy(pt); if(!tp) return;
+        let best=-1, bestD=tol*tol;
+        pendingClicks.forEach((pc,j)=>{ if(used[j]) return; const cp=pxy(pc); if(!cp) return;
+          const dx=cp.x-tp.x, dy=cp.y-tp.y, d=dx*dx+dy*dy; if(d<bestD){ bestD=d; best=j; } });
+        if(best<0) return; used[best]=true; const pc=pendingClicks[best];
+        const np = pc.timestamp!=null?{timestamp:pc.timestamp,value:pc.value}:{dataIndex:pc.dataIndex,value:pc.value};
+        // garis vertikal = penanda waktu → snap ke bar terdekat (label akurat + bisa diklik/hapus)
+        if(o.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
+        o.points[i]=np;
+      });
       chart.overrideOverlay({id:o.id, points:o.points}); } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
@@ -2428,7 +2442,7 @@ window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap d
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
 // waktu sub-bar; bila magnet aktif, snap ke high/low candle terdekat.
 $('#chart').addEventListener('mousedown', (ev)=>{
-  if(!inProgressId) return;
+  if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
   const r=$('#chart').getBoundingClientRect();
   const xa=xAnchorFromPx(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
   if(!xa||v==null) return;
