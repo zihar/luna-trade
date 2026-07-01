@@ -1953,7 +1953,10 @@ function draftLevel(kind,price,info){
   });
 }
 function drawDraftLines(){
-  if(trade || pending || T==null){ clearDraftLines(); return; }
+  // preview SL/TP hanya saat panel order terbuka & sedang menyiapkan order —
+  // jangan mengotori chart saat panel tertutup / sudah ada posisi/pending
+  const op=$('#orderpanel');
+  if(trade || pending || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
   const cur=currentCandle(), ba=curBidAsk(); if(!cur){ clearDraftLines(); return; }
   const isSell=orderDir==='short', entry= ba?(isSell?ba.bid:ba.ask):cur.close;
   const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal(), dist=slp*pip, units=currentLots()*unitsPer();
@@ -3105,7 +3108,7 @@ function setMarketsHidden(hidden){
   try{chart.resize();}catch(e){}
 }
 function toggleMarkets(){ const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':'0'); }
-function toggleOrder(){ const op=$('#orderpanel'); const hide=op.style.display!=='none'; op.style.display=hide?'none':''; $('#toggleOrder').classList.toggle('on',!hide); localStorage.setItem('br_orderHidden',hide?'1':'0'); }
+function toggleOrder(){ const op=$('#orderpanel'); const hide=op.style.display!=='none'; op.style.display=hide?'none':''; $('#toggleOrder').classList.toggle('on',!hide); localStorage.setItem('br_orderHidden',hide?'1':'0'); try{ drawDraftLines(); }catch(e){} }
 function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('collapsed');
   app.style.setProperty('--trades-h', c?'36px':savedTradesH()+'px');
   $('#bottomToggle').textContent=c?'⏶':'⏷'; $('#toggleTrades').classList.toggle('on',!c);
