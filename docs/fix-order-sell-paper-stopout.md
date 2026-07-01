@@ -1,5 +1,13 @@
 # Fix: posisi Sell (paper) stop-out instan pada instrumen spread lebar
 
+> ## ✅ STATUS 2026-07-01 — SELESAI & di-commit (`64b82de`, + guard draft `b961aff`)
+> - ✅ **Clamp spread di sumber**: `hub.go` `maxSpread()` + `clampSpread()`, dipanggil di `broadcast` → entry/monitor SL/TP/FE konsisten.
+> - ✅ **Validasi SL/TP dalam spread** saat buka: `handlePaperOrder` (paper.go) menolak SL/TP yang sudah terlanggar (pesan jelas "taruh di atas/bawah Ask/Bid").
+> - ✅ **Grace period** di `paper_monitor.checkPaperSLTP`: skip auto-close bila posisi < ~2 dtk.
+> - ✅ **`clearDraftLines()` + `toast()`** di `ServerPaperBroker.market`; `drawDraftLines` juga skip saat panel order ditutup.
+>
+> Detail rencana asli di bawah (untuk referensi).
+
 > **STATUS: SELESAI & TERVERIFIKASI (2026-07-01).** Implementasi: `hub.go` (clampSpread di
 > broadcast), `paper_monitor.go` (grace 2s), `paper.go` (validasi SL/TP tolak di dalam
 > spread), `index.html` (clearDraftLines + toast + suppress preview saat ada posisi paper).
