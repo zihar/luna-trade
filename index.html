@@ -1048,7 +1048,9 @@ async function refineMagnetPoints(id){
     const o=chart.getOverlayById(id); if(!o||MAGNET_REFINE_SKIP[o.name]) return;
     if(DUR[currentTF]<=DUR.M5) return;                         // sudah ≤M5 → tak ada gunanya
     const cur=currentTF; if(!tfData[cur]||!tfData[cur].length) return;
-    const pts=(o.points||[]).map(p=>({timestamp:p.timestamp,value:p.value}));
+    // clone PENUH (pertahankan dataIndex titik future!). Dulu map ke {timestamp,value} saja →
+    // titik future kehilangan dataIndex saat override → anchorless → garis "kelempar ke kiri".
+    const pts=(o.points||[]).map(p=>Object.assign({},p));
     let changed=false;
     for(const p of pts){
       if(p.timestamp==null||p.value==null) continue;
