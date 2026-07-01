@@ -100,6 +100,11 @@ func main() {
 	}
 	hub = newHub(conn, streamInsts)
 	log.Printf("Connector aktif: %s (live trading: %v, stream: %d instrumen)", cfg.Broker, cfg.LiveEnabled, len(streamInsts))
+	// Monitor SL/TP paper server-side (auto-close walau browser ditutup).
+	// Butuh stream harga (OANDA_ACCOUNT_ID). Nonaktifkan via PAPER_SLTP_MONITOR=0.
+	if cfg.Creds.AccountID != "" && os.Getenv("PAPER_SLTP_MONITOR") != "0" {
+		startPaperMonitor()
+	}
 
 	mux := http.NewServeMux()
 	// Shell statik (index.html, assets/) publik; data di balik sesi (requireUser).

@@ -1,4 +1,28 @@
-# Polish UI/UX Luna Trade + identitas "Luna" — (re-validasi 2026-06-30)
+# Polish UI/UX Luna Trade + identitas "Luna"
+
+> ## ✅ STATUS 2026-07-01 — SELESAI (divalidasi langsung ke kode)
+> Hampir semua item plan ini sudah terpasang; dokumen di bawah (bertanggal 2026-06-30)
+> sudah **usang**. Hasil validasi kode terkini:
+>
+> | Item | Status |
+> |---|---|
+> | A1 order ticket clip | ✅ Beres total (redesign order panel dua-mode simple↔expand, compact) |
+> | A2 tabel Markets sesak | ✅ `.wl-head` flex+gap+bar aksen; `.wl-row` grid kolom rapi (Bid/Ask/Spread/Day Hi/Lo terpisah) |
+> | A3 spread sintetik aneh | ✅ `maxSpread`+`clampSpread` di `hub.go` (dipanggil di broadcast) → entry/monitor/FE konsisten |
+> | A4 header chart sekunder / OHLC wrap | ✅ legend dipendekkan (anti-wrap) |
+> | B5 kontras header + hover | ✅ token `--hdr` + hover baris |
+> | B6 empty-state in-voice | ✅ `.tp-empty` ikon ☾ + judul + hint |
+> | B7 rapikan 2 bar atas / label "TF:" | ✅ label "TF:" sudah tak ada |
+> | B8 focus-visible | ⚠️ sebagian (2 tempat) — bisa dilengkapi |
+> | C9 brandmark bulan sabit | ✅ SVG crescent di logo kiri-atas |
+> | C10 token `--luna-glow` + near-black dingin | ✅ `--luna-glow` (dark & light) |
+> | C11 momen lunar di login | ✅ login: crescent + glow + tagline |
+>
+> **Sisa kecil:** B8 focus-visible dilengkapi. Selebihnya polish + identitas Luna DONE.
+
+---
+
+<details><summary>Arsip plan asli (2026-06-30, sudah usang)</summary>
 
 ## Context
 Plan ditulis lalu disimpan; kemudian dicek ulang relevansinya karena ada commit baru
@@ -71,3 +95,5 @@ bukan recolor UI.
 - Server `PORT=8765`. Screenshot CDP: `scratchpad/shot.mjs` + cookie `luna_session`
   (`cookies.txt`). Uji 4 state: default, panel terbuka, ticket expand (cek SL/TP tak
   ke-clip), split-2. Plus light mode (`body.light`) & no console error.
+
+</details>

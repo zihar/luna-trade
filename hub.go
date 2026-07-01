@@ -7,9 +7,45 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
+
+// maxSpread = batas atas spread wajar per instrumen (dalam harga). Closeout spread
+// broker untuk metal/kripto bisa sangat lebar (XAU ~$20, BTC ~$400) → menyesatkan &
+// membuat SL/TP paper langsung kena saat buka. Selaras dgn clamp tampilan FE
+// (maxSpreadPips di index.html). Ini CAP: FX normal jauh di bawah → tak terdampak.
+func maxSpread(inst string) float64 {
+	switch {
+	case strings.Contains(inst, "XAU"):
+		return 0.50
+	case strings.Contains(inst, "XAG"):
+		return 0.40
+	case strings.Contains(inst, "BTC"):
+		return 80
+	case strings.Contains(inst, "JPY"):
+		return 0.30
+	default:
+		return 0.0030 // FX ~3 pip
+	}
+}
+
+// clampSpread mempersempit spread tick bila melebihi batas wajar, di-tengah-kan pada
+// mid (mempertahankan harga tengah). Aman untuk DXY (bid==ask → tak berubah).
+func clampSpread(t Tick) Tick {
+	if t.Bid <= 0 || t.Ask <= 0 || t.Ask <= t.Bid {
+		return t
+	}
+	max := maxSpread(string(t.Instrument))
+	if t.Ask-t.Bid <= max {
+		return t
+	}
+	mid := (t.Bid + t.Ask) / 2
+	t.Bid = mid - max/2
+	t.Ask = mid + max/2
+	return t
+}
 
 // stopLinger = jeda sebelum upstream dimatikan setelah subscriber habis, supaya
 // reload/buka-tutup tab cepat tak memicu reconnect upstream berulang.
@@ -113,6 +149,7 @@ func (h *Hub) runUpstream(ctx context.Context) {
 // broadcast menyalin satu tick ke semua subscriber tanpa blocking: klien lambat
 // (buffer penuh) di-skip ticknya, tak menahan upstream maupun klien lain.
 func (h *Hub) broadcast(t Tick) {
+	t = clampSpread(t) // spread wajar di SATU titik → entry, monitor SL/TP, & FE konsisten
 	h.mu.Lock()
 	h.last[t.Instrument] = t // simpan snapshot utk subscriber berikutnya
 	// DXY tak ada di OANDA: tiap kali komponen update, hitung ulang & siarkan
