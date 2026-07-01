@@ -2371,6 +2371,9 @@ function delHooks(){ return {
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});
+      if(localStorage.getItem('br_debugDraw')==='1'){ try{ const li=revealed(currentTF).length-1;
+        console.log('[pts]',o.name,'pc='+pendingClicks.length,'li='+li,JSON.stringify(o.points.map(p=>({ts:p.timestamp,idx:p.dataIndex,val:p.value})))); }catch(_){}
+      }
       chart.overrideOverlay({id:o.id, points:o.points}); } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
@@ -2412,7 +2415,9 @@ function serializeDraws(){
   const out=[];
   drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);
     if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
-    out.push({ name:o.name, points:o.points.map(p=>({vt:tsOf(p), value:p.value})),
+    const pts=o.points.map(p=>({vt:tsOf(p), value:p.value}));
+    if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
+    out.push({ name:o.name, points:pts,
       extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
   }catch(e){} });
   return out;
@@ -2426,6 +2431,7 @@ function restoreDraws(){
   const prev=suppressDrawSave; suppressDrawSave=true;
   arr.forEach(d=>{ try{
     if(!PERSIST_DRAW[d.name]||!Array.isArray(d.points)||!d.points.length) return;
+    if(d.points.some(pt=>pt.vt==null)) return;   // lewati gambar rusak lama (titik anchorless → far-left)
     const pts=d.points.map(pt=> pt.vt==null ? {value:pt.value}
       : (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // future → dataIndex
       : {timestamp:pt.vt, value:pt.value});
