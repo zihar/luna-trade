@@ -920,6 +920,30 @@ function nyTime(ms){
       hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms)).replace(',','');
   }catch(e){ return new Date(ms).toISOString().slice(0,16).replace('T',' '); }
 }
+// label tanggal crosshair sumbu-X: "Tue 30 Jun '26 10:00" (ada hari) — hormati timezone chart.
+function crosshairDate(ms){
+  try{
+    const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',
+      year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(ms));
+    const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
+    return `${g('weekday')} ${g('day')} ${g('month')} '${g('year')} ${g('hour')}:${g('minute')}`;
+  }catch(e){ return nyTime(ms); }
+}
+// tick sumbu-X (klinecharts): hormati pola `format` (granularitas) + timezone chart.
+function axisTickDate(ms, pattern){
+  try{
+    const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ms));
+    const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
+    return String(pattern||'YYYY-MM-DD HH:mm').replace('YYYY',g('year')).replace('MM',g('month'))
+      .replace('DD',g('day')).replace('HH',g('hour')).replace('mm',g('minute')).replace('ss',g('second'));
+  }catch(e){ return nyTime(ms); }
+}
+// dipakai di klinecharts.init(customApi.formatDate). FormatDateType klinecharts: 0=Tooltip,
+// 1=Crosshair, 2=XAxis. Tick sumbu (2) → ringkas hormati pola; crosshair/tooltip (0/1) → ada hari.
+function chartFormatDate(_dtf, timestamp, format, type){
+  return (type===2 || type==='xAxis') ? axisTickDate(timestamp, format) : crosshairDate(timestamp);
+}
 // candle terungkap = yang sudah CLOSED pada cursor T (anti-lookahead), via binary search
 function revealed(tf){
   const arr=tfData[tf]; if(!arr) return [];
@@ -1470,7 +1494,7 @@ const lightStyles = {
     point:{ color:'rgba(0,0,0,0)', borderColor:'#3a5fe0', borderSize:1.5, radius:3,
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
 };
-const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ});
+const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
 
 // ===================== tema gelap/terang =====================
@@ -2948,7 +2972,7 @@ function updateAxisTime(e){
   if(di<=lastIdx+0.5){ el.style.display='none'; return; }  // di atas bar nyata → klinecharts sudah menandai
   const off=Math.round(di-lastIdx);                         // berapa bar ke depan
   const ts=dl[lastIdx].timestamp + off*DUR[currentTF];
-  el.textContent=nyTime(ts);
+  el.textContent=crosshairDate(ts);
   el.style.left=x+'px';
   // top-align ke atas band sumbu-X — sama persis dgn pill crosshair klinecharts
   el.style.top=chartAxisTop()+'px';
@@ -3396,7 +3420,7 @@ function makeSecondary(slot){
   panel.appendChild(hd); panel.appendChild(cdiv);
 
   const light=document.body.classList.contains('light');
-  const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ});
+  const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
   try{ c.setStyles({candle:{bar:candleBarCfg()}}); }catch(e){}   // ikut warna candle kustom user
   attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
