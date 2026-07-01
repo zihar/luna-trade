@@ -2350,8 +2350,8 @@ function delHooks(){ return {
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
     // diagnostik opsional (aktifkan: localStorage.br_debugDraw='1') → tangkap flip di sesi live
     if(o && localStorage.getItem('br_debugDraw')==='1'){ try{
-      const pxy=p=>{const k=p.timestamp!=null?{timestamp:p.timestamp}:{dataIndex:p.dataIndex};k.value=p.value;let c=chart.convertToPixel(k,{paneId:'candle_pane',absolute:true});if(Array.isArray(c))c=c[0];return c?Math.round(c.x):null;};
-      console.log('[draw]',o.name,'captured',pendingClicks.map(pxy),'final',(o.points||[]).map(pxy)); }catch(_){}
+      const pxy=p=>{const k=p.timestamp!=null?{timestamp:p.timestamp}:{dataIndex:p.dataIndex};k.value=p.value;let c=chart.convertToPixel(k,{paneId:'candle_pane',absolute:true});if(Array.isArray(c))c=c[0];return c?(Math.round(c.x)+','+Math.round(c.y)):null;};
+      console.log('[draw]',o.name,'captured',JSON.stringify(pendingClicks.map(pxy)),'final',JSON.stringify((o.points||[]).map(pxy))); }catch(_){}
     }
     // Tempelkan tiap klik presisi ke titik final klinecharts TERDEKAT (bukan by-index): kebal
     // terhadap mousedown "nyasar" (klik kena overlay lain / diabaikan) yang dulu menggeser array
@@ -2446,7 +2446,10 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   const r=$('#chart').getBoundingClientRect();
   const xa=xAnchorFromPx(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
   if(!xa||v==null) return;
-  if(magnetOn){ const s=magnetSnap(tsOf(xa), v, ev.clientX-r.left, ev.clientY-r.top); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
+  // magnet HANYA utk titik di dalam data (punya timestamp). Titik di area future (dataIndex,
+  // tanpa candle) tak boleh di-snap: magnetSnap akan menariknya ke bar TERAKHIR → garis
+  // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
+  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ev.clientX-r.left, ev.clientY-r.top); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
   pendingClicks.push(Object.assign({value:v}, xa));
 }, true);
 
