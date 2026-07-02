@@ -2247,6 +2247,7 @@ function savePosLevel(id,kind,v){
 }
 function confirmPosLevel(id,kind,v){
   const p=posById(id); if(!p) return; const dec=decimalsFor(p.instrument);
+  if(p[kind]!=null && (+v).toFixed(dec)===(+p[kind]).toFixed(dec)){ drawPaperLines(); return; }   // nilai tak berubah (mis. klik garis tanpa geser) → jangan munculkan konfirmasi
   pendingLevel={id,kind,v};
   const rec=posDom[id];
   miniConfirm(`Ubah ${kind.toUpperCase()} ke ${(+v).toFixed(dec)}?`,'Simpan',
@@ -2267,10 +2268,11 @@ function onPosLevelDragStart(e){
   const node=e.target.closest('.pos-node.sl, .pos-node.tp'); if(!node) return;
   if(e.target.closest('.pos-x, .pos-add')) return;   // tombol → bukan drag
   const id=+node.dataset.pid, kind=node.classList.contains('sl')?'sl':'tp';
-  if(editingPosId===id) return;   // panel Edit terbuka → drag garis via klinecharts staged
-  if(!(paperLines[id]&&paperLines[id][kind])) return;
+  const editing=(editingPosId===id && !!editPos);   // panel Edit terbuka → drag = staged ke editPos (bukan mini-confirm)
+  if(editing){ if(editPos[kind]==null || !editPos[kind+'On']) return; }   // level staged tak aktif → tak ada yg digeser
+  else if(!(paperLines[id]&&paperLines[id][kind])) return;
   e.preventDefault();
-  posLevelDrag={id,kind,startY:e.clientY,moved:false};
+  posLevelDrag={id,kind,startY:e.clientY,moved:false,editing};
   window.addEventListener('mousemove',onPosLevelDragMove);
   window.addEventListener('mouseup',onPosLevelDragEnd);
 }
@@ -2279,15 +2281,16 @@ function onPosLevelDragMove(e){
   if(!d.moved && Math.abs(e.clientY-d.startY)<3) return;   // ambang kecil supaya klik biasa tetap = buka panel
   d.moved=true;
   const v=priceFromClientY(e.clientY); if(v==null||!(v>0)) return;
-  pendingLevel={id:d.id,kind:d.kind,v};
   const ov=paperLines[d.id]&&paperLines[d.id][d.kind];
-  if(ov) try{chart.overrideOverlay({id:ov, points:[{value:v}], extendData:posExtend(posById(d.id),d.kind)});}catch(_){}
-  previewPosLevel(d.id,d.kind,v);
+  if(ov) try{chart.overrideOverlay({id:ov, points:[{value:v}], extendData:posExtend(d.editing?editPos:posById(d.id),d.kind)});}catch(_){}
+  if(d.editing && editPos){ editPos[d.kind]=v; renderPosEdit(); try{renderPosDom(posById(d.id));}catch(_){}}   // staged: input panel + label ikut geser
+  else { pendingLevel={id:d.id,kind:d.kind,v}; previewPosLevel(d.id,d.kind,v); }
 }
 function onPosLevelDragEnd(e){
   window.removeEventListener('mousemove',onPosLevelDragMove);
   window.removeEventListener('mouseup',onPosLevelDragEnd);
   const d=posLevelDrag; posLevelDrag=null; if(!d) return;
+  if(d.editing){ return; }   // staged → disimpan lewat Confirm panel (tanpa mini-confirm)
   if(!d.moved){ openPositionEditor(d.id); return; }   // tak digeser → klik = buka panel
   const v=pendingLevel&&pendingLevel.v; if(v==null){ drawPaperLines(); return; }
   confirmPosLevel(d.id,d.kind,v);
@@ -2303,7 +2306,7 @@ function posLevel(p,kind,draggable){
     onClick:()=>{ openPositionEditor(p.id); return false; },
     onPressedMoving:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
       if(editingPosId===p.id && editPos){ editPos[kind]=v; renderPosEdit(); try{renderPosDom(posById(editingPosId));}catch(_){}} // panel: staged
-      else previewPosLevel(p.id,kind,v);   // view: preview (belum simpan)
+      else { pendingLevel={id:p.id,kind,v}; previewPosLevel(p.id,kind,v); }   // view: preview (belum simpan) + lindungi garis dari refresh spSync tiap tick
       return false; },
     onPressedMoveEnd:(e)=>{ if(editingPosId===p.id) return false;   // panel yg simpan (Confirm)
       const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
@@ -2323,11 +2326,12 @@ function drawPaperLines(){
     else rec.entry=posLevel(p,'entry',false);
     // posisi yg sedang diedit: garis SL/TP staged dikelola panel/drag → jangan disentuh; segarkan panel + node DOM
     if(editingPosId===p.id){ if(editPos){ editPos.price=+p.price; renderPosEdit(); } renderPosDom(p); return; }
-    // lainnya: garis SL/TP = state server. Garis terkunci (klik→panel, chart tetap bisa di-pan);
-    // geser lewat menarik LABEL DOM (gagang besar) → preview + konfirmasi mini.
+    // lainnya: garis SL/TP = state server. Garis BISA digeser langsung (ala TradingView):
+    // drag garis → onPressedMoving preview + onPressedMoveEnd konfirmasi mini; klik (tanpa geser) → panel.
+    // Label DOM (gagang kecil) tetap bisa ditarik juga sebagai alternatif.
     ['sl','tp'].forEach(k=>{ const has=p[k]!=null;
       if(pendingLevel && pendingLevel.id===p.id && pendingLevel.kind===k) return;   // sedang menunggu konfirmasi → jangan reset garis/label
-      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k,false); }
+      if(has){ if(rec[k]) try{chart.overrideOverlay({id:rec[k], points:[{value:p[k]}], extendData:posExtend(p,k)});}catch(e){} else rec[k]=posLevel(p,k,true); }
       else if(rec[k]){ try{chart.removeOverlay(rec[k]);}catch(e){} rec[k]=null; }
     });
     renderPosDom(p);
