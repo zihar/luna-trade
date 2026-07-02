@@ -554,10 +554,11 @@
   /* order panel — ticket modern minimalis ala TradeLocker */
   .op2{ display:flex; flex-direction:column; gap:5px; }
   .op2-sym{ font-size:11.5px; font-weight:700; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  /* header simple: 2 baris rapi — identitas (flag·sym·chev·X) + kontrol (pill·chips) */
-  .op-shead{ display:flex; flex-direction:column; gap:5px; cursor:move; touch-action:none; }
-  .op-shead-id{ display:flex; align-items:center; gap:6px; min-width:0; }
-  .op-shead-ctl{ display:flex; align-items:center; gap:5px; min-width:0; }
+  /* header simple: 1 baris — flag·sym·MARKET · ··· · RISK·SL·TP · chev·X (compact) */
+  .op-shead{ display:flex; align-items:center; gap:5px; cursor:move; touch-action:none; }
+  /* jarak kecil: pisahkan MARKET dari identitas & window control (⌄✕) dari grup chip */
+  .op-shead #opTypePill{ margin-left:3px; }
+  .op-shead #op2Expand{ margin-left:5px; }
   .op-ehead{ display:flex; align-items:center; gap:6px; cursor:move; touch-action:none; }
   .op-chev{ width:22px; height:22px; padding:0; font-size:10px; line-height:1; color:var(--muted);
     background:var(--inset); border:1px solid var(--border); border-radius:6px; flex:0 0 auto; cursor:pointer; }
@@ -804,21 +805,16 @@
         <!-- ===== MODE SIMPLE (compact) ===== -->
         <div class="op-simple">
           <div class="op-shead">
-            <div class="op-shead-id">
-              <span class="op2-flag j-flag"></span>
-              <span class="op2-sym j-sym">EURUSD</span>
-              <span class="grow"></span>
-              <button type="button" class="op-chev" id="op2Expand" title="Expand detail">⌄</button>
-              <button type="button" class="op-chev op-x" title="Close order panel">✕</button>
-            </div>
-            <div class="op-shead-ctl">
-              <button type="button" class="op3-pill" id="opTypePill" title="Market / Pending">MARKET ⇄</button>
-              <button type="button" class="op3-pill dir-pill dir-sell" id="dirPill" title="Buy / Sell" hidden>SELL ⇄</button>
-              <span class="grow"></span>
-              <button type="button" class="op3-chip" id="chipRisk" title="Risk % sizing">RISK</button>
-              <button type="button" class="op3-chip" id="chipSL" title="Stop Loss">SL</button>
-              <button type="button" class="op3-chip" id="chipTP" title="Take Profit">TP</button>
-            </div>
+            <span class="op2-flag j-flag"></span>
+            <span class="op2-sym j-sym">EURUSD</span>
+            <button type="button" class="op3-pill" id="opTypePill" title="Market / Pending">MARKET ⇄</button>
+            <button type="button" class="op3-pill dir-pill dir-sell" id="dirPill" title="Buy / Sell" hidden>SELL ⇄</button>
+            <span class="grow"></span>
+            <button type="button" class="op3-chip" id="chipRisk" title="Risk % sizing">RISK</button>
+            <button type="button" class="op3-chip" id="chipSL" title="Stop Loss">SL</button>
+            <button type="button" class="op3-chip" id="chipTP" title="Take Profit">TP</button>
+            <button type="button" class="op-chev" id="op2Expand" title="Expand detail">⌄</button>
+            <button type="button" class="op-chev op-x" title="Close order panel">✕</button>
           </div>
           <!-- editor "stage" (muncul saat chip aktif) -->
           <div class="op3-stage" id="opStage">
