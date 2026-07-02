@@ -1523,6 +1523,8 @@ klinecharts.registerOverlay({
     const figs=[{type:'line',attrs:{coordinates:[{x:0,y},{x:xR,y}]},styles:{color:lc,size:1,style:'dashed'}}];
     // posisi paper: pill/label/tombol dirender sbg node DOM (#posLayer) → di sini cukup garis + sinkron posisi Y
     if(d.posId!=null){ if(d.kind) syncPosNodeY(d.posId,d.kind,y,bounding&&bounding.height); return figs; }
+    // garis draft tiket order (SL/TP sebelum posisi): label = chip DOM (#posLayer), desain sama dgn posisi
+    if(d.draftKind){ syncDraftNodeY(d.draftKind,y,bounding&&bounding.height); return figs; }
     // garis draft tiket order (entry/SL/TP): teks tetap digambar di canvas spt semula
     if(d.pill){   // pill terisi (kotak kecil ujung kiri)
       figs.push({type:'text',attrs:{x:4,y,text:d.label||'',align:'left',baseline:'middle'},
@@ -2061,42 +2063,59 @@ function openTrade(dir){
 function moveLine(id,value){ if(id==null) return; try{ chart.overrideOverlay({id, points:[{value}]}); }catch(e){} }
 
 // ===== garis draft SL/TP (preview sebelum order; bisa di-drag) =====
+// Desain DISAMAKAN dgn garis SL/TP posisi on-chart: garis tradeLevel (warna POS_RED/POS_GREEN) +
+// label chip DOM (.pos-tag) di #posLayer — bukan teks canvas. Drag garis → update pips tiket.
 let draft={sl:null,tp:null};
-function clearDraftLines(){ ['sl','tp'].forEach(k=>{ if(draft[k]){ try{chart.removeOverlay(draft[k]);}catch(e){} draft[k]=null; } }); }
-function draftInfo(kind,price,entry,units){
-  const bal=+$('#balance').value||0, pnl=Math.abs(pnlUsd(orderDir,entry,price,units)), pct=bal?pnl/bal*100:0;
-  return kind==='sl'
-    ? {color:'#ff6f6f', text:`SL ${fmtPx(price)}   -${usdGrp(pnl)} / -${pct.toFixed(2)}%`}
-    : {color:'#54c88c', text:`TP ${fmtPx(price)}   +${usdGrp(pnl)} / +${pct.toFixed(2)}%`};
+let draftDom={sl:null,tp:null};   // kind -> elemen chip DOM (.pos-node .draft)
+let draftDragKind=null;           // kind yg sedang digeser → chip tampil $/% (spt preview drag posisi)
+function ensureDraftNode(kind){
+  if(draftDom[kind] && draftDom[kind].parentNode) return draftDom[kind];
+  const el=document.createElement('div'); el.className='pos-node '+kind+' draft'; el.style.display='none';
+  el.innerHTML='<span class="pos-tag"></span>';
+  posLayer().appendChild(el); return draftDom[kind]=el;
 }
-function draftLevel(kind,price,info){
-  return chart.createOverlay({ name:'tradeLevel', points:[{value:price}], extendData:{kind,color:info.color,label:info.text},
+function removeDraftNode(kind){ const el=draftDom[kind]; if(el&&el.parentNode) el.parentNode.removeChild(el); draftDom[kind]=null; }
+// dipanggil createPointFigures tiap repaint → tempatkan chip di y garis; sembunyi bila di luar pane
+function syncDraftNodeY(kind,y,h){ const el=draftDom[kind]; if(!el) return;
+  const on = y!=null && y>=-6 && (h==null||y<=h+6); el.style.display=on?'':'none'; if(on) el.style.top=y+'px'; }
+function clearDraftLines(){ ['sl','tp'].forEach(k=>{ if(draft[k]){ try{chart.removeOverlay(draft[k]);}catch(e){} draft[k]=null; } removeDraftNode(k); }); }
+function draftChipText(kind,price,entry,units){
+  const bal=+$('#balance').value||0, pnl=Math.abs(pnlUsd(orderDir,entry,price,units)), pct=bal?pnl/bal*100:0, s=kind==='sl'?'-':'+';
+  return `${kind.toUpperCase()} ${s}${usdGrp(pnl)} / ${s}${pct.toFixed(2)}%`;
+}
+function draftLevel(kind,price){
+  const lc=(kind==='sl')?POS_RED:POS_GREEN;
+  return chart.createOverlay({ name:'tradeLevel', points:[{value:price}], extendData:{draftKind:kind,color:lc,lineColor:lc},
     onPressedMoving:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
       const ba=curBidAsk(), cur=currentCandle(), entry= ba?(orderDir==='short'?ba.bid:ba.ask):(cur?cur.close:null);
       if(entry==null) return false;
       const pip=+$('#pipSize').value||instSpec().pip, ticks=Math.max(1, Math.round(Math.abs(v-entry)/pip));
-      $(kind==='sl'?'#slPips':'#tpPips').value=ticks; renderOrderPanel(); try{renderSizing();}catch(_){}
+      draftDragKind=kind; $(kind==='sl'?'#slPips':'#tpPips').value=ticks; renderOrderPanel(); try{renderSizing();}catch(_){}
       return false; },
+    onPressedMoveEnd:()=>{ draftDragKind=null; try{drawDraftLines();}catch(_){} return false; },   // lepas → chip balik ke label ringkas
   });
 }
 function drawDraftLines(){
-  // preview SL/TP hanya saat panel order terbuka & sedang menyiapkan order —
-  // jangan mengotori chart saat panel tertutup / sudah ada posisi (lokal replay ATAU
-  // paper server pada instrumen ini) / ada pending
+  // preview SL/TP saat panel order terbuka & menyiapkan order — termasuk saat sudah ada
+  // posisi lain (tambah posisi baru). Sembunyikan hanya saat panel tertutup / replay lokal / pending.
   const op=$('#orderpanel');
-  const hasPaperPos = (typeof spActive==='function' && spActive() && Array.isArray(SP.positions) && SP.positions.some(p=>p.instrument===inst));
-  if(trade || pending || hasPaperPos || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
+  if(trade || pending || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
   const cur=currentCandle(), ba=curBidAsk(); if(!cur){ clearDraftLines(); return; }
   const isSell=orderDir==='short', entry= ba?(isSell?ba.bid:ba.ask):cur.close;
   const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal(), dist=slp*pip, units=currentLots()*unitsPer();
   const slPrice=($('#slOn').checked && slp>0) ? (isSell?entry+dist:entry-dist) : null;
   const tpPrice=($('#tpOn').checked && slp>0) ? (isSell?entry-dist*rr:entry+dist*rr) : null;
+  const lc=k=>(k==='sl')?POS_RED:POS_GREEN;
   const upd=(kind,price)=>{
-    if(price==null){ if(draft[kind]){ try{chart.removeOverlay(draft[kind]);}catch(e){} draft[kind]=null; } return; }
-    const info=draftInfo(kind,price,entry,units);
+    if(price==null){ if(draft[kind]){ try{chart.removeOverlay(draft[kind]);}catch(e){} draft[kind]=null; } removeDraftNode(kind); return; }
+    const el=ensureDraftNode(kind), tag=el.querySelector('.pos-tag');
+    if(tag){   // label ringkas "SL"/"TP" (spt posisi view); saat digeser → $/% + glow (spt preview drag posisi)
+      if(draftDragKind===kind){ tag.textContent=draftChipText(kind,price,entry,units); tag.classList.add('drag'); }
+      else { tag.textContent=kind.toUpperCase(); tag.classList.remove('drag'); }
+    }
     let alive=false; try{ alive=draft[kind]&&!!chart.getOverlayById(draft[kind]); }catch(e){ alive=!!draft[kind]; }
-    if(!alive) draft[kind]=draftLevel(kind,price,info);
-    else { try{ chart.overrideOverlay({id:draft[kind], points:[{value:price}], extendData:{kind,color:info.color,label:info.text}}); }catch(e){} }
+    if(!alive) draft[kind]=draftLevel(kind,price);
+    else { try{ chart.overrideOverlay({id:draft[kind], points:[{value:price}], extendData:{draftKind:kind,color:lc(kind),lineColor:lc(kind)}}); }catch(e){} }
   };
   upd('sl',slPrice); upd('tp',tpPrice);
 }
@@ -2263,6 +2282,13 @@ function onPosLevelDragStart(e){
   if(e.button!==0) return;
   const node=e.target.closest('.pos-node.sl, .pos-node.tp'); if(!node) return;
   if(e.target.closest('.pos-x, .pos-add')) return;   // tombol → bukan drag
+  if(node.classList.contains('draft')){   // chip draft tiket order → drag = ubah pips (sama mudahnya spt chip posisi)
+    e.preventDefault();
+    posLevelDrag={draft:true, kind:node.classList.contains('sl')?'sl':'tp', startY:e.clientY, moved:false};
+    window.addEventListener('mousemove',onPosLevelDragMove);
+    window.addEventListener('mouseup',onPosLevelDragEnd);
+    return;
+  }
   const id=+node.dataset.pid, kind=node.classList.contains('sl')?'sl':'tp';
   const editing=(editingPosId===id && !!editPos);   // panel Edit terbuka → drag = staged ke editPos (bukan mini-confirm)
   if(editing){ if(editPos[kind]==null || !editPos[kind+'On']) return; }   // level staged tak aktif → tak ada yg digeser
@@ -2277,6 +2303,13 @@ function onPosLevelDragMove(e){
   if(!d.moved && Math.abs(e.clientY-d.startY)<3) return;   // ambang kecil supaya klik biasa tetap = buka panel
   d.moved=true;
   const v=priceFromClientY(e.clientY); if(v==null||!(v>0)) return;
+  if(d.draft){   // chip draft → hitung ticks dari entry pasar terkini, set pips (garis+chip auto-redraw)
+    const ba=curBidAsk(), cur=currentCandle(), entry= ba?(orderDir==='short'?ba.bid:ba.ask):(cur?cur.close:null);
+    if(entry==null) return;
+    const pip=+$('#pipSize').value||instSpec().pip, ticks=Math.max(1, Math.round(Math.abs(v-entry)/pip));
+    draftDragKind=d.kind; $(d.kind==='sl'?'#slPips':'#tpPips').value=ticks; renderOrderPanel(); try{renderSizing();}catch(_){}
+    return;
+  }
   const ov=paperLines[d.id]&&paperLines[d.id][d.kind];
   if(ov) try{chart.overrideOverlay({id:ov, points:[{value:v}], extendData:posExtend(d.editing?editPos:posById(d.id),d.kind)});}catch(_){}
   if(d.editing && editPos){ editPos[d.kind]=v; renderPosEdit(); try{renderPosDom(posById(d.id));}catch(_){}}   // staged: input panel + label ikut geser
@@ -2286,6 +2319,7 @@ function onPosLevelDragEnd(e){
   window.removeEventListener('mousemove',onPosLevelDragMove);
   window.removeEventListener('mouseup',onPosLevelDragEnd);
   const d=posLevelDrag; posLevelDrag=null; if(!d) return;
+  if(d.draft){ draftDragKind=null; try{drawDraftLines();}catch(_){} return; }   // lepas → chip balik ke label ringkas
   if(d.editing){ return; }   // staged → disimpan lewat Confirm panel (tanpa mini-confirm)
   if(!d.moved){ openPositionEditor(d.id); return; }   // tak digeser → klik = buka panel
   const v=pendingLevel&&pendingLevel.v; if(v==null){ drawPaperLines(); return; }
