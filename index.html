@@ -1600,6 +1600,8 @@ const lightStyles = {
 };
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
+// Jaring pengaman: setelah web-font siap, satu re-measure bersih (sumbu klinecharts diukur ulang dgn Inter final)
+try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ try{ chart.resize(); }catch(e){} }); }catch(e){}
 
 // ===================== tema gelap/terang =====================
 function applyTheme(t){
@@ -1677,6 +1679,12 @@ function guessPip(){
 // loadBtn → backtest dari tanggal terpilih; latest=true → langsung data terkini (saat ganti pair)
 $('#loadBtn').onclick = ()=>loadInit(false);
 async function loadInit(latest){
+  // Render pertama tunggu font sumbu (Inter) siap — cegah "tremor": kalau chart menggambar
+  // dgn metrik font fallback lalu Inter swap-in, lebar y-axis berubah → sumbu bergeser (hanya cold load).
+  if(!loadInit._fontReady){ loadInit._fontReady=true;
+    try{ if(document.fonts&&document.fonts.load) await Promise.race([
+      Promise.all([document.fonts.load("10px 'Inter'"), document.fonts.load("bold 10px 'Inter'")]),
+      new Promise(r=>setTimeout(r,700)) ]); }catch(e){} }
   inst = $('#instrument').value;
   const date = $('#date').value;
   if(!latest && !date){ setStatus('Pick a date first.',true); return; }
