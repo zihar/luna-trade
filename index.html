@@ -7,7 +7,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <style>
   :root{
@@ -244,6 +244,9 @@
   :root{ color-scheme:dark;
          /* TradeLocker pakai Inter utk angka juga (tabular figures), bukan monospace */
          --mono:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         /* order panel — type futuristik: Space Grotesk (UI/label) + Space Mono (angka/instrumen) */
+         --font-display:'Space Grotesk','Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         --font-num:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
          --shadow:0 10px 30px rgba(0,0,0,.5); --ring:rgba(59,130,246,.35); }
   body.light{ color-scheme:light; --shadow:0 8px 22px rgba(22,33,55,.12); --ring:rgba(37,99,235,.28); }
 
@@ -546,6 +549,12 @@
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
   .orderpanel{ border-top:1px solid var(--border); padding:3px 8px 5px; }
+  /* ── Type futuristik: UI pakai Space Grotesk, angka/readout pakai Space Mono (tabular) ── */
+  .orderpanel, #orderForm{ font-family:var(--font-display); -webkit-font-smoothing:antialiased; }
+  .orderpanel .op3-deal-px, .orderpanel .tl-px, .orderpanel .tl-tick input, .orderpanel .tl-kv,
+  .orderpanel .op2-step-val input, .orderpanel .op3-stage-step .v, .orderpanel .op3-stage-out,
+  .orderpanel .op3-exec-num, .orderpanel .op3-margin b, .orderpanel .op3-riskpct, .orderpanel input[type=number]{
+    font-family:var(--font-num); font-feature-settings:"tnum" 1; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
   /* docked: jangan diciutkan oleh daftar Markets; scroll internal saat expand agar SL/TP & exec terjangkau */
   .orderpanel[data-dock="docked"]{ flex:0 0 auto; max-height:64%; overflow-y:auto; }
   .orderpanel[data-dock="floating"]{ cursor:move; }   /* seluruh area (incl. tepi atas) = drag handle; kontrol di-skip via JS */
@@ -553,7 +562,7 @@
   .orderpanel .bp-title{ margin-bottom:8px; }
   /* order panel — ticket modern minimalis ala TradeLocker */
   .op2{ display:flex; flex-direction:column; gap:5px; }
-  .op2-sym{ font-size:11.5px; font-weight:700; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .op2-sym{ font-size:12.5px; font-weight:600; letter-spacing:.01em; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   /* header simple: 1 baris — flag·sym·MARKET · ··· · RISK·SL·TP · chev·X (compact) */
   .op-shead{ display:flex; align-items:center; gap:5px; cursor:move; touch-action:none; }
   /* jarak kecil: pisahkan MARKET dari identitas & window control (⌄✕) dari grup chip */
@@ -569,7 +578,7 @@
   .op3-seg,.op3-dir{ display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:3px;
     background:var(--inset); border-radius:8px; }
   .op3-seg button,.op3-dir button{ height:27px; border:1px solid transparent; border-radius:6px;
-    background:transparent; color:var(--muted); font-size:11px; font-weight:600; }
+    background:transparent; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.03em; }
   .op3-seg button:hover,.op3-dir button:hover{ color:var(--txt); }
   .op3-seg button.on{ background:var(--btn); color:var(--txt); border-color:var(--border); }
   .op3-dir button.dir-sell.on{ color:var(--red); border-color:var(--red); background:rgba(255,111,111,.12); }
@@ -595,9 +604,9 @@
   .tl-cell.r-top{ border-top:1px solid var(--border); border-radius:8px 8px 0 0; }
   .tl-cell.r-bot{ border-bottom:1px solid var(--border); border-radius:0 0 8px 8px; }
   .tl-cell.r-mid{ border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .tl-px{ font-size:13px; font-weight:700; color:var(--accent); }
+  .tl-px{ font-size:14px; font-weight:700; color:var(--accent); text-shadow:0 0 10px rgba(74,113,255,.4); }
   .tl-tick{ border:1px solid var(--border); border-radius:5px; padding:2px 7px; background:var(--inset); }
-  .tl-tick input{ width:100%; border:0; background:transparent; padding:0; height:auto; font-size:13px; font-weight:700; color:var(--txt); }
+  .tl-tick input{ width:100%; border:0; background:transparent; padding:0; height:auto; font-size:14px; font-weight:700; color:var(--txt); }
   .tl-kv{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; font-size:12px; font-weight:600; }
   .tl-kv i{ font-style:normal; font-size:9px; color:var(--muted); }
   .tl-kv.pos{ color:var(--green); } .tl-kv.neg{ color:var(--red); }
@@ -622,10 +631,10 @@
   .op2-step button:hover{ background:var(--btn-hover); color:var(--txt); }
   .op2-step-val{ display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:2px 2px; min-width:52px; }
   .op2-step-val input{ width:100%; border:0; background:transparent; text-align:center;
-    font-size:12px; font-weight:700; padding:0; height:auto; color:var(--txt); }
-  .op2-step-val span{ font-size:8px; color:var(--muted); text-transform:lowercase; letter-spacing:.04em; }
+    font-size:13px; font-weight:700; padding:0; height:auto; color:var(--txt); }
+  .op2-step-val span{ font-size:8px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; }
   /* execute button */
-  .op3-exec{ height:35px; border:0; border-radius:8px; font-size:12px; font-weight:700; color:#15151a; cursor:pointer; }
+  .op3-exec{ height:35px; border:0; border-radius:8px; font-size:12.5px; font-weight:700; letter-spacing:.06em; color:#15151a; cursor:pointer; }
   .op3-exec.dir-sell{ background:var(--red); } .op3-exec.dir-buy{ background:var(--green); }
   .op3-exec:hover{ filter:brightness(1.08); }
   /* ===== dua mode: simple (compact) ↔ expand ===== */
@@ -638,10 +647,10 @@
   .op2-flag{ font-size:15px; line-height:1; margin-right:1px; }
   /* header satu baris simple: pill Market/Pending + chip RISK/SL/TP (netral, ala TradeLocker) */
   .op3-pill{ height:22px; padding:0 9px; border-radius:12px; background:var(--inset);
-    border:1px solid var(--border); color:var(--txt); font-size:9px; font-weight:600; letter-spacing:.02em; flex:0 0 auto; }
+    border:1px solid var(--border); color:var(--txt); font-size:9px; font-weight:600; letter-spacing:.12em; flex:0 0 auto; }
   .op3-pill:hover{ border-color:var(--btn-border-hover); }
   .op3-chip{ height:22px; padding:0 7px; border-radius:6px; background:var(--inset);
-    border:1px solid var(--border); color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.04em; flex:0 0 auto; }
+    border:1px solid var(--border); color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.1em; flex:0 0 auto; }
   .op3-chip:hover{ color:var(--txt); border-color:var(--btn-border-hover); }
   /* aktif = halus & netral; border-color WAJIB di-set utk override global `button.on` (biru) */
   /* chip aktif: warna jelas per fungsi (SL merah, TP hijau, RISK accent) */
@@ -653,7 +662,7 @@
   .op3-stage:not(:has(> .op3-stage-row:not([hidden]))){ display:none; }   /* tak ada baris aktif → tak makan ruang */
   .op3-stage-row{ display:flex; align-items:center; gap:8px; }
   .op3-stage-row[hidden]{ display:none; }
-  .op3-stage-lbl{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; min-width:62px; }
+  .op3-stage-lbl{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; min-width:62px; }
   .op3-stage-lbl.sl{ color:var(--red); } .op3-stage-lbl.tp{ color:var(--green); } .op3-stage-lbl.risk{ color:var(--accent); }
   .op3-stage-step{ display:flex; align-items:center; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:var(--inset); }
   .op3-stage-step button{ width:23px; height:21px; padding:0; border:0; border-radius:0; background:transparent; color:var(--muted); font-size:14px; line-height:1; }
@@ -681,8 +690,8 @@
   .op3-deal-btn.dir-sell{ background:var(--sell); color:#3d0c0c; }
   .op3-deal-btn.dir-buy{ background:var(--buy); color:#06291b; }
   .op3-deal-btn:hover{ filter:brightness(1.07); }
-  .op3-deal-px{ font-size:13px; font-weight:700; line-height:1.15; }
-  .op3-deal-lbl{ font-size:8.5px; font-weight:700; letter-spacing:.1em; opacity:.8; }
+  .op3-deal-px{ font-size:15px; font-weight:700; line-height:1.1; letter-spacing:-.02em; }
+  .op3-deal-lbl{ font-size:8px; font-weight:700; letter-spacing:.2em; opacity:.8; }
   .op3-deal-mid{ display:flex; align-items:stretch; min-width:96px; }
   .op3-deal-mid .op2-step{ flex:1; }
   /* mode satu-arah (SL/TP/Risk ON): stepper kiri + satu tombol eksekusi */
@@ -1808,7 +1817,7 @@ function renderOrderPanel(){
   // tombol eksekusi
   const ex=$('#execBtn');
   if(ex){ ex.className='op3-exec '+(isSell?'dir-sell':'dir-buy');
-    ex.textContent = entry!=null ? `${isSell?'SELL':'BUY'} ${lots.toFixed(lotDec())} @ ${fmtPx(entry)}` : (isSell?'SELL':'BUY'); }
+    ex.innerHTML = entry!=null ? `${isSell?'SELL':'BUY'} <span class="op3-exec-num">${lots.toFixed(lotDec())} @ ${fmtPx(entry)}</span>` : (isSell?'SELL':'BUY'); }
   // tombol harga mode simple (sell=bid, buy=ask)
   const dsx=$('#dealSellPx'), dbx=$('#dealBuyPx'), fb=cur?fmtPx(cur.close):'—';
   if(dsx) dsx.textContent = ba ? fmtPx(ba.bid) : fb;
@@ -1824,7 +1833,7 @@ function renderOrderPanel(){
     if(dirPill){ dirPill.className='op3-pill dir-pill '+(isSell?'dir-sell':'dir-buy'); dirPill.textContent=(isSell?'SELL':'BUY')+' ⇄'; dirPill.hidden=!anyStage; }
     const one=$('#dealOne');
     if(one){ one.className='op3-exec dir-'+(isSell?'sell':'buy');
-      one.textContent = entry!=null ? `${isSell?'SELL':'BUY'} ${lots.toFixed(lotDec())} @ ${fmtPx(entry)}` : (isSell?'SELL':'BUY'); }
+      one.innerHTML = entry!=null ? `${isSell?'SELL':'BUY'} <span class="op3-exec-num">${lots.toFixed(lotDec())} @ ${fmtPx(entry)}</span>` : (isSell?'SELL':'BUY'); }
   }
   // chips & pill (simple) — cermin dari state kanonik
   const pill=$('#opTypePill'); if(pill) pill.textContent=(ordType()==='pending'?'PENDING':'MARKET')+' ⇄';
