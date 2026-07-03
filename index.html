@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <style>
   :root{
     --bg:#0e0f14; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
@@ -266,6 +265,32 @@
                  filter:drop-shadow(0 0 6px rgba(174,185,232,.5)); }
   .brand .glyph .luna-disc{ fill:currentColor; }
   .vsep{ width:1px; height:20px; background:var(--border); }
+  /* header price block (tenang) — harga live instrumen aktif menyatu di toolbar */
+  .hdr-px{ display:inline-flex; align-items:baseline; gap:9px; min-width:0; }
+  .hdr-last{ font-family:var(--font-num); font-size:15px; font-weight:700; letter-spacing:-.01em;
+             font-variant-numeric:tabular-nums; color:var(--txt);
+             text-shadow:0 0 10px rgba(174,185,232,.16); }
+  .hdr-chg{ font-family:var(--font-num); font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .hdr-chg.up{ color:var(--green); }
+  .hdr-chg.down{ color:var(--red); }
+  .hdr-ba{ font-family:var(--font-num); font-size:10.5px; color:var(--muted);
+           font-variant-numeric:tabular-nums; letter-spacing:.02em; white-space:nowrap; }
+  @media (max-width:900px){ .hdr-ba{ display:none; } }
+  /* instrument selector — native, dipoles: chevron custom + fokus ring */
+  #instrument{ appearance:none; -webkit-appearance:none; font-family:var(--font-num); font-weight:600;
+    font-size:13px; letter-spacing:.01em; height:30px; padding:5px 26px 5px 10px; cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2389898b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat; background-position:right 8px center; background-size:11px; }
+  #instrument:hover{ border-color:var(--btn-border-hover); background-color:var(--btn-hover); }
+  #instrument:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
+  body.light #instrument{ background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23697280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>"); }
+
+  /* Placeholder bulan statis: identitas lunar sejak paint pertama (sebelum klinecharts
+     load & loadInit jalan). Dihapus via JS saat chart pertama ter-render. */
+  .chart-boot{ position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--luna-glow); pointer-events:none;
+    filter:drop-shadow(0 0 8px rgba(174,185,232,.4)); }
+  .chart-boot .cl-disc{ fill:currentColor; }
 
   /* ===== Moon loader: momen lunar saat ganti instrument ===== */
   /* Overlay di area chart. Signature: bulan sabit brand yg "berubah fase"
@@ -798,7 +823,7 @@
       <span id="layoutbtns" title="Layout chart"></span>
     </div>
     <div id="chartgrid" class="lay-1">
-      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"></div></div>
+      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div></div></div>
     </div>
   </div>
   <div class="rh rh-markets" id="rhMarkets" title="Drag to resize Markets width"></div>
@@ -1004,6 +1029,9 @@
   </div>
 </div>
 
+<!-- klinecharts dimuat di sini (bukan <head>) agar shell + placeholder bulan paint dulu;
+     tetap sebelum script utama supaya global `klinecharts` siap saat registerOverlay/init. -->
+<script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <script>
 // ===================== konstanta =====================
 const TF_LIST = ['M1','M5','M15','M30','H1','H4','D','W','MN'];
@@ -1843,6 +1871,7 @@ async function switchTF(tf){
 // ===================== render =====================
 function render(full){
   if(T==null) return;
+  const boot=document.querySelector('.chart-boot'); if(boot) boot.remove();  // chart nyata siap → lepas placeholder
   const data=revealed(currentTF);
   if(full || lastLen<0 || data.length<lastLen){ chart.applyNewData(data); }
   else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
