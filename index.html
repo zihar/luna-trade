@@ -551,7 +551,7 @@
   .orderpanel{ border-top:1px solid var(--border); padding:3px 8px 5px; }
   /* ── Type futuristik: UI pakai Space Grotesk, angka/readout pakai Space Mono (tabular) ── */
   .orderpanel, #orderForm{ font-family:var(--font-display); -webkit-font-smoothing:antialiased; }
-  .orderpanel .op3-deal-px, .orderpanel .tl-px, .orderpanel .tl-tick input, .orderpanel .tl-kv,
+  .orderpanel .op3-deal-px, .orderpanel .tl-in,
   .orderpanel .op2-step-val input, .orderpanel .op3-stage-step .v, .orderpanel .op3-stage-out,
   .orderpanel .op3-exec-num, .orderpanel .op3-margin b, .orderpanel .op3-riskpct, .orderpanel input[type=number]{
     font-family:var(--font-num); font-feature-settings:"tnum" 1; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
@@ -596,23 +596,32 @@
     font-size:11px; font-weight:600; cursor:pointer; }
   .tl-toggle.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .tl-toggle input{ accent-color:#fff; }
-  /* grid 3 kolom: SL | label | TP, baris Price/Ticks/P&L */
-  .tl-grid{ display:grid; grid-template-columns:1fr auto 1fr; column-gap:0; }
-  .tl-cell{ padding:6px 9px; min-width:0; }
-  .tl-cell.sl{ border-left:1px solid var(--border); border-right:1px solid var(--border); }
-  .tl-cell.tp{ border-left:1px solid var(--border); border-right:1px solid var(--border); }
-  .tl-cell.r-top{ border-top:1px solid var(--border); border-radius:8px 8px 0 0; }
-  .tl-cell.r-bot{ border-bottom:1px solid var(--border); border-radius:0 0 8px 8px; }
-  .tl-cell.r-mid{ border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .tl-px{ font-size:14px; font-weight:700; color:var(--accent); text-shadow:0 0 10px rgba(74,113,255,.4); }
-  .tl-tick{ border:1px solid var(--border); border-radius:5px; padding:2px 7px; background:var(--inset); }
-  .tl-tick input{ width:100%; border:0; background:transparent; padding:0; height:auto; font-size:14px; font-weight:700; color:var(--txt); }
-  .tl-kv{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; font-size:12px; font-weight:600; }
-  .tl-kv i{ font-style:normal; font-size:9px; color:var(--muted); }
-  .tl-kv.pos{ color:var(--green); } .tl-kv.neg{ color:var(--red); }
+  /* grid 3 kolom: SL | label | TP — tiap sel = field editable (Price/Ticks/P&L·Balance) */
+  .tl-grid{ display:grid; grid-template-columns:1fr auto 1fr; column-gap:7px; row-gap:5px; align-items:stretch; }
+  /* field modern: kotak membulat bg inset, border tipis → MENYALA saat fokus (ring near-white + halo luna) */
+  .tl-cell{ min-width:0; background:var(--inset); border:1px solid var(--border); border-radius:8px;
+    transition:border-color .12s ease, box-shadow .12s ease; }
+  .tl-cell:focus-within{ border-color:#eef1f7; box-shadow:0 0 0 1px #eef1f7, 0 0 13px rgba(174,185,232,.5); }
+  /* P&L/Balance dipisah sedikit → ritme 2 grup ala referensi */
+  .tl-grid .grp-solo{ margin-top:4px; }
+  /* input di dalam field */
+  .tl-in{ width:100%; border:0; background:transparent; outline:none; color:var(--accent);
+    font-weight:700; font-size:14px; padding:9px 11px; letter-spacing:-.01em; }
+  .tl-in::placeholder{ color:var(--muted); opacity:.65; }
+  .tl-in::-webkit-outer-spin-button,.tl-in::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .tl-in[type=number]{ -moz-appearance:textfield; appearance:textfield; }
+  .tl-cell:focus-within .tl-in:focus{ color:var(--txt); }   /* nilai yg sedang diedit → putih */
+  /* baris P&L $ & Balance % dalam satu field */
+  .tl-cell.grp-solo{ display:flex; flex-direction:column; }
+  .tl-kv{ display:flex; align-items:center; justify-content:space-between; gap:6px; padding:5px 11px; }
+  .tl-kv + .tl-kv{ border-top:1px solid var(--line); }
+  .tl-kv .tl-in{ padding:0; font-size:12px; }
+  .tl-kv i{ font-style:normal; font-size:9px; color:var(--muted); flex:0 0 auto; }
+  .tl-cell.neg .tl-in{ color:var(--red); } .tl-cell.pos .tl-in{ color:var(--green); }
+  .tl-cell.neg:focus-within .tl-in:focus, .tl-cell.pos:focus-within .tl-in:focus{ color:var(--txt); }
   /* kolom label tengah */
-  .tl-lbl{ display:flex; align-items:center; justify-content:center; padding:0 11px; font-size:10px; color:var(--muted); white-space:nowrap; }
-  .tl-lbl.two{ flex-direction:column; gap:3px; justify-content:center; }
+  .tl-lbl{ display:flex; align-items:center; justify-content:center; padding:0 10px; font-size:10px; color:var(--muted); white-space:nowrap; }
+  .tl-lbl.two{ flex-direction:column; gap:12px; justify-content:center; }
   /* kolom dinonaktifkan */
   .tl-sltp .off{ opacity:.4; }
   .op3-pend{ }
@@ -891,18 +900,18 @@
               <label class="tl-toggle" id="tpCard">Take Profit<input type="checkbox" id="tpOn"></label>
             </div>
             <div class="tl-grid">
-              <!-- Price -->
-              <div class="tl-cell sl r-top"><div class="tl-px" id="slPrice">—</div></div>
-              <div class="tl-lbl r-top">Price</div>
-              <div class="tl-cell tp r-top"><div class="tl-px" id="tpPrice">—</div></div>
+              <!-- Price (editable → hitung balik ke ticks) -->
+              <div class="tl-cell sl"><input class="tl-in" id="slPrice" type="text" inputmode="decimal" placeholder="—" title="Harga Stop Loss"></div>
+              <div class="tl-lbl">Price</div>
+              <div class="tl-cell tp"><input class="tl-in" id="tpPrice" type="text" inputmode="decimal" placeholder="—" title="Harga Take Profit"></div>
               <!-- Ticks (editable) -->
-              <div class="tl-cell sl r-mid"><div class="tl-tick"><input id="slPips" type="number" value="100" min="1" step="1"></div></div>
-              <div class="tl-lbl r-mid">Ticks</div>
-              <div class="tl-cell tp r-mid"><div class="tl-tick"><input id="tpPips" type="number" value="200" min="1" step="1"></div></div>
-              <!-- P&L / Balance -->
-              <div class="tl-cell sl r-bot"><div class="tl-kv neg"><span id="slPnl">—</span><i>$</i></div><div class="tl-kv neg"><span id="slPct">—</span><i>%</i></div></div>
-              <div class="tl-lbl r-bot two"><span>P&L</span><span>Balance</span></div>
-              <div class="tl-cell tp r-bot"><div class="tl-kv pos"><span id="tpPnl">—</span><i>$</i></div><div class="tl-kv pos"><span id="tpPct">—</span><i>%</i></div></div>
+              <div class="tl-cell sl"><input class="tl-in" id="slPips" type="number" value="100" min="1" step="1"></div>
+              <div class="tl-lbl">Ticks</div>
+              <div class="tl-cell tp"><input class="tl-in" id="tpPips" type="number" value="200" min="1" step="1"></div>
+              <!-- P&L ($) / Balance (%) (editable) -->
+              <div class="tl-cell sl grp-solo neg"><div class="tl-kv"><input class="tl-in" id="slPnl" type="text" inputmode="decimal" placeholder="—" title="Rugi target ($)"><i>$</i></div><div class="tl-kv"><input class="tl-in" id="slPct" type="text" inputmode="decimal" placeholder="—" title="Rugi target (% balance)"><i>%</i></div></div>
+              <div class="tl-lbl grp-solo two"><span>P&L</span><span>Balance</span></div>
+              <div class="tl-cell tp grp-solo pos"><div class="tl-kv"><input class="tl-in" id="tpPnl" type="text" inputmode="decimal" placeholder="—" title="Profit target ($)"><i>$</i></div><div class="tl-kv"><input class="tl-in" id="tpPct" type="text" inputmode="decimal" placeholder="—" title="Profit target (% balance)"><i>%</i></div></div>
             </div>
           </div>
 
@@ -1849,6 +1858,8 @@ function renderOrderPanel(){
   document.querySelectorAll('.tl-cell.sl').forEach(c=>c.classList.toggle('off',!slOn));
   document.querySelectorAll('.tl-cell.tp').forEach(c=>c.classList.toggle('off',!tpOn));
   const set=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
+  // field input SL/TP: set .value tapi JANGAN timpa field yg sedang diketik user
+  const setF=(id,v)=>{ const e=$(id); if(e && e!==document.activeElement) e.value=v; };
   // editor "stage" (simple): tampil/sembunyi baris + nilai ticks/risk
   const sgRisk=$('#stageRisk'), sgSL=$('#stageSL'), sgTP=$('#stageTP');
   if(sgRisk) sgRisk.hidden=!$('#riskOn').checked;
@@ -1861,12 +1872,12 @@ function renderOrderPanel(){
   if(entry!=null){
     const slDist=slp*pip, sl=isSell?entry+slDist:entry-slDist, tp=isSell?entry-slDist*rr:entry+slDist*rr;
     const loss=Math.abs(pnlUsd(orderDir,entry,sl,units)), rew=Math.abs(pnlUsd(orderDir,entry,tp,units));
-    set('#slPrice', fmtPx(sl)); set('#tpPrice', fmtPx(tp));
-    set('#slPnl', '−'+loss.toFixed(2)); set('#slPct', '−'+(bal?(loss/bal*100).toFixed(2):'0.00'));
-    set('#tpPnl', '+'+rew.toFixed(2)); set('#tpPct', '+'+(bal?(rew/bal*100).toFixed(2):'0.00'));
+    setF('#slPrice', fmtPx(sl)); setF('#tpPrice', fmtPx(tp));
+    setF('#slPnl', loss.toFixed(2)); setF('#slPct', bal?(loss/bal*100).toFixed(2):'0.00');
+    setF('#tpPnl', rew.toFixed(2)); setF('#tpPct', bal?(rew/bal*100).toFixed(2):'0.00');
     set('#stgSLOut', `${fmtPx(sl)} · −${usdGrp(loss)} / −${bal?(loss/bal*100).toFixed(2):'0.00'}%`);
     set('#stgTPOut', `${fmtPx(tp)} · +${usdGrp(rew)} / +${bal?(rew/bal*100).toFixed(2):'0.00'}%`);
-  }
+  } else { ['#slPrice','#tpPrice','#slPnl','#slPct','#tpPnl','#tpPct'].forEach(id=>setF(id,'')); }
   // Init. Margin (tampil di simple & expand)
   document.querySelectorAll('.op3-margin').forEach(mEl=>{
     if(cur){ const margin=units*cur.close*quoteToUsd(cur.close)/100;   // leverage 100
@@ -3832,6 +3843,24 @@ $('#riskPct').value  = localStorage.getItem('br_riskPct')||1;
 $('#balance').addEventListener('input',()=>{ localStorage.setItem('br_balance',$('#balance').value); renderSizing(); renderAcct(); refreshLotSuggestion(); });
 $('#riskPct').addEventListener('input', ()=>{ localStorage.setItem('br_riskPct',$('#riskPct').value);  renderSizing(); refreshLotSuggestion(); });
 ['slPips','tpPips','pipSize'].forEach(id=>$('#'+id).addEventListener('input',()=>{ renderOrderPanel(); renderSizing(); refreshLotSuggestion(); }));
+// Field SL/TP bisa diisi manual: Price / P&L($) / Balance(%) → dihitung balik ke ticks (lot tetap)
+(function(){
+  const num=s=>{ const v=parseFloat(String(s).replace(/[^0-9.\-]/g,'')); return isFinite(v)?v:NaN; };
+  const ctx=()=>{ const cur=currentCandle(), ba=curBidAsk(), isSell=orderDir==='short';
+    const entry=ba?(isSell?ba.bid:ba.ask):(cur?cur.close:null);
+    const pip=+$('#pipSize').value||instSpec().pip, units=currentLots()*unitsPer();
+    return { entry, pip, perTick:units*pip*quoteToUsd(entry||0), bal:+$('#balance').value||0 }; };
+  const applyTicks=(which,ticks)=>{ if(!isFinite(ticks)) return;
+    $(which==='sl'?'#slPips':'#tpPips').value=Math.max(1,Math.round(ticks));
+    renderOrderPanel(); try{renderSizing();}catch(_){} try{refreshLotSuggestion();}catch(_){} try{drawDraftLines();}catch(_){} };
+  const onPrice=w=>e=>{ const {entry,pip}=ctx(), p=num(e.target.value); if(entry==null||!isFinite(p)||pip<=0) return; applyTicks(w,Math.abs(p-entry)/pip); };
+  const onPnl  =w=>e=>{ const {perTick}=ctx(), d=num(e.target.value); if(!isFinite(d)||perTick<=0) return; applyTicks(w,Math.abs(d)/perTick); };
+  const onPct  =w=>e=>{ const {perTick,bal}=ctx(), p=num(e.target.value); if(!isFinite(p)||perTick<=0||bal<=0) return; applyTicks(w,Math.abs(p)/100*bal/perTick); };
+  const bind=(id,fn)=>{ const el=$(id); if(el) el.addEventListener('input',fn); };
+  bind('#slPrice',onPrice('sl')); bind('#tpPrice',onPrice('tp'));
+  bind('#slPnl',  onPnl('sl'));   bind('#tpPnl',  onPnl('tp'));
+  bind('#slPct',  onPct('sl'));   bind('#tpPct',  onPct('tp'));
+})();
 // ===================== multi-chart (panel sekunder, view-only) =====================
 // Panel utama (#chart, slot 0) = chart penuh (trading/drawing/replay). Panel sekunder
 // (slot 1..) = chart ringan: hanya tampilkan candle + lilin live simbol/TF sendiri.
