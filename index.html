@@ -467,7 +467,8 @@
   /* popup Kelola posisi (edit SL/TP dari klik garis) */
   /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
   .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
-  .pos-edit2 .pe-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+  .pos-edit2 .pe-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; cursor:move; touch-action:none; }
+  .pos-edit2 .pe-head button{ cursor:pointer; }   /* tombol ✕ tetap klik, bukan geser */
   .pos-edit2 .pe-pen{ color:var(--muted); font-size:13px; }
   .pos-edit2 .pe-title{ font-size:12.5px; font-weight:700; flex:1; }
   .pos-edit2 .pe-dir{ font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.05em; }
@@ -2442,6 +2443,24 @@ function buildPosEditPanel(){
   $$('#peSLprice').oninput=()=>{ if(editPos){ const v=+$$('#peSLprice').value; if(isFinite(v)&&v>0){ editPos.sl=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTPprice').oninput=()=>{ if(editPos){ const v=+$$('#peTPprice').value; if(isFinite(v)&&v>0){ editPos.tp=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTrail').onclick=()=>{ if(editPos){ editPos.trail=!editPos.trail; renderPosEdit(); } };
+  // panel bisa digeser dari header (kecuali tombol ✕)
+  (function(){ const head=$$('.pe-head'); let drag=false,sx,sy,ox,oy;
+    head.addEventListener('pointerdown',e=>{
+      if(e.target.closest('button')) return;   // tombol tutup = bukan drag
+      const r=posEditEl.getBoundingClientRect();
+      drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+      posEditEl.style.left=ox+'px'; posEditEl.style.top=oy+'px';
+      head.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    head.addEventListener('pointermove',e=>{ if(!drag) return;
+      let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+      nx=Math.max(0,Math.min(window.innerWidth - posEditEl.offsetWidth, nx));
+      ny=Math.max(0,Math.min(window.innerHeight - 36, ny));
+      posEditEl.style.left=nx+'px'; posEditEl.style.top=ny+'px';
+    });
+    const stop=()=>{ drag=false; };
+    head.addEventListener('pointerup',stop); head.addEventListener('pointercancel',stop);
+  })();
 }
 function drawStagedLines(){
   if(!editPos) return; const rec=paperLines[editPos.id]||(paperLines[editPos.id]={entry:null,sl:null,tp:null});
