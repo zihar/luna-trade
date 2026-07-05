@@ -123,6 +123,9 @@
   .chartwrap{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
   .tfbar{display:flex;gap:5px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
   .tfbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+  .tfbar button.hticon{display:inline-flex;align-items:center;justify-content:center;padding:5px;color:var(--muted)}
+  .tfbar button.hticon svg{width:16px;height:16px;display:block}
+  .tfbar button.hticon:not(:disabled):hover{color:var(--txt)}
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
   /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
@@ -824,6 +827,9 @@
       <span id="tfbtns"></span>
       <span class="sep"></span>
       <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
+      <span class="sep"></span>
+      <button id="undoBtn" class="hticon" title="Undo drawing (Ctrl/⌘+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+      <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
       <span class="grow" style="flex:1"></span>
       <span id="layoutbtns" title="Layout chart"></span>
     </div>
@@ -1802,6 +1808,7 @@ async function loadInit(latest){
   startLive();          // live = default
   restoreDraws();       // munculkan kembali gambar tersimpan utk instrumen ini
   suppressDrawSave=false; clearTimeout(drawSaveTimer);
+  try{ resetDrawHistory(); }catch(e){}   // history undo/redo bersifat per-instrumen → reset
 }
 
 async function fetchCandles(tf,{count,to,from}){
@@ -3022,10 +3029,17 @@ function serializeDraws(){
   }catch(e){} });
   return out;
 }
-function saveDraws(){ if(suppressDrawSave) return; try{ localStorage.setItem(drawsKey(), JSON.stringify(serializeDraws())); }catch(e){} }
+function saveDraws(){ if(suppressDrawSave) return;
+  const json=JSON.stringify(serializeDraws());
+  try{ localStorage.setItem(drawsKey(), json); }catch(e){}
+  recordDrawHistory(json);
+}
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
 function restoreDraws(){
   let arr; try{ arr=JSON.parse(localStorage.getItem(drawsKey())); }catch(e){ arr=null; }
+  buildDrawsFromArray(arr);
+}
+function buildDrawsFromArray(arr){
   if(!Array.isArray(arr)||!arr.length) return;
   const a=revealed(currentTF), li=a.length-1, lt=li>=0?a[li].timestamp:null, dur=DUR[currentTF];
   const prev=suppressDrawSave; suppressDrawSave=true;
@@ -3045,6 +3059,44 @@ function restoreDraws(){
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
 }
 window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
+
+// ===================== undo / redo objek gambar (snapshot-based, per-instrumen) =====================
+// Tiap perubahan gambar meng-commit satu snapshot (JSON serializeDraws) lewat saveDraws.
+// Debounce saveDraws (350ms) membuat satu drag = satu langkah undo. suppressDrawSave menahan
+// perekaman saat apply snapshot, jadi undo/redo tak mencemari history-nya sendiri.
+let drawUndo=[], drawRedo=[], drawSnap=null;
+const DRAW_HISTORY_MAX=60;
+function recordDrawHistory(json){
+  if(json===drawSnap) return;                    // tak ada perubahan efektif
+  if(drawSnap!=null){ drawUndo.push(drawSnap); if(drawUndo.length>DRAW_HISTORY_MAX) drawUndo.shift(); }
+  drawSnap=json; drawRedo=[]; syncUndoRedoBtns();
+}
+function applyDrawsSnapshot(arr){
+  const prev=suppressDrawSave; suppressDrawSave=true;
+  clearDrawings();
+  buildDrawsFromArray(arr);
+  suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+  try{ localStorage.setItem(drawsKey(), JSON.stringify(arr)); }catch(e){}
+}
+function undoDraw(){
+  if(!drawUndo.length) return;
+  drawRedo.push(drawSnap); drawSnap=drawUndo.pop();
+  applyDrawsSnapshot(JSON.parse(drawSnap)); syncUndoRedoBtns();
+}
+function redoDraw(){
+  if(!drawRedo.length) return;
+  drawUndo.push(drawSnap); drawSnap=drawRedo.pop();
+  applyDrawsSnapshot(JSON.parse(drawSnap)); syncUndoRedoBtns();
+}
+// dipanggil setelah restore per-instrumen: history bersifat per-instrumen, jadi di-reset.
+function resetDrawHistory(){ drawUndo=[]; drawRedo=[]; drawSnap=JSON.stringify(serializeDraws()); syncUndoRedoBtns(); }
+function syncUndoRedoBtns(){
+  const u=$('#undoBtn'), r=$('#redoBtn');
+  if(u) u.disabled=!drawUndo.length;
+  if(r) r.disabled=!drawRedo.length;
+}
+$('#undoBtn').onclick=undoDraw;
+$('#redoBtn').onclick=redoDraw;
 
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
 // waktu sub-bar; bila magnet aktif, snap ke nilai OHLC candle terdekat.
@@ -3793,6 +3845,12 @@ $('#toggleTrades').classList.toggle('on',!_coll);
 // ===================== keyboard =====================
 window.addEventListener('keydown',e=>{
   if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  // undo/redo objek gambar — Ctrl/⌘+Z, redo = Ctrl/⌘+Shift+Z atau Ctrl/⌘+Y
+  if(e.ctrlKey||e.metaKey){
+    const k=e.key.toLowerCase();
+    if(k==='z'){ e.preventDefault(); e.shiftKey?redoDraw():undoDraw(); return; }
+    if(k==='y'){ e.preventDefault(); redoDraw(); return; }
+  }
   if(e.key==='ArrowRight'){e.preventDefault();step(1)}
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
