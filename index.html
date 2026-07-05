@@ -529,6 +529,12 @@
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
+  /* pegangan drag untuk popup config tanpa header (objpop/fibpop/chartSet/pos-confirm) */
+  .pp-grip{ display:flex; align-items:center; justify-content:center; height:14px; margin:-2px 0 8px;
+            border-bottom:1px solid var(--border); cursor:grab; user-select:none; touch-action:none; }
+  .pp-grip::before{ content:'\2059\2059\2059'; color:var(--muted); font-size:11px; letter-spacing:3px; line-height:1; }
+  .objpop.dragging, .fibpop.dragging{ cursor:grabbing; }
+  .pp-grip:active{ cursor:grabbing; }
   /* popup Kelola posisi (edit SL/TP dari klik garis) */
   /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
   .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
@@ -2379,8 +2385,8 @@ function stageLevel(id,k,on){ if(editingPosId!==id) openPositionEditor(id); if(!
   editPos[k+'On']=on; drawStagedLines(); renderPosEdit(); renderPosDom(posById(id)); }
 let posConfirmEl=null;
 function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
-  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); }
-  posConfirmEl.innerHTML=`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Batal</button><button class="pc-yes">${yesLabel}</button></div>`;
+  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); makeDraggable(posConfirmEl,'.pp-grip'); }
+  posConfirmEl.innerHTML=GRIP+`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Batal</button><button class="pc-yes">${yesLabel}</button></div>`;
   const hide=()=>posConfirmEl.classList.remove('show');
   posConfirmEl.querySelector('.pc-no').onclick=()=>{ hide(); if(onNo) onNo(); };
   posConfirmEl.querySelector('.pc-yes').onclick=()=>{ hide(); if(onYes) onYes(); };
@@ -2522,6 +2528,31 @@ function closePositionEditor(){
   if(wasId!=null && paperLines[wasId]){ ['sl','tp'].forEach(k=>{ if(paperLines[wasId][k]){try{chart.removeOverlay(paperLines[wasId][k]);}catch(e){} paperLines[wasId][k]=null; } }); }
   drawPaperLines();   // gambar ulang dari state server (batalkan staged)
 }
+// drag popup config: satu listener di elemen popup (delegasi) → tahan rebuild innerHTML.
+// Drag hanya dari handleSel; kontrol interaktif dikecualikan. Non-persisten (show menimpa left/top).
+function makeDraggable(el, handleSel){
+  let drag=false, sx=0, sy=0, ox=0, oy=0;
+  el.addEventListener('pointerdown', e=>{
+    if(!e.target.closest(handleSel)) return;
+    if(e.target.closest('button,input,select,textarea,label,a')) return;   // klik kontrol ≠ drag
+    const r=el.getBoundingClientRect();
+    drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    el.style.left=ox+'px'; el.style.top=oy+'px';
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    el.classList.add('dragging'); e.preventDefault();
+  });
+  el.addEventListener('pointermove', e=>{ if(!drag) return;
+    let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+    nx=Math.max(0, Math.min(window.innerWidth - el.offsetWidth, nx));
+    ny=Math.max(0, Math.min(window.innerHeight - 36, ny));   // sisakan ≥36px agar handle popup tinggi tetap terjangkau
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+  });
+  const stop=e=>{ if(!drag) return; drag=false; el.classList.remove('dragging');
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){} };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+}
+const GRIP='<div class="pp-grip"></div>';   // bilah pegangan drag untuk popup tanpa header
 function buildPosEditPanel(){
   if(posEditEl) return;
   posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
@@ -2555,24 +2586,7 @@ function buildPosEditPanel(){
   $$('#peSLprice').oninput=()=>{ if(editPos){ const v=+$$('#peSLprice').value; if(isFinite(v)&&v>0){ editPos.sl=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTPprice').oninput=()=>{ if(editPos){ const v=+$$('#peTPprice').value; if(isFinite(v)&&v>0){ editPos.tp=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTrail').onclick=()=>{ if(editPos){ editPos.trail=!editPos.trail; renderPosEdit(); } };
-  // panel bisa digeser dari header (kecuali tombol ✕)
-  (function(){ const head=$$('.pe-head'); let drag=false,sx,sy,ox,oy;
-    head.addEventListener('pointerdown',e=>{
-      if(e.target.closest('button')) return;   // tombol tutup = bukan drag
-      const r=posEditEl.getBoundingClientRect();
-      drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
-      posEditEl.style.left=ox+'px'; posEditEl.style.top=oy+'px';
-      head.setPointerCapture(e.pointerId); e.preventDefault();
-    });
-    head.addEventListener('pointermove',e=>{ if(!drag) return;
-      let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
-      nx=Math.max(0,Math.min(window.innerWidth - posEditEl.offsetWidth, nx));
-      ny=Math.max(0,Math.min(window.innerHeight - 36, ny));
-      posEditEl.style.left=nx+'px'; posEditEl.style.top=ny+'px';
-    });
-    const stop=()=>{ drag=false; };
-    head.addEventListener('pointerup',stop); head.addEventListener('pointercancel',stop);
-  })();
+  makeDraggable(posEditEl, '.pe-head');
 }
 function drawStagedLines(){
   if(!editPos) return; const rec=paperLines[editPos.id]||(paperLines[editPos.id]={entry:null,sl:null,tp:null});
@@ -3931,6 +3945,7 @@ $('#chart').addEventListener('click',()=>{
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
 const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);
+makeDraggable(objPop, '.pp-grip');
 function markOn(sel,el){ objPop.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); }
 function showObjPopup(o, cx, cy){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
@@ -3944,7 +3959,7 @@ function showObjPopup(o, cx, cy){
   const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
   const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
   const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
-  objPop.innerHTML=(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
+  objPop.innerHTML=GRIP+(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
     +(hasText?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
@@ -3965,7 +3980,7 @@ function showObjPopup(o, cx, cy){
 function showPosPopup(o, cx, cy){
   const st=dstyle(o);
   const tA=st.tgtAlpha!=null?st.tgtAlpha:12, sA=st.stopAlpha!=null?st.stopAlpha:12;
-  objPop.innerHTML=
+  objPop.innerHTML=GRIP+
      `<div class="pp-lbl">Profit / Target</div>`
     +`<div class="pp-row"><input type="color" class="pp-color" id="ppTgtC" value="${st.tgtColor||'#089981'}"></div>`
     +`<div class="pp-slider"><input type="range" id="ppTgtA" min="0" max="100" value="${tA}"><span class="pp-sval" id="ppTgtAV">${tA}%</span></div>`
@@ -3987,9 +4002,10 @@ document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&
 
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
+makeDraggable(fibPop, '.pp-grip');
 function showFibPop(cx,cy){
   const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Warna level"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
-  fibPop.innerHTML=`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
+  fibPop.innerHTML=GRIP+`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
     +`<div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Background</label>`
     +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div>`
     +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
@@ -3998,12 +4014,12 @@ function showFibPop(cx,cy){
   fibPop.classList.add('show');
   fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
   fibPop.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
-  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(cx,cy); });
+  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); });
   const bgOn=fibPop.querySelector('#fpBgOn'), bgOp=fibPop.querySelector('#fpBgOp'), bgVal=fibPop.querySelector('#fpBgVal');
   bgOn.onchange=()=>{ fibBg.on=bgOn.checked; bgOp.disabled=!fibBg.on; saveFibBg(); };
   bgOp.oninput=()=>{ fibBg.opacity=+bgOp.value; bgVal.textContent=fibBg.opacity+'%'; saveFibBg(); };
-  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(cx,cy); };
-  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(cx,cy); };
+  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
+  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
@@ -4034,18 +4050,19 @@ function applyChartCfg(){
 function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
 // Setting chart dibuka dari menu klik-kanan canvas (lihat handler contextmenu), di posisi kursor.
 const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
+makeDraggable(chartSet, '.pp-grip');
 function showChartSet(cx,cy){
   const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
   // bg & grid → edit kunci tema yang sedang aktif
   const light=document.body.classList.contains('light'), thm=light?'light':'dark';
   const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
-  chartSet.innerHTML=`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
+  chartSet.innerHTML=GRIP+`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
     +row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
   chartSet.style.left=Math.min(cx,window.innerWidth-220)+'px';
   chartSet.style.top=Math.max(8,Math.min(cy,window.innerHeight-320))+'px';
   chartSet.classList.add('show');
   chartSet.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
-  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(cx,cy); };
+  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(chartSet.offsetLeft,chartSet.offsetTop); };
 }
 document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)) chartSet.classList.remove('show'); }, true);
 applyChartCfg();   // terapkan cfg tersimpan saat startup
