@@ -3939,17 +3939,24 @@ function showObjPopup(o, cx, cy){
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
+  const talign=st.textAlign||(DRAW_DEFAULT[o.name]&&DRAW_DEFAULT[o.name].textAlign)||'center';
+  const tvalign=st.textValign||(DRAW_DEFAULT[o.name]&&DRAW_DEFAULT[o.name].textValign)||'middle';
+  const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
+  const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
   const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
   objPop.innerHTML=(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
+    +(hasText?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
     +`<div class="pp-act">${isFib?'<button id="ppFib">⚙ Level &amp; Warna</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
-  objPop.style.top =Math.min(cy,window.innerHeight-220)+'px';
+  objPop.style.top =Math.min(cy,window.innerHeight-(hasText?300:220))+'px';
   objPop.classList.add('show');
   objPop.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); markOn('[data-col]',b); });
   objPop.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); markOn('[data-w]',b); });
   objPop.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); markOn('[data-st]',b); });
+  objPop.querySelectorAll('[data-ha]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textAlign:b.dataset.ha}); markOn('[data-ha]',b); });
+  objPop.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); markOn('[data-va]',b); });
   const tb=objPop.querySelector('#ppText'); if(tb) tb.onclick=()=>{ hideObjPopup(); openOverlayTextEditor(o,false); };
   const fb=objPop.querySelector('#ppFib'); if(fb) fb.onclick=()=>{ const x=objPop.offsetLeft, y=objPop.offsetTop; hideObjPopup(); showFibPop(x,y); };
   objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
