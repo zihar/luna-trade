@@ -603,6 +603,9 @@
   .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:2px; }
   .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
   .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; padding:2px; }
+  .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }
+  .pp-slider input[type=range]{ flex:1; min-width:0; }
+  .pp-slider .pp-sval{ flex:0 0 auto; color:var(--muted); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
   /* editor level Fibonacci */
   .fibpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
@@ -1268,6 +1271,9 @@ const DRAW_DEFAULT = {
   text:{color:'',size:13,style:'solid'},
   horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},  // default dotted, warna bisa diganti
   verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},
+  // Long/Short Position: warna & transparansi zona Profit (tgt) & Stop terpisah, per objek.
+  longPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
+  shortPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
 };
 // garis bawaan klinecharts (horizontal/vertical) — pakai styles.line, bukan createPointFigures
 const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1};
@@ -1493,6 +1499,11 @@ function posFigures(dir){
     const xs=C.map(c=>c.x);
     let xL=Math.min(...xs), xR=Math.max(...xs);
     if(xR<=xL) xR=(bounding&&bounding.width)?bounding.width:xL+160;
+    // warna & transparansi zona per objek (default = konstanta global lama)
+    const st=dstyle(overlay);
+    const tgtColor=st.tgtColor||POS_GREEN, stopColor=st.stopColor||POS_RED;
+    const tgtFill=tgtColor+alphaHex(st.tgtAlpha!=null?st.tgtAlpha:12);
+    const stopFill=stopColor+alphaHex(st.stopAlpha!=null?st.stopAlpha:12);
     const F=[];
     const line=(y,c)=>F.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:c,size:1}});
     const box =(y1,y2,c)=>F.push({type:'rect',attrs:{x:xL,y:Math.min(y1,y2),width:xR-xL,height:Math.abs(y2-y1)},styles:{style:'fill',color:c}});
@@ -1511,17 +1522,17 @@ function posFigures(dir){
 
     const tp=pts[1].value, yT=C[1].y;
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
-    box(yE,yT,POS_GBG); line(yE,'#9aa4b2');   // body target + garis Entry (garis TP atas dihapus)
+    box(yE,yT,tgtFill); line(yE,'#9aa4b2');   // body target + garis Entry (garis TP atas dihapus)
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
-    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', POS_GREEN, 'left', tBase);
+    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', tgtColor, 'left', tBase);
 
     if(haveSL){
       const sl=pts[2].value, yS=C[2].y;
       const slPips=Math.round(Math.abs(entry-sl)/pip), slPct=(Math.abs(entry-sl)/entry*100);
       const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
-      box(yE,yS,POS_RBG);   // body stop (garis SL bawah dihapus)
+      box(yE,yS,stopFill);   // body stop (garis SL bawah dihapus)
       const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
-      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p · '+tickN(Math.abs(entry-sl))+'t ('+slPct.toFixed(3)+'%)', POS_RED, 'left', sBase);
+      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p · '+tickN(Math.abs(entry-sl))+'t ('+slPct.toFixed(3)+'%)', stopColor, 'left', sBase);
       pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
     } else {
       pill(xL, yE, 'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']', 'rgba(20,28,40,0.92)', 'left', 'middle');
@@ -3914,6 +3925,7 @@ const objPop=document.createElement('div'); objPop.className='objpop'; document.
 function markOn(sel,el){ objPop.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); }
 function showObjPopup(o, cx, cy){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
+  if(o.name==='longPosition'||o.name==='shortPosition'){ showPosPopup(o, cx, cy); return; }
   const st=dstyle(o), hasText=(o.name==='trendline'||o.name==='rect'||o.name==='text');
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
@@ -3931,6 +3943,27 @@ function showObjPopup(o, cx, cy){
   objPop.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); markOn('[data-st]',b); });
   const tb=objPop.querySelector('#ppText'); if(tb) tb.onclick=()=>{ hideObjPopup(); openOverlayTextEditor(o,false); };
   const fb=objPop.querySelector('#ppFib'); if(fb) fb.onclick=()=>{ const x=objPop.offsetLeft, y=objPop.offsetTop; hideObjPopup(); showFibPop(x,y); };
+  objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
+}
+// popup khusus Long/Short Position: warna & transparansi zona Profit & Stop terpisah (per objek)
+function showPosPopup(o, cx, cy){
+  const st=dstyle(o);
+  const tA=st.tgtAlpha!=null?st.tgtAlpha:12, sA=st.stopAlpha!=null?st.stopAlpha:12;
+  objPop.innerHTML=
+     `<div class="pp-lbl">Profit / Target</div>`
+    +`<div class="pp-row"><input type="color" class="pp-color" id="ppTgtC" value="${st.tgtColor||'#089981'}"></div>`
+    +`<div class="pp-slider"><input type="range" id="ppTgtA" min="0" max="100" value="${tA}"><span class="pp-sval" id="ppTgtAV">${tA}%</span></div>`
+    +`<div class="pp-lbl">Stop / Loss</div>`
+    +`<div class="pp-row"><input type="color" class="pp-color" id="ppStopC" value="${st.stopColor||'#f23645'}"></div>`
+    +`<div class="pp-slider"><input type="range" id="ppStopA" min="0" max="100" value="${sA}"><span class="pp-sval" id="ppStopAV">${sA}%</span></div>`
+    +`<div class="pp-act"><button id="ppDel">🗑 Delete</button></div>`;
+  objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
+  objPop.style.top =Math.min(cy,window.innerHeight-240)+'px';
+  objPop.classList.add('show');
+  objPop.querySelector('#ppTgtC').oninput =e=>setObjStyle(o.id,{tgtColor:e.target.value});
+  objPop.querySelector('#ppStopC').oninput=e=>setObjStyle(o.id,{stopColor:e.target.value});
+  objPop.querySelector('#ppTgtA').oninput =e=>{ objPop.querySelector('#ppTgtAV').textContent=e.target.value+'%'; setObjStyle(o.id,{tgtAlpha:+e.target.value}); };
+  objPop.querySelector('#ppStopA').oninput=e=>{ objPop.querySelector('#ppStopAV').textContent=e.target.value+'%'; setObjStyle(o.id,{stopAlpha:+e.target.value}); };
   objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
 }
 function hideObjPopup(){ objPop.classList.remove('show'); }
