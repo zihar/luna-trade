@@ -4014,12 +4014,12 @@ function showFibPop(cx,cy){
   fibPop.classList.add('show');
   fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
   fibPop.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
-  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(cx,cy); });
+  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); });
   const bgOn=fibPop.querySelector('#fpBgOn'), bgOp=fibPop.querySelector('#fpBgOp'), bgVal=fibPop.querySelector('#fpBgVal');
   bgOn.onchange=()=>{ fibBg.on=bgOn.checked; bgOp.disabled=!fibBg.on; saveFibBg(); };
   bgOp.oninput=()=>{ fibBg.opacity=+bgOp.value; bgVal.textContent=fibBg.opacity+'%'; saveFibBg(); };
-  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(cx,cy); };
-  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(cx,cy); };
+  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
+  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
@@ -4062,7 +4062,7 @@ function showChartSet(cx,cy){
   chartSet.style.top=Math.max(8,Math.min(cy,window.innerHeight-320))+'px';
   chartSet.classList.add('show');
   chartSet.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
-  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(cx,cy); };
+  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(chartSet.offsetLeft,chartSet.offsetTop); };
 }
 document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)) chartSet.classList.remove('show'); }, true);
 applyChartCfg();   // terapkan cfg tersimpan saat startup
