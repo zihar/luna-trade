@@ -2385,8 +2385,8 @@ function stageLevel(id,k,on){ if(editingPosId!==id) openPositionEditor(id); if(!
   editPos[k+'On']=on; drawStagedLines(); renderPosEdit(); renderPosDom(posById(id)); }
 let posConfirmEl=null;
 function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
-  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); }
-  posConfirmEl.innerHTML=`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Batal</button><button class="pc-yes">${yesLabel}</button></div>`;
+  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); makeDraggable(posConfirmEl,'.pp-grip'); }
+  posConfirmEl.innerHTML=GRIP+`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Batal</button><button class="pc-yes">${yesLabel}</button></div>`;
   const hide=()=>posConfirmEl.classList.remove('show');
   posConfirmEl.querySelector('.pc-no').onclick=()=>{ hide(); if(onNo) onNo(); };
   posConfirmEl.querySelector('.pc-yes').onclick=()=>{ hide(); if(onYes) onYes(); };
@@ -2552,6 +2552,7 @@ function makeDraggable(el, handleSel){
   el.addEventListener('pointerup', stop);
   el.addEventListener('pointercancel', stop);
 }
+const GRIP='<div class="pp-grip"></div>';   // bilah pegangan drag untuk popup tanpa header
 function buildPosEditPanel(){
   if(posEditEl) return;
   posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
@@ -3944,6 +3945,7 @@ $('#chart').addEventListener('click',()=>{
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
 const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);
+makeDraggable(objPop, '.pp-grip');
 function markOn(sel,el){ objPop.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); }
 function showObjPopup(o, cx, cy){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
@@ -3957,7 +3959,7 @@ function showObjPopup(o, cx, cy){
   const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
   const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
   const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
-  objPop.innerHTML=(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
+  objPop.innerHTML=GRIP+(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
     +(hasText?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
@@ -3978,7 +3980,7 @@ function showObjPopup(o, cx, cy){
 function showPosPopup(o, cx, cy){
   const st=dstyle(o);
   const tA=st.tgtAlpha!=null?st.tgtAlpha:12, sA=st.stopAlpha!=null?st.stopAlpha:12;
-  objPop.innerHTML=
+  objPop.innerHTML=GRIP+
      `<div class="pp-lbl">Profit / Target</div>`
     +`<div class="pp-row"><input type="color" class="pp-color" id="ppTgtC" value="${st.tgtColor||'#089981'}"></div>`
     +`<div class="pp-slider"><input type="range" id="ppTgtA" min="0" max="100" value="${tA}"><span class="pp-sval" id="ppTgtAV">${tA}%</span></div>`
@@ -4000,9 +4002,10 @@ document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&
 
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
+makeDraggable(fibPop, '.pp-grip');
 function showFibPop(cx,cy){
   const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Warna level"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
-  fibPop.innerHTML=`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
+  fibPop.innerHTML=GRIP+`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
     +`<div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Background</label>`
     +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div>`
     +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
@@ -4047,12 +4050,13 @@ function applyChartCfg(){
 function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
 // Setting chart dibuka dari menu klik-kanan canvas (lihat handler contextmenu), di posisi kursor.
 const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
+makeDraggable(chartSet, '.pp-grip');
 function showChartSet(cx,cy){
   const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
   // bg & grid → edit kunci tema yang sedang aktif
   const light=document.body.classList.contains('light'), thm=light?'light':'dark';
   const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
-  chartSet.innerHTML=`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
+  chartSet.innerHTML=GRIP+`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
     +row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
   chartSet.style.left=Math.min(cx,window.innerWidth-220)+'px';
   chartSet.style.top=Math.max(8,Math.min(cy,window.innerHeight-320))+'px';
