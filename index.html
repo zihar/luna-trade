@@ -129,6 +129,11 @@
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
+  /* [magnet] buletan preview: penanda titik yg akan mendarat di OHLC terdekat saat menggambar */
+  .mag-dot{ position:absolute; z-index:7; pointer-events:none; display:none;
+    width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border-radius:50%;
+    border:2px solid var(--accent); background:rgba(74,113,255,.28);
+    box-shadow:0 0 0 1px rgba(0,0,0,.28); }
   /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
   .axis-time{ position:absolute; z-index:6; pointer-events:none; display:none;
     transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
@@ -1183,13 +1188,12 @@ function snapTimeToBar(t){
   return (t-a<=b-t)?a:b;
 }
 
-// [magnet] snap (time,value) ke high/low candle terdekat — pakai data intraday
-// terhalus yang ter-load dalam rentang bar saat ini → mendarat di extreme PRESISI.
+// [magnet] snap (time,value) ke nilai OHLC candle terdekat — pakai data intraday
+// terhalus yang ter-load dalam rentang bar saat ini → mendarat di OHLC PRESISI.
 let magnetOn = (localStorage.getItem('br_magnet')==='1');
-const MAGNET_PX = 16;     // radius tarik magnet (px) — "lemah": hanya nempel bila kursor dekat high/low
 function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].length) return tf; } return currentTF; }
-// snap (time,value) ke high/low candle terdekat, TAPI hanya bila kursor (px,py) berada dalam
-// radius MAGNET_PX dari extreme itu — di luar radius kembalikan null (titik dibiarkan bebas).
+// magnet "keras": snap (time,value) SELALU ke nilai OHLC (open/high/low/close) candle terdekat
+// dalam rentang bar, tanpa peduli jarak kursor (px,py diabaikan — dipertahankan utk kompatibilitas pemanggil).
 function magnetSnap(time, value, px, py){
   const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
@@ -1198,21 +1202,16 @@ function magnetSnap(time, value, px, py){
   const src=(DUR[ftf]<DUR[cur]&&tfData[ftf])?tfData[ftf]:arr;
   let best=null, bestD=Infinity;
   for(const c of src){ if(c.timestamp>=barOpen && c.timestamp<barEnd){
-    if(Math.abs(c.high-value)<bestD){bestD=Math.abs(c.high-value); best={timestamp:c.timestamp,value:c.high};}
-    if(Math.abs(c.low-value)<bestD){bestD=Math.abs(c.low-value); best={timestamp:c.timestamp,value:c.low};}
+    for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-value); if(d<bestD){bestD=d; best={timestamp:c.timestamp,value:v};} }
   }}
   if(!best){ const c=arr[i]; let bd=Infinity,bv=c.close; for(const v of [c.open,c.high,c.low,c.close]){const d=Math.abs(v-value);if(d<bd){bd=d;bv=v;}} best={timestamp:barOpen,value:bv}; }
-  // gate jarak (magnet lemah): bila kursor jauh dari extreme → jangan paksa nempel
-  if(best && px!=null && py!=null){
-    let cp=chart.convertToPixel({timestamp:best.timestamp,value:best.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp))cp=cp[0];
-    if(cp && Math.hypot(px-cp.x, py-cp.y) > MAGNET_PX) return null;
-  }
+  // magnet "keras": selalu nempel ke nilai OHLC terdekat (tanpa gate jarak kursor).
   return best;
 }
-// [magnet presisi M5] Saat menggambar dgn magnet di TF besar (mis. Daily), high/low hanya
+// [magnet presisi M5] Saat menggambar dgn magnet di TF besar (mis. Daily), nilai OHLC hanya
 // se-presisi data terhalus yg KEBETULAN ter-load → sering mentok di jam buka candle (mis.
 // Daily buka 18:00 NY). Setelah gambar selesai, ambil M5 ON-DEMAND utk rentang tiap candle
-// yg di-magnet, lalu geser titik ke menit high/low M5 yg sebenarnya → presisi saat pindah TF.
+// yg di-magnet, lalu geser titik ke menit OHLC M5 yg sebenarnya → presisi saat pindah TF.
 const m5WinCache={};                    // key: "INST|barOpenMs" → array M5 candle (rentang 1 bar)
 function barRangeContaining(tf, ts){    // batas [open,end) bar TF `tf` yang memuat ts (anti-gap weekend)
   const arr=tfData[tf]; if(!arr||!arr.length||ts==null) return null;
@@ -1243,15 +1242,9 @@ async function refineMagnetPoints(id){
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
       let best=null,bd=Infinity;
       for(const c of m5){ if(c.timestamp>=rng.open && c.timestamp<rng.end){
-        const dh=Math.abs(c.high-p.value); if(dh<bd){bd=dh; best={timestamp:c.timestamp,value:c.high};}
-        const dl=Math.abs(c.low -p.value); if(dl<bd){bd=dl; best={timestamp:c.timestamp,value:c.low };}
+        for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={timestamp:c.timestamp,value:v};} }
       }}
-      // hanya refine titik yang memang DEKAT extreme (sudah ter-magnet); titik bebas dibiarkan
-      if(best){
-        let pp=chart.convertToPixel({timestamp:p.timestamp,value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(pp))pp=pp[0];
-        let bp=chart.convertToPixel({timestamp:best.timestamp,value:best.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(bp))bp=bp[0];
-        if(pp&&bp&&Math.hypot(pp.x-bp.x, pp.y-bp.y) > MAGNET_PX) best=null;
-      }
+      // magnet "keras": semua titik digeser ke nilai OHLC M5 sebenarnya (tanpa gate jarak).
       if(best && (best.timestamp!==p.timestamp || best.value!==p.value)){ p.timestamp=best.timestamp; p.value=best.value; changed=true; }
     }
     if(changed){ try{chart.overrideOverlay({id, points:pts});}catch(e){} }
@@ -2978,8 +2971,8 @@ function delHooks(){ return {
       chart.overrideOverlay({id:o.id, points:o.points}); } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
-    if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke high/low M5 presisi (async, on-demand)
-    inProgressId=null; disarmIcons(); scheduleSaveDraws(); return false; },
+    if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
+    inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
   onClick:(e)=>{ selectedId=e.overlay.id; return false; },
   onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
@@ -2998,6 +2991,10 @@ function createDraw(name,btn,extra){
     if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }   // mau gambar baru → tampilkan lagi
     const base={name};
     if(BUILTIN_LINE[name]) base.styles=klineLineStyles(dstyle({name}));   // garis h/v: default dotted + warna
+    // magnet ON → mode 'strong_magnet' bawaan klinecharts: garis preview (rubber-band) LANGSUNG
+    // nempel ke OHLC candle terdekat saat ditarik, bukan cuma titik yg sudah diklik. Presisi
+    // sub-bar (timestamp M5) tetap disempurnakan oleh pendingClicks + refineMagnetPoints di onDrawEnd.
+    if(magnetOn) base.mode='strong_magnet';
     const id=chart.createOverlay(Object.assign(base,delHooks(),extra||{}));
     if(id){ drawIds.push(id); inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
     else setStatus('Failed to activate '+name,true);
@@ -3048,7 +3045,7 @@ function restoreDraws(){
 window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
 
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
-// waktu sub-bar; bila magnet aktif, snap ke high/low candle terdekat.
+// waktu sub-bar; bila magnet aktif, snap ke nilai OHLC candle terdekat.
 $('#chart').addEventListener('mousedown', (ev)=>{
   if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
   const r=$('#chart').getBoundingClientRect();
@@ -3063,7 +3060,24 @@ $('#chart').addEventListener('mousedown', (ev)=>{
 
 // posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
 let lastPtr={x:innerWidth/2,y:innerHeight/2};
-$('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; });
+
+// [magnet] preview live: buletan penanda di OHLC terdekat saat menggambar dgn magnet ON —
+// walau kursor jauh di atas/bawah candle, dot menempel di titik tempat drawing akan mendarat.
+const magDot=document.createElement('div'); magDot.className='mag-dot'; $('#chart').appendChild(magDot);
+function hideMagDot(){ magDot.style.display='none'; }
+function updateMagDot(ev){
+  if(!(magnetOn && inProgressId)){ hideMagDot(); return; }
+  const r=$('#chart').getBoundingClientRect();
+  const px=ev.clientX-r.left, py=ev.clientY-r.top;
+  const xa=xAnchorFromPx(px), v=pxToValue(py);
+  if(!xa || v==null || xa.timestamp==null){ hideMagDot(); return; }   // area future: tak di-snap (sama spt saat klik)
+  const s=magnetSnap(tsOf(xa), v, px, py); if(!s){ hideMagDot(); return; }
+  let cp=chart.convertToPixel({timestamp:s.timestamp,value:s.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp)) cp=cp[0];
+  if(!cp){ hideMagDot(); return; }
+  magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block';
+}
+$('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
+$('#chart').addEventListener('mouseleave',hideMagDot);
 
 // Text: editor inline di chart. Dipakai saat baru dibuat & saat double-click teks lama.
 let textEditorEl=null;
@@ -3204,11 +3218,13 @@ function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.ti
 syncHideDrawBtn();
 _hd.onclick=()=>{ drawsHidden=!drawsHidden; applyDrawsVisibility(); syncHideDrawBtn(); };
 const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Delete all drawings'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings;
-// toggle Magnet (snap ke high/low candle) — ala TradingView
+// toggle Magnet (snap ke nilai OHLC candle terdekat) — ala TradingView
 const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
-const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap point to candle high/low (on/off)'; _mag.innerHTML=MAGNET_SVG;
+const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap point to nearest candle OHLC (on/off)'; _mag.innerHTML=MAGNET_SVG;
 if(magnetOn) _mag.classList.add('armed');
-_mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); };
+_mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); if(!magnetOn) try{hideMagDot();}catch(_){}
+  // toggle saat sedang menggambar → sinkronkan mode overlay in-progress supaya garis preview langsung ikut/lepas snap
+  if(inProgressId) try{chart.overrideOverlay({id:inProgressId, mode: magnetOn?'strong_magnet':'normal'});}catch(_){} };
 // urutan tombol bawah (atas→bawah): magnet, hide, trash
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
@@ -3779,7 +3795,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
-  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); } }
+  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } }
   else if(e.key.toLowerCase()==='b'){submitOrder('long')}
   else if(e.key.toLowerCase()==='s'){submitOrder('short')}
 });
