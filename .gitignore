@@ -23,3 +23,6 @@ ROADMAP.md
 *.db
 *.db-wal
 *.db-shm
+
+# Artefak Playwright MCP (screenshot/trace sesi browser)
+.playwright-mcp/
