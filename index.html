@@ -1264,11 +1264,11 @@ let pendingClicks=[];
 
 // ===== style per-objek gambar (ala TradingView): id → {color,size,style} =====
 const DRAW_DEFAULT = {
-  trendline:{color:'#4a71ff',size:1,style:'solid'},
-  rect:{color:'#4a71ff',size:1,style:'solid'},
+  trendline:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
+  rect:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle'},
   fib3:{color:'#4a71ff',size:1,style:'solid'},
   dateRange:{color:'#4a71ff',size:2,style:'solid'},
-  text:{color:'',size:13,style:'solid'},
+  text:{color:'',size:13,style:'solid',textAlign:'left',textValign:'top'},
   horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},  // default dotted, warna bisa diganti
   verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},
   // Long/Short Position: warna & transparansi zona Profit (tgt) & Stop terpisah, per objek.
@@ -1343,9 +1343,11 @@ klinecharts.registerOverlay({
     const rl=lsLine(st);
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
-    const t=overlay&&overlay.extendData;                       // teks opsional → di TENGAH kotak, center
-    if(t){ const lines=String(t).split('\n'), lh=15, cx=x+w/2, cy=y+h/2, y0=cy-(lines.length-1)*lh/2;
-      lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:y0+i*lh,text:ln,align:'center',baseline:'middle'},
+    const t=overlay&&overlay.extendData;                       // teks opsional → posisi via textAlign/textValign
+    if(t){ const ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=String(t).split('\n'), lh=15;
+      const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
+      const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
+      lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
         styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
     return figs;
   }
