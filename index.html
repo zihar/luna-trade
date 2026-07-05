@@ -1451,7 +1451,9 @@ klinecharts.registerOverlay({
     // persentase ditaruh di pinggir kiri & sejajar tengah garis (bukan di atas garis)
     rows.forEach(r=>{
       figs.push({type:'line',attrs:{coordinates:[{x:xL,y:r.y},{x:xR,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
-      figs.push({type:'text',attrs:{x:xL+3,y:r.y,text:(r.Lv*100).toFixed(2)+'%',align:'left',baseline:'middle'},styles:{color:r.color,size:10}});
+      // angka persen: SEMUA rata-kanan di sisi kiri garis (di luar/kiri titik jangkar xL) →
+      // seragam untuk semua level & tak pernah tumpang-tindih dgn buletan handle.
+      figs.push({type:'text',attrs:{x:xL-5,y:r.y,text:(r.Lv*100).toFixed(2)+'%',align:'right',baseline:'middle'},styles:{color:r.color,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     });
     return figs;
   },
