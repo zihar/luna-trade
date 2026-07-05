@@ -1565,8 +1565,10 @@ klinecharts.registerOverlay({
     const C=subBarCoords(overlay,coordinates), x=C[0].x, y0=C[0].y, lh=16;
     const st=dstyle(overlay);
     const lines=String(t).split('\n');
+    const ha=st.textAlign||'left', va=st.textValign||'top';
+    const yTop = va==='top' ? y0 : va==='bottom' ? y0-(lines.length-1)*lh : y0-(lines.length-1)*lh/2;
     return lines.map((ln,i)=>({ type:'text',
-      attrs:{x, y:y0+i*lh, text:ln, align:'left', baseline:'top'},
+      attrs:{x, y:yTop+i*lh, text:ln, align:ha, baseline:va},
       styles:{color:(st.color||drawTextColor), size:(st.size||13), backgroundColor:'transparent', borderColor:'transparent',
               paddingLeft:0, paddingRight:0, paddingTop:0, paddingBottom:0} }));
   }
