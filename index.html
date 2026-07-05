@@ -529,6 +529,12 @@
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
+  /* pegangan drag untuk popup config tanpa header (objpop/fibpop/chartSet/pos-confirm) */
+  .pp-grip{ display:flex; align-items:center; justify-content:center; height:14px; margin:-2px 0 8px;
+            border-bottom:1px solid var(--border); cursor:grab; user-select:none; touch-action:none; }
+  .pp-grip::before{ content:'\2059\2059\2059'; color:var(--muted); font-size:11px; letter-spacing:3px; line-height:1; }
+  .objpop.dragging, .fibpop.dragging{ cursor:grabbing; }
+  .pp-grip:active{ cursor:grabbing; }
   /* popup Kelola posisi (edit SL/TP dari klik garis) */
   /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
   .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
@@ -2522,6 +2528,30 @@ function closePositionEditor(){
   if(wasId!=null && paperLines[wasId]){ ['sl','tp'].forEach(k=>{ if(paperLines[wasId][k]){try{chart.removeOverlay(paperLines[wasId][k]);}catch(e){} paperLines[wasId][k]=null; } }); }
   drawPaperLines();   // gambar ulang dari state server (batalkan staged)
 }
+// drag popup config: satu listener di elemen popup (delegasi) → tahan rebuild innerHTML.
+// Drag hanya dari handleSel; kontrol interaktif dikecualikan. Non-persisten (show menimpa left/top).
+function makeDraggable(el, handleSel){
+  let drag=false, sx=0, sy=0, ox=0, oy=0;
+  el.addEventListener('pointerdown', e=>{
+    if(!e.target.closest(handleSel)) return;
+    if(e.target.closest('button,input,select,textarea,label,a')) return;   // klik kontrol ≠ drag
+    const r=el.getBoundingClientRect();
+    drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    el.style.left=ox+'px'; el.style.top=oy+'px';
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    el.classList.add('dragging'); e.preventDefault();
+  });
+  el.addEventListener('pointermove', e=>{ if(!drag) return;
+    let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+    nx=Math.max(0, Math.min(window.innerWidth - el.offsetWidth, nx));
+    ny=Math.max(0, Math.min(window.innerHeight - 36, ny));   // sisakan ≥36px agar handle popup tinggi tetap terjangkau
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+  });
+  const stop=e=>{ if(!drag) return; drag=false; el.classList.remove('dragging');
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){} };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+}
 function buildPosEditPanel(){
   if(posEditEl) return;
   posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
@@ -2555,24 +2585,7 @@ function buildPosEditPanel(){
   $$('#peSLprice').oninput=()=>{ if(editPos){ const v=+$$('#peSLprice').value; if(isFinite(v)&&v>0){ editPos.sl=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTPprice').oninput=()=>{ if(editPos){ const v=+$$('#peTPprice').value; if(isFinite(v)&&v>0){ editPos.tp=v; drawStagedLines(); renderPosEdit(true); } } };
   $$('#peTrail').onclick=()=>{ if(editPos){ editPos.trail=!editPos.trail; renderPosEdit(); } };
-  // panel bisa digeser dari header (kecuali tombol ✕)
-  (function(){ const head=$$('.pe-head'); let drag=false,sx,sy,ox,oy;
-    head.addEventListener('pointerdown',e=>{
-      if(e.target.closest('button')) return;   // tombol tutup = bukan drag
-      const r=posEditEl.getBoundingClientRect();
-      drag=true; sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
-      posEditEl.style.left=ox+'px'; posEditEl.style.top=oy+'px';
-      head.setPointerCapture(e.pointerId); e.preventDefault();
-    });
-    head.addEventListener('pointermove',e=>{ if(!drag) return;
-      let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
-      nx=Math.max(0,Math.min(window.innerWidth - posEditEl.offsetWidth, nx));
-      ny=Math.max(0,Math.min(window.innerHeight - 36, ny));
-      posEditEl.style.left=nx+'px'; posEditEl.style.top=ny+'px';
-    });
-    const stop=()=>{ drag=false; };
-    head.addEventListener('pointerup',stop); head.addEventListener('pointercancel',stop);
-  })();
+  makeDraggable(posEditEl, '.pe-head');
 }
 function drawStagedLines(){
   if(!editPos) return; const rec=paperLines[editPos.id]||(paperLines[editPos.id]={entry:null,sl:null,tp:null});
