@@ -126,6 +126,26 @@
   .tfbar button.hticon{display:inline-flex;align-items:center;justify-content:center;padding:5px;color:var(--muted)}
   .tfbar button.hticon svg{width:16px;height:16px;display:block}
   .tfbar button.hticon:not(:disabled):hover{color:var(--txt)}
+  /* indikator teknikal: tombol ƒx + dropdown menu */
+  .indwrap{position:relative;display:inline-flex}
+  #indBtn{position:relative;display:inline-flex;align-items:center;gap:3px}
+  .ind-fx{font-style:italic;font-weight:600;font-size:15px;line-height:1}
+  .ind-fx sub{font-style:normal;font-size:9px}
+  #indBtn.on{color:var(--accent);background:rgba(74,113,255,.14)}
+  .ind-badge{min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--accent);color:#fff;
+             font-size:10px;font-weight:700;line-height:15px;text-align:center}
+  .ind-menu{display:none;position:absolute;top:36px;left:0;z-index:60;width:230px;padding:5px;
+            background:var(--panel);border:1px solid var(--border);border-radius:10px;
+            box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .ind-menu.open{display:block}
+  .ind-grp{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+           padding:7px 8px 3px}
+  .ind-item{display:flex;align-items:center;gap:7px;height:30px;padding:0 8px;border-radius:7px;
+            font-size:12.5px;color:var(--txt);cursor:pointer}
+  .ind-item:hover{background:var(--btn-hover)}
+  .ind-check{width:13px;font-size:12px;color:var(--accent);opacity:0}
+  .ind-item.on .ind-check{opacity:1}
+  .ind-item.on{color:var(--accent)}
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
   /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
@@ -854,6 +874,11 @@
       <span class="sep"></span>
       <button id="undoBtn" class="hticon" title="Undo drawing (Ctrl/⌘+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
       <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+      <span class="sep"></span>
+      <span class="indwrap">
+        <button id="indBtn" title="Indicators"><span class="ind-fx">ƒ<sub>x</sub></span><span class="ind-badge" id="indBadge" hidden></span></button>
+        <div class="ind-menu" id="indMenu"></div>
+      </span>
       <span class="grow" style="flex:1"></span>
       <span id="layoutbtns" title="Layout chart"></span>
     </div>
@@ -4062,6 +4087,56 @@ function showChartSet(cx,cy){
 }
 document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)) chartSet.classList.remove('show'); }, true);
 applyChartCfg();   // terapkan cfg tersimpan saat startup
+
+// ===================== indikator teknikal (ƒx) =====================
+// Indikator bawaan KLineCharts di chart UTAMA. Overlay (MA/EMA/BOLL) numpang di pane
+// candle; osilator (VOL/MACD/RSI) di sub-pane sendiri. Parameter pakai default library.
+const IND_DEFS=[
+  {name:'MA',   label:'MA — Moving Average',        overlay:true },
+  {name:'EMA',  label:'EMA — Exp. Moving Average',  overlay:true },
+  {name:'BOLL', label:'BOLL — Bollinger Bands',     overlay:true },
+  {name:'VOL',  label:'VOL — Volume',               overlay:false},
+  {name:'MACD', label:'MACD',                       overlay:false},
+  {name:'RSI',  label:'RSI',                         overlay:false},
+];
+const activeInd={};   // name -> paneId ('candle_pane' utk overlay, id sub-pane utk osilator)
+function persistInd(){ try{ localStorage.setItem('br_indicators', JSON.stringify(Object.keys(activeInd))); }catch(e){} }
+function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function addInd(name){
+  const def=IND_DEFS.find(d=>d.name===name); if(!def||activeInd[name]) return;
+  try{
+    const pid = def.overlay ? chart.createIndicator(name, true, {id:'candle_pane'}) : chart.createIndicator(name);
+    activeInd[name] = def.overlay ? 'candle_pane' : pid;   // overlay: paneId candle konstan; sub-pane: id dinamis
+  }catch(e){}
+}
+function removeInd(name){
+  const pid=activeInd[name]; if(pid==null) return;
+  try{ chart.removeIndicator(pid, name); }catch(e){}
+  delete activeInd[name];
+}
+function updateIndBadge(){
+  const n=Object.keys(activeInd).length, b=$('#indBadge'), btn=$('#indBtn');
+  if(b){ b.textContent=n; b.hidden=(n===0); }
+  if(btn) btn.classList.toggle('on', n>0);
+}
+function renderIndMenu(){
+  const m=$('#indMenu'); if(!m) return;
+  const grp=(title,items)=>`<div class="ind-grp">${title}</div>`+items.map(d=>
+    `<div class="ind-item${activeInd[d.name]?' on':''}" data-ind="${d.name}"><span class="ind-check">✓</span>${d.label}</div>`).join('');
+  m.innerHTML=grp('Overlays',IND_DEFS.filter(d=>d.overlay))+grp('Oscillators',IND_DEFS.filter(d=>!d.overlay));
+  m.querySelectorAll('.ind-item').forEach(el=>el.onclick=()=>{
+    const name=el.dataset.ind;
+    if(activeInd[name]) removeInd(name); else addInd(name);
+    persistInd(); renderIndMenu(); updateIndBadge();
+    track('indicator',{name, on: !!activeInd[name]});
+  });
+}
+savedInd().forEach(addInd); updateIndBadge();   // pulihkan indikator tersimpan
+(function(){
+  const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
+  btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
+  document.addEventListener('mousedown',e=>{ if(menu.classList.contains('open')&&!menu.contains(e.target)&&!btn.contains(e.target)) menu.classList.remove('open'); }, true);
+})();
 
 // ===================== context menu: reset chart view =====================
 const ctxMenu=document.createElement('div');
