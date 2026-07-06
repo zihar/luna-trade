@@ -1906,7 +1906,7 @@ function render(full){
   if(full || lastLen<0 || data.length<lastLen){ chart.applyNewData(data); }
   else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
   lastLen=data.length;
-  drawTradeLines();
+  drawPaperLines();
   drawPendingLines();
   drawAlertLines();
   updateOpenTradeBox();
@@ -2211,8 +2211,8 @@ function openTrade(dir){
   const tp = tpOn ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
   trade={dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
          trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
-         time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
-  clearDraftLines(); drawTradeLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
+         instrument:inst, time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
+  clearDraftLines(); drawPaperLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)
 function moveLine(id,value){ if(id==null) return; try{ chart.overrideOverlay({id, points:[{value}]}); }catch(e){} }
@@ -2281,33 +2281,8 @@ function hline(value,color,onMove){
     onPressedMoving:(e)=>{ const v=e.overlay.points[0].value; if(v!=null) onMove(+v); return false; },
   });
 }
-// label + warna per garis trade dari state terkini ($/% relatif balance)
-function tradeLineInfo(kind){
-  if(!trade) return {color:'#888',text:''};
-  const dec=priceDecimals(), units=trade.units||0, bal=+$('#balance').value||0, cur=currentCandle();
-  if(kind==='entry'){ const pnl=cur?pnlUsd(trade.dir,trade.entry,cur.close,units):0;
-    return {color:'#4a71ff', text:`Entry ${trade.entry.toFixed(dec)}   ${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(2)}`}; }
-  if(kind==='sl'){ const loss=Math.abs(pnlUsd(trade.dir,trade.entry,trade.sl,units)), pct=bal?loss/bal*100:0;
-    return {color:'#ff6f6f', text:`SL ${trade.sl.toFixed(dec)}   -$${loss.toFixed(2)} / -${pct.toFixed(2)}%`}; }
-  const rew=Math.abs(pnlUsd(trade.dir,trade.entry,trade.tp,units)), pctt=bal?rew/bal*100:0;
-  return {color:'#54c88c', text:`TP ${trade.tp.toFixed(dec)}   +$${rew.toFixed(2)} / +${pctt.toFixed(2)}%`};
-}
-function tradeLevel(kind,value){
-  const info=tradeLineInfo(kind);
-  return chart.createOverlay({ name:'tradeLevel', points:[{value}], extendData:{kind,color:info.color,label:info.text},
-    onPressedMoving:(e)=>{ const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null||!trade) return false;
-      if(kind==='entry') trade.entry=v; else if(kind==='sl'){ trade.sl=v; recalcRisk(); } else if(kind==='tp') trade.tp=v;
-      const ni=tradeLineInfo(kind); try{chart.overrideOverlay({id:e.overlay.id,extendData:{kind,color:ni.color,label:ni.text}});}catch(_){}
-      updateOpenTradeBox(); return false; },
-  });
-}
-function drawTradeLines(){
-  ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(trade&&trade[k]){ try{chart.removeOverlay(trade[k]);}catch(e){} trade[k]=null; }});
-  if(!trade) return;
-  trade.lineEntry=tradeLevel('entry',trade.entry);
-  trade.lineSL   = trade.sl!=null ? tradeLevel('sl',trade.sl) : null;
-  trade.lineTP   = trade.tp!=null ? tradeLevel('tp',trade.tp) : null;
-}
+// Trade replay kini digambar oleh sistem on-chart terpadu (drawPaperLines/posLevel),
+// sama seperti posisi Live. Fungsi lama tradeLineInfo/tradeLevel/drawTradeLines dihapus.
 
 // ===== garis + pill posisi PAPER on-chart (per posisi, instrumen aktif) =====
 // garis = overlay klinecharts (tradeLevel, warna candle POS_GREEN/POS_RED); pill/label/tombol = node DOM di #posLayer.
@@ -2315,7 +2290,18 @@ function drawTradeLines(){
 let paperLines={};   // posId -> {entry,sl,tp}  (id overlay garis)
 let posDom={};       // posId -> {entry,sl,tp}  (elemen DOM)
 let posLayerEl=null;
-function posById(id){ return (SP.positions||[]).find(x=>x.id===id); }
+function posById(id){ return currentPositions().find(x=>x.id===id); }
+// Sumber posisi on-chart terpadu: Live → SP.positions; Replay → trade (dibungkus jadi posisi).
+const REPLAY_ID = -1;
+function replayPos(){
+  if(!trade) return null;
+  const cur=currentCandle(), price=cur?cur.close:trade.entry, units=trade.units||0;
+  return { id:REPLAY_ID, src:'replay', instrument:trade.instrument||inst,
+    dir:trade.dir, units, entry:trade.entry, price, sl:trade.sl, tp:trade.tp,
+    unrealizedPl: pnlUsd(trade.dir,trade.entry,price,units),
+    margin: units*trade.entry*quoteToUsd(trade.entry)/100 };
+}
+function currentPositions(){ if(spActive()) return SP.positions||[]; const rp=replayPos(); return rp?[rp]:[]; }
 function posPnlStr(v){ return (v>=0?'+':'-')+'$'+Math.abs(+v||0).toFixed(2); }
 function posLayer(){
   const host=document.getElementById('chart');
@@ -2397,7 +2383,10 @@ function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
   posConfirmEl.style.top=((r?r.bottom:lastPtr.y)+6)+'px';
   posConfirmEl.classList.add('show');
 }
-function confirmClosePos(id,anchor){ miniConfirm(`Tutup posisi #${id}?`,'Tutup',()=>spClose(id),null,anchor); }
+function confirmClosePos(id,anchor){
+  if(id===REPLAY_ID){ miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle(); if(c) closeTrade(c.close,c.timestamp); drawPaperLines(); },null,anchor); return; }
+  miniConfirm(`Tutup posisi #${id}?`,'Tutup',()=>spClose(id),null,anchor);
+}
 // ---- drag SL/TP di view-mode: preview saat digeser, konfirmasi saat dilepas ----
 let pendingLevel=null;   // {id,kind,v} — garis yg sedang menunggu konfirmasi (jangan di-reset spSync)
 function previewPosLevel(id,kind,v){
@@ -2408,6 +2397,8 @@ function previewPosLevel(id,kind,v){
 }
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
+  if(id===REPLAY_ID){ if(!trade) return; trade[kind]=+v; if(kind==='sl') recalcRisk();
+    toast('✓ '+kind.toUpperCase()+' diperbarui'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
@@ -2486,6 +2477,16 @@ function clearPaperLines(){ Object.values(paperLines).forEach(rec=>['entry','sl'
 //  - view-mode → preview label saat digeser, konfirmasi mini saat dilepas
 function posLevel(p,kind,draggable){
   const value = kind==='entry'?p.entry : kind==='sl'?p.sl : p.tp;
+  if(kind==='entry'){
+    // Entry: klik → editor. Drag hanya untuk trade replay (p.id===REPLAY_ID) → geser
+    // entry trade secara live tanpa konfirmasi (meniru perilaku lama tradeLevel entry).
+    return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable, extendData:posExtend(p,kind),
+      onClick:()=>{ openPositionEditor(p.id); return false; },
+      onPressedMoving:(e)=>{ if(p.id!==REPLAY_ID||!trade) return false;
+        const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
+        trade.entry=v; try{renderPosDom(posById(p.id));}catch(_){} updateOpenTradeBox(); return false; },
+    });
+  }
   return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable,
     extendData:posExtend(p,kind),
     onClick:()=>{ openPositionEditor(p.id); return false; },
@@ -2499,8 +2500,7 @@ function posLevel(p,kind,draggable){
   });
 }
 function drawPaperLines(){
-  if(typeof spActive!=='function'||!spActive()){ clearPaperLines(); return; }
-  const cur=(SP.positions||[]).filter(p=>p.instrument===inst);
+  const cur=currentPositions().filter(p=>p.instrument===inst);
   const keep=new Set(cur.map(p=>p.id));
   if(pendingLevel && !keep.has(pendingLevel.id)) pendingLevel=null;
   Object.keys(paperLines).forEach(idStr=>{ if(!keep.has(+idStr)){ ['entry','sl','tp'].forEach(k=>{ if(paperLines[idStr][k]){try{chart.removeOverlay(paperLines[idStr][k]);}catch(e){}} }); delete paperLines[idStr]; removePosNodes(+idStr); if(+idStr===editingPosId) closePositionEditor(); } });
@@ -2508,7 +2508,7 @@ function drawPaperLines(){
     const rec=paperLines[p.id]||(paperLines[p.id]={entry:null,sl:null,tp:null});
     // entry (garis biru + pill P&L live di DOM)
     if(rec.entry) try{chart.overrideOverlay({id:rec.entry, points:[{value:p.entry}], extendData:posExtend(p,'entry')});}catch(e){}
-    else rec.entry=posLevel(p,'entry',false);
+    else rec.entry=posLevel(p,'entry', p.id===REPLAY_ID);   // entry replay bisa di-drag; entry live tidak
     // posisi yg sedang diedit: garis SL/TP staged dikelola panel/drag → jangan disentuh; segarkan panel + node DOM
     if(editingPosId===p.id){ if(editPos){ editPos.price=+p.price; renderPosEdit(); } renderPosDom(p); return; }
     // lainnya: garis SL/TP = state server. Garis BISA digeser langsung (ala TradingView):
@@ -2619,6 +2619,8 @@ function renderPosEdit(skipPriceInputs){
 }
 function commitPosSLTP(){
   if(!editPos) return;
+  if(editPos.id===REPLAY_ID){ if(trade){ trade.sl=editPos.slOn?+editPos.sl:null; trade.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(); }
+    toast('✓ SL/TP diperbarui'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
@@ -2627,7 +2629,7 @@ function commitPosSLTP(){
     .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
 }
 function openPositionEditor(id){
-  const p=(SP.positions||[]).find(x=>x.id===id); if(!p) return;
+  const p=posById(id); if(!p) return;
   const pip=pipOf(p.instrument), isSell=p.dir==='short', hasNone=(p.sl==null&&p.tp==null);
   editingPosId=id;
   editPos={ id, dir:p.dir, instrument:p.instrument, entry:+p.entry, units:p.units, price:+p.price,
@@ -2700,9 +2702,9 @@ function checkPending(c){
   if(!(c.low<=pending.entry && pending.entry<=c.high)) return;   // belum tersentuh
   clearPendingLines();
   trade={dir:pending.dir,entry:pending.entry,sl:pending.sl,tp:pending.tp,risk:pending.risk,
-         units:pending.units,trail:pending.trail,time:c.timestamp,lineEntry:null,lineSL:null,lineTP:null};
+         units:pending.units,trail:pending.trail,instrument:inst,time:c.timestamp,lineEntry:null,lineSL:null,lineTP:null};
   pending=null;
-  drawTradeLines(); updateOpenTradeBox();
+  drawPaperLines(); updateOpenTradeBox();
   toast('✓ Pending executed @ '+fmt(trade.entry));
 }
 // ---------- partial close ----------
@@ -2730,6 +2732,7 @@ function closeTrade(exit,time){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(trade[k]){ try{chart.removeOverlay(trade[k]);}catch(e){} }});
   trade=null;
   saveJournal(); renderStats(); renderJournal(); updateOpenTradeBox(); renderAcct();
+  try{ drawPaperLines(); }catch(e){}   // bersihkan garis/pill on-chart (paperLines[REPLAY_ID]) di semua jalur close
 }
 // ===================== broker abstraction (Fase 0) =====================
 // Fasad order: seluruh UI memanggil broker.* sehingga aksi order ditulis sekali.
@@ -2882,7 +2885,7 @@ function spRenderStats(){
 function applyPaperMode(){
   if(replayMode){ broker=ReplayBroker; spStopPolling(); }
   else { broker=ServerPaperBroker; spStartPolling(); }
-  try{ renderAcct(); renderTrades(); }catch(e){}
+  try{ renderAcct(); renderTrades(); drawPaperLines(); }catch(e){}
 }
 let broker = ReplayBroker;
 
@@ -3450,7 +3453,7 @@ function renderTrades(){
       <td>${fmt(trade.tp)}</td>
       <td>${usdFmt(margin)}</td>
       <td class="${pl>=0?'t-pos':'t-neg'}">${pl>=0?'+':''}${usdFmt(pl)}</td>
-      <td class="t-act"><button data-act="partial">Close ½</button><button data-act="close">Close</button></td></tr>`;
+      <td class="t-act"><button data-act="close">Close</button></td></tr>`;
   } else if(activeTradeTab==='pending'){
     head.innerHTML=thRow(['Instrument','Side','Type','Entry','Stop Loss','Take Profit','Size','Actions']);
     if(!pending){ body.innerHTML=emptyRow(8,'No pending orders','Switch the order ticket to Pending to place one away from price.'); return; }
@@ -3501,6 +3504,7 @@ function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
   trade=null;
+  try{ drawPaperLines(); }catch(e){}   // bersihkan garis/pill on-chart trade replay
 }
 
 // ===================== watchlist & price alert (Fase 1d) =====================
