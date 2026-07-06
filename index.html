@@ -163,7 +163,6 @@
   td:first-child,th:first-child{text-align:left}
   .journal-wrap{max-height:200px;overflow-y:auto}
   .kbd{display:inline-block;background:var(--inset);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted)}
-  .open-trade{background:var(--inset);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px;font-size:12px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .chartrow{flex:1;display:flex;min-height:0}
   .drawtools{width:42px;background:var(--panel);border-right:1px solid var(--border);
@@ -230,7 +229,6 @@
   .fld label{font-size:10px;color:var(--muted)}
   .fld input{width:92px}
   .bp-trade button.buy,.bp-trade button.sell{padding:7px 14px}
-  .bp-trade #openTradeBox{flex-basis:100%}
   .bp-stats .stats{display:grid;grid-template-columns:repeat(4,minmax(82px,1fr));gap:7px}
   .bp-journal{flex:1;min-width:300px}
   .bp-journal .journal-wrap{max-height:26vh}
@@ -643,7 +641,6 @@
   /* docked: jangan diciutkan oleh daftar Markets; scroll internal saat expand agar SL/TP & exec terjangkau */
   .orderpanel[data-dock="docked"]{ flex:0 0 auto; max-height:64%; overflow-y:auto; }
   .orderpanel[data-dock="floating"]{ cursor:move; }   /* seluruh area (incl. tepi atas) = drag handle; kontrol di-skip via JS */
-  #openTradeBox:empty{ display:none; }   /* jangan makan gap saat tak ada posisi (hilangkan ruang kosong atas) */
   .orderpanel .bp-title{ margin-bottom:8px; }
   /* order panel — ticket modern minimalis ala TradeLocker */
   .op2{ display:flex; flex-direction:column; gap:5px; }
@@ -920,8 +917,6 @@
     </div>
     <div class="bp-section" id="orderForm">
       <div class="op2">
-        <div id="openTradeBox"></div>
-
         <!-- ===== MODE SIMPLE (compact) ===== -->
         <div class="op-simple">
           <div class="op-shead">
@@ -2968,28 +2963,10 @@ document.querySelectorAll('.op3-stage-step button').forEach(b=>b.onclick=()=>{
   renderOrderPanel(); renderSizing();
 });
 function updateOpenTradeBox(){
+  // box status di atas order panel dihapus — P&L posisi ditampilkan langsung di chart.
+  // Fungsi dipertahankan hanya untuk efek samping refresh sizing & daftar trade.
   renderSizing();
   try{renderTrades();}catch(e){}
-  const box=$('#openTradeBox');
-  if(trade){
-    const cur=currentCandle(); const mul=trade.dir==='long'?1:-1;
-    const liveR=cur?(cur.close-trade.entry)*mul/(trade.risk||1e-9):0;
-    const liveUsd=cur?pnlUsd(trade.dir,trade.entry,cur.close,trade.units||0):0;
-    box.innerHTML=`<div class="open-trade">
-      <b style="color:${trade.dir==='long'?'#54c88c':'#ff6f6f'}">${trade.dir.toUpperCase()}</b>
-      @ ${fmt(trade.entry)} · SL ${fmt(trade.sl)} · TP ${fmt(trade.tp)} · ${lotLabel(trade.units||0)}${trade.trail>0?' · trail':''}<br>
-      Floating: <b class="${liveR>=0?'pos':'neg'}">${liveR>=0?'+':''}${liveR.toFixed(2)}R</b>
-      · <b class="${liveUsd>=0?'pos':'neg'}">${liveUsd>=0?'+':''}$${liveUsd.toFixed(2)}</b></div>`;
-    return;
-  }
-  if(pending){
-    box.innerHTML=`<div class="open-trade" style="border-color:#4a71ff">
-      <b style="color:#4a71ff">PENDING ${pending.dir.toUpperCase()} ${pending.type}</b>
-      @ ${fmt(pending.entry)} · SL ${fmt(pending.sl)} · TP ${fmt(pending.tp)} · ${lotLabel(pending.units||0)}<br>
-      <span style="color:var(--muted)">waiting for price to be touched — Close = cancel</span></div>`;
-    return;
-  }
-  box.innerHTML='';
 }
 
 // ===================== drawing tools (ikon, ala TV) =====================
