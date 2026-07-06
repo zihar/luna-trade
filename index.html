@@ -1511,9 +1511,12 @@ function posFigures(dir){
     const tkSize = inst.includes('XAU') ? 0.01 : Math.pow(10,-dec);
     const tickN=d=>Math.round(d/tkSize);
     const C=subBarCoords(overlay,coordinates);
-    const xs=C.map(c=>c.x);
+    const xs=C.map(c=>c.x).filter(x=>x!=null&&isFinite(x));
+    if(!xs.length) return [];   // semua koordinat-X invalid (transient klinecharts) → skip frame, jangan gambar sampah
     let xL=Math.min(...xs), xR=Math.max(...xs);
-    if(xR<=xL) xR=(bounding&&bounding.width)?bounding.width:xL+160;
+    // Koordinat-X kolaps ke 1 titik (fase 1-titik / transient anchor rusak) → lebar default KECIL.
+    // Dulu memakai bounding.width → box/garis "kelempar" membentang sampai tepi kanan chart (bug intermittent draw long).
+    if(xR<=xL) xR=xL+160;
     // warna & transparansi zona per objek (default = konstanta global lama)
     const st=dstyle(overlay);
     const tgtColor=st.tgtColor||POS_GREEN, stopColor=st.stopColor||POS_RED;
@@ -3245,13 +3248,22 @@ function expandPosition(o){
   if(!o || (o.name!=='longPosition' && o.name!=='shortPosition')) return;
   if(!o.points || o.points.length>=6) return;          // sudah di-expand
   const p0=o.points[0]; if(!p0 || p0.value==null) return;
+  // p0 WAJIB punya anchor-X valid. klinecharts kadang menaruh titik area-future TANPA anchor
+  // (timestamp & dataIndex null) → keyOf(p0)={dataIndex:undefined} & tsOf(p0)=null → Lxa/Rxa jadi
+  // undefined/NaN → override menaruh titik ngawur → x kolaps → garis "kelempar" ke tepi kanan.
+  // Turunkan anchor dari posisi kursor terakhir (sama seperti jaring pengaman di onDrawEnd).
+  if(p0.timestamp==null && (p0.dataIndex==null || !isFinite(p0.dataIndex))){
+    try{ const rect=$('#chart').getBoundingClientRect(); const a=xAnchorFromPx(lastPtr.x-rect.left); if(a) Object.assign(p0,a); }catch(_){}
+  }
   const dir=o.name==='longPosition'?'long':'short';
   const entry=p0.value;
   const risk=tfDefaultRisk();
   const sl=dir==='long'? entry-risk : entry+risk;
   const tp=dir==='long'? entry+DEFAULT_POS_RR*risk : entry-DEFAULT_POS_RR*risk;
   // sisi kanan = 15 bar ke kanan; bila melewati candle terakhir → pakai dataIndex (area future, tak ter-clamp)
-  const Lxa=keyOf(p0), li=revealed(currentTF).length-1, Rxa=(fidxOf(p0)+15>li)?{dataIndex:fidxOf(p0)+15}:{timestamp:tsOf(p0)+15*DUR[currentTF]};
+  const li=revealed(currentTF).length-1; let fL=fidxOf(p0); if(!isFinite(fL)) fL=li;
+  const Lxa=(p0.timestamp!=null||p0.dataIndex!=null)?keyOf(p0):{dataIndex:fL};
+  const Rxa=(fL+15>li)?{dataIndex:fL+15}:{timestamp:tsOf(p0)+15*DUR[currentTF]};
   try{ chart.overrideOverlay({ id:o.id, points:[
     Object.assign({value:entry},Lxa), Object.assign({value:tp},Rxa), Object.assign({value:sl},Rxa),
     Object.assign({value:tp},Lxa),    Object.assign({value:sl},Lxa),  Object.assign({value:entry},Rxa) ] }); }
