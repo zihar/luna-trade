@@ -4112,8 +4112,9 @@ window.addEventListener('blur',hideCtx);
 // Kembalikan zoom/scroll/skala ke default utk instrument + TF yang sedang dibuka.
 function resetChartView(){
   if(T==null){ setStatus('Load first.',true); return; }
-  lastLen=-1; render(true);                 // re-apply data current → reset skala harga & posisi
+  lastLen=-1; render(true);                 // re-apply data current → reset posisi
   try{ chart.setBarSpace(8); }catch(e){}     // reset level zoom waktu ke default
+  try{ chart.setStyles({yAxis:{type:'normal'}}); }catch(e){} // reset zoom/skala HARGA (y-axis) → auto-calc (setAutoCalcTickFlag(true))
   try{ chart.scrollToRealTime(); }catch(e){} // tempel ke bar terbaru yang terungkap
   setStatus('Chart view reset to default ('+currentTF+').');
 }
