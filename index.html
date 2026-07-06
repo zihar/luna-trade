@@ -380,9 +380,13 @@
   .tz-item:hover{ background:var(--btn-hover); }
   .tz-item .ck{ width:13px; color:var(--accent); }
   .tz-item .off{ color:var(--muted); font-family:var(--mono); font-size:11px; min-width:62px; }
-  /* kontrol playback hanya tampil saat mode Bar Replay aktif */
-  #replayCtrls{ display:contents; }
-  .replaybar:not(.replaying) #replayCtrls{ display:none; }
+  /* kontrol playback di toolbar — tampil hanya saat mode Bar Replay aktif */
+  #replayCtrls{ display:none; align-items:center; gap:5px; }
+  #replayCtrls.on{ display:inline-flex; }
+  #replayCtrls button{ padding:5px 9px; }
+  #replayCtrls .rlabel{ margin-left:3px; }
+  #replayCtrls select{ height:28px; padding:2px 6px; border-radius:6px; background:var(--btn);
+                       border:1px solid var(--border); color:var(--txt); font-size:12px; cursor:pointer; }
 
   /* sizing readout (Fase 1a) */
   .sizing{ flex-basis:100%; display:flex; gap:18px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:2px; }
@@ -836,6 +840,20 @@
       <span id="tfbtns"></span>
       <span class="sep"></span>
       <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
+      <span id="replayCtrls">
+        <button id="prevBtn" title="Prev (←)">⏪</button>
+        <button id="playBtn" title="Play/Pause (Space)">▶</button>
+        <button id="nextBtn" title="Next (→)">⏩</button>
+        <span class="rlabel">Speed</span>
+        <select id="speed" title="Play speed (candles/sec)">
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="3" selected>3×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+          <option value="20">20×</option>
+        </select>
+      </span>
       <span class="sep"></span>
       <button id="undoBtn" class="hticon" title="Undo drawing (Ctrl/⌘+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
       <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
@@ -1030,22 +1048,6 @@
       <input id="date" type="date">
     </span>
     <button id="loadBtn" class="primary" title="Backtest from selected date (changing pair = auto-load latest data)">Load</button>
-    <span id="replayCtrls">
-      <span class="rsep"></span>
-      <button id="prevBtn" title="Prev (←)">⏪</button>
-      <button id="playBtn" title="Play/Pause (Space)">▶</button>
-      <button id="nextBtn" title="Next (→)">⏩</button>
-      <span class="rsep"></span>
-      <span class="rlabel">Speed</span>
-      <select id="speed" title="Play speed (candles/sec)">
-        <option value="1">1×</option>
-        <option value="2">2×</option>
-        <option value="3" selected>3×</option>
-        <option value="5">5×</option>
-        <option value="10">10×</option>
-        <option value="20">20×</option>
-      </select>
-    </span>
   </div>
 </div>
 
@@ -3903,6 +3905,7 @@ chart.subscribeAction('onCrosshairChange', d=>{ if(d&&d.kLineData&&d.kLineData.t
 function setReplayUI(on){
   replayMode=on;
   $('#replaybar').classList.toggle('replaying', on);
+  $('#replayCtrls').classList.toggle('on', on);   // kontrol playback di toolbar
   replayBtn.classList.toggle('on', on);
   replayBtn.textContent = on ? '⏹ Exit Replay' : '⏮ Bar Replay';
   replayBtn.title = on ? 'Exit replay → back to realtime' : 'Pick replay start point directly on the chart';
