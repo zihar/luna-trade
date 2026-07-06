@@ -163,8 +163,8 @@ func candlesHandler(token string) http.HandlerFunc {
 		if v := q.Get("from"); v != "" {
 			p.Set("from", v)
 		}
-		// Daily/Weekly candle disetel tutup 18:00 NY (samakan dengan engine ICT).
-		if gran == "D" || gran == "W" {
+		// Daily/Weekly + H4 disetel tutup 18:00 NY (samakan dengan engine ICT / FOREX.com).
+		if gran == "D" || gran == "W" || gran == "H4" {
 			p.Set("alignmentTimezone", "America/New_York")
 			p.Set("dailyAlignment", "18")
 		}
