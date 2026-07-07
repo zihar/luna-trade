@@ -3236,8 +3236,16 @@ function delHooks(){ return {
       const rect=$('#chart').getBoundingClientRect();
       const toPt=(pc)=>{ const np = pc.timestamp!=null?{timestamp:pc.timestamp,value:pc.value}:{dataIndex:pc.dataIndex,value:pc.value};
         if(o.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp); return np; };
-      const n=Math.min(pendingClicks.length,o.points.length);
-      for(let k=0;k<n;k++) o.points[k]=toPt(pendingClicks[k]);
+      // Refine ke presisi sub-bar HANYA bila klik ↔ titik klinecharts SELARAS: jumlah sama &
+      // tiap titik berdekatan secara pixel. Saat klik cepat, pendingClicks bisa desync (klik
+      // ekstra dianggap noise / push ter-skip) → pemetaan by-index memasang klik yg salah &
+      // kotak "mengecil". Bila desync, pakai titik klinecharts apa adanya (ukuran benar, x snap-ke-bar).
+      const pxOf=(p)=>{ if(!p) return null; let c=chart.convertToPixel(p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c||null; };
+      let refine = pendingClicks.length===o.points.length;
+      if(refine){ const tolX=1.5*barSpacePx();
+        for(let k=0;k<o.points.length;k++){ const a=pxOf(toPt(pendingClicks[k])), b=pxOf(o.points[k]);
+          if(!a||!b||Math.abs(a.x-b.x)>tolX||Math.abs(a.y-b.y)>6){ refine=false; break; } } }
+      if(refine){ for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]); }
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});
