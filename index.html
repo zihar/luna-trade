@@ -40,6 +40,24 @@
   button.buy:hover,button.sell:hover{filter:brightness(1.07)}
   button.tf{padding:5px 10px;font-weight:600}
   button.tf.on,button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* TF favorit + dropdown ala TradingView */
+  .tfwrap{position:relative;display:inline-flex;align-items:center;gap:5px}
+  button.tf-more{display:inline-flex;align-items:center;justify-content:center;padding:5px 6px;color:var(--muted)}
+  button.tf-more svg{width:14px;height:14px;display:block}
+  button.tf-more:hover,button.tf-more.on{color:var(--txt)}
+  .tf-menu{display:none;position:absolute;top:34px;left:0;z-index:60;width:150px;padding:5px;
+           background:var(--panel);border:1px solid var(--border);border-radius:10px;
+           box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .tf-menu.open{display:block}
+  .tf-row{display:flex;align-items:center;height:30px;padding:0 4px 0 9px;border-radius:7px;
+          font-size:12.5px;font-weight:600;color:var(--txt);cursor:pointer}
+  .tf-row:hover{background:var(--btn-hover)}
+  .tf-row.on{color:var(--accent)}
+  .tf-row .tf-lbl{flex:1}
+  .tf-star{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+           border-radius:6px;color:var(--muted);opacity:.55;font-size:14px;line-height:1}
+  .tf-star:hover{background:var(--border);opacity:1;color:var(--txt)}
+  .tf-star.fav{color:var(--accent);opacity:1}
   button.tool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent)}
   .grow{flex:1}
   .status{font-size:12px;color:var(--muted)}
@@ -302,14 +320,95 @@
   .hdr-ba{ font-family:var(--font-num); font-size:10.5px; color:var(--muted);
            font-variant-numeric:tabular-nums; letter-spacing:.02em; white-space:nowrap; }
   @media (max-width:900px){ .hdr-ba{ display:none; } }
-  /* instrument selector — native, dipoles: chevron custom + fokus ring */
-  #instrument{ appearance:none; -webkit-appearance:none; font-family:var(--font-num); font-weight:600;
-    font-size:13px; letter-spacing:.01em; height:30px; padding:5px 26px 5px 10px; cursor:pointer;
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2389898b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
-    background-repeat:no-repeat; background-position:right 8px center; background-size:11px; }
-  #instrument:hover{ border-color:var(--btn-border-hover); background-color:var(--btn-hover); }
-  #instrument:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
-  body.light #instrument{ background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23697280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>"); }
+  /* ===== Luna Instrument Picker (ganti <select> native) ============================
+     Signature: tiap pair = dua chip mata uang menyatu (base di atas quote). Metal/kripto
+     dapat warna metaliknya. Baris aktif dapat bar crescent-glow --luna-glow. Select asli
+     tetap ada (hidden) sbg sumber kebenaran → kode lama ($('#instrument').value/.onchange) utuh. */
+  #instrument[hidden]{ display:none; }
+  .ipick{ position:relative; }
+  .ipick-trg{ display:flex; align-items:center; gap:8px; height:30px; padding:0 8px 0 7px; cursor:pointer;
+    border:1px solid var(--border); border-radius:8px; background:var(--btn);
+    transition:border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+  .ipick-trg:hover{ border-color:var(--btn-border-hover); background:var(--btn-hover); }
+  .ipick-trg.open{ border-color:var(--luna-glow); box-shadow:0 0 0 1px var(--luna-glow), 0 0 16px rgba(174,185,232,.35); }
+  .ipick-trg:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
+  .ipick-tick{ font-family:var(--font-num); font-weight:700; font-size:13px; letter-spacing:.02em; color:var(--txt); }
+  .ipick-chev{ width:14px; height:14px; color:var(--muted); transition:transform .18s ease; flex:none; }
+  .ipick-trg.open .ipick-chev{ transform:rotate(180deg); }
+
+  /* fused dual-chip */
+  .ipick-pair{ display:inline-flex; align-items:center; flex:none; }
+  .ipick-chip{ width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-num); font-weight:700; font-size:9px; letter-spacing:.02em; color:#e7eaf2;
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 1px 2px rgba(0,0,0,.35); }
+  .ipick-pair .ipick-chip+.ipick-chip{ margin-left:-7px; }
+  .ipick-pair .ipick-chip:first-child{ position:relative; z-index:2;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 2px var(--panel), 0 1px 2px rgba(0,0,0,.4); }
+  .ipick-trg .ipick-pair .ipick-chip:first-child{ box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 2px var(--btn), 0 1px 2px rgba(0,0,0,.4); }
+  body.light .ipick-trg .ipick-pair .ipick-chip:first-child{ box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 2px var(--btn), 0 1px 2px rgba(0,0,0,.4); }
+  .ipk-c-EUR{ background:linear-gradient(155deg,#2c3a5c,#1f2942); }
+  .ipk-c-USD{ background:linear-gradient(155deg,#20423a,#173029); }
+  .ipk-c-GBP{ background:linear-gradient(155deg,#352c54,#241d3c); }
+  .ipk-c-JPY{ background:linear-gradient(155deg,#4a2b33,#331d24); }
+  .ipk-c-AUD{ background:linear-gradient(155deg,#463a20,#302816); }
+  .ipk-c-CAD{ background:linear-gradient(155deg,#452e24,#2f1f18); }
+  .ipk-c-NZD{ background:linear-gradient(155deg,#1c3f3c,#122b29); }
+  .ipk-c-CHF{ background:linear-gradient(155deg,#4a2626,#331a1a); }
+  .ipk-c-XAU{ background:linear-gradient(155deg,#6a531f,#4a3915); color:#f0cf76; }
+  .ipk-c-XAG{ background:linear-gradient(155deg,#3a4048,#2a2f36); color:#dfe6f0; }
+  .ipk-c-BTC{ background:linear-gradient(155deg,#5c3a13,#40290d); color:#f7a53a; }
+  .ipk-c-ETH{ background:linear-gradient(155deg,#343b63,#242848); color:#b9c2f0; }
+  .ipk-c-LTC{ background:linear-gradient(155deg,#2b3440,#1d232c); color:#b9c6d6; }
+  .ipk-c-BCH{ background:linear-gradient(155deg,#1f4030,#153021); color:#7fdca8; }
+  .ipk-c-DXY{ background:linear-gradient(155deg,#28356a,#1c2648); color:#9fb1ff; }
+  /* indeks: satu warna slate bersama — teks kode indeks yang membedakan */
+  .ipk-c-SPX,.ipk-c-NAS,.ipk-c-DJI,.ipk-c-RUT,.ipk-c-DAX,.ipk-c-FTSE,.ipk-c-CAC,.ipk-c-STOXX,.ipk-c-NKY,.ipk-c-ASX,.ipk-c-HSI{
+    background:linear-gradient(155deg,#2b3444,#1d2431); color:#c3ccdb; }
+
+  /* dropdown panel */
+  .ipick-panel{ position:absolute; top:calc(100% + 8px); left:0; width:308px; max-width:calc(100vw - 24px); z-index:1300;
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
+    overflow:hidden; transform-origin:top left; opacity:0; transform:translateY(-6px) scale(.98);
+    pointer-events:none; transition:opacity .16s ease, transform .16s ease; }
+  .ipick-panel.open{ opacity:1; transform:none; pointer-events:auto; }
+  .ipick-search{ display:flex; align-items:center; gap:8px; padding:11px 12px 10px; border-bottom:1px solid var(--line); }
+  .ipick-box{ flex:1; display:flex; align-items:center; gap:8px; height:34px; padding:0 11px;
+    background:var(--inset); border:1px solid var(--border); border-radius:8px;
+    transition:border-color .12s ease, box-shadow .12s ease; }
+  .ipick-box:focus-within{ border-color:#eef1f7; box-shadow:0 0 0 1px #eef1f7, 0 0 13px rgba(174,185,232,.5); }
+  body.light .ipick-box:focus-within{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 0 13px rgba(90,108,196,.4); }
+  .ipick-box svg{ width:14px; height:14px; color:var(--muted); flex:none; }
+  .ipick-box input{ flex:1; min-width:0; border:0; background:transparent; outline:none; color:var(--txt); font:13px 'Inter',sans-serif; }
+  .ipick-box input::placeholder{ color:var(--muted); }
+  .ipick-kbd{ font-family:var(--font-num); font-size:10px; color:var(--muted); border:1px solid var(--border);
+    border-radius:5px; padding:2px 5px; background:var(--btn); }
+  .ipick-list{ max-height:376px; overflow-y:auto; padding:5px 5px 7px; }
+  .ipick-list::-webkit-scrollbar{ width:9px; }
+  .ipick-list::-webkit-scrollbar-thumb{ background:#2f2f35; border-radius:6px; border:2px solid var(--panel); }
+  body.light .ipick-list::-webkit-scrollbar-thumb{ background:#cfd5de; border-color:var(--panel); }
+  .ipick-eye{ display:flex; align-items:center; gap:8px; padding:11px 9px 5px; }
+  .ipick-eye .lbl{ font-family:var(--font-display); font-weight:600; font-size:10px; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--hdr); }
+  .ipick-eye .rule{ flex:1; height:1px; background:var(--line); }
+  .ipick-eye .cnt{ font-family:var(--font-num); font-size:10px; color:var(--muted); }
+  .ipick-row{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:11px;
+    padding:7px 9px; border-radius:9px; cursor:pointer; position:relative; transition:background .1s ease; }
+  .ipick-row:hover, .ipick-row.cursor{ background:var(--btn-hover); }
+  .ipick-row.on{ background:rgba(174,185,232,.11); }
+  body.light .ipick-row.on{ background:rgba(90,108,196,.12); }
+  .ipick-row.on::before{ content:""; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px;
+    background:var(--luna-glow); box-shadow:0 0 8px rgba(174,185,232,.7); }
+  .ipick-row .id{ min-width:0; }
+  .ipick-row .sym{ font-family:var(--font-num); font-weight:700; font-size:12.5px; letter-spacing:.02em; color:var(--txt); }
+  .ipick-row .name{ font-size:11px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ipick-row .px{ text-align:right; font-family:var(--font-num); }
+  .ipick-row .last{ font-size:12.5px; font-weight:700; color:var(--txt); font-variant-numeric:tabular-nums; }
+  .ipick-row .chg{ font-size:10.5px; margin-top:1px; display:flex; align-items:center; gap:3px; justify-content:flex-end; font-variant-numeric:tabular-nums; }
+  .ipick-row .chg.up{ color:var(--green); } .ipick-row .chg.down{ color:var(--red); }
+  .ipick-row .chg .arw{ font-size:8px; }
+  .ipick-empty{ padding:26px 12px; text-align:center; color:var(--muted); font-size:12px; }
+  @media (prefers-reduced-motion:reduce){ .ipick-panel{ transition:opacity .12s ease; transform:none; } .ipick-chev{ transition:none; } }
 
   /* Placeholder bulan statis: identitas lunar sejak paint pertama (sebelum klinecharts
      load & loadInit jalan). Dihapus via JS saat chart pertama ter-render. */
@@ -755,7 +854,12 @@
   .op-shead, .op-ehead{ padding-top:2px; }
   .op2.expanded .op-simple{ display:none; }
   .op2.expanded .op-expand{ display:flex; }
-  .op2-flag{ font-size:15px; line-height:1; margin-right:1px; }
+  /* slot "flag" order panel & popup edit: pakai ulang dual-chip picker (versi 18px kompak) */
+  .op2-flag, .pe-flag{ display:inline-flex; align-items:center; line-height:1; margin-right:1px; vertical-align:middle; }
+  .op2-flag .ipick-chip, .pe-flag .ipick-chip{ width:18px; height:18px; border-radius:5px; font-size:8px; }
+  .op2-flag .ipick-chip+.ipick-chip, .pe-flag .ipick-chip+.ipick-chip{ margin-left:-6px; }
+  .op2-flag .ipick-chip:first-child, .pe-flag .ipick-chip:first-child{ position:relative; z-index:2;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 2px var(--panel), 0 1px 2px rgba(0,0,0,.4); }
   /* header satu baris simple: pill Market/Pending + chip RISK/SL/TP (netral, ala TradeLocker) */
   .op3-pill{ height:22px; padding:0 9px; border-radius:12px; background:var(--inset);
     border:1px solid var(--border); color:var(--txt); font-size:9px; font-weight:600; letter-spacing:.12em; flex:0 0 auto; }
@@ -827,14 +931,39 @@
 <div class="toolbar">
   <span class="brand"><svg class="glyph" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><mask id="lunaCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaCut)"/></svg>Luna&nbsp;Trade</span>
   <span class="vsep"></span>
-  <select id="instrument">
+  <select id="instrument" hidden aria-hidden="true" tabindex="-1">
+    <!-- Forex majors -->
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
-    <option>AUD_USD</option><option>USD_CAD</option><option>XAU_USD</option>
-    <option>XAG_USD</option>
+    <option>USD_CHF</option><option>USD_CAD</option><option>AUD_USD</option><option>NZD_USD</option>
+    <!-- Forex cross -->
     <option>GBP_JPY</option><option>EUR_JPY</option>
+    <!-- Metals -->
+    <option>XAU_USD</option><option>XAG_USD</option>
+    <!-- Indices -->
     <option>DXY</option>
-    <option>BTC_USD</option>
+    <option>SPX500_USD</option><option>NAS100_USD</option><option>US30_USD</option><option>US2000_USD</option>
+    <option>DE30_EUR</option><option>UK100_GBP</option><option>FR40_EUR</option><option>EU50_EUR</option>
+    <option>JP225_USD</option><option>AU200_AUD</option><option>HK33_HKD</option>
+    <!-- Crypto -->
+    <option>BTC_USD</option><option>ETH_USD</option><option>LTC_USD</option><option>BCH_USD</option>
   </select>
+  <div class="ipick" id="ipick">
+    <button type="button" class="ipick-trg" id="ipickTrg" aria-haspopup="listbox" aria-expanded="false" aria-label="Switch instrument">
+      <span class="ipick-pair" id="ipickTrgPair"></span>
+      <span class="ipick-tick" id="ipickTrgTick">EURUSD</span>
+      <svg class="ipick-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="ipick-panel" id="ipickPanel" role="listbox" aria-label="Instruments">
+      <div class="ipick-search">
+        <div class="ipick-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="ipickQ" placeholder="Search instruments…" autocomplete="off" spellcheck="false">
+        </div>
+        <span class="ipick-kbd">esc</span>
+      </div>
+      <div class="ipick-list" id="ipickList"></div>
+    </div>
+  </div>
   <span class="vsep"></span>
   <span class="acct-badge demo" id="acctBadge" title="Demo account (simulated, no real money) — real OANDA execution comes in Phase 2">● DEMO</span>
   <span class="vsep"></span>
@@ -854,7 +983,11 @@
   </aside>
   <div class="center">
     <div class="tfbar">
-      <span id="tfbtns"></span>
+      <span class="tfwrap">
+        <span id="tfbtns"></span>
+        <button id="tfMore" class="tf-more" title="Timeframes" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="tf-menu" id="tfMenu" role="menu"></div>
+      </span>
       <span class="sep"></span>
       <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
       <span id="replayCtrls">
@@ -1762,13 +1895,59 @@ attachPriceWheelZoom($('#chart'));
 // ===================== TF buttons =====================
 const tfWrap = $('#tfbtns');
 const TF_LABEL = {MN:'M'};   // label tampil per-TF (key internal tetap, mis. MN → "M")
-TF_LIST.forEach(tf=>{
-  const b=document.createElement('button');
-  b.className='tf'; b.textContent=TF_LABEL[tf]||tf; b.dataset.tf=tf;
-  b.onclick=()=>switchTF(tf);
-  tfWrap.appendChild(b);
-});
-function highlightTF(){ tfWrap.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.tf===currentTF)); }
+const tfMoreBtn = $('#tfMore');
+const tfMenu = $('#tfMenu');
+const TF_FAV_DEFAULT = ['M15','D'];
+// favorit TF yang tampil di bar (custom per-user, ala TradingView) — disimpan di localStorage.
+function loadTFFav(){
+  try{ const a=JSON.parse(localStorage.getItem('br_tfFav'));
+    if(Array.isArray(a)){ const f=a.filter(t=>TF_LIST.includes(t)); if(f.length) return f; }
+  }catch(e){}
+  return TF_FAV_DEFAULT.slice();
+}
+let tfFav = loadTFFav();
+function saveTFFav(){ try{ localStorage.setItem('br_tfFav', JSON.stringify(tfFav)); }catch(e){} }
+function toggleTFFav(tf){
+  const i=tfFav.indexOf(tf);
+  if(i>=0){ if(tfFav.length<=1) return; tfFav.splice(i,1); }   // sisakan minimal 1 favorit
+  else tfFav.push(tf);
+  saveTFFav(); rebuildTFBar(); buildTFMenu();
+}
+// tombol di bar = favorit (urut kanonik TF_LIST) + TF aktif bila bukan favorit (tampil sementara)
+function rebuildTFBar(){
+  const show = TF_LIST.filter(tf=> tfFav.includes(tf) || tf===currentTF);
+  tfWrap.innerHTML='';
+  show.forEach(tf=>{
+    const b=document.createElement('button');
+    b.className='tf'+(tf===currentTF?' on':''); b.textContent=TF_LABEL[tf]||tf; b.dataset.tf=tf;
+    b.onclick=()=>switchTF(tf);
+    tfWrap.appendChild(b);
+  });
+}
+// dropdown: semua TF; klik label → pindah TF, klik ★ → toggle favorit (muncul/hilang di bar)
+function buildTFMenu(){
+  tfMenu.innerHTML='';
+  TF_LIST.forEach(tf=>{
+    const row=document.createElement('div');
+    row.className='tf-row'+(tf===currentTF?' on':''); row.setAttribute('role','menuitem');
+    const lbl=document.createElement('span'); lbl.className='tf-lbl'; lbl.textContent=TF_LABEL[tf]||tf;
+    lbl.onclick=()=>{ closeTFMenu(); switchTF(tf); };
+    const fav=tfFav.includes(tf);
+    const star=document.createElement('span');
+    star.className='tf-star'+(fav?' fav':''); star.textContent='★';
+    star.title=fav?'Remove from favorites':'Add to favorites';
+    star.onclick=(e)=>{ e.stopPropagation(); toggleTFFav(tf); };
+    row.append(lbl,star);
+    tfMenu.appendChild(row);
+  });
+}
+function openTFMenu(){ buildTFMenu(); tfMenu.classList.add('open'); tfMoreBtn.classList.add('on'); tfMoreBtn.setAttribute('aria-expanded','true'); }
+function closeTFMenu(){ tfMenu.classList.remove('open'); tfMoreBtn.classList.remove('on'); tfMoreBtn.setAttribute('aria-expanded','false'); }
+tfMoreBtn.onclick=(e)=>{ e.stopPropagation(); tfMenu.classList.contains('open')?closeTFMenu():openTFMenu(); };
+document.addEventListener('click',(e)=>{ if(tfMenu.classList.contains('open') && !e.target.closest('.tfwrap')) closeTFMenu(); });
+// highlightTF dipanggil di banyak tempat saat currentTF berubah → rebuild bar (agar TF non-favorit aktif ikut tampil/hilang) & refresh menu bila terbuka.
+function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); }
+rebuildTFBar();
 
 // ===================== load awal =====================
 $('#instrument').value = localStorage.getItem('br_inst')||'EUR_USD';
@@ -1788,10 +1967,14 @@ syncDateDisplay();
 currentTF = localStorage.getItem('br_tf')||'M15';
 guessPip(); highlightTF();
 // ganti pair → langsung load data terkini (tombol Load khusus backtest by tanggal)
-$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); loadInit(true); };
+$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); syncIpickTrigger(); loadInit(true); };
 function guessPip(){
   const s=$('#instrument').value;
-  $('#pipSize').value = s.includes('BTC')?1 : s.includes('DXY')?0.01 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : s.includes('XAG')?0.001 : 0.0001;
+  // tabel di dalam fungsi: guessPip dipanggil saat init sebelum const global lain siap → hindari TDZ
+  const PIP={ SPX500_USD:1, NAS100_USD:1, US30_USD:1, DE30_EUR:1, UK100_GBP:1, FR40_EUR:1, EU50_EUR:1,
+    JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:0.01, ETH_USD:0.1, LTC_USD:0.1, BCH_USD:0.1 };
+  $('#pipSize').value = PIP[s]!=null ? PIP[s]
+    : s.includes('BTC')?1 : s.includes('DXY')?0.01 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : s.includes('XAG')?0.001 : 0.0001;
   lotsManual=false;   // saran lot otomatis menyesuaikan instrumen baru
 }
 
@@ -1971,9 +2154,8 @@ const usdGrp=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFra
 function updateOrderBtns(){ renderOrderPanel(); }
 function renderOrderPanel(){
   document.querySelectorAll('.j-sym').forEach(s=>s.textContent=inst.replace('_',''));
-  const flag = inst.includes('XAU')?'🥇' : inst.includes('XAG')?'🥈'
-    : inst.includes('BTC')?'₿' : inst==='DXY'?'💵' : '🏳️';
-  document.querySelectorAll('.j-flag').forEach(f=>f.textContent=flag);
+  const flagHtml = ipkPair(inst);   // dual-chip identik picker (pengganti emoji generik)
+  document.querySelectorAll('.j-flag').forEach(f=>f.innerHTML=flagHtml);
   const lu=$('#lotUnit'); if(lu) lu.textContent=lotUnitName();
   const cur=currentCandle(), ba=curBidAsk();
   const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal();
@@ -2165,10 +2347,18 @@ async function liveRefresh(){
 //   cross JPY  → asumsi USD/JPY (approx; cross-rate penuh = Fase 2)
 const INSTRUMENT = {
   EUR_USD:{pip:0.0001,quote:'USD'}, GBP_USD:{pip:0.0001,quote:'USD'}, AUD_USD:{pip:0.0001,quote:'USD'},
+  NZD_USD:{pip:0.0001,quote:'USD'}, USD_CHF:{pip:0.0001,quote:'CHF'},
   USD_CAD:{pip:0.0001,quote:'CAD'}, USD_JPY:{pip:0.01,quote:'JPY'},
   GBP_JPY:{pip:0.01,quote:'JPY'},   EUR_JPY:{pip:0.01,quote:'JPY'},
-  XAU_USD:{pip:0.1,quote:'USD'},    XAG_USD:{pip:0.001,quote:'USD'},   BTC_USD:{pip:1,quote:'USD'},
+  XAU_USD:{pip:0.1,quote:'USD'},    XAG_USD:{pip:0.001,quote:'USD'},
+  // Indices (CFD). quote non-USD (EUR/GBP/AUD/HKD) → konversi P&L masih approx (lihat quoteToUsd).
   DXY:{pip:0.01,quote:'USD'},
+  SPX500_USD:{pip:1,quote:'USD'}, NAS100_USD:{pip:1,quote:'USD'}, US30_USD:{pip:1,quote:'USD'},
+  US2000_USD:{pip:0.01,quote:'USD'}, JP225_USD:{pip:1,quote:'USD'},
+  DE30_EUR:{pip:1,quote:'EUR'}, FR40_EUR:{pip:1,quote:'EUR'}, EU50_EUR:{pip:1,quote:'EUR'},
+  UK100_GBP:{pip:1,quote:'GBP'}, AU200_AUD:{pip:1,quote:'AUD'}, HK33_HKD:{pip:1,quote:'HKD'},
+  // Crypto (CFD)
+  BTC_USD:{pip:1,quote:'USD'}, ETH_USD:{pip:0.1,quote:'USD'}, LTC_USD:{pip:0.1,quote:'USD'}, BCH_USD:{pip:0.1,quote:'USD'},
 };
 const APPROX_USDJPY = 157;   // fallback cross JPY (akun USD; cross-rate penuh menyusul di Fase 2)
 function instSpec(){ return INSTRUMENT[inst] || {pip:+$('#pipSize').value||0.0001, quote:'USD'}; }
@@ -2583,7 +2773,7 @@ function buildPosEditPanel(){
   posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
   posEditEl.innerHTML=
     `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Tutup">✕</button></div>`+
-    `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag">🏳️</span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
+    `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag"></span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
     `<div class="tl-sltp"><div class="tl-head">`+
       `<button type="button" class="tl-trail" id="peTrail" title="Trailing (segera)">Trail</button>`+
       `<label class="tl-toggle" id="peSLtog">Stop Loss<input type="checkbox" id="peSLon"></label>`+
@@ -2624,7 +2814,7 @@ function renderPosEdit(skipPriceInputs){
   const $$=s=>posEditEl.querySelector(s);
   const dec=decimalsFor(editPos.instrument), pip=pipOf(editPos.instrument), bal=+$('#balance').value||0, isSell=editPos.dir==='short';
   $$('#peDir').textContent=isSell?'SELL':'BUY'; $$('#peDir').className='pe-dir '+(isSell?'sell':'buy');
-  $$('#peFlag').textContent = editPos.instrument.includes('XAU')?'🥇':editPos.instrument.includes('XAG')?'🥈':editPos.instrument.includes('BTC')?'₿':editPos.instrument==='DXY'?'💵':'🏳️';
+  $$('#peFlag').innerHTML = ipkPair(editPos.instrument);   // dual-chip identik picker
   $$('#peSym').textContent=editPos.instrument.replace('_','');
   const mkt=+editPos.price, mktCls=(isSell? mkt<=editPos.entry : mkt>=editPos.entry)?'t-pos':'t-neg';
   $$('#peInstR').innerHTML=`${lotLabelFor(editPos.instrument,editPos.units)} / ${(+editPos.entry).toFixed(dec)} → <span class="${mktCls}">${mkt.toFixed(dec)}</span>`;
@@ -3523,7 +3713,14 @@ function resetTrade(){
 
 // ===================== watchlist & price alert (Fase 1d) =====================
 const WATCH_SYMS = [...document.querySelectorAll('#instrument option')].map(o=>o.value);
-function symDecimals(s){ return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
+// desimal tampil per simbol. Indices/crypto CFD & metal punya presisi khusus (dari OANDA
+// displayPrecision) → tabel eksak dulu, sisanya fallback substring (FX 5, JPY 3, metal 3).
+const SYM_DECIMALS = {
+  SPX500_USD:1, NAS100_USD:1, US30_USD:1, DE30_EUR:1, UK100_GBP:1, FR40_EUR:1, EU50_EUR:1,
+  JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:3, ETH_USD:2, LTC_USD:2, BCH_USD:2,
+};
+function symDecimals(s){ if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
+  return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
 // toast feedback ringan (alert berbunyi / pending tereksekusi) — terlihat tanpa mengandalkan setStatus
 let toastTimer=null;
 function toast(msg){
@@ -3551,6 +3748,8 @@ function maxSpreadPips(s){
   if(s.includes('XAU')) return 50;     // emas ~ s/d $0.50
   if(s.includes('XAG')) return 40;     // perak
   if(s.includes('BTC')) return 80;     // kripto ~ s/d $80
+  if(s==='ETH_USD'||s==='LTC_USD'||s==='BCH_USD') return 300;   // crypto CFD (pip 0.1) → spread $ bisa lebar
+  if(SYM_DECIMALS[s]!=null) return 200;                          // indices CFD → spread beberapa poin, longgar
   return 30;                            // FX major/minor & JPY (real biasanya 1–15, jadi aman)
 }
 function renderWatch(){
@@ -3580,7 +3779,108 @@ function renderWatch(){
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); try{drawPaperLines();}catch(e){} loadInit(true); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true); }
+
+// ===================== Luna Instrument Picker (dropdown custom) =====================
+// Menyetir <select id="instrument"> yang tersembunyi. Data harga nebeng quoteCache/liveTicks
+// yg sudah dipakai watchlist (tanpa request tambahan); baris hanya di-update saat dropdown
+// terbuka (queuePriceRender → updateIpickPrices), jadi biaya per-tick ~nol saat tertutup.
+const IPK_CCY = {
+  // mata uang (pair 2-chip)
+  EUR:'EU', USD:'US', GBP:'GB', JPY:'JP', AUD:'AU', CAD:'CA', NZD:'NZ', CHF:'CH', HKD:'HK',
+  XAU:'Au', XAG:'Ag',
+  // crypto (chip base)
+  BTC:'₿', ETH:'Ξ', LTC:'Ł', BCH:'BC',
+  // indeks (chip tunggal) — kode singkat khas indeksnya
+  DXY:'$', SPX:'SP', NAS:'NQ', DJI:'DJ', RUT:'RU', DAX:'DE', FTSE:'UK', CAC:'FR', STOXX:'SX', NKY:'NK', ASX:'AS', HSI:'HK',
+};
+const IPK_GROUPS = ['Forex','Metals','Indices','Crypto'];
+const IPK_META = {
+  EUR_USD:{grp:'Forex',   name:'Euro / US Dollar',                  base:'EUR', quote:'USD'},
+  GBP_USD:{grp:'Forex',   name:'British Pound / US Dollar',         base:'GBP', quote:'USD'},
+  USD_JPY:{grp:'Forex',   name:'US Dollar / Japanese Yen',          base:'USD', quote:'JPY'},
+  USD_CHF:{grp:'Forex',   name:'US Dollar / Swiss Franc',           base:'USD', quote:'CHF'},
+  USD_CAD:{grp:'Forex',   name:'US Dollar / Canadian Dollar',       base:'USD', quote:'CAD'},
+  AUD_USD:{grp:'Forex',   name:'Australian Dollar / US Dollar',     base:'AUD', quote:'USD'},
+  NZD_USD:{grp:'Forex',   name:'New Zealand Dollar / US Dollar',    base:'NZD', quote:'USD'},
+  GBP_JPY:{grp:'Forex',   name:'British Pound / Japanese Yen',      base:'GBP', quote:'JPY'},
+  EUR_JPY:{grp:'Forex',   name:'Euro / Japanese Yen',              base:'EUR', quote:'JPY'},
+  XAU_USD:{grp:'Metals',  name:'Gold / US Dollar',                  base:'XAU', quote:'USD'},
+  XAG_USD:{grp:'Metals',  name:'Silver / US Dollar',                base:'XAG', quote:'USD'},
+  DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY'},
+  SPX500_USD:{grp:'Indices', name:'S&P 500',            base:'SPX'},
+  NAS100_USD:{grp:'Indices', name:'Nasdaq 100',         base:'NAS'},
+  US30_USD:  {grp:'Indices', name:'Dow Jones 30',       base:'DJI'},
+  US2000_USD:{grp:'Indices', name:'Russell 2000',       base:'RUT'},
+  DE30_EUR:  {grp:'Indices', name:'Germany 40 (DAX)',   base:'DAX'},
+  UK100_GBP: {grp:'Indices', name:'FTSE 100',           base:'FTSE'},
+  FR40_EUR:  {grp:'Indices', name:'CAC 40',             base:'CAC'},
+  EU50_EUR:  {grp:'Indices', name:'Euro Stoxx 50',      base:'STOXX'},
+  JP225_USD: {grp:'Indices', name:'Nikkei 225',         base:'NKY'},
+  AU200_AUD: {grp:'Indices', name:'ASX 200',            base:'ASX'},
+  HK33_HKD:  {grp:'Indices', name:'Hang Seng',          base:'HSI'},
+  BTC_USD:{grp:'Crypto',  name:'Bitcoin / US Dollar',      base:'BTC', quote:'USD'},
+  ETH_USD:{grp:'Crypto',  name:'Ether / US Dollar',        base:'ETH', quote:'USD'},
+  LTC_USD:{grp:'Crypto',  name:'Litecoin / US Dollar',     base:'LTC', quote:'USD'},
+  BCH_USD:{grp:'Crypto',  name:'Bitcoin Cash / US Dollar', base:'BCH', quote:'USD'},
+};
+function ipkMeta(s){ const m=IPK_META[s]; if(m) return m;
+  const p=s.split('_'); return { grp:'Forex', name:s.replace('_',' / '), base:p[0], quote:p[1] }; }
+function ipkChip(ccy){ if(!ccy) return ''; const t=IPK_CCY[ccy]||ccy.slice(0,2); return `<span class="ipick-chip ipk-c-${ccy}">${t}</span>`; }
+function ipkPair(s){ const m=ipkMeta(s); return ipkChip(m.base)+ipkChip(m.quote); }
+function ipkPrice(s){ const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s);
+  let last=lt?(lt.bid+lt.ask)/2 : (q?q.last:null);
+  return { last: last!=null?last.toFixed(dec):'—', chg: q?q.chg:null }; }
+function ipkPriceHTML(s){ const p=ipkPrice(s);
+  if(p.chg==null && p.last==='—') return `<div class="last">—</div>`;
+  const chg=p.chg||0, up=chg>=0;
+  return `<div class="last">${p.last}</div><div class="chg ${up?'up':'down'}"><span class="arw">${up?'▲':'▼'}</span>${(up?'+':'')+chg.toFixed(2)}%</div>`; }
+
+let ipickOpen=false, ipickCursor=-1;
+function syncIpickTrigger(){ const s=($('#instrument')&&$('#instrument').value)||inst;
+  const tp=$('#ipickTrgPair'), tt=$('#ipickTrgTick');
+  if(tp) tp.innerHTML=ipkPair(s); if(tt) tt.textContent=s.replace('_',''); }
+function renderIpick(filter=''){
+  const list=$('#ipickList'); if(!list) return;
+  const f=(filter||'').trim().toLowerCase();
+  const match=s=>{ const m=ipkMeta(s); return !f || s.replace('_','').toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f); };
+  let html='', any=false, idx=0; const flat=[];
+  for(const g of IPK_GROUPS){
+    const items=WATCH_SYMS.filter(s=>ipkMeta(s).grp===g && match(s));
+    if(!items.length) continue; any=true;
+    html+=`<div class="ipick-eye"><span class="lbl">${g}</span><span class="rule"></span><span class="cnt">${items.length}</span></div>`;
+    for(const s of items){ const m=ipkMeta(s), on=s===inst?' on':'', cur=idx===ipickCursor?' cursor':'';
+      html+=`<div class="ipick-row${on}${cur}" data-sym="${s}" role="option" aria-selected="${s===inst}">
+        <span class="ipick-pair">${ipkPair(s)}</span>
+        <span class="id"><div class="sym">${s.replace('_','')}</div><div class="name">${m.name||s}</div></span>
+        <span class="px">${ipkPriceHTML(s)}</span></div>`;
+      flat.push(s); idx++; }
+  }
+  list.innerHTML = any ? html : `<div class="ipick-empty">No instruments match “${filter}”.</div>`;
+  list._flat=flat;
+  list.querySelectorAll('.ipick-row').forEach(r=>r.onclick=()=>{ selectSymbol(r.dataset.sym); closeIpick(); });
+}
+function updateIpickPrices(){ const list=$('#ipickList'); if(!list) return;
+  list.querySelectorAll('.ipick-row').forEach(r=>{ const px=r.querySelector('.px'); if(px) px.innerHTML=ipkPriceHTML(r.dataset.sym); }); }
+function ipkScrollCursor(){ const el=$('#ipickList').querySelector('.ipick-row.cursor'); if(el) el.scrollIntoView({block:'nearest'}); }
+function openIpick(){ const p=$('#ipickPanel'), t=$('#ipickTrg'), q=$('#ipickQ'); if(!p) return;
+  ipickOpen=true; ipickCursor=-1; p.classList.add('open'); t.classList.add('open'); t.setAttribute('aria-expanded','true');
+  q.value=''; renderIpick(); q.focus(); }
+function closeIpick(){ const p=$('#ipickPanel'), t=$('#ipickTrg'); if(!p) return;
+  ipickOpen=false; p.classList.remove('open'); t.classList.remove('open'); t.setAttribute('aria-expanded','false'); }
+function initIpick(){ const trg=$('#ipickTrg'), q=$('#ipickQ'); if(!trg) return;
+  syncIpickTrigger();
+  trg.onclick=()=> ipickOpen?closeIpick():openIpick();
+  trg.onkeydown=e=>{ if((e.key==='ArrowDown'||e.key==='Enter'||e.key===' ') && !ipickOpen){ e.preventDefault(); openIpick(); } };
+  q.oninput=()=>{ ipickCursor=-1; renderIpick(q.value); };
+  q.onkeydown=e=>{ const flat=($('#ipickList')._flat)||[];
+    if(e.key==='ArrowDown'){ e.preventDefault(); ipickCursor=Math.min(ipickCursor+1,flat.length-1); renderIpick(q.value); ipkScrollCursor(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); ipickCursor=Math.max(ipickCursor-1,0); renderIpick(q.value); ipkScrollCursor(); }
+    else if(e.key==='Enter'){ e.preventDefault(); const pick=flat[ipickCursor]||flat[0]; if(pick){ selectSymbol(pick); closeIpick(); trg.focus(); } }
+    else if(e.key==='Escape'){ e.preventDefault(); closeIpick(); trg.focus(); } };
+  document.addEventListener('click',e=>{ if(ipickOpen && !e.target.closest('#ipick')) closeIpick(); });
+}
+initIpick();
 
 // ===================== live price stream (SSE /api/prices) =====================
 // Satu EventSource → semua simbol watchlist. Throttle render via rAF (tick bisa
@@ -3592,6 +3892,7 @@ function queuePriceRender(){
   if(priceRenderQueued) return; priceRenderQueued=true;
   requestAnimationFrame(()=>{ priceRenderQueued=false;
     if(!$('#watchlist').classList.contains('hidden')) renderWatch();
+    if(ipickOpen) updateIpickPrices();   // dropdown instrumen: refresh harga in-place saat terbuka
     if(live){ pushFormingCandle(); renderOrderPanel(); updatePriceTimer(); }  // gerak chart+panel tiap tick (Live)
     secondaries.forEach(sc=>{ try{ sc.tick(); }catch(e){} });                  // panel sekunder gerak tiap tick
   });
