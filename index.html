@@ -84,6 +84,15 @@
   .user-pop-logout{height:34px;border:1px solid var(--border);border-radius:8px;background:var(--btn);color:var(--txt);
                    cursor:pointer;font-size:13px;font-weight:500;margin-top:2px}
   .user-pop-logout:hover{background:var(--btn-hover)}
+  /* badge Demo di bawah identitas user + pemilih tema di dalam popup profil */
+  .user-pop-badge{display:inline-flex;align-items:center;gap:5px;margin-top:6px;width:fit-content;
+                  font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.6;
+                  color:var(--accent);background:var(--btn);border:1px solid var(--border);border-radius:999px;padding:2px 9px}
+  .theme-seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--btn)}
+  .theme-seg button{border:0;background:transparent;color:var(--muted);font-size:11px;font-weight:600;
+                    padding:4px 11px;cursor:pointer;line-height:1.4}
+  .theme-seg button:hover{color:var(--txt)}
+  .theme-seg button.on{background:var(--accent);color:#fff}
   /* dashboard analytics (admin) */
   .an-modal{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
   .an-modal.open{display:flex}
@@ -969,10 +978,6 @@
       <div class="ipick-list" id="ipickList"></div>
     </div>
   </div>
-  <span class="vsep"></span>
-  <span class="acct-badge demo" id="acctBadge" title="Demo account (simulated, no real money) — real OANDA execution comes in Phase 2">● DEMO</span>
-  <span class="vsep"></span>
-  <button id="themeBtn" title="Toggle dark/light theme">☀️</button>
   <span class="grow"></span>
   <span class="status" id="status"></span>
 </div>
@@ -1868,11 +1873,16 @@ function applyTheme(t){
   try{ chart.setStyles(light?lightStyles:darkStyles); }catch(e){}
   try{ secondaries.forEach(sc=>sc.chart.setStyles(light?lightStyles:darkStyles)); }catch(e){}
   try{ applyChartCfg(); }catch(e){}   // pertahankan warna chart kustom user di atas tema
-  const b=$('#themeBtn'); if(b){ b.textContent = light?'🌙':'☀️'; b.title = light?'Ke mode gelap':'Ke mode terang'; }
+  syncThemeUI(light);   // pemilih tema kini di dalam popup profil
   localStorage.setItem('br_theme', t);
   try{ drawEquity(); }catch(e){}   // warna kurva ikut tema
 }
-$('#themeBtn').onclick = ()=> applyTheme(document.body.classList.contains('light')?'dark':'light');
+// sinkronkan segmented control tema di popup profil (aman bila popup belum dibuat)
+function syncThemeUI(light){
+  document.querySelectorAll('#themeSeg button').forEach(btn=>{
+    btn.classList.toggle('on', btn.dataset.theme===(light?'light':'dark'));
+  });
+}
 applyTheme(localStorage.getItem('br_theme')||'dark');
 
 // Zoom HARGA via scroll wheel saat kursor di zona sumbu harga (kanan).
@@ -4740,12 +4750,14 @@ function onAuthed(u){
     const bar = document.querySelector('.toolbar');
     el = document.createElement('div'); el.id='userMenu'; el.className='user-menu';
     el.innerHTML =
-      '<button class="user-avatar" id="userAvatar" title="Akun"></button>'+
+      '<button class="user-avatar" id="userAvatar" title="Account"></button>'+
       '<div class="user-pop" id="userPop">'+
       '  <div class="user-pop-head"><div class="user-av-lg" id="userAvLg"></div>'+
-      '    <div class="user-pop-id"><div class="user-pop-name" id="userPopName"></div><div class="user-pop-email" id="userPopEmail"></div></div></div>'+
-      '  <div class="user-pop-row"><span>Akun</span><b>Demo · Paper</b></div>'+
-      '  <div class="user-pop-row"><span>Saldo</span><b id="userPopBal">—</b></div>'+
+      '    <div class="user-pop-id"><div class="user-pop-name" id="userPopName"></div><div class="user-pop-email" id="userPopEmail"></div>'+
+      '      <span class="user-pop-badge">● Demo · Paper</span></div></div>'+
+      '  <div class="user-pop-row"><span>Balance</span><b id="userPopBal">—</b></div>'+
+      '  <div class="user-pop-row"><span>Theme</span>'+
+      '    <span class="theme-seg" id="themeSeg"><button data-theme="dark">Dark</button><button data-theme="light">Light</button></span></div>'+
       '  <button class="user-pop-logout" id="analyticsBtn" style="display:none;margin-bottom:8px">📊 Analytics</button>'+
       '  <button class="user-pop-logout" id="logoutBtn">Logout</button>'+
       '</div>';
@@ -4761,6 +4773,8 @@ function onAuthed(u){
     document.addEventListener('click',()=>pop.classList.remove('open'));
     el.querySelector('#logoutBtn').onclick = doLogout;
     el.querySelector('#analyticsBtn').onclick = ()=>{ pop.classList.remove('open'); openAnalyticsDashboard(30); };
+    el.querySelectorAll('#themeSeg button').forEach(btn=>{ btn.onclick=()=>applyTheme(btn.dataset.theme); });
+    syncThemeUI(document.body.classList.contains('light'));
   }
   const ini=userInitials(name,email);
   setAvatar(el.querySelector('#userAvatar'), pic, ini);
