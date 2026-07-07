@@ -46,6 +46,7 @@
   button.tf-more svg{width:14px;height:14px;display:block}
   button.tf-more:hover,button.tf-more.on{color:var(--txt)}
   .tf-menu{display:none;position:absolute;top:34px;left:0;z-index:60;width:150px;padding:5px;
+           max-height:min(70vh,520px);overflow-y:auto;
            background:var(--panel);border:1px solid var(--border);border-radius:10px;
            box-shadow:0 10px 30px rgba(0,0,0,.4)}
   .tf-menu.open{display:block}
@@ -619,11 +620,15 @@
               background:var(--panel); font-size:11px; cursor:default; }
   .cp-sym{ font-size:11px; padding:2px 5px; background:var(--panel-2); color:var(--txt);
            border:1px solid var(--border); border-radius:5px; }
+  .cp-tfwrap{ position:relative; display:inline-flex; align-items:center; gap:2px; }
   .cp-tfs{ display:inline-flex; gap:2px; }
   .cp-tf{ font-size:10px; padding:1px 5px; background:transparent; border:1px solid transparent;
           color:var(--muted); border-radius:4px; cursor:pointer; }
   .cp-tf:hover{ color:var(--txt); }
   .cp-tf.on{ color:var(--accent); background:rgba(74,113,255,.16); }
+  .cp-more{ font-size:9px; padding:1px 3px; }
+  .cp-tf-menu{ top:20px; width:132px; }
+  .cp-tf-menu .tf-row{ height:26px; font-size:11px; }
   .cp-last{ margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
   .cp-act{ margin-left:6px; font-size:13px; line-height:1; padding:2px 5px; background:transparent;
            border:1px solid var(--border); border-radius:5px; color:var(--muted); cursor:pointer; }
@@ -1209,8 +1214,8 @@
 <script src="https://unpkg.com/klinecharts@9.8.10/dist/umd/klinecharts.min.js"></script>
 <script>
 // ===================== konstanta =====================
-const TF_LIST = ['M1','M5','M15','M30','H1','H4','D','W','MN'];
-const DUR = {M1:6e4,M5:3e5,M15:9e5,M30:18e5,H1:36e5,H4:1.44e7,D:8.64e7,W:6.048e8,MN:2.63e9}; // ms (MN≈30.44 hari)
+const TF_LIST = ['M1','M2','M4','M5','M10','M15','M30','H1','H2','H3','H4','H6','H8','H12','D','W','MN'];
+const DUR = {M1:6e4,M2:12e4,M4:24e4,M5:3e5,M10:6e5,M15:9e5,M30:18e5,H1:36e5,H2:72e5,H3:108e5,H4:1.44e7,H6:2.16e7,H8:2.88e7,H12:4.32e7,D:8.64e7,W:6.048e8,MN:2.63e9}; // ms (MN≈30.44 hari)
 const GRAN = {MN:'M'};   // label TF → granularity OANDA (MN = Monthly = 'M')
 const FWD_CHUNK = 500;
 const NY_TZ = 'America/New_York';
@@ -1911,7 +1916,17 @@ function toggleTFFav(tf){
   const i=tfFav.indexOf(tf);
   if(i>=0){ if(tfFav.length<=1) return; tfFav.splice(i,1); }   // sisakan minimal 1 favorit
   else tfFav.push(tf);
-  saveTFFav(); rebuildTFBar(); buildTFMenu();
+  saveTFFav(); refreshAllTFBars();   // favorit dipakai bersama chart utama & panel sekunder
+}
+// refresh semua TF bar (utama + sekunder) + menu yg sedang terbuka — dipanggil saat favorit berubah
+function refreshAllTFBars(){
+  rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu();
+  secondaries.forEach(sc=>{ try{ sc.rebuildTFBar(); if(sc.menuEl.classList.contains('open')) sc.buildMenu(); }catch(e){} });
+}
+// tutup semua dropdown TF yg terbuka (utama + sekunder)
+function closeAllTFMenus(){
+  if(tfMenu.classList.contains('open')) closeTFMenu();
+  secondaries.forEach(sc=>{ try{ sc.closeMenu(); }catch(e){} });
 }
 // tombol di bar = favorit (urut kanonik TF_LIST) + TF aktif bila bukan favorit (tampil sementara)
 function rebuildTFBar(){
@@ -1941,10 +1956,15 @@ function buildTFMenu(){
     tfMenu.appendChild(row);
   });
 }
-function openTFMenu(){ buildTFMenu(); tfMenu.classList.add('open'); tfMoreBtn.classList.add('on'); tfMoreBtn.setAttribute('aria-expanded','true'); }
+function openTFMenu(){ closeAllTFMenus(); buildTFMenu(); tfMenu.classList.add('open'); tfMoreBtn.classList.add('on'); tfMoreBtn.setAttribute('aria-expanded','true'); }
 function closeTFMenu(){ tfMenu.classList.remove('open'); tfMoreBtn.classList.remove('on'); tfMoreBtn.setAttribute('aria-expanded','false'); }
 tfMoreBtn.onclick=(e)=>{ e.stopPropagation(); tfMenu.classList.contains('open')?closeTFMenu():openTFMenu(); };
-document.addEventListener('click',(e)=>{ if(tfMenu.classList.contains('open') && !e.target.closest('.tfwrap')) closeTFMenu(); });
+// klik di luar → tutup dropdown mana pun (utama & sekunder) yg tak berada di wrap yg diklik
+document.addEventListener('click',(e)=>{
+  const inWrap=e.target.closest('.tfwrap,.cp-tfwrap');
+  if(tfMenu.classList.contains('open') && inWrap!==tfMenu.parentElement) closeTFMenu();
+  secondaries.forEach(sc=>{ try{ if(sc.menuEl.classList.contains('open') && inWrap!==sc.menuEl.parentElement) sc.closeMenu(); }catch(e){} });
+});
 // highlightTF dipanggil di banyak tempat saat currentTF berubah → rebuild bar (agar TF non-favorit aktif ikut tampil/hilang) & refresh menu bila terbuka.
 function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); }
 rebuildTFBar();
@@ -4521,12 +4541,16 @@ function makeSecondary(slot){
   const hd=document.createElement('div'); hd.className='cpanel-hd';
   const sel=document.createElement('select'); sel.className='cp-sym';
   WATCH_SYMS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s.replace('_','/'); sel.appendChild(o); });
+  // TF: favorit (+ TF aktif panel) sebagai tombol + dropdown ▾ (favorit berbagi dgn chart utama)
+  const tfWrapEl=document.createElement('span'); tfWrapEl.className='cp-tfwrap';
   const tfs=document.createElement('span'); tfs.className='cp-tfs';
-  TF_LIST.forEach(tf=>{ const b=document.createElement('button'); b.className='cp-tf'; b.dataset.tf=tf; b.textContent=TF_LABEL[tf]||tf; tfs.appendChild(b); });
+  const moreBtn=document.createElement('button'); moreBtn.className='cp-tf cp-more'; moreBtn.textContent='▾'; moreBtn.title='Timeframes';
+  const menu=document.createElement('div'); menu.className='tf-menu cp-tf-menu';
+  tfWrapEl.appendChild(tfs); tfWrapEl.appendChild(moreBtn); tfWrapEl.appendChild(menu);
   const last=document.createElement('span'); last.className='cp-last';
   const act=document.createElement('button'); act.className='cp-act'; act.textContent='⌖';
   act.title='Jadikan panel aktif (trading & drawing pindah ke sini)';
-  hd.appendChild(sel); hd.appendChild(tfs); hd.appendChild(last); hd.appendChild(act);
+  hd.appendChild(sel); hd.appendChild(tfWrapEl); hd.appendChild(last); hd.appendChild(act);
   const cdiv=document.createElement('div'); cdiv.className='cp-chart';
   panel.appendChild(hd); panel.appendChild(cdiv);
 
@@ -4536,9 +4560,35 @@ function makeSecondary(slot){
   attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
 
-  const sc={ slot, panel, chart:c, el:cdiv, selEl:sel, tfsEl:tfs, lastEl:last,
+  const sc={ slot, panel, chart:c, el:cdiv, selEl:sel, tfsEl:tfs, menuEl:menu, moreEl:moreBtn, lastEl:last,
     sym:'EUR_USD', tf:'M15', data:[], forming:null, ro, rollTimer:null,
-    highlightTF(){ tfs.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.tf===this.tf)); },
+    // tombol = favorit (urut kanonik) + TF aktif panel bila bukan favorit (tampil sementara)
+    rebuildTFBar(){
+      const show=TF_LIST.filter(tf=> tfFav.includes(tf) || tf===this.tf);
+      tfs.innerHTML='';
+      show.forEach(tf=>{
+        const b=document.createElement('button');
+        b.className='cp-tf'+(tf===this.tf?' on':''); b.dataset.tf=tf; b.textContent=TF_LABEL[tf]||tf;
+        b.onclick=()=>{ this.tf=tf; this.rebuildTFBar(); this.load(); persistSec(); };
+        tfs.appendChild(b);
+      });
+    },
+    buildMenu(){
+      menu.innerHTML='';
+      TF_LIST.forEach(tf=>{
+        const row=document.createElement('div'); row.className='tf-row'+(tf===this.tf?' on':'');
+        const lbl=document.createElement('span'); lbl.className='tf-lbl'; lbl.textContent=TF_LABEL[tf]||tf;
+        lbl.onclick=()=>{ this.closeMenu(); this.tf=tf; this.rebuildTFBar(); this.load(); persistSec(); };
+        const fav=tfFav.includes(tf);
+        const star=document.createElement('span'); star.className='tf-star'+(fav?' fav':''); star.textContent='★';
+        star.title=fav?'Remove from favorites':'Add to favorites';
+        star.onclick=(e)=>{ e.stopPropagation(); toggleTFFav(tf); };   // favorit dipakai bersama → refresh semua bar
+        row.append(lbl,star); menu.appendChild(row);
+      });
+    },
+    openMenu(){ closeAllTFMenus(); this.buildMenu(); menu.classList.add('open'); moreBtn.classList.add('on'); },
+    closeMenu(){ menu.classList.remove('open'); moreBtn.classList.remove('on'); },
+    highlightTF(){ this.rebuildTFBar(); if(menu.classList.contains('open')) this.buildMenu(); },
     setSymTF(sym,tf){ this.sym=sym; this.tf=tf; },
     async load(){
       sel.value=this.sym; this.highlightTF(); this.forming=null;
@@ -4590,9 +4640,10 @@ function makeSecondary(slot){
   };
 
   sel.onchange=()=>{ sc.sym=sel.value; sc.load(); persistSec(); };
-  tfs.querySelectorAll('button').forEach(b=> b.onclick=()=>{ sc.tf=b.dataset.tf; sc.highlightTF(); sc.load(); persistSec(); });
+  moreBtn.onclick=(e)=>{ e.stopPropagation(); menu.classList.contains('open')?sc.closeMenu():sc.openMenu(); };
   act.onclick=()=>activatePanel(sc);
-  hd.ondblclick=(e)=>{ if(e.target===sel || e.target.closest('.cp-tf') || e.target===act) return; activatePanel(sc); };
+  hd.ondblclick=(e)=>{ if(e.target===sel || e.target.closest('.cp-tfwrap') || e.target===act) return; activatePanel(sc); };
+  sc.rebuildTFBar();
   return sc;
 }
 
