@@ -82,11 +82,19 @@ func loadConfig() Config {
 		// Cocokkan dgn watchlist FE (opsi #instrument di index.html) agar semua baris
 		// Markets ter-update realtime, termasuk BTC_USD (crypto, trading 24/7).
 		c.StreamInstruments = []string{
-			"EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD",
-			"XAU_USD", "XAG_USD", "GBP_JPY", "EUR_JPY", "BTC_USD",
-			// USD_SEK & USD_CHF: bukan utk ditampilkan, tapi komponen DXY sintetis
-			// (lihat dxy.go) — di-stream agar tick DXY bisa dihitung realtime.
-			"USD_SEK", "USD_CHF",
+			// Forex
+			"EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "USD_CAD", "AUD_USD", "NZD_USD",
+			"GBP_JPY", "EUR_JPY",
+			// Metals
+			"XAU_USD", "XAG_USD",
+			// Indices (CFD)
+			"SPX500_USD", "NAS100_USD", "US30_USD", "US2000_USD", "DE30_EUR",
+			"UK100_GBP", "FR40_EUR", "EU50_EUR", "JP225_USD", "AU200_AUD", "HK33_HKD",
+			// Crypto (CFD)
+			"BTC_USD", "ETH_USD", "LTC_USD", "BCH_USD",
+			// USD_SEK: bukan utk ditampilkan, tapi komponen DXY sintetis (lihat dxy.go)
+			// — di-stream agar tick DXY bisa dihitung realtime. (USD_CHF sudah di atas.)
+			"USD_SEK",
 		}
 	}
 	c.Creds = BrokerCreds{
