@@ -3477,6 +3477,11 @@ function expandPosition(o){
   if(p0.timestamp==null && (p0.dataIndex==null || !isFinite(p0.dataIndex))){
     try{ const rect=$('#chart').getBoundingClientRect(); const a=xAnchorFromPx(lastPtr.x-rect.left); if(a) Object.assign(p0,a); }catch(_){}
   }
+  // [fix geser-kiri] klinecharts merender titik ber-timestamp di PUSAT BAR bawah/kiri (floor via
+  // timestampToDataIndex), BUKAN sub-bar → entry meleset ke kiri hingga ~1 lebar-bar tergantung
+  // posisi klik dalam bar. Snap timestamp entry ke bar TERDEKAT: entry mendarat tepat di center
+  // candle terpilih (simetris, tanpa bias kiri) & durable. Titik future (dataIndex) dibiarkan presisi.
+  if(p0.timestamp!=null) p0.timestamp=snapTimeToBar(p0.timestamp);
   const dir=o.name==='longPosition'?'long':'short';
   const entry=p0.value;
   const risk=tfDefaultRisk();
