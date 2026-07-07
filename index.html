@@ -3577,7 +3577,9 @@ addTextBtn.addEventListener('click',e=>{ e.stopPropagation();
   hideAddTextNow();
 });
 $('#chart').addEventListener('mousemove',e=>{
-  const can = hoverId && hoverId===selectedId && (hoverName==='trendline'||hoverName==='rect');
+  // jangan munculkan "+ Add text" selama objek masih DIGAMBAR (inProgressId): tunggu draw selesai
+  // dulu, baru saat di-hover tombolnya muncul (ala TradingView).
+  const can = hoverId && hoverId!==inProgressId && hoverId===selectedId && (hoverName==='trendline'||hoverName==='rect');
   if(can) showAddText(hoverId);
   else if(!overAddBtn) scheduleHideAddText();
 });
