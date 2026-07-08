@@ -3971,7 +3971,9 @@ function renderWatch(){
   box.innerHTML=hdr+rows;
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true);
+  if(!$('#newspanel').classList.contains('hidden') && typeof loadNews==='function') loadNews();   // instrumen aktif berubah → sync bias card News (Task 7)
+}
 
 // ===================== Luna Instrument Picker (dropdown custom) =====================
 // Menyetir <select id="instrument"> yang tersembunyi. Data harga nebeng quoteCache/liveTicks
@@ -4345,6 +4347,67 @@ function toggleMarkets(){
   }
   const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':'0');
 }
+// --- News panel: fetch & render (bias card, next-release countdown, weekly calendar) ---
+function newsCurrentInstrument(){ return inst || 'XAU_USD'; }   // `inst` = instrumen chart aktif (lihat selectSymbol)
+let _newsTimer=null, _newsCountdown=null;
+function loadNews(){
+  const body=$('#newsBody');
+  const reqInst=newsCurrentInstrument();
+  fetch('/api/news/calendar?instrument='+encodeURIComponent(reqInst))
+    .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
+    .then(renderNews)
+    .catch(()=>{ body.innerHTML='<div class="news-empty">News feed unavailable.'
+      +' <button id="newsRetry" class="wl-x">Retry</button></div>';
+      const b=$('#newsRetry'); if(b) b.onclick=loadNews; });
+}
+function fmtLocal(iso){ const d=new Date(iso);
+  return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
+function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
+function renderNews(d){
+  const body=$('#newsBody');
+  const pretty=(d.instrument||'').replace('_','/');
+  // Bias card dari rilis terbaru yang sudah keluar (kalau ada), else netral.
+  let latest=null;
+  for(const r of (d.releases||[])) if(r.released) latest=r;
+  const bias = latest ? latest.verdict.bias : 'neutral';
+  const line = latest ? latest.verdict.playbook
+    : 'Awaiting the next high-impact release.';
+  let html='';
+  html+=`<div class="news-bias ${bias}">
+    <div class="sym">${pretty}</div>
+    <div class="dir">${biasArrow(bias)} ${bias.toUpperCase()}</div>
+    <div>${line}</div>
+    <span class="news-regime">Regime: ${d.regime==='strong-data-hawkish'?'strong data → USD↑':'strong data → USD↓'}</span>
+    ${d.stale?'<span class="news-regime">Delayed data</span>':''}
+  </div>`;
+  // Next release + countdown
+  if(d.nextRelease){
+    html+=`<div class="news-next"><div class="nm">Next: ${d.nextRelease.name}</div>
+      <div class="cd" data-t="${d.nextRelease.time}">—</div></div>`;
+  }
+  // Calendar list
+  if(!(d.releases||[]).length){
+    html+='<div class="news-empty">No high-impact USD events this week.</div>';
+  }else{
+    for(const r of d.releases){
+      const sur = r.released ? (r.verdict.surprise==='above'?'📈':r.verdict.surprise==='below'?'📉':'➖') : '';
+      html+=`<div class="cal-item ${r.released?'released':''}">
+        <div class="row1"><span class="nm"><span class="impact-dot impact-${r.impact}"></span>${r.currency} ${r.name}</span>
+          <span class="tm">${fmtLocal(r.time)}</span></div>
+        <div class="cal-fig">F: <b>${r.forecast||'—'}</b> · P: ${r.previous||'—'}${r.released?` · A: <b>${r.actual||'—'}</b> ${sur}`:''}</div>
+      </div>`;
+    }
+  }
+  body.innerHTML=html;
+  tickNewsCountdown();
+}
+function tickNewsCountdown(){
+  const el=$('#newsBody .news-next .cd'); if(!el) return;
+  const t=new Date(el.dataset.t).getTime(); const diff=t-Date.now();
+  if(diff<=0){ el.textContent='now'; return; }
+  const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000);
+  el.textContent=(h>0?h+'h ':'')+m+'m';
+}
 // Markets hidden-state ditangkap saat News dibuka, utk direstore persis saat News ditutup.
 // null = News sedang tertutup / belum pernah dibuka di sesi render ini.
 let newsPrevMarketsHidden=null;
@@ -4358,6 +4421,8 @@ function setNewsOpen(open){
     $('#toggleMarkets').classList.remove('on');
     np.classList.remove('hidden');
     if(typeof loadNews==='function') loadNews();   // didefinisikan di Task 7
+    clearInterval(_newsTimer); _newsTimer=setInterval(loadNews, 60000);          // refresh data tiap 60s
+    clearInterval(_newsCountdown); _newsCountdown=setInterval(tickNewsCountdown, 1000);   // countdown tiap detik
   }else{
     if(np.classList.contains('hidden')) return;    // sudah tertutup — no-op
     np.classList.add('hidden');
@@ -4367,6 +4432,8 @@ function setNewsOpen(open){
     $('#toggleMarkets').classList.toggle('on', !restoreHidden);
     localStorage.setItem('br_watchHidden', restoreHidden?'1':'0');
     newsPrevMarketsHidden=null;
+    clearInterval(_newsTimer); _newsTimer=null;
+    clearInterval(_newsCountdown); _newsCountdown=null;
   }
   try{chart.resize();}catch(e){}
   localStorage.setItem('br_newsOpen', open?'1':'0');
