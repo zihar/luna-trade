@@ -709,6 +709,19 @@
                        50%{ box-shadow:0 0 12px 2px rgba(174,185,232,.95); } }
   @media (prefers-reduced-motion:reduce){ .nmk.is-next{ animation:none; } }
 
+  .nmk-pop{ position:absolute; z-index:20; min-width:168px; max-width:232px;
+     background:var(--panel); border:1px solid var(--border); border-radius:8px;
+     box-shadow:var(--shadow); padding:9px 11px; font-size:12px; color:var(--txt);
+     pointer-events:auto; transform:translateX(-50%); }
+  .nmk-pop .np-hd{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-bottom:4px; }
+  .nmk-pop .np-nm{ font-weight:600; }
+  .nmk-pop .np-tm{ color:var(--muted); font:11px var(--mono,monospace); white-space:nowrap; }
+  .nmk-pop .np-imp{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+  .nmk-pop .np-imp.impact-high{ color:var(--red); } .nmk-pop .np-imp.impact-medium{ color:#e0a63a; }
+  .nmk-pop .np-fig{ color:var(--muted); } .nmk-pop .np-fig b{ color:var(--txt); }
+  .nmk-pop .np-bias{ margin-top:6px; font-weight:600; font-family:'Space Grotesk',sans-serif; }
+  .nmk-pop .np-bias.bullish{ color:var(--green); } .nmk-pop .np-bias.bearish{ color:var(--red); }
+
   /* toast feedback (alert/pending) */
   .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
           background:var(--panel); border:1px solid var(--accent); color:var(--txt);
@@ -4404,6 +4417,7 @@ function ensureNewsLayer(){
   if(_newsLayer) return _newsLayer;
   _newsLayer=document.createElement('div'); _newsLayer.id='newsMarkers';
   $('#chart').appendChild(_newsLayer);
+  document.addEventListener('click', ()=>{ if(typeof closeNewsPop==='function') closeNewsPop(); });
   return _newsLayer;
 }
 // impact feed → kelas warna tick (hanya High/Medium yg dikirim backend; fallback medium).
@@ -4458,6 +4472,51 @@ function nudgeNewsMarkers(){
     if(vis[i].x - vis[i-1].x < 10){ vis[i].x=vis[i-1].x+10; vis[i].e.style.left=vis[i].x+'px'; }
   }
 }
+// ---- News marker popup (hover desktop / tap mobile) ----
+let _newsPop=null, _newsPopHideT=null;
+function bindNewsMarker(el){
+  el.addEventListener('mouseenter', ()=>{ clearTimeout(_newsPopHideT); openNewsPop(el); });
+  el.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop, 180); });
+  el.addEventListener('click', (e)=>{ e.stopPropagation();
+    if(_newsPop && _newsPop._for===el){ closeNewsPop(); } else { openNewsPop(el); } });
+}
+// Baris bias arah utk instrumen aktif — hanya bila event menghasilkan arah (non-neutral).
+function newsBiasLine(v){
+  if(!v || !v.bias || v.bias==='neutral') return '';
+  return `<div class="np-bias ${newsEsc(v.bias)}">${biasArrow(v.bias)} ${newsEsc(v.bias.toUpperCase())}</div>`;
+}
+function openNewsPop(el){
+  const r=((newsState&&newsState.releases)||[])[+el.dataset.idx]; if(!r) return;
+  closeNewsPop();
+  const impCls=nmkImpactClass(r.impact);
+  const fig=`F: <b>${newsEsc(r.forecast||'—')}</b> · P: ${newsEsc(r.previous||'—')}`
+    + (r.released?` · A: <b>${newsEsc(r.actual||'—')}</b>`:'');
+  const pop=document.createElement('div'); pop.className='nmk-pop'; pop._for=el;
+  pop.innerHTML=`<div class="np-hd"><span class="np-nm">${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
+      <span class="np-tm">${newsEsc(fmtLocal(r.time))}</span></div>
+    <div class="np-imp ${impCls}">${newsEsc(r.impact)} impact</div>
+    <div class="np-fig">${fig}</div>
+    ${r.released?newsBiasLine(r.verdict):''}`;
+  pop.addEventListener('mouseenter', ()=>clearTimeout(_newsPopHideT));
+  pop.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop,180); });
+  $('#chart').appendChild(pop); _newsPop=pop;
+  positionNewsPop();
+}
+// Popup selalu di ATAS tick (tick di dekat sumbu bawah → ruang di atas cukup); clamp
+// horizontal agar tak keluar tepi kiri/kanan chart.
+function positionNewsPop(){
+  if(!_newsPop||!_newsPop._for) return;
+  const el=_newsPop._for, cW=$('#chart').clientWidth;
+  const x=parseFloat(el.style.left)||0, halfW=_newsPop.offsetWidth/2+6;
+  _newsPop.style.left=Math.max(halfW, Math.min(x, cW-halfW))+'px';
+  _newsPop.style.bottom='46px';   // tepat di atas tick (bottom:24px + tinggi ~14 + gap)
+}
+function repositionNewsPop(){
+  if(!_newsPop||!_newsPop._for) return;
+  if(_newsPop._for.style.display==='none'){ closeNewsPop(); return; }   // tick keluar layar → tutup
+  positionNewsPop();
+}
+function closeNewsPop(){ if(_newsPop){ _newsPop.remove(); _newsPop=null; } }
 function fmtLocal(iso){ const d=new Date(iso);
   return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
 function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
