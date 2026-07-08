@@ -4432,6 +4432,7 @@ function renderNewsMarkers(){
   const now=Date.now();
   let nextIdx=-1, nextT=Infinity;
   rels.forEach((r,i)=>{ const t=Date.parse(r.time); if(!isNaN(t)&&t>now&&t<nextT){ nextT=t; nextIdx=i; } });
+  if(typeof closeNewsPop==='function') closeNewsPop();   // tutup popup terbuka; ticknya akan didetach oleh rebuild
   layer.innerHTML='';
   rels.forEach((r,i)=>{
     if(isNaN(Date.parse(r.time))) return;   // timestamp rusak → skip
@@ -4475,8 +4476,10 @@ function nudgeNewsMarkers(){
 // ---- News marker popup (hover desktop / tap mobile) ----
 let _newsPop=null, _newsPopHideT=null;
 function bindNewsMarker(el){
-  el.addEventListener('mouseenter', ()=>{ clearTimeout(_newsPopHideT); openNewsPop(el); });
-  el.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop, 180); });
+  // Hover buka popup HANYA untuk mouse — pointer touch/pen dilewati agar tak balapan
+  // dgn tap→click (yg sudah men-toggle); tanpa ini tap mobile buka-lalu-tutup seketika.
+  el.addEventListener('pointerenter', (e)=>{ if(e.pointerType!=='mouse') return; clearTimeout(_newsPopHideT); openNewsPop(el); });
+  el.addEventListener('pointerleave', (e)=>{ if(e.pointerType!=='mouse') return; _newsPopHideT=setTimeout(closeNewsPop, 180); });
   el.addEventListener('click', (e)=>{ e.stopPropagation();
     if(_newsPop && _newsPop._for===el){ closeNewsPop(); } else { openNewsPop(el); } });
 }
@@ -4497,6 +4500,7 @@ function openNewsPop(el){
     <div class="np-imp ${impCls}">${newsEsc(r.impact)} impact</div>
     <div class="np-fig">${fig}</div>
     ${r.released?newsBiasLine(r.verdict):''}`;
+  pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside
   pop.addEventListener('mouseenter', ()=>clearTimeout(_newsPopHideT));
   pop.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop,180); });
   $('#chart').appendChild(pop); _newsPop=pop;
@@ -4513,7 +4517,7 @@ function positionNewsPop(){
 }
 function repositionNewsPop(){
   if(!_newsPop||!_newsPop._for) return;
-  if(_newsPop._for.style.display==='none'){ closeNewsPop(); return; }   // tick keluar layar → tutup
+  if(!document.contains(_newsPop._for) || _newsPop._for.style.display==='none'){ closeNewsPop(); return; }   // tick keluar layar / didetach → tutup
   positionNewsPop();
 }
 function closeNewsPop(){ if(_newsPop){ _newsPop.remove(); _newsPop=null; } }
