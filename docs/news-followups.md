@@ -18,6 +18,15 @@ Item non-blocking yang ditunda dari fitur News (Fase 1 kalender+bias & Fase 2 ma
 - **Startup double-fetch News.**
   Bila panel News tersimpan terbuka (`br_newsOpen==='1'`), `refreshNewsData` terpanggil dua kali saat boot (dari `setNewsOpen(true)` di parse-time + dari `initPriceTimer` chart-ready). Idempoten & murah (server-side cache), tapi bisa di-dedupe.
 
+## Future phases (deferred)
+
+Fitur lebih besar yang sengaja di-non-goal-kan di spec Fase 1 (`docs/superpowers/specs/2026-07-08-news-economic-calendar-bias-design.md`) — masing-masing butuh spec/plan sendiri, bukan sekadar tweak:
+
+- **Headline / article news feed.** Berita/artikel aktual (judul + ringkasan), **beda** dari economic calendar. Butuh provider berbayar + **API key** (Marketaux atau Alpha Vantage). Fase 1/2 sengaja zero-API-key, jadi ini ditunda.
+- **Push notification / alert rilis.** Beri tahu user saat event high-impact akan/baru rilis tanpa harus membuka panel/chart.
+- **Fallback BLS (keandalan sumber data).** Economic calendar kini bergantung pada satu feed mirror tak-resmi (Forex Factory via `nfs.faireconomy.media`). Tambah sumber cadangan/otoritatif dari **U.S. Bureau of Labor Statistics** (API publik gratis) untuk CPI/PPI/employment saat feed mirror down/basi, atau untuk cross-check nilai Actual.
+- **AI summary / digest.** Ringkasan naratif atau digest berkala dari kalender/berita.
+
 ## Catatan
 
 Status fitur & rincian keputusan desain terekam di spec/plan pada `docs/superpowers/` (`2026-07-08-news-*`).
