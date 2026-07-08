@@ -29,6 +29,7 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/close", requireUser(handlePaperClose))
 	mux.HandleFunc("POST /api/position/sltp", requireUser(handlePaperModify))
 	mux.HandleFunc("GET /api/journal", requireUser(handlePaperJournal))
+	mux.HandleFunc("GET /api/news/calendar", requireUser(handleNewsCalendar)) // Fase 1: economic calendar + bias
 	mux.HandleFunc("GET /api/prices", requireUser(handlePrices))
 	mux.HandleFunc("POST /api/track", requireUser(handleTrack))         // analytics: catat event fitur
 	mux.HandleFunc("GET /api/analytics", requireUser(handleAnalytics))  // analytics: laporan (admin)
