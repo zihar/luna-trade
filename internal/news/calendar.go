@@ -142,7 +142,9 @@ var fiatCodes = map[string]bool{
 func RelevantCurrencies(symbol string) []string {
 	seen := map[string]bool{}
 	var out []string
-	for _, part := range strings.Split(strings.ToUpper(strings.TrimSpace(symbol)), "_") {
+	// Terima bentuk "EUR/USD" maupun "EUR_USD" (senada InstrumentRole di bias.go).
+	norm := strings.ReplaceAll(strings.ToUpper(strings.TrimSpace(symbol)), "/", "_")
+	for _, part := range strings.Split(norm, "_") {
 		if fiatCodes[part] && !seen[part] {
 			seen[part] = true
 			out = append(out, part)
