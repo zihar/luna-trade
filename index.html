@@ -4485,7 +4485,7 @@ function repositionNewsMarkers(){
   nudgeNewsMarkers();
   if(typeof repositionNewsPop==='function') repositionNewsPop();   // ikutkan popup terbuka (Task 4)
 }
-// Dua tick berdekatan (<10px) → geser kecil ke kanan agar keduanya bisa di-hover.
+// Dua badge berdekatan (<24px, ≈ lebar badge) → geser kecil ke kanan agar keduanya bisa di-hover.
 function nudgeNewsMarkers(){
   const layer=_newsLayer; if(!layer) return;
   const vis=[...layer.querySelectorAll('.nmk')].filter(e=>e.style.display!=='none')
