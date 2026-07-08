@@ -507,13 +507,78 @@
   .tz-item:hover{ background:var(--btn-hover); }
   .tz-item .ck{ width:13px; color:var(--accent); }
   .tz-item .off{ color:var(--muted); font-family:var(--mono); font-size:11px; min-width:62px; }
-  /* kontrol playback di toolbar — tampil hanya saat mode Bar Replay aktif */
+  /* kontrol playback lama di toolbar — kini DIKONSOLIDASI ke floating pill bawah (.replaypill).
+     Elemen tetap ada di DOM (jd sumber nilai #speed + handler lama), tapi tak pernah tampil. */
   #replayCtrls{ display:none; align-items:center; gap:5px; }
-  #replayCtrls.on{ display:inline-flex; }
+  #replayCtrls.on{ display:none; }
   #replayCtrls button{ padding:5px 9px; }
   #replayCtrls .rlabel{ margin-left:3px; }
   #replayCtrls select{ height:28px; padding:2px 6px; border-radius:6px; background:var(--btn);
                        border:1px solid var(--border); color:var(--txt); font-size:12px; cursor:pointer; }
+
+  /* ===== Bar Replay: floating pill (ala TradingView) + watermark crescent Luna ===== */
+  /* Pill playback melayang di tengah-bawah panel chart utama; hanya tampil saat replay aktif. */
+  .replaypill{
+    position:absolute; left:50%; bottom:52px; z-index:40;
+    transform:translateX(-50%) translateY(10px);
+    display:none; align-items:center; gap:1px;
+    padding:5px; border-radius:13px;
+    background:var(--panel); border:1px solid var(--border);
+    box-shadow:0 12px 36px rgba(0,0,0,.5), inset 0 0 0 1px rgba(174,185,232,.05);
+    opacity:0; pointer-events:none;
+    transition:opacity .22s ease, transform .26s cubic-bezier(.2,.75,.3,1);
+  }
+  .replaypill.on{ display:inline-flex; opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
+  .replaypill button{
+    height:32px; min-width:32px; padding:0 8px; border:0; border-radius:9px;
+    background:transparent; color:var(--txt); cursor:pointer; line-height:0;
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    transition:background .12s ease, color .12s ease, transform .08s ease;
+  }
+  .replaypill button:hover{ background:var(--btn-hover); }
+  .replaypill button:active{ transform:scale(.94); }
+  .replaypill button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .replaypill svg{ width:17px; height:17px; display:block; }
+  /* "Select bar" — pakai identitas Luna (--luna-glow), bukan biru fungsional */
+  .rp-select{ padding:0 11px 0 9px !important; font-family:var(--font-display);
+              font-weight:600; font-size:12.5px; letter-spacing:.01em; color:var(--luna-glow) !important; line-height:1 !important; }
+  .rp-select svg{ stroke:currentColor; }
+  .rp-select:hover{ background:rgba(174,185,232,.12) !important; }
+  .rp-select.armed{ background:rgba(174,185,232,.20) !important;
+                    box-shadow:inset 0 0 0 1px rgba(174,185,232,.5); }
+  /* Play = satu aksen dominan (Chanel: boldness di satu tempat) */
+  .rp-play{ background:var(--accent) !important; color:#fff !important; min-width:38px !important; }
+  .rp-play:hover{ background:var(--accent) !important; filter:brightness(1.1); }
+  .rp-play svg{ fill:currentColor; }
+  .rp-step svg{ fill:currentColor; }
+  .rp-speed{ font-family:var(--font-num); font-weight:700; font-size:12px; color:var(--muted); min-width:36px !important; line-height:1 !important; }
+  .rp-speed:hover{ color:var(--txt); }
+  .rp-tf{ align-self:center; font-family:var(--font-num); font-weight:700; font-size:11px;
+          letter-spacing:.04em; color:var(--muted); padding:0 9px; white-space:nowrap; }
+  .rp-div{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
+  .rp-close{ color:var(--muted); }
+  .rp-close:hover{ color:var(--red) !important; background:rgba(255,111,111,.13) !important; }
+
+  /* Watermark samar: user aware sedang di mode replay. Non-interaktif, di belakang candle-interaksi. */
+  .replay-watermark{
+    position:absolute; inset:0; z-index:3;
+    display:none; align-items:center; justify-content:center; gap:min(3.2vw,42px);
+    pointer-events:none; user-select:none;
+  }
+  .cpanel-pri.replay-on .replay-watermark{ display:flex; }
+  .replay-watermark .wm-moon{
+    width:clamp(56px,8.5vw,116px); height:auto; color:var(--luna-glow);
+    opacity:.12; filter:drop-shadow(0 0 26px rgba(174,185,232,.28));
+  }
+  .replay-watermark .wm-text{
+    font-family:var(--font-display); font-weight:600; letter-spacing:.05em;
+    font-size:clamp(40px,7.4vw,96px); color:var(--luna-glow); opacity:.09; line-height:1;
+  }
+  @media (prefers-reduced-motion:reduce){
+    .replaypill{ transition:none; }
+    .replaypill button{ transition:none; }
+    .replaypill button:active{ transform:none; }
+  }
 
   /* sizing readout (Fase 1a) */
   .sizing{ flex-basis:100%; display:flex; gap:18px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:2px; }
@@ -1026,7 +1091,24 @@
       <span id="layoutbtns" title="Layout chart"></span>
     </div>
     <div id="chartgrid" class="lay-1">
-      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div></div></div>
+      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div></div>
+        <div class="replay-watermark" aria-hidden="true">
+          <svg class="wm-moon" viewBox="0 0 24 24"><mask id="lunaReplayCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle cx="11.6" cy="12" r="8.4" fill="currentColor" mask="url(#lunaReplayCut)"/></svg>
+          <span class="wm-text">Replay</span>
+        </div>
+        <div class="replaypill" id="replayPill" role="toolbar" aria-label="Bar replay controls">
+          <button class="rp-select" id="rpSelect" title="Pick a new replay start bar (stays in replay)" aria-label="Select bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14"/><path d="M20 12H9.5"/><path d="m13 8-4 4 4 4"/></svg>Select bar</button>
+          <span class="rp-div"></span>
+          <button class="rp-step" id="rpPrev" title="Previous bar (←)" aria-label="Previous bar"><svg viewBox="0 0 24 24"><path d="M18 5v14l-9-7z"/><rect x="5" y="5" width="3" height="14" rx="1"/></svg></button>
+          <button class="rp-play" id="rpPlay" title="Play / Pause (Space)" aria-label="Play or pause"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          <button class="rp-step" id="rpNext" title="Next bar (→)" aria-label="Next bar"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z"/><rect x="16" y="5" width="3" height="14" rx="1"/></svg></button>
+          <span class="rp-div"></span>
+          <button class="rp-speed" id="rpSpeed" title="Playback speed — click to cycle" aria-label="Playback speed">3×</button>
+          <span class="rp-tf" id="rpTf">D</span>
+          <span class="rp-div"></span>
+          <button class="rp-close" id="rpExit" title="Exit replay → back to realtime" aria-label="Exit replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="rh rh-markets" id="rhMarkets" title="Drag to resize Markets width"></div>
@@ -2286,8 +2368,8 @@ window.addEventListener('resize',()=>{ try{drawEquity();}catch(e){} });
 if(localStorage.getItem('br_bottomHidden')!=='0'){ $('#bottompanel').classList.add('collapsed'); $('#bottomToggle').textContent='⏶'; }
 $('#speed').onchange=()=>{ if(playing){pause();play();} };
 function togglePlay(){ playing?pause():play(); }
-function play(){ if(T==null)return; if(!replayMode){ stopLive(); setReplayUI(true); } playing=true; $('#playBtn').textContent='⏸'; playTimer=setInterval(()=>step(1),1000/(+$('#speed').value)); }
-function pause(){ playing=false; $('#playBtn').textContent='▶'; clearInterval(playTimer); }
+function play(){ if(T==null)return; if(!replayMode){ stopLive(); setReplayUI(true); } playing=true; $('#playBtn').textContent='⏸'; try{syncReplayPill();}catch(e){} playTimer=setInterval(()=>step(1),1000/(+$('#speed').value)); }
+function pause(){ playing=false; $('#playBtn').textContent='▶'; try{syncReplayPill();}catch(e){} clearInterval(playTimer); }
 
 // ===================== auto-extend forward =====================
 async function autoExtend(tf){
@@ -4273,10 +4355,14 @@ chart.subscribeAction('onCrosshairChange', d=>{ if(d&&d.kLineData&&d.kLineData.t
 function setReplayUI(on){
   replayMode=on;
   $('#replaybar').classList.toggle('replaying', on);
-  $('#replayCtrls').classList.toggle('on', on);   // kontrol playback di toolbar
+  $('#replayCtrls').classList.toggle('on', on);   // kontrol lama (tersembunyi; sumber nilai #speed)
   replayBtn.classList.toggle('on', on);
   replayBtn.textContent = on ? '⏹ Exit Replay' : '⏮ Bar Replay';
   replayBtn.title = on ? 'Exit replay → back to realtime' : 'Pick replay start point directly on the chart';
+  // floating pill + watermark crescent (aware mode replay)
+  document.querySelector('.cpanel-pri').classList.toggle('replay-on', on);
+  $('#replayPill').classList.toggle('on', on);
+  if(on){ syncReplayPill(); } else { $('#rpSelect').classList.remove('armed'); }
   applyPaperMode();   // replay → client-side; realtime → akun live server
 }
 function exitReplay(){
@@ -4303,6 +4389,7 @@ $('#chart').addEventListener('click',()=>{
   if(!pickMode||hoverTs==null) return;
   const ts=hoverTs;
   pickMode=false;
+  $('#rpSelect').classList.remove('armed');   // re-select selesai (bila dipicu dari pill)
   stopLive();                        // replay = realtime mati
   setReplayUI(true);                 // masuk mode replay → kontrol step tampil
   setStatus('Replay from '+nyTime(ts)+' (NY) …');
@@ -4312,6 +4399,42 @@ $('#chart').addEventListener('click',()=>{
   setTimeout(()=>{ T=ts+DUR[currentTF]; lastLen=-1; render(true);
     setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
+
+// ===================== floating pill playback (ala TradingView) =====================
+// Konsolidasi kontrol replay ke pill melayang di bawah chart. Delegasi ke fungsi lama
+// (step/togglePlay/exitReplay) + fitur baru "Select bar" = re-pick tanpa keluar replay.
+const RP_PLAY_SVG='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+const RP_PAUSE_SVG='<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+const RP_SPEEDS=[1,2,3,5,10,20];
+function syncReplayPill(){
+  const sp=$('#speed'); if(sp) $('#rpSpeed').textContent=sp.value+'×';
+  if(typeof currentTF!=='undefined' && currentTF) $('#rpTf').textContent=currentTF;
+  $('#rpPlay').innerHTML = playing ? RP_PAUSE_SVG : RP_PLAY_SVG;
+}
+// Select bar lagi TANPA keluar replay: masuk pick-mode; handler klik #chart yg ada set titik baru.
+function pickBarAgain(){
+  if(!replayMode) return;
+  if(pickMode){   // sudah armed → batalkan
+    pickMode=false; $('#rpSelect').classList.remove('armed');
+    setStatus('Bar selection cancelled.'); return;
+  }
+  if(playing) pause();
+  pickMode=true; $('#rpSelect').classList.add('armed');
+  // JANGAN reveal seluruh data — itu melompat ke "sekarang" + membocorkan candle masa depan.
+  // Tetap di posisi replay saat ini; user memilih bar dari histori yang sudah tampil.
+  setStatus('Select bar: click a bar in view to move the replay start (no jump to now).');
+}
+function cycleSpeed(){
+  const sp=$('#speed'); let i=RP_SPEEDS.indexOf(+sp.value); i=(i+1)%RP_SPEEDS.length;
+  sp.value=RP_SPEEDS[i]; sp.dispatchEvent(new Event('change'));   // restart playTimer bila sedang play
+  $('#rpSpeed').textContent=RP_SPEEDS[i]+'×';
+}
+$('#rpSelect').onclick=pickBarAgain;
+$('#rpPrev').onclick=()=>step(-1);
+$('#rpPlay').onclick=togglePlay;
+$('#rpNext').onclick=()=>step(1);
+$('#rpSpeed').onclick=cycleSpeed;
+$('#rpExit').onclick=exitReplay;
 
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
