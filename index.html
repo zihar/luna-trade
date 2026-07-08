@@ -692,6 +692,23 @@
   .cal-fig{ color:var(--muted); } .cal-fig b{ color:var(--txt); }
   .cal-item.released{ background:color-mix(in srgb, var(--accent) 6%, transparent); }
 
+  /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
+  #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
+  .nmk{ position:absolute; bottom:24px; width:2px; height:14px; border-radius:2px;
+        transform:translateX(-50%); pointer-events:auto; cursor:pointer;
+        transition:height .12s ease, box-shadow .18s ease; }
+  .nmk::after{ content:""; position:absolute; top:-3px; left:50%; transform:translateX(-50%);
+        width:6px; height:6px; border-radius:50%; background:inherit; }
+  .nmk.impact-high{ background:var(--red); }
+  .nmk.impact-medium{ background:#e0a63a; }
+  .nmk:hover{ height:18px; }
+  .nmk.is-next{ background:var(--luna-glow); box-shadow:0 0 8px 1px rgba(174,185,232,.85);
+        animation:nmkPulse 2.4s ease-in-out infinite; }
+  .nmk.is-next::after{ background:var(--luna-glow); }
+  @keyframes nmkPulse{ 0%,100%{ box-shadow:0 0 6px 0 rgba(174,185,232,.5); }
+                       50%{ box-shadow:0 0 12px 2px rgba(174,185,232,.95); } }
+  @media (prefers-reduced-motion:reduce){ .nmk.is-next{ animation:none; } }
+
   /* toast feedback (alert/pending) */
   .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
           background:var(--panel); border:1px solid var(--accent); color:var(--txt);
@@ -1997,7 +2014,7 @@ const lightStyles = {
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
 };
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
-new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} }).observe($('#chart'));
+new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{repositionNewsMarkers();}catch(e){} }).observe($('#chart'));
 // Jaring pengaman: setelah web-font siap, satu re-measure bersih (sumbu klinecharts diukur ulang dgn Inter final)
 try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ try{ chart.resize(); }catch(e){} }); }catch(e){}
 
@@ -2294,6 +2311,7 @@ function render(full){
   refreshLotSuggestion();
   if(live) pushFormingCandle();   // re-append candle berjalan setelah data di-redraw
   updatePriceTimer();
+  try{ repositionNewsMarkers(); }catch(e){}   // marker ikut pan/zoom/TF/playback
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
 // logam (XAU/XAG): 1 lot = 100 oz (konvensi TradeLocker). units di-kawat tetap = oz (1 oz = 1 unit).
@@ -4380,6 +4398,66 @@ function refreshNewsData(){
     });
 }
 function loadNews(){ refreshNewsData(); }   // kompat: pemanggil lama (selectSymbol, setNewsOpen)
+// ---- News on-chart markers (Fase 2): layer DOM tersinkron pan/zoom ----
+let _newsLayer=null;
+function ensureNewsLayer(){
+  if(_newsLayer) return _newsLayer;
+  _newsLayer=document.createElement('div'); _newsLayer.id='newsMarkers';
+  $('#chart').appendChild(_newsLayer);
+  return _newsLayer;
+}
+// impact feed → kelas warna tick (hanya High/Medium yg dikirim backend; fallback medium).
+function nmkImpactClass(imp){ return String(imp||'').toLowerCase()==='high' ? 'impact-high' : 'impact-medium'; }
+// Rebuild seluruh tick dari newsState.releases. Event mendatang terdekat (wall-clock now)
+// dapat kelas .is-next (glow). Timestamp rusak → di-skip (defensif).
+function renderNewsMarkers(){
+  const layer=ensureNewsLayer();
+  if(!newsMarkersEnabled()){ layer.style.display='none'; layer.innerHTML=''; return; }
+  layer.style.display='';
+  const rels=(newsState&&newsState.releases)||[];
+  const now=Date.now();
+  let nextIdx=-1, nextT=Infinity;
+  rels.forEach((r,i)=>{ const t=Date.parse(r.time); if(!isNaN(t)&&t>now&&t<nextT){ nextT=t; nextIdx=i; } });
+  layer.innerHTML='';
+  rels.forEach((r,i)=>{
+    if(isNaN(Date.parse(r.time))) return;   // timestamp rusak → skip
+    const el=document.createElement('div');
+    el.className='nmk '+nmkImpactClass(r.impact)+(i===nextIdx?' is-next':'');
+    el.dataset.idx=i;
+    el.title=(r.currency||'')+' '+(r.name||'');   // fallback native tooltip (popup penuh di Task 4)
+    if(typeof bindNewsMarker==='function') bindNewsMarker(el);
+    layer.appendChild(el);
+  });
+  repositionNewsMarkers();
+}
+// Set posisi X tiap tick: event lampau (ts<=lastTs) → tsToPx; mendatang → idxToPx via
+// dataIndex terproyeksi (pola reanchorFuturePoints). Di luar plot → display:none.
+function repositionNewsMarkers(){
+  const layer=_newsLayer; if(!layer || layer.style.display==='none') return;
+  const a=(typeof revealed==='function')?revealed(currentTF):null;
+  if(!a||!a.length) return;
+  const li=a.length-1, lt=a[li].timestamp, dur=DUR[currentTF];
+  const W=$('#chart').clientWidth||0;
+  const rels=(newsState&&newsState.releases)||[];
+  layer.querySelectorAll('.nmk').forEach(el=>{
+    const r=rels[+el.dataset.idx]; const t=r?Date.parse(r.time):NaN;
+    if(!r||isNaN(t)){ el.style.display='none'; return; }
+    let x = t<=lt ? tsToPx(t) : idxToPx(li+(t-lt)/dur);
+    if(x==null || x<0 || x>W){ el.style.display='none'; return; }
+    el.style.display=''; el.style.left=x+'px';
+  });
+  nudgeNewsMarkers();
+  if(typeof repositionNewsPop==='function') repositionNewsPop();   // ikutkan popup terbuka (Task 4)
+}
+// Dua tick berdekatan (<10px) → geser kecil ke kanan agar keduanya bisa di-hover.
+function nudgeNewsMarkers(){
+  const layer=_newsLayer; if(!layer) return;
+  const vis=[...layer.querySelectorAll('.nmk')].filter(e=>e.style.display!=='none')
+    .map(e=>({e,x:parseFloat(e.style.left)||0})).sort((p,q)=>p.x-q.x);
+  for(let i=1;i<vis.length;i++){
+    if(vis[i].x - vis[i-1].x < 10){ vis[i].x=vis[i-1].x+10; vis[i].e.style.left=vis[i].x+'px'; }
+  }
+}
 function fmtLocal(iso){ const d=new Date(iso);
   return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
 function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
