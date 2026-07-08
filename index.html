@@ -697,20 +697,24 @@
 
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
-  .nmk{ position:absolute; bottom:24px; width:2px; height:14px; border-radius:2px;
+  .nmk{ position:absolute; bottom:15px; width:22px; height:22px; border-radius:50%;
         transform:translateX(-50%); pointer-events:auto; cursor:pointer;
-        transition:height .12s ease, box-shadow .18s ease; }
-  .nmk::after{ content:""; position:absolute; top:-3px; left:50%; transform:translateX(-50%);
-        width:6px; height:6px; border-radius:50%; background:inherit; }
-  .nmk.impact-high{ background:var(--red); }
-  .nmk.impact-medium{ background:#e0a63a; }
-  .nmk:hover{ height:18px; }
-  .nmk.is-next{ background:var(--luna-glow); box-shadow:0 0 8px 1px rgba(174,185,232,.85);
-        animation:nmkPulse 2.4s ease-in-out infinite; }
-  .nmk.is-next::after{ background:var(--luna-glow); }
-  @keyframes nmkPulse{ 0%,100%{ box-shadow:0 0 6px 0 rgba(174,185,232,.5); }
-                       50%{ box-shadow:0 0 12px 2px rgba(174,185,232,.95); } }
-  @media (prefers-reduced-motion:reduce){ .nmk.is-next{ animation:none; } }
+        display:grid; place-items:center; background:var(--panel-2); border:2px solid var(--muted);
+        transition:transform .12s ease, box-shadow .18s ease; }
+  .nmk:hover{ transform:translateX(-50%) scale(1.14); z-index:3; }
+  .nmk .nmk-fl{ font-size:12px; line-height:1; }
+  .nmk.impact-high{ border-color:var(--red); }
+  .nmk.impact-medium{ border-color:#e0a63a; }
+  .nmk-sev{ position:absolute; right:-3px; bottom:-3px; display:flex; gap:1px; align-items:flex-end;
+        height:9px; padding:1px; border-radius:4px; background:var(--bg); }
+  .nmk-sev i{ width:2px; border-radius:1px; background:currentColor; }
+  .nmk-sev i:nth-child(1){ height:3px; } .nmk-sev i:nth-child(2){ height:5px; } .nmk-sev i:nth-child(3){ height:7px; }
+  .nmk.impact-high .nmk-sev{ color:var(--red); } .nmk.impact-medium .nmk-sev{ color:#e0a63a; }
+  .nmk.is-next{ box-shadow:0 0 0 2px var(--bg), 0 0 10px 2px rgba(174,185,232,.85); }
+  .nmk.is-next::after{ content:""; position:absolute; inset:-4px; border-radius:50%;
+        border:1.5px solid var(--luna-glow); animation:nmkPulse 2.4s ease-in-out infinite; }
+  @keyframes nmkPulse{ 0%,100%{ opacity:.45; transform:scale(1); } 50%{ opacity:.95; transform:scale(1.14); } }
+  @media (prefers-reduced-motion:reduce){ .nmk.is-next::after{ animation:none; opacity:.7; } }
 
   .nmk-pop{ position:absolute; z-index:20; min-width:168px; max-width:232px;
      background:var(--panel); border:1px solid var(--border); border-radius:8px;
@@ -4427,6 +4431,14 @@ function ensureNewsLayer(){
 }
 // impact feed → kelas warna tick (hanya High/Medium yg dikirim backend; fallback medium).
 function nmkImpactClass(imp){ return String(imp||'').toLowerCase()==='high' ? 'impact-high' : 'impact-medium'; }
+// currency feed (mis. "USD") → emoji flag via regional-indicator dari 2 huruf pertama
+// ("USD"→"US"→🇺🇸). Di platform tanpa emoji-flag otomatis tampil huruf ("US") — fallback berguna.
+// Hanya A-Z yang dipetakan (aman utk innerHTML); selain itu string kosong.
+function currencyFlag(cur){
+  const cc=String(cur||'').toUpperCase().slice(0,2);
+  if(!/^[A-Z]{2}$/.test(cc)) return '';
+  return cc.replace(/./g, c=>String.fromCodePoint(0x1F1E6 + c.charCodeAt(0)-65));
+}
 // Rebuild seluruh tick dari newsState.releases. Event mendatang terdekat (wall-clock now)
 // dapat kelas .is-next (glow). Timestamp rusak → di-skip (defensif).
 function renderNewsMarkers(){
@@ -4444,7 +4456,10 @@ function renderNewsMarkers(){
     const el=document.createElement('div');
     el.className='nmk '+nmkImpactClass(r.impact)+(i===nextIdx?' is-next':'');
     el.dataset.idx=i;
-    el.title=(r.currency||'')+' '+(r.name||'');   // fallback native tooltip (popup penuh di Task 4)
+    el.title=(r.currency||'')+' '+(r.name||'');   // fallback native tooltip
+    const sev=String(r.impact||'').toLowerCase()==='high'?3:2;
+    el.innerHTML=`<span class="nmk-fl">${currencyFlag(r.currency)}</span>`
+      +`<span class="nmk-sev">${'<i></i>'.repeat(sev)}</span>`;
     if(typeof bindNewsMarker==='function') bindNewsMarker(el);
     layer.appendChild(el);
   });
@@ -4457,7 +4472,8 @@ function repositionNewsMarkers(){
   const a=(typeof revealed==='function')?revealed(currentTF):null;
   if(!a||!a.length) return;
   const li=a.length-1, lt=a[li].timestamp, dur=DUR[currentTF];
-  const W=$('#chart').clientWidth||0;
+  let W=$('#chart').clientWidth||0;
+  try{ const sz=chart.getSize('candle_pane','main'); if(sz&&sz.width) W=sz.width; }catch(e){}   // batas kanan = area plot (tanpa sumbu harga)
   const rels=(newsState&&newsState.releases)||[];
   layer.querySelectorAll('.nmk').forEach(el=>{
     const r=rels[+el.dataset.idx]; const t=r?Date.parse(r.time):NaN;
@@ -4475,7 +4491,7 @@ function nudgeNewsMarkers(){
   const vis=[...layer.querySelectorAll('.nmk')].filter(e=>e.style.display!=='none')
     .map(e=>({e,x:parseFloat(e.style.left)||0})).sort((p,q)=>p.x-q.x);
   for(let i=1;i<vis.length;i++){
-    if(vis[i].x - vis[i-1].x < 10){ vis[i].x=vis[i-1].x+10; vis[i].e.style.left=vis[i].x+'px'; }
+    if(vis[i].x - vis[i-1].x < 24){ vis[i].x=vis[i-1].x+24; vis[i].e.style.left=vis[i].x+'px'; }   // ≈ lebar badge
   }
 }
 // ---- News marker popup (hover desktop / tap mobile) ----
