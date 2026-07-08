@@ -1171,7 +1171,7 @@
     </div>
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
   </div>
-  <div class="watchlist" id="newspanel" style="display:none">
+  <div class="watchlist hidden" id="newspanel">
     <div class="wl-head">News<span class="grow"></span><button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
     <div id="newsBody" class="news-body">
       <div class="news-empty">Loading…</div>
@@ -4320,34 +4320,59 @@ function setOrderDock(floating, keepPos){
     $('#watchlist').appendChild(op);
   }
 }
+// kolom kanan (grid-area:markets) ditempati Markets ATAU News (radio). rhMarkets/--markets-w
+// mengontrol geometri kolom itu sendiri, terpisah dari panel mana yg sedang tampil di dalamnya.
+function setColumnVisible(visible){
+  $('#rhMarkets').classList.toggle('hidden', !visible);
+  app.style.setProperty('--markets-w', visible ? savedMarketsW()+'px' : '0px');
+}
 function setMarketsHidden(hidden){
   $('#watchlist').classList.toggle('hidden',hidden);
-  $('#rhMarkets').classList.toggle('hidden',hidden);
-  app.style.setProperty('--markets-w', hidden?'0px':savedMarketsW()+'px');
+  setColumnVisible(!hidden);
   $('#toggleMarkets').classList.toggle('on',!hidden);
   setOrderDock(hidden);   // auto-float saat Markets disembunyikan, dock saat tampil
   try{chart.resize();}catch(e){}
 }
 function toggleMarkets(){
-  const np=$('#newspanel');
-  if(np && np.style.display!=='none'){ np.style.display='none'; localStorage.setItem('br_newsOpen','0'); }  // News & Markets berbagi kolom (radio)
+  const newsWasOpen=!$('#newspanel').classList.contains('hidden');
+  if(newsWasOpen){
+    setNewsOpen(false);                 // satu jalur tutup News (radio) — restore Markets ke state sebelumnya
+    if($('#watchlist').classList.contains('hidden')){
+      setMarketsHidden(false);          // klik Markets = maksud user: tampilkan Markets (lepas dari state sebelumnya)
+      localStorage.setItem('br_watchHidden','0');
+    }
+    return;
+  }
   const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':'0');
 }
+// Markets hidden-state ditangkap saat News dibuka, utk direstore persis saat News ditutup.
+// null = News sedang tertutup / belum pernah dibuka di sesi render ini.
+let newsPrevMarketsHidden=null;
 function setNewsOpen(open){
   const np=$('#newspanel'), wl=$('#watchlist');
   if(open){
-    setMarketsHidden(false);          // pastikan kolom kanan tampil (lebar --markets-w, resize handle)
-    if(wl) wl.style.display='none';   // sembunyikan Markets — News & Markets berbagi grid-area:markets (radio)
-    np.style.display='';
+    if(!np.classList.contains('hidden')) return;   // sudah terbuka — no-op, jangan timpa prev state
+    newsPrevMarketsHidden=wl.classList.contains('hidden');
+    setColumnVisible(true);            // pastikan kolom kanan tampil (lebar, resize handle) — TANPA sentuh order dock
+    wl.classList.add('hidden');        // sembunyikan Markets, News & Markets berbagi grid-area:markets (radio)
+    $('#toggleMarkets').classList.remove('on');
+    np.classList.remove('hidden');
     if(typeof loadNews==='function') loadNews();   // didefinisikan di Task 7
   }else{
-    np.style.display='none';
-    if(wl) wl.style.display='';       // kembalikan Markets
+    if(np.classList.contains('hidden')) return;    // sudah tertutup — no-op
+    np.classList.add('hidden');
+    const restoreHidden = newsPrevMarketsHidden===null ? true : newsPrevMarketsHidden;
+    wl.classList.toggle('hidden', restoreHidden);
+    setColumnVisible(!restoreHidden);
+    $('#toggleMarkets').classList.toggle('on', !restoreHidden);
+    localStorage.setItem('br_watchHidden', restoreHidden?'1':'0');
+    newsPrevMarketsHidden=null;
   }
+  try{chart.resize();}catch(e){}
   localStorage.setItem('br_newsOpen', open?'1':'0');
   $('#toggleNews').classList.toggle('on',open);
 }
-function toggleNews(){ setNewsOpen($('#newspanel').style.display==='none'); }
+function toggleNews(){ setNewsOpen($('#newspanel').classList.contains('hidden')); }
 function toggleOrder(){ const op=$('#orderpanel'); const hide=op.style.display!=='none'; op.style.display=hide?'none':''; $('#toggleOrder').classList.toggle('on',!hide); localStorage.setItem('br_orderHidden',hide?'1':'0'); try{ drawDraftLines(); }catch(e){} }
 function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('collapsed');
   app.style.setProperty('--trades-h', c?'36px':savedTradesH()+'px');
