@@ -46,3 +46,32 @@ func TestFilterUSDHighImpact(t *testing.T) {
 		}
 	}
 }
+
+const sampleFeedMixed = `[
+  {"title":"CPI m/m","country":"USD","date":"2026-07-10T12:30:00+00:00","impact":"High","forecast":"0.3%","previous":"0.2%","actual":"0.4%"},
+  {"title":"ISM Services PMI","country":"USD","date":"2026-07-08T14:00:00+00:00","impact":"Medium","forecast":"53.1","previous":"52.8","actual":""},
+  {"title":"German Factory Orders m/m","country":"EUR","date":"2026-07-06T06:00:00+00:00","impact":"Medium","forecast":"1.1%","previous":"-3.8%","actual":""},
+  {"title":"Non-Farm Employment Change","country":"USD","date":"2026-07-11T12:30:00+00:00","impact":"High","forecast":"180K","previous":"200K","actual":""}
+]`
+
+func TestFilterUSDImpact(t *testing.T) {
+	ev, _ := ParseCalendar([]byte(sampleFeedMixed))
+
+	high := FilterUSDImpact(ev, "High")
+	if len(high) != 2 {
+		t.Fatalf("High-only: want 2, got %d", len(high))
+	}
+
+	both := FilterUSDImpact(ev, "High", "Medium")
+	if len(both) != 3 {
+		t.Fatalf("High+Medium: want 3 USD events, got %d", len(both))
+	}
+	for _, e := range both {
+		if e.Country != "USD" {
+			t.Fatalf("filter leaked non-USD: %+v", e)
+		}
+		if e.Impact != "High" && e.Impact != "Medium" {
+			t.Fatalf("filter leaked impact %q", e.Impact)
+		}
+	}
+}

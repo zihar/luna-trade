@@ -107,15 +107,27 @@ func ParseCalendar(body []byte) ([]Event, error) {
 	return out, nil
 }
 
-// FilterUSDHighImpact menyaring event USD ber-impact High (case-insensitive).
-func FilterUSDHighImpact(events []Event) []Event {
+// FilterUSDImpact menyaring event USD dengan salah satu impact yang diminta
+// (case-insensitive). Contoh: FilterUSDImpact(ev, "High", "Medium").
+func FilterUSDImpact(events []Event, impacts ...string) []Event {
 	var out []Event
 	for _, e := range events {
-		if strings.EqualFold(e.Country, "USD") && strings.EqualFold(e.Impact, "High") {
-			out = append(out, e)
+		if !strings.EqualFold(e.Country, "USD") {
+			continue
+		}
+		for _, imp := range impacts {
+			if strings.EqualFold(e.Impact, imp) {
+				out = append(out, e)
+				break
+			}
 		}
 	}
 	return out
+}
+
+// FilterUSDHighImpact menyaring event USD ber-impact High (case-insensitive).
+func FilterUSDHighImpact(events []Event) []Event {
+	return FilterUSDImpact(events, "High")
 }
 
 // snippet memotong body untuk pesan error.

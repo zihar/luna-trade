@@ -94,6 +94,29 @@ func TestBuildCalendarResponseIncludesAllUSDHigh(t *testing.T) {
 	}
 }
 
+func TestBuildCalendarIncludesMedium(t *testing.T) {
+	now := time.Date(2026, 7, 8, 10, 0, 0, 0, time.UTC)
+	events := []news.Event{
+		{Title: "CPI m/m", Country: "USD", Impact: "High", Time: now.Add(48 * time.Hour), Forecast: "0.3%", Previous: "0.2%"},
+		{Title: "ISM Services PMI", Country: "USD", Impact: "Medium", Time: now.Add(2 * time.Hour), Forecast: "53.1", Previous: "52.8"},
+		{Title: "German Factory Orders", Country: "EUR", Impact: "Medium", Time: now.Add(time.Hour)},
+	}
+	resp := buildCalendarResponse(events, "XAU_USD", now, now, false)
+
+	var sawMedium bool
+	for _, it := range resp.Releases {
+		if it.Currency != "USD" {
+			t.Fatalf("non-USD leaked into releases: %+v", it)
+		}
+		if it.Impact == "Medium" {
+			sawMedium = true
+		}
+	}
+	if !sawMedium {
+		t.Fatalf("expected a Medium USD release in response, got %d releases", len(resp.Releases))
+	}
+}
+
 func TestNewsCacheStaleFallback(t *testing.T) {
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	calls := 0

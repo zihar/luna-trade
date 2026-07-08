@@ -101,7 +101,7 @@ func buildCalendarResponse(events []news.Event, instrument string, now, fetchedA
 		}
 		return strings.TrimSpace(title)
 	}
-	releases := news.GroupReleases(news.FilterUSDHighImpact(events), nameOf)
+	releases := news.GroupReleases(news.FilterUSDImpact(events, "High", "Medium"), nameOf)
 	sort.Slice(releases, func(i, j int) bool { return releases[i].Time.Before(releases[j].Time) })
 
 	items := make([]calItem, 0, len(releases))
