@@ -3972,7 +3972,7 @@ function renderWatch(){
   box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
 }
 function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true);
-  if(!$('#newspanel').classList.contains('hidden') && typeof loadNews==='function') loadNews();   // instrumen aktif berubah → sync bias card News (Task 7)
+  if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
 // ===================== Luna Instrument Picker (dropdown custom) =====================
@@ -4233,6 +4233,12 @@ function initPriceTimer(){
   setInterval(updatePriceTimer, 1000);                       // detak tiap detik
   try{ chart.subscribeAction('onScroll', updatePriceTimer); }catch(e){}
   try{ chart.subscribeAction('onZoom',   updatePriceTimer); }catch(e){}
+  // News: fetch data saat chart ready + poll 60s (marker tampil walau panel tertutup).
+  try{ refreshNewsData(); }catch(e){}
+  clearInterval(_newsTimer); _newsTimer=setInterval(()=>{ try{ refreshNewsData(); }catch(e){} }, 60000);
+  // Reposisi marker saat pan/zoom (reposition & popup didefinisikan di Task 3/4; try/catch aman bila belum ada).
+  try{ chart.subscribeAction('onScroll', ()=>{ try{ repositionNewsMarkers(); }catch(e){} }); }catch(e){}
+  try{ chart.subscribeAction('onZoom',   ()=>{ try{ repositionNewsMarkers(); }catch(e){} }); }catch(e){}
   updatePriceTimer();
 }
 
@@ -4350,16 +4356,30 @@ function toggleMarkets(){
 // --- News panel: fetch & render (bias card, next-release countdown, weekly calendar) ---
 function newsCurrentInstrument(){ return inst || 'XAU_USD'; }   // `inst` = instrumen chart aktif (lihat selectSymbol)
 let _newsTimer=null, _newsCountdown=null;
-function loadNews(){
-  const body=$('#newsBody');
+let newsState=null;   // respons /api/news/calendar last-good — dibagi panel & marker on-chart
+// Toggle marker on-chart (Fase 2). Default ON. '0' = off.
+function newsMarkersEnabled(){ return localStorage.getItem('br_newsMarkers')!=='0'; }
+// Fetch kalender utk instrumen aktif → simpan ke newsState → render panel (bila terbuka)
+// & marker on-chart (bila enabled). Dipanggil saat chart ready, ganti instrumen, poll 60s.
+function refreshNewsData(){
   const reqInst=newsCurrentInstrument();
   fetch('/api/news/calendar?instrument='+encodeURIComponent(reqInst))
     .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
-    .then(renderNews)
-    .catch(()=>{ body.innerHTML='<div class="news-empty">News feed unavailable.'
-      +' <button id="newsRetry" class="wl-x">Retry</button></div>';
-      const b=$('#newsRetry'); if(b) b.onclick=loadNews; });
+    .then(d=>{ newsState=d;
+      if(!$('#newspanel').classList.contains('hidden')) renderNews(d);
+      if(newsMarkersEnabled() && typeof renderNewsMarkers==='function') renderNewsMarkers();
+    })
+    .catch(()=>{
+      // Panel terbuka → tampilkan error Fase 1. Marker: pertahankan last-good (jangan hapus).
+      if(!$('#newspanel').classList.contains('hidden')){
+        const body=$('#newsBody');
+        body.innerHTML='<div class="news-empty">News feed unavailable.'
+          +' <button id="newsRetry" class="wl-x">Retry</button></div>';
+        const b=$('#newsRetry'); if(b) b.onclick=refreshNewsData;
+      }
+    });
 }
+function loadNews(){ refreshNewsData(); }   // kompat: pemanggil lama (selectSymbol, setNewsOpen)
 function fmtLocal(iso){ const d=new Date(iso);
   return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
 function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
@@ -4431,8 +4451,7 @@ function setNewsOpen(open){
     wl.classList.add('hidden');        // sembunyikan Markets, News & Markets berbagi grid-area:markets (radio)
     $('#toggleMarkets').classList.remove('on');
     np.classList.remove('hidden');
-    if(typeof loadNews==='function') loadNews();   // didefinisikan di Task 7
-    clearInterval(_newsTimer); _newsTimer=setInterval(loadNews, 60000);          // refresh data tiap 60s
+    if(typeof loadNews==='function') loadNews();                                 // fresh saat buka
     clearInterval(_newsCountdown); _newsCountdown=setInterval(tickNewsCountdown, 1000);   // countdown tiap detik
   }else{
     if(np.classList.contains('hidden')) return;    // sudah tertutup — no-op
@@ -4443,7 +4462,6 @@ function setNewsOpen(open){
     $('#toggleMarkets').classList.toggle('on', !restoreHidden);
     localStorage.setItem('br_watchHidden', restoreHidden?'1':'0');
     newsPrevMarketsHidden=null;
-    clearInterval(_newsTimer); _newsTimer=null;
     clearInterval(_newsCountdown); _newsCountdown=null;
   }
   try{chart.resize();}catch(e){}
