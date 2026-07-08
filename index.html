@@ -2225,19 +2225,26 @@ async function switchTF(tf){
   // (re)fetch bila belum ada ATAU cache tak mencakup kursor T: T sebelum bar pertama →
   // revealed() kosong (chart blank); T melewati bar terakhir → cache basi, bar depan hilang.
   const dur=DUR[tf], a=tfData[tf];
+  // cache mentok di tepi live → wilayah setelah bar complete terakhir = bar forming
+  // (memang tak pernah ter-cache karna filter c.complete), bukan data hilang → jangan refetch.
+  // Tanpa ini, cursor M15 (halus) selalu "melewati" batas TF kasar (D/W/MN) → refetch sia-sia tiap switch.
+  const atLiveEdge = a && a.length && (a[a.length-1].timestamp + dur > Date.now() - dur);
   const needFetch = !a || !a.length
       || T < a[0].timestamp + dur
-      || T > a[a.length-1].timestamp + dur;
+      || (T > a[a.length-1].timestamp + dur && !atLiveEdge);
+  let loadTok=null;
   if(needFetch){
+    loadTok=chartLoad.show(inst);                // overlay lunar — hanya bila benar-benar menarik data (switch dari cache tetap instan)
     setStatus('Fetching '+tf+' …');
     try{ tfData[tf]=await fetchCandles(tf,{count:5000,to:new Date(T).toISOString()}); }
-    catch(e){ setStatus('Failed TF '+tf+': '+e.message,true); return; }
+    catch(e){ chartLoad.hide(loadTok); setStatus('Failed TF '+tf+': '+e.message,true); return; }
   }
   const futSnap=snapshotFuturePoints();         // rekam waktu wall-clock titik future (TF lama)
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
   clearFormingBar(); formingSeed=null;          // candle berjalan TF lama tak berlaku
   if(live) fetchFormingSeed();                   // seed OHLC periode utk TF baru secepatnya
   lastLen=-1; render(true);
+  if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
   setStatus('TF → '+tf);
 }
