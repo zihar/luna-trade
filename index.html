@@ -4530,7 +4530,7 @@ function openNewsPop(el){
       <div class="np-hd"><span class="np-fl">${currencyFlag(r.currency)}</span>
         <span class="np-nm">${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
         <span class="np-chip ${impCls}"><span class="nmk-sev">${sev}</span>${newsEsc(r.impact)}</span></div>
-      <div class="np-tm">${newsEsc(fmtLocal(r.time))}</div>
+      <div class="np-tm">${newsEsc(fmtLocalFull(r.time))}</div>
       <div class="np-grid">${grid}</div>
       ${r.released?newsBiasLine(r.verdict):''}</div>`;
   pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside
@@ -4556,6 +4556,11 @@ function repositionNewsPop(){
 function closeNewsPop(){ if(_newsPop){ _newsPop.remove(); _newsPop=null; } }
 function fmtLocal(iso){ const d=new Date(iso);
   return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
+// Tanggal-waktu lengkap utk popup marker (ala TradingView: "Wed, 10 Jul 2026 · 19:30").
+function fmtLocalFull(iso){ const d=new Date(iso);
+  const day=d.toLocaleDateString([], {weekday:'short', day:'2-digit', month:'short', year:'numeric'});
+  const tm=d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return day+' · '+tm; }
 function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
 // Escape HTML minimal utk data yang berasal dari feed kalender ekonomi pihak ketiga
 // (nama rilis, currency, forecast/previous/actual, playbook) sebelum masuk innerHTML —
