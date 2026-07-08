@@ -4370,11 +4370,18 @@ function newsEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&
 function renderNews(d){
   const body=$('#newsBody');
   const pretty=newsEsc((d.instrument||'').replace('_','/'));
-  // Bias card dari rilis terbaru yang sudah keluar (kalau ada), else netral.
-  let latest=null;
-  for(const r of (d.releases||[])) if(r.released) latest=r;
-  const bias = latest ? latest.verdict.bias : 'neutral';
-  const line = newsEsc(latest ? latest.verdict.playbook
+  // Bias card = rilis terbaru yang MENGHASILKAN arah (bias non-netral). Event
+  // high-impact netral (mis. ISM/FOMC) tak menimpa bias CPI/PPI/NFP sebelumnya;
+  // bila belum ada rilis berarah, pakai rilis terakhir (netral) / pesan menunggu.
+  let directional=null, lastReleased=null;
+  for(const r of (d.releases||[])){
+    if(!r.released) continue;
+    lastReleased=r;
+    if(r.verdict && r.verdict.bias && r.verdict.bias!=='neutral') directional=r;
+  }
+  const card = directional || lastReleased;
+  const bias = card ? card.verdict.bias : 'neutral';
+  const line = newsEsc(card ? card.verdict.playbook
     : 'Awaiting the next high-impact release.');
   let html='';
   html+=`<div class="news-bias ${bias}">

@@ -59,6 +59,41 @@ func TestBuildCalendarResponseBaseUSD(t *testing.T) {
 	}
 }
 
+func TestBuildCalendarResponseIncludesAllUSDHigh(t *testing.T) {
+	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	events := []news.Event{
+		{Title: "CPI m/m", Country: "USD", Impact: "High", Time: now.Add(-2 * time.Hour), Forecast: "0.3%", Previous: "0.2%", Actual: "0.5%"},
+		{Title: "ISM Services PMI", Country: "USD", Impact: "High", Time: now.Add(-1 * time.Hour), Forecast: "54.2", Previous: "54.5", Actual: "55.0"},
+		{Title: "FOMC Meeting Minutes", Country: "USD", Impact: "High", Time: now.Add(90 * time.Minute), Forecast: "", Previous: "", Actual: ""},
+		{Title: "German Orders", Country: "EUR", Impact: "High", Time: now, Forecast: "1%", Previous: "0%", Actual: "2%"},
+	}
+	resp := buildCalendarResponse(events, "XAU_USD", now, now, false)
+	// EUR event filtered out; all 3 USD/High events kept (2 released + 1 pending).
+	if len(resp.Releases) != 3 {
+		t.Fatalf("want 3 USD/High releases (incl. ISM, FOMC), got %d", len(resp.Releases))
+	}
+	byName := map[string]*calItem{}
+	for i := range resp.Releases {
+		byName[resp.Releases[i].Name] = &resp.Releases[i]
+	}
+	// CPI still produces a directional bias.
+	if cpi := byName["CPI"]; cpi == nil || cpi.Verdict.Bias != "bearish" {
+		t.Fatalf("CPI should be bearish for gold, got %+v", cpi)
+	}
+	// Non-indicator USD/High event kept, labeled by its title, neutral bias.
+	ism := byName["ISM Services PMI"]
+	if ism == nil {
+		t.Fatalf("ISM Services PMI should be included as a calendar row")
+	}
+	if ism.Verdict.Bias != "neutral" {
+		t.Fatalf("ISM bias should be neutral, got %s", ism.Verdict.Bias)
+	}
+	// Next release = nearest FUTURE high-impact event = FOMC (not a distant CPI/NFP).
+	if resp.NextRelease == nil || resp.NextRelease.Name != "FOMC Meeting Minutes" || resp.NextRelease.MinsToGo != 90 {
+		t.Fatalf("nextRelease should be FOMC in 90m, got %+v", resp.NextRelease)
+	}
+}
+
 func TestNewsCacheStaleFallback(t *testing.T) {
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	calls := 0
