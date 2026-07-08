@@ -645,6 +645,9 @@
   .wl-head{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
             padding:9px 11px 6px; display:flex; align-items:center; gap:7px; }
   .wl-head::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
+  .nmk-toggle{ display:inline-flex; align-items:center; gap:4px; font-size:10px;
+    text-transform:none; letter-spacing:0; color:var(--muted); cursor:pointer; margin-right:8px; }
+  .nmk-toggle input{ accent-color:var(--luna-glow); cursor:pointer; margin:0; }
   .wl-live{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--muted); opacity:.45; }
   .wl-live.on{ background:var(--green); opacity:1; box-shadow:0 0 5px var(--green); }
   .wl-row{ display:grid; grid-template-columns:minmax(46px,1fr) 58px 58px 44px 50px 50px; gap:6px; align-items:center;
@@ -1202,7 +1205,9 @@
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
   </div>
   <div class="watchlist hidden" id="newspanel">
-    <div class="wl-head">News<span class="grow"></span><button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
+    <div class="wl-head">News<span class="grow"></span>
+      <label class="nmk-toggle" title="Show events on chart"><input type="checkbox" id="newsMarkerToggle"> On chart</label>
+      <button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
     <div id="newsBody" class="news-body">
       <div class="news-empty">Loading…</div>
     </div>
@@ -4426,7 +4431,7 @@ function nmkImpactClass(imp){ return String(imp||'').toLowerCase()==='high' ? 'i
 // dapat kelas .is-next (glow). Timestamp rusak → di-skip (defensif).
 function renderNewsMarkers(){
   const layer=ensureNewsLayer();
-  if(!newsMarkersEnabled()){ layer.style.display='none'; layer.innerHTML=''; return; }
+  if(!newsMarkersEnabled()){ if(typeof closeNewsPop==='function') closeNewsPop(); layer.style.display='none'; layer.innerHTML=''; return; }
   layer.style.display='';
   const rels=(newsState&&newsState.releases)||[];
   const now=Date.now();
@@ -4618,6 +4623,16 @@ function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('
 $('#toggleMarkets').onclick=toggleMarkets;
 $('#toggleOrder').onclick=toggleOrder;
 $('#toggleTrades').onclick=toggleTrades;
+// Toggle marker on-chart — sinkron localStorage; off → sembunyikan layer & tutup popup.
+(function initNewsMarkerToggle(){
+  const cb=$('#newsMarkerToggle'); if(!cb) return;
+  cb.checked=newsMarkersEnabled();
+  cb.addEventListener('change', ()=>{
+    localStorage.setItem('br_newsMarkers', cb.checked?'1':'0');
+    if(typeof closeNewsPop==='function') closeNewsPop();
+    renderNewsMarkers();   // enabled=false → renderNewsMarkers menyembunyikan & mengosongkan layer
+  });
+})();
 $('#bottomToggle').onclick=toggleTrades;
 $('#marketsClose').onclick=toggleMarkets;     // sembunyikan dari header Markets
 $('#toggleNews').onclick=toggleNews;
