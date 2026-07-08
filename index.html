@@ -4363,15 +4363,19 @@ function loadNews(){
 function fmtLocal(iso){ const d=new Date(iso);
   return d.toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'}); }
 function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
+// Escape HTML minimal utk data yang berasal dari feed kalender ekonomi pihak ketiga
+// (nama rilis, currency, forecast/previous/actual, playbook) sebelum masuk innerHTML —
+// mencegah injeksi script kalau respons feed dipalsukan/di-compromise.
+function newsEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function renderNews(d){
   const body=$('#newsBody');
-  const pretty=(d.instrument||'').replace('_','/');
+  const pretty=newsEsc((d.instrument||'').replace('_','/'));
   // Bias card dari rilis terbaru yang sudah keluar (kalau ada), else netral.
   let latest=null;
   for(const r of (d.releases||[])) if(r.released) latest=r;
   const bias = latest ? latest.verdict.bias : 'neutral';
-  const line = latest ? latest.verdict.playbook
-    : 'Awaiting the next high-impact release.';
+  const line = newsEsc(latest ? latest.verdict.playbook
+    : 'Awaiting the next high-impact release.');
   let html='';
   html+=`<div class="news-bias ${bias}">
     <div class="sym">${pretty}</div>
@@ -4382,7 +4386,7 @@ function renderNews(d){
   </div>`;
   // Next release + countdown
   if(d.nextRelease){
-    html+=`<div class="news-next"><div class="nm">Next: ${d.nextRelease.name}</div>
+    html+=`<div class="news-next"><div class="nm">Next: ${newsEsc(d.nextRelease.name)}</div>
       <div class="cd" data-t="${d.nextRelease.time}">—</div></div>`;
   }
   // Calendar list
@@ -4392,9 +4396,9 @@ function renderNews(d){
     for(const r of d.releases){
       const sur = r.released ? (r.verdict.surprise==='above'?'📈':r.verdict.surprise==='below'?'📉':'➖') : '';
       html+=`<div class="cal-item ${r.released?'released':''}">
-        <div class="row1"><span class="nm"><span class="impact-dot impact-${r.impact}"></span>${r.currency} ${r.name}</span>
+        <div class="row1"><span class="nm"><span class="impact-dot impact-${newsEsc(r.impact)}"></span>${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
           <span class="tm">${fmtLocal(r.time)}</span></div>
-        <div class="cal-fig">F: <b>${r.forecast||'—'}</b> · P: ${r.previous||'—'}${r.released?` · A: <b>${r.actual||'—'}</b> ${sur}`:''}</div>
+        <div class="cal-fig">F: <b>${newsEsc(r.forecast||'—')}</b> · P: ${newsEsc(r.previous||'—')}${r.released?` · A: <b>${newsEsc(r.actual||'—')}</b> ${sur}`:''}</div>
       </div>`;
     }
   }
