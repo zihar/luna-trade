@@ -671,6 +671,27 @@
   .al-row .al-x{ padding:1px 6px; font-size:10px; }
   .al-empty{ padding:4px 11px; font-size:11px; color:var(--muted); }
 
+  /* News panel (shares grid-area:markets with #watchlist, radio toggle) */
+  #newspanel{ grid-area:markets; overflow:auto; }
+  .news-body{ display:flex; flex-direction:column; gap:10px; padding:10px; }
+  .news-empty{ color:var(--muted); font-size:13px; text-align:center; padding:24px 8px; }
+  .news-bias{ border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:var(--panel-2); }
+  .news-bias .sym{ font:600 13px Inter,sans-serif; color:var(--txt); }
+  .news-bias .dir{ font:700 15px 'Space Grotesk',sans-serif; }
+  .news-bias.bullish .dir{ color:var(--green); } .news-bias.bearish .dir{ color:var(--red); }
+  .news-bias.neutral .dir{ color:var(--muted); }
+  .news-regime{ font-size:10px; color:var(--hdr); border:1px solid var(--border); border-radius:10px; padding:1px 7px; display:inline-block; margin-top:6px; }
+  .news-next{ border:1px solid var(--accent); border-radius:8px; padding:8px 12px; }
+  .news-next .cd{ font:600 13px var(--mono,monospace); color:var(--accent); }
+  .cal-item{ border-bottom:1px solid var(--border); padding:8px 4px; font-size:12px; }
+  .cal-item .row1{ display:flex; justify-content:space-between; align-items:center; }
+  .cal-item .nm{ color:var(--txt); font-weight:600; }
+  .cal-item .tm{ color:var(--muted); font:11px var(--mono,monospace); }
+  .impact-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
+  .impact-High{ background:var(--red); } .impact-Medium{ background:#e0a63a; } .impact-Low{ background:var(--muted); }
+  .cal-fig{ color:var(--muted); } .cal-fig b{ color:var(--txt); }
+  .cal-item.released{ background:color-mix(in srgb, var(--accent) 6%, transparent); }
+
   /* toast feedback (alert/pending) */
   .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
           background:var(--panel); border:1px solid var(--accent); color:var(--txt);
@@ -1106,6 +1127,7 @@
     <button class="railbtn" id="toggleMarkets" title="Markets panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="15" y1="4" x2="15" y2="20"/></svg></button>
     <button class="railbtn" id="toggleOrder" title="Order panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
     <button class="railbtn" id="toggleTrades" title="Trades panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="14" x2="21" y2="14"/></svg></button>
+    <button class="railbtn" id="toggleNews" title="News panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14H4z"/><path d="M17 8h3v9a2 2 0 0 1-2 2h-1"/><path d="M7 8h7M7 11h7M7 14h5"/></svg></button>
     <div class="raildiv"></div>
     <div class="drawtools" id="drawtools"></div>
     <div class="railspacer"></div>
@@ -1148,6 +1170,12 @@
       <div id="alertList"></div>
     </div>
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
+  </div>
+  <div class="watchlist" id="newspanel" style="display:none">
+    <div class="wl-head">News<span class="grow"></span><button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
+    <div id="newsBody" class="news-body">
+      <div class="news-empty">Loading…</div>
+    </div>
   </div>
 
   <div class="bottompanel" id="bottompanel">
@@ -4300,7 +4328,26 @@ function setMarketsHidden(hidden){
   setOrderDock(hidden);   // auto-float saat Markets disembunyikan, dock saat tampil
   try{chart.resize();}catch(e){}
 }
-function toggleMarkets(){ const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':'0'); }
+function toggleMarkets(){
+  const np=$('#newspanel');
+  if(np && np.style.display!=='none'){ np.style.display='none'; localStorage.setItem('br_newsOpen','0'); }  // News & Markets berbagi kolom (radio)
+  const hidden=!$('#watchlist').classList.contains('hidden'); setMarketsHidden(hidden); localStorage.setItem('br_watchHidden',hidden?'1':'0');
+}
+function setNewsOpen(open){
+  const np=$('#newspanel'), wl=$('#watchlist');
+  if(open){
+    setMarketsHidden(false);          // pastikan kolom kanan tampil (lebar --markets-w, resize handle)
+    if(wl) wl.style.display='none';   // sembunyikan Markets — News & Markets berbagi grid-area:markets (radio)
+    np.style.display='';
+    if(typeof loadNews==='function') loadNews();   // didefinisikan di Task 7
+  }else{
+    np.style.display='none';
+    if(wl) wl.style.display='';       // kembalikan Markets
+  }
+  localStorage.setItem('br_newsOpen', open?'1':'0');
+  $('#toggleNews').classList.toggle('on',open);
+}
+function toggleNews(){ setNewsOpen($('#newspanel').style.display==='none'); }
 function toggleOrder(){ const op=$('#orderpanel'); const hide=op.style.display!=='none'; op.style.display=hide?'none':''; $('#toggleOrder').classList.toggle('on',!hide); localStorage.setItem('br_orderHidden',hide?'1':'0'); try{ drawDraftLines(); }catch(e){} }
 function toggleTrades(){ const b=$('#bottompanel'); const c=b.classList.toggle('collapsed');
   app.style.setProperty('--trades-h', c?'36px':savedTradesH()+'px');
@@ -4311,6 +4358,8 @@ $('#toggleOrder').onclick=toggleOrder;
 $('#toggleTrades').onclick=toggleTrades;
 $('#bottomToggle').onclick=toggleTrades;
 $('#marketsClose').onclick=toggleMarkets;     // sembunyikan dari header Markets
+$('#toggleNews').onclick=toggleNews;
+$('#newsClose').onclick=()=>setNewsOpen(false);
 document.querySelectorAll('.op-x').forEach(b=>b.onclick=toggleOrder);   // tutup dari header (sejajar chevron)
 
 // --- drag order panel dari mana saja KECUALI kontrol (tombol/input/label/stepper) ---
@@ -4355,6 +4404,7 @@ makeResizer($('#rhTrades'), 'y','--trades-h', 'br_tradesH');
 
 // sinkron state awal — default hidden (kecuali user pernah set tampil '0')
 { const wh=localStorage.getItem('br_watchHidden'); setMarketsHidden(wh===null?true:wh==='1'); }
+if(localStorage.getItem('br_newsOpen')==='1') setNewsOpen(true);   // restore News state (radio dgn Markets)
 { const oh=localStorage.getItem('br_orderHidden'); const hideOrder=(oh===null?true:oh==='1');
   $('#orderpanel').style.display=hideOrder?'none':''; $('#toggleOrder').classList.toggle('on',!hideOrder); }
 const _coll=$('#bottompanel').classList.contains('collapsed');
