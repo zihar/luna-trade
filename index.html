@@ -583,6 +583,29 @@
     .replaypill button:active{ transform:none; }
   }
 
+  /* ===== Pick-mode "cut cursor": garis pemisah + sisi kanan (masa depan) dipudarkan ===== */
+  /* Aktif saat memilih bar mulai replay — tak mengubah data, murni lapisan visual. --pcx = x garis. */
+  .pick-cut{ position:absolute; inset:0; z-index:35; pointer-events:none;
+             opacity:0; transition:opacity .15s ease; }
+  .cpanel-pri.picking .pick-cut{ opacity:1; }
+  .pick-cut .pc-veil{ position:absolute; top:0; bottom:0; left:var(--pcx,100%); right:0;
+                      background:rgba(6,7,10,.55); }
+  body.light .pick-cut .pc-veil{ background:rgba(255,255,255,.6); }
+  .pick-cut .pc-line{ position:absolute; top:0; bottom:0; left:var(--pcx,100%);
+                      width:2px; margin-left:-1px; background:var(--accent);
+                      box-shadow:0 0 10px rgba(74,113,255,.65); }
+  .pick-cut .pc-scissors{ position:absolute; left:50%; top:54%; transform:translate(-50%,-50%);
+                          width:26px; height:26px; border-radius:50%; background:var(--panel);
+                          border:1px solid var(--accent); color:var(--accent);
+                          display:flex; align-items:center; justify-content:center;
+                          box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  .pick-cut .pc-scissors svg{ width:15px; height:15px; }
+  .pick-cut .pc-date{ position:absolute; bottom:24px; left:var(--pcx,100%); transform:translateX(-50%);
+                      background:var(--accent); color:#fff; font-family:var(--font-num); font-weight:700;
+                      font-size:11px; letter-spacing:.02em; padding:3px 9px; border-radius:6px;
+                      white-space:nowrap; box-shadow:0 2px 10px rgba(0,0,0,.4); }
+  @media (prefers-reduced-motion:reduce){ .pick-cut{ transition:none; } }
+
   /* sizing readout (Fase 1a) */
   .sizing{ flex-basis:100%; display:flex; gap:18px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:2px; }
   .sizing b{ font-family:var(--mono); color:var(--accent); }
@@ -1093,6 +1116,11 @@
         <div class="replay-watermark" aria-hidden="true">
           <svg class="wm-moon" viewBox="0 0 24 24"><mask id="lunaReplayCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle cx="11.6" cy="12" r="8.4" fill="currentColor" mask="url(#lunaReplayCut)"/></svg>
           <span class="wm-text">Replay</span>
+        </div>
+        <div class="pick-cut" aria-hidden="true">
+          <div class="pc-veil"></div>
+          <div class="pc-line"><span class="pc-scissors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span></div>
+          <div class="pc-date" id="pcDate"></div>
         </div>
         <div class="replaypill" id="replayPill" role="toolbar" aria-label="Bar replay controls">
           <button class="rp-select" id="rpSelect" title="Pick a new replay start bar (stays in replay)" aria-label="Select bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14"/><path d="M20 12H9.5"/><path d="m13 8-4 4 4 4"/></svg>Select bar</button>
@@ -4349,7 +4377,35 @@ window.addEventListener('keydown',e=>{
 // pilih titik mulai di chart → stepping historis (live mati). Klik lagi = keluar → realtime.
 let pickMode=false, hoverTs=null, replayMode=false;
 const replayBtn=$('#replayPick');
-chart.subscribeAction('onCrosshairChange', d=>{ if(d&&d.kLineData&&d.kLineData.timestamp!=null) hoverTs=d.kLineData.timestamp; });
+chart.subscribeAction('onCrosshairChange', d=>{ if(d&&d.kLineData&&d.kLineData.timestamp!=null){ hoverTs=d.kLineData.timestamp; if(pickMode) updatePickCut(hoverTs); } });
+// ===== pick-mode "cut cursor" (garis pemisah + sisi kanan dipudarkan) =====
+function setPickCut(on){
+  const host=document.querySelector('.cpanel-pri');
+  host.classList.toggle('picking', on);
+  if(on) host.style.setProperty('--pcx', host.getBoundingClientRect().width+'px');   // mulai: garis di tepi kanan (veil kosong)
+  // sembunyikan crosshair bawaan (garis putus2 + label) saat pick agar tak redundan dg garis potong.
+  // top-level show tetap true → onCrosshairChange masih memicu updatePickCut.
+  try{ chart.setStyles({ crosshair:{ horizontal:{ show:!on }, vertical:{ show:!on } } }); }catch(e){}
+}
+function pickCutX(ts){   // ts bar → x tepi-kanan bar (center + setengah lebar bar) relatif tepi kiri chart
+  try{
+    const p=chart.convertToPixel({timestamp:ts},{paneId:'candle_pane'});
+    const x=Array.isArray(p)?(p[0]&&p[0].x):(p&&p.x);
+    if(typeof x!=='number') return null;
+    let half=4; try{ const bs=chart.getBarSpace(); half=(bs&&bs.halfBar)||(bs&&bs.bar&&bs.bar/2)||half; }catch(e){}
+    return x+half;
+  }catch(e){ return null; }
+}
+function fmtCutDate(ts){
+  try{ return new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ts)); }
+  catch(e){ return ''; }
+}
+function updatePickCut(ts){
+  if(ts==null) return;
+  const x=pickCutX(ts);
+  if(x!=null) document.querySelector('.cpanel-pri').style.setProperty('--pcx', x+'px');
+  const el=$('#pcDate'); if(el) el.textContent=fmtCutDate(ts);
+}
 function setReplayUI(on){
   replayMode=on;
   $('#replaybar').classList.toggle('replaying', on);
@@ -4365,6 +4421,7 @@ function setReplayUI(on){
 }
 function exitReplay(){
   pickMode=false;
+  setPickCut(false);
   setReplayUI(false);
   const arr=tfData[currentTF];
   if(arr&&arr.length) T=arr[arr.length-1].timestamp+DUR[currentTF];   // lompat ke bar terbaru
@@ -4381,12 +4438,14 @@ replayBtn.onclick=()=>{
     chart.applyNewData(tfData[currentTF]); lastLen=tfData[currentTF].length;  // tampilkan semua bar
     setStatus('Bar Replay: point & CLICK a bar on the chart to pick the replay start.');
   }else{ render(true); setStatus('Point selection cancelled.'); }
+  setPickCut(pickMode);   // garis potong + veil kanan hanya saat pick
 };
 const REPLAY_SCROLL_MS=700;   // durasi animasi geser ke bar yang dipilih
 $('#chart').addEventListener('click',()=>{
   if(!pickMode||hoverTs==null) return;
   const ts=hoverTs;
   pickMode=false;
+  setPickCut(false);                 // pick selesai → hilangkan garis potong + veil
   $('#rpSelect').classList.remove('armed');   // re-select selesai (bila dipicu dari pill)
   stopLive();                        // replay = realtime mati
   setReplayUI(true);                 // masuk mode replay → kontrol step tampil
@@ -4413,11 +4472,11 @@ function syncReplayPill(){
 function pickBarAgain(){
   if(!replayMode) return;
   if(pickMode){   // sudah armed → batalkan
-    pickMode=false; $('#rpSelect').classList.remove('armed');
+    pickMode=false; $('#rpSelect').classList.remove('armed'); setPickCut(false);
     setStatus('Bar selection cancelled.'); return;
   }
   if(playing) pause();
-  pickMode=true; $('#rpSelect').classList.add('armed');
+  pickMode=true; $('#rpSelect').classList.add('armed'); setPickCut(true);
   // JANGAN reveal seluruh data — itu melompat ke "sekarang" + membocorkan candle masa depan.
   // Tetap di posisi replay saat ini; user memilih bar dari histori yang sudah tampil.
   setStatus('Select bar: click a bar in view to move the replay start (no jump to now).');
