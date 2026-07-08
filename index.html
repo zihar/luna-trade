@@ -716,17 +716,25 @@
   @keyframes nmkPulse{ 0%,100%{ opacity:.45; transform:scale(1); } 50%{ opacity:.95; transform:scale(1.14); } }
   @media (prefers-reduced-motion:reduce){ .nmk.is-next::after{ animation:none; opacity:.7; } }
 
-  .nmk-pop{ position:absolute; z-index:20; min-width:168px; max-width:232px;
-     background:var(--panel); border:1px solid var(--border); border-radius:8px;
-     box-shadow:var(--shadow); padding:9px 11px; font-size:12px; color:var(--txt);
-     pointer-events:auto; transform:translateX(-50%); }
-  .nmk-pop .np-hd{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-bottom:4px; }
-  .nmk-pop .np-nm{ font-weight:600; }
-  .nmk-pop .np-tm{ color:var(--muted); font:11px var(--mono,monospace); white-space:nowrap; }
-  .nmk-pop .np-imp{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
-  .nmk-pop .np-imp.impact-high{ color:var(--red); } .nmk-pop .np-imp.impact-medium{ color:#e0a63a; }
-  .nmk-pop .np-fig{ color:var(--muted); } .nmk-pop .np-fig b{ color:var(--txt); }
-  .nmk-pop .np-bias{ margin-top:6px; font-weight:600; font-family:'Space Grotesk',sans-serif; }
+  .nmk-pop{ position:absolute; z-index:20; width:248px; background:var(--panel);
+     border:1px solid var(--border); border-radius:11px; box-shadow:var(--shadow);
+     color:var(--txt); pointer-events:auto; transform:translateX(-50%); overflow:hidden; }
+  .nmk-pop .np-acc{ height:4px; }
+  .nmk-pop .np-acc.impact-high{ background:var(--red); } .nmk-pop .np-acc.impact-medium{ background:#e0a63a; }
+  .nmk-pop .np-body{ padding:13px 15px; }
+  .nmk-pop .np-hd{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .nmk-pop .np-fl{ font-size:15px; line-height:1; }
+  .nmk-pop .np-nm{ font:600 14px 'Space Grotesk',Inter,sans-serif; flex:1; }
+  .nmk-pop .np-chip{ font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px;
+     border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .nmk-pop .np-chip.impact-high{ color:var(--red); background:rgba(255,111,111,.13); border:1px solid rgba(255,111,111,.4); }
+  .nmk-pop .np-chip.impact-medium{ color:#e0a63a; background:rgba(224,166,58,.13); border:1px solid rgba(224,166,58,.4); }
+  .nmk-pop .np-chip .nmk-sev{ position:static; background:none; padding:0; height:8px; }
+  .nmk-pop .np-tm{ color:var(--muted); font:11px var(--mono,monospace); margin-bottom:11px; }
+  .nmk-pop .np-grid{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; font-size:13px; }
+  .nmk-pop .np-grid .k{ color:var(--muted); } .nmk-pop .np-grid .v{ font-weight:600; text-align:right; }
+  .nmk-pop .np-bias{ margin-top:11px; padding-top:10px; border-top:1px solid var(--border);
+     font:600 13px 'Space Grotesk',Inter,sans-serif; }
   .nmk-pop .np-bias.bullish{ color:var(--green); } .nmk-pop .np-bias.bearish{ color:var(--red); }
 
   /* toast feedback (alert/pending) */
@@ -4507,20 +4515,24 @@ function bindNewsMarker(el){
 // Baris bias arah utk instrumen aktif — hanya bila event menghasilkan arah (non-neutral).
 function newsBiasLine(v){
   if(!v || !v.bias || v.bias==='neutral') return '';
-  return `<div class="np-bias ${newsEsc(v.bias)}">${biasArrow(v.bias)} ${newsEsc(v.bias.toUpperCase())}</div>`;
+  const inst=newsEsc((newsCurrentInstrument()||'').replace('_','/'));
+  return `<div class="np-bias ${newsEsc(v.bias)}">${biasArrow(v.bias)} ${inst} ${newsEsc(v.bias.toUpperCase())}</div>`;
 }
 function openNewsPop(el){
   const r=((newsState&&newsState.releases)||[])[+el.dataset.idx]; if(!r) return;
   closeNewsPop();
   const impCls=nmkImpactClass(r.impact);
-  const fig=`F: <b>${newsEsc(r.forecast||'—')}</b> · P: ${newsEsc(r.previous||'—')}`
-    + (r.released?` · A: <b>${newsEsc(r.actual||'—')}</b>`:'');
+  const sev='<i></i>'.repeat(String(r.impact||'').toLowerCase()==='high'?3:2);
+  const rows=[['Actual', r.released?(r.actual||'—'):'—'],['Forecast', r.forecast||'—'],['Previous', r.previous||'—']];
+  const grid=rows.map(([k,v])=>`<span class="k">${k}</span><span class="v">${newsEsc(v)}</span>`).join('');
   const pop=document.createElement('div'); pop.className='nmk-pop'; pop._for=el;
-  pop.innerHTML=`<div class="np-hd"><span class="np-nm">${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
-      <span class="np-tm">${newsEsc(fmtLocal(r.time))}</span></div>
-    <div class="np-imp ${impCls}">${newsEsc(r.impact)} impact</div>
-    <div class="np-fig">${fig}</div>
-    ${r.released?newsBiasLine(r.verdict):''}`;
+  pop.innerHTML=`<div class="np-acc ${impCls}"></div><div class="np-body">
+      <div class="np-hd"><span class="np-fl">${currencyFlag(r.currency)}</span>
+        <span class="np-nm">${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
+        <span class="np-chip ${impCls}"><span class="nmk-sev">${sev}</span>${newsEsc(r.impact)}</span></div>
+      <div class="np-tm">${newsEsc(fmtLocal(r.time))}</div>
+      <div class="np-grid">${grid}</div>
+      ${r.released?newsBiasLine(r.verdict):''}</div>`;
   pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside
   pop.addEventListener('mouseenter', ()=>clearTimeout(_newsPopHideT));
   pop.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop,180); });
