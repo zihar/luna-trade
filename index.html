@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Luna Trade — Manual Forex Backtester (OANDA)</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
@@ -149,11 +150,10 @@
   .auth-google:hover{background:#f2f2f2}
   .main{flex:1;display:flex;min-height:0}
   .chartwrap{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
-  .tfbar{display:flex;gap:5px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
-  .tfbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
-  .tfbar button.hticon{display:inline-flex;align-items:center;justify-content:center;padding:5px;color:var(--muted)}
-  .tfbar button.hticon svg{width:16px;height:16px;display:block}
-  .tfbar button.hticon:not(:disabled):hover{color:var(--txt)}
+  .toolbar .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+  .toolbar button.hticon{display:inline-flex;align-items:center;justify-content:center;padding:5px;color:var(--muted)}
+  .toolbar button.hticon svg{width:16px;height:16px;display:block}
+  .toolbar button.hticon:not(:disabled):hover{color:var(--txt)}
   /* indikator teknikal: tombol ƒx + dropdown menu */
   .indwrap{position:relative;display:inline-flex}
   #indBtn{position:relative;display:inline-flex;align-items:center;gap:3px}
@@ -313,11 +313,14 @@
     outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--ring); }
   ::selection{ background:var(--accent); color:#fff; }
 
-  /* wordmark */
-  .brand{ display:inline-flex; align-items:center; gap:9px; font-weight:700; font-size:14px; color:var(--txt); letter-spacing:-.012em; }
-  .brand .glyph{ width:22px; height:22px; display:block; color:var(--luna-glow);
-                 filter:drop-shadow(0 0 6px rgba(174,185,232,.5)); }
-  .brand .glyph .luna-disc{ fill:currentColor; }
+  /* wordmark → dipindah ke dalam chart (pojok kiri-bawah), gaya watermark ala TradingView */
+  .chart-brand{ position:absolute; bottom:28px; left:12px; z-index:7; /* kiri-bawah ala TradingView: kiri bebas (sumbu harga selalu di kanan), bottom 28px lolos sumbu waktu (~22px) */
+    display:inline-flex; align-items:center; gap:7px;
+    font-weight:700; font-size:13px; letter-spacing:-.01em; color:var(--txt);
+    opacity:.85; pointer-events:none; user-select:none; }
+  .chart-brand .glyph{ width:17px; height:17px; display:block; color:var(--luna-glow);
+    filter:drop-shadow(0 0 6px rgba(174,185,232,.5)); }
+  .chart-brand .glyph .luna-disc{ fill:currentColor; }
   .vsep{ width:1px; height:20px; background:var(--border); }
   /* header price block (tenang) — harga live instrumen aktif menyatu di toolbar */
   .hdr-px{ display:inline-flex; align-items:baseline; gap:9px; min-width:0; }
@@ -1008,8 +1011,6 @@
 </style>
 
 <div class="toolbar">
-  <span class="brand"><svg class="glyph" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><mask id="lunaCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaCut)"/></svg>Luna&nbsp;Trade</span>
-  <span class="vsep"></span>
   <select id="instrument" hidden aria-hidden="true" tabindex="-1">
     <!-- Forex majors -->
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
@@ -1043,7 +1044,37 @@
       <div class="ipick-list" id="ipickList"></div>
     </div>
   </div>
-  <span class="grow"></span>
+  <span class="sep"></span>
+  <span class="tfwrap">
+    <span id="tfbtns"></span>
+    <button id="tfMore" class="tf-more" title="Timeframes" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="tf-menu" id="tfMenu" role="menu"></div>
+  </span>
+  <span class="sep"></span>
+  <span class="indwrap">
+    <button id="indBtn" title="Indicators"><span class="ind-fx">ƒ<sub>x</sub></span><span class="ind-badge" id="indBadge" hidden></span></button>
+    <div class="ind-menu" id="indMenu"></div>
+  </span>
+  <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
+  <span id="replayCtrls">
+    <button id="prevBtn" title="Prev (←)">⏪</button>
+    <button id="playBtn" title="Play/Pause (Space)">▶</button>
+    <button id="nextBtn" title="Next (→)">⏩</button>
+    <span class="rlabel">Speed</span>
+    <select id="speed" title="Play speed (candles/sec)">
+      <option value="1">1×</option>
+      <option value="2">2×</option>
+      <option value="3" selected>3×</option>
+      <option value="5">5×</option>
+      <option value="10">10×</option>
+      <option value="20">20×</option>
+    </select>
+  </span>
+  <span class="sep"></span>
+  <button id="undoBtn" class="hticon" title="Undo drawing (Ctrl/⌘+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+  <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+  <span class="grow" style="flex:1"></span>
+  <span id="layoutbtns" title="Layout chart"></span>
   <span class="status" id="status"></span>
 </div>
 
@@ -1057,41 +1088,8 @@
     <div class="railspacer"></div>
   </aside>
   <div class="center">
-    <div class="tfbar">
-      <span class="tfwrap">
-        <span id="tfbtns"></span>
-        <button id="tfMore" class="tf-more" title="Timeframes" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
-        <div class="tf-menu" id="tfMenu" role="menu"></div>
-      </span>
-      <span class="sep"></span>
-      <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
-      <span id="replayCtrls">
-        <button id="prevBtn" title="Prev (←)">⏪</button>
-        <button id="playBtn" title="Play/Pause (Space)">▶</button>
-        <button id="nextBtn" title="Next (→)">⏩</button>
-        <span class="rlabel">Speed</span>
-        <select id="speed" title="Play speed (candles/sec)">
-          <option value="1">1×</option>
-          <option value="2">2×</option>
-          <option value="3" selected>3×</option>
-          <option value="5">5×</option>
-          <option value="10">10×</option>
-          <option value="20">20×</option>
-        </select>
-      </span>
-      <span class="sep"></span>
-      <button id="undoBtn" class="hticon" title="Undo drawing (Ctrl/⌘+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
-      <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
-      <span class="sep"></span>
-      <span class="indwrap">
-        <button id="indBtn" title="Indicators"><span class="ind-fx">ƒ<sub>x</sub></span><span class="ind-badge" id="indBadge" hidden></span></button>
-        <div class="ind-menu" id="indMenu"></div>
-      </span>
-      <span class="grow" style="flex:1"></span>
-      <span id="layoutbtns" title="Layout chart"></span>
-    </div>
     <div id="chartgrid" class="lay-1">
-      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div></div>
+      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div><div class="chart-brand" aria-hidden="true"><svg class="glyph" viewBox="0 0 24 24" width="16" height="16"><mask id="lunaChartCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaChartCut)"/></svg>Luna&nbsp;Trade</div></div>
         <div class="replay-watermark" aria-hidden="true">
           <svg class="wm-moon" viewBox="0 0 24 24"><mask id="lunaReplayCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle cx="11.6" cy="12" r="8.4" fill="currentColor" mask="url(#lunaReplayCut)"/></svg>
           <span class="wm-text">Replay</span>
