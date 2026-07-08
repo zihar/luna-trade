@@ -75,6 +75,7 @@ type calItem struct {
 
 type nextRel struct {
 	Name     string `json:"name"`
+	Currency string `json:"currency"`
 	Time     string `json:"time"`
 	MinsToGo int    `json:"minsToGo"`
 }
@@ -150,6 +151,7 @@ func buildCalendarResponse(events []news.Event, instrument string, now, fetchedA
 			if next == nil && rel.Time.After(now) {
 				next = &nextRel{
 					Name:     rel.Name,
+					Currency: it.Currency,
 					Time:     rel.Time.Format(time.RFC3339),
 					MinsToGo: int(rel.Time.Sub(now).Round(time.Minute).Minutes()),
 				}

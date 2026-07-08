@@ -4546,7 +4546,7 @@ function positionNewsPop(){
   const el=_newsPop._for, cW=$('#chart').clientWidth;
   const x=parseFloat(el.style.left)||0, halfW=_newsPop.offsetWidth/2+6;
   _newsPop.style.left=Math.max(halfW, Math.min(x, cW-halfW))+'px';
-  _newsPop.style.bottom='46px';   // tepat di atas tick (bottom:24px + tinggi ~14 + gap)
+  _newsPop.style.bottom='46px';   // tepat di atas badge (bottom:15px + tinggi 22 + gap)
 }
 function repositionNewsPop(){
   if(!_newsPop||!_newsPop._for) return;
@@ -4592,12 +4592,13 @@ function renderNews(d){
   </div>`;
   // Next release + countdown
   if(d.nextRelease){
-    html+=`<div class="news-next"><div class="nm">Next: ${newsEsc(d.nextRelease.name)}</div>
+    const nc=d.nextRelease.currency?newsEsc(d.nextRelease.currency)+' ':'';
+    html+=`<div class="news-next"><div class="nm">Next: ${nc}${newsEsc(d.nextRelease.name)}</div>
       <div class="cd" data-t="${d.nextRelease.time}">—</div></div>`;
   }
   // Calendar list
   if(!(d.releases||[]).length){
-    html+='<div class="news-empty">No high-impact USD events this week.</div>';
+    html+='<div class="news-empty">No high-impact events this week.</div>';
   }else{
     for(const r of d.releases){
       const sur = r.released ? (r.verdict.surprise==='above'?'📈':r.verdict.surprise==='below'?'📉':'➖') : '';
