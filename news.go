@@ -91,18 +91,17 @@ type calResponse struct {
 // buildCalendarResponse = fungsi murni (tanpa jaringan) → mudah di-test.
 func buildCalendarResponse(events []news.Event, instrument string, now, fetchedAt time.Time, stale bool) calResponse {
 	role := news.InstrumentRole(instrument)
-	// Tampilkan SEMUA event USD impact High + Medium (Fase 2 — marker on-chart &
-	// panel berbagi filter ini). CPI/PPI/NFP tetap dikelompokkan & menghasilkan bias;
-	// event lain (ISM/FOMC/retail dst) di-label dengan judulnya sendiri, Kind=Other →
-	// bias netral. Ini membuat kalender & countdown "next release" mencerminkan
-	// seluruh penggerak pasar USD, bukan cuma 3 indikator.
+	// Tampilkan event High+Medium untuk mata uang relevan instrumen (kedua sisi pasangan;
+	// metal/DXY → USD saja). Bias ARAH hanya dihitung untuk event USD (engine Fase 1);
+	// event non-USD tampil informasional (verdict netral). Panel News & marker berbagi ini.
 	nameOf := func(title string) string {
 		if n := news.DefaultName(title); n != "" {
 			return n
 		}
 		return strings.TrimSpace(title)
 	}
-	releases := news.GroupReleases(news.FilterUSDImpact(events, "High", "Medium"), nameOf)
+	currencies := news.RelevantCurrencies(instrument)
+	releases := news.GroupReleasesByCurrency(news.FilterEvents(events, currencies, "High", "Medium"), nameOf)
 	sort.Slice(releases, func(i, j int) bool { return releases[i].Time.Before(releases[j].Time) })
 
 	items := make([]calItem, 0, len(releases))
@@ -125,15 +124,20 @@ func buildCalendarResponse(events []news.Event, instrument string, now, fetchedA
 			}
 		}
 		if it.Released {
-			v := rel.Classify()
-			bias := news.InstrumentBias(v.Lean, role)
-			it.Verdict = calVerdict{
-				Surprise: v.Surprise.String(),
-				USDLean:  v.Lean.String(),
-				Bias:     bias.String(),
-				Label:    v.Label,
-				Playbook: news.Playbook(v.Lean, role, bias, instrument),
-				Tiebreak: v.Tiebreak,
+			if strings.EqualFold(it.Currency, "USD") {
+				v := rel.Classify()
+				bias := news.InstrumentBias(v.Lean, role)
+				it.Verdict = calVerdict{
+					Surprise: v.Surprise.String(),
+					USDLean:  v.Lean.String(),
+					Bias:     bias.String(),
+					Label:    v.Label,
+					Playbook: news.Playbook(v.Lean, role, bias, instrument),
+					Tiebreak: v.Tiebreak,
+				}
+			} else {
+				// Lite: event non-USD tampil tanpa arah.
+				it.Verdict = calVerdict{Surprise: "unknown", USDLean: "neutral", Bias: "neutral", Label: "released"}
 			}
 		} else {
 			it.Verdict = calVerdict{

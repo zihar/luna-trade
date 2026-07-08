@@ -117,6 +117,41 @@ func TestBuildCalendarIncludesMedium(t *testing.T) {
 	}
 }
 
+func TestBuildCalendarMultiCurrency(t *testing.T) {
+	now := time.Date(2026, 7, 8, 10, 0, 0, 0, time.UTC)
+	events := []news.Event{
+		// USD CPI rilis, surprise di atas → seharusnya berarah (non-neutral) utk GBP_USD
+		{Title: "CPI m/m", Country: "USD", Impact: "High", Time: now.Add(-2 * time.Hour), Forecast: "0.3%", Previous: "0.2%", Actual: "0.5%"},
+		// UK CPI rilis → Lite: verdict netral (tak dihitung arah)
+		{Title: "CPI y/y", Country: "GBP", Impact: "High", Time: now.Add(-time.Hour), Forecast: "3.1%", Previous: "3.0%", Actual: "3.4%"},
+		// EUR event: TIDAK relevan utk GBP_USD → tak muncul
+		{Title: "German Factory Orders", Country: "EUR", Impact: "Medium", Time: now.Add(-3 * time.Hour), Actual: "1.0%"},
+	}
+	resp := buildCalendarResponse(events, "GBP_USD", now, now, false)
+
+	var sawUSD, sawGBP bool
+	for _, it := range resp.Releases {
+		if it.Currency == "EUR" {
+			t.Fatalf("EUR event leaked into GBP_USD response")
+		}
+		if it.Currency == "USD" {
+			sawUSD = true
+			if it.Verdict.Bias == "neutral" {
+				t.Fatalf("USD directional release should have non-neutral bias, got neutral")
+			}
+		}
+		if it.Currency == "GBP" {
+			sawGBP = true
+			if it.Verdict.Bias != "neutral" {
+				t.Fatalf("Lite: non-USD release must be neutral, got %q", it.Verdict.Bias)
+			}
+		}
+	}
+	if !sawUSD || !sawGBP {
+		t.Fatalf("want both USD and GBP releases; sawUSD=%v sawGBP=%v (n=%d)", sawUSD, sawGBP, len(resp.Releases))
+	}
+}
+
 func TestNewsCacheStaleFallback(t *testing.T) {
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	calls := 0
