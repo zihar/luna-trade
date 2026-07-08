@@ -91,10 +91,11 @@ type calResponse struct {
 // buildCalendarResponse = fungsi murni (tanpa jaringan) → mudah di-test.
 func buildCalendarResponse(events []news.Event, instrument string, now, fetchedAt time.Time, stale bool) calResponse {
 	role := news.InstrumentRole(instrument)
-	// Tampilkan SEMUA event USD high-impact. CPI/PPI/NFP tetap dikelompokkan &
-	// menghasilkan bias; event lain (ISM/FOMC/retail dst) di-label dengan judulnya
-	// sendiri, Kind=Other → bias netral. Ini membuat kalender & countdown "next
-	// release" mencerminkan seluruh penggerak pasar USD, bukan cuma 3 indikator.
+	// Tampilkan SEMUA event USD impact High + Medium (Fase 2 — marker on-chart &
+	// panel berbagi filter ini). CPI/PPI/NFP tetap dikelompokkan & menghasilkan bias;
+	// event lain (ISM/FOMC/retail dst) di-label dengan judulnya sendiri, Kind=Other →
+	// bias netral. Ini membuat kalender & countdown "next release" mencerminkan
+	// seluruh penggerak pasar USD, bukan cuma 3 indikator.
 	nameOf := func(title string) string {
 		if n := news.DefaultName(title); n != "" {
 			return n
