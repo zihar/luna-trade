@@ -62,3 +62,21 @@ func TestGroupReleasesAndKind(t *testing.T) {
 		t.Errorf("NFP should not be released in sample")
 	}
 }
+
+func TestGroupReleasesByCurrencyNoCrossMerge(t *testing.T) {
+	name := func(title string) string {
+		if n := DefaultName(title); n != "" {
+			return n
+		}
+		return title
+	}
+	// US CPI & UK CPI: DefaultName keduanya "CPI" → TANPA partisi currency akan tergabung.
+	ev := []Event{
+		{Title: "CPI m/m", Country: "USD", Impact: "High"},
+		{Title: "CPI y/y", Country: "GBP", Impact: "High"},
+	}
+	rels := GroupReleasesByCurrency(ev, name)
+	if len(rels) != 2 {
+		t.Fatalf("want 2 releases (US CPI + UK CPI kept separate), got %d", len(rels))
+	}
+}

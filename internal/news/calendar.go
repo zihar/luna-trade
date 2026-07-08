@@ -130,6 +130,51 @@ func FilterUSDHighImpact(events []Event) []Event {
 	return FilterUSDImpact(events, "High")
 }
 
+// fiatCodes = mata uang yang punya kalender ekonomi di feed & dipakai instrumen Luna.
+var fiatCodes = map[string]bool{
+	"USD": true, "EUR": true, "GBP": true, "JPY": true,
+	"CHF": true, "CAD": true, "AUD": true, "NZD": true,
+}
+
+// RelevantCurrencies mengembalikan mata uang fiat yang event-nya relevan untuk instrumen:
+// kedua sisi pasangan FX (mis. "GBP_USD" → ["GBP","USD"]). Kode non-fiat (XAU/XAG/DXY dst)
+// di-drop; bila tak ada yang cocok, fallback ["USD"].
+func RelevantCurrencies(symbol string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, part := range strings.Split(strings.ToUpper(strings.TrimSpace(symbol)), "_") {
+		if fiatCodes[part] && !seen[part] {
+			seen[part] = true
+			out = append(out, part)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"USD"}
+	}
+	return out
+}
+
+// FilterEvents menyaring event yang Country-nya ada di currencies DAN Impact-nya salah satu
+// di impacts (keduanya case-insensitive).
+func FilterEvents(events []Event, currencies []string, impacts ...string) []Event {
+	var out []Event
+	for _, e := range events {
+		if containsFold(currencies, e.Country) && containsFold(impacts, e.Impact) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func containsFold(list []string, s string) bool {
+	for _, x := range list {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // snippet memotong body untuk pesan error.
 func snippet(b []byte) string {
 	const n = 180

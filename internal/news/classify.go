@@ -192,6 +192,26 @@ func GroupReleases(events []Event, nameOf func(string) string) []Release {
 	return out
 }
 
+// GroupReleasesByCurrency mempartisi event per Country lalu memanggil GroupReleases tiap
+// partisi — mencegah indikator senama dari negara berbeda (mis. "CPI" US vs UK, yang
+// DefaultName-nya sama) keliru tergabung. Urutan currency mengikuti kemunculan pertama.
+func GroupReleasesByCurrency(events []Event, nameOf func(string) string) []Release {
+	var order []string
+	byCur := map[string][]Event{}
+	for _, e := range events {
+		c := strings.ToUpper(e.Country)
+		if _, ok := byCur[c]; !ok {
+			order = append(order, c)
+		}
+		byCur[c] = append(byCur[c], e)
+	}
+	var out []Release
+	for _, c := range order {
+		out = append(out, GroupReleases(byCur[c], nameOf)...)
+	}
+	return out
+}
+
 // DefaultName memetakan judul → label indikator yang dipantau ("" = diabaikan).
 func DefaultName(title string) string {
 	t := strings.ToUpper(title)

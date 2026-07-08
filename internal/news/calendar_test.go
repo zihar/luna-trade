@@ -75,3 +75,44 @@ func TestFilterUSDImpact(t *testing.T) {
 		}
 	}
 }
+
+func TestRelevantCurrencies(t *testing.T) {
+	cases := map[string][]string{
+		"EUR_USD": {"EUR", "USD"},
+		"GBP_USD": {"GBP", "USD"},
+		"USD_JPY": {"USD", "JPY"},
+		"XAU_USD": {"USD"},
+		"XAG_USD": {"USD"},
+		"DXY":     {"USD"},
+		"eur_usd": {"EUR", "USD"},
+	}
+	for sym, want := range cases {
+		got := RelevantCurrencies(sym)
+		if len(got) != len(want) {
+			t.Fatalf("%s: want %v, got %v", sym, want, got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("%s: want %v, got %v", sym, want, got)
+			}
+		}
+	}
+}
+
+func TestFilterEvents(t *testing.T) {
+	ev, _ := ParseCalendar([]byte(sampleFeedMixed)) // dari TestFilterUSDImpact (calendar_test.go)
+	// sampleFeedMixed: USD/High(CPI), USD/Medium(ISM), EUR/Medium(GFO), USD/High(NFP)
+	got := FilterEvents(ev, []string{"USD", "EUR"}, "High", "Medium")
+	if len(got) != 4 {
+		t.Fatalf("USD+EUR High+Medium: want 4, got %d", len(got))
+	}
+	onlyUSD := FilterEvents(ev, []string{"USD"}, "High")
+	if len(onlyUSD) != 2 {
+		t.Fatalf("USD High: want 2, got %d", len(onlyUSD))
+	}
+	for _, e := range FilterEvents(ev, []string{"EUR"}, "High", "Medium") {
+		if e.Country != "EUR" {
+			t.Fatalf("leaked non-EUR: %+v", e)
+		}
+	}
+}
