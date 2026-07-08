@@ -3504,8 +3504,9 @@ function expandPosition(o){
     Object.assign({value:tp},Lxa),    Object.assign({value:sl},Lxa),  Object.assign({value:entry},Rxa) ] }); }
   catch(e){ setStatus('Position expand error: '+e.message,true); }
 }
-// Pojok TP/SL = drag 2 arah (level + lebar), level di-clamp tak melewati Entry (titik tengah).
-// Handle tengah (Entry kiri/kanan) = horizontal saja (level Entry tetap).
+// Pojok TP/SL = drag VERTIKAL saja (ubah level, lebar kotak tetap), level di-clamp tak
+// melewati Entry (titik tengah). Handle tengah (Entry kiri/kanan) = HORIZONTAL saja
+// (atur lebar kotak, level Entry tetap).
 function posPressedMove(t){
   const pts=t.points, k=t.performPointIndex, pp=t.performPoint;
   if(!pts||pts.length<6||pp==null) return;
@@ -3519,10 +3520,13 @@ function posPressedMove(t){
   let tp=tpRef, sl=slRef;
   if(k===1||k===3) tp=clamp(pp.value,tpSide);   // pojok TP: ubah level (clamp)
   if(k===2||k===4) sl=clamp(pp.value,slSide);   // pojok SL: ubah level (clamp)
-  // x: titik kiri = 0,3,4 · titik kanan = 1,2,5. Yg di-drag pakai pp; sisi lain pakai titik stabil.
-  const leftSet=(k===0||k===3||k===4);
-  let tL = leftSet ? keyOf(pp) : keyOf(pts[3]);   // pts[3]=TP-kiri (titik kiri stabil)
-  let tR = leftSet ? keyOf(pts[1]) : keyOf(pp);   // pts[1]=TP-kanan (titik kanan stabil)
+  // x/lebar: HANYA handle tengah (Entry) yg boleh mengubahnya. Pojok TP/SL vertikal murni →
+  // abaikan X titik yg di-drag (pp), pakai anchor stabil Entry-kiri(pts0)/Entry-kanan(pts5)
+  // supaya lebar tak "mengecil/geser" walau gerakan mouse tak persis vertikal.
+  let tL, tR;
+  if(k===0){ tL=keyOf(pp);      tR=keyOf(pts[5]); }   // Entry-kiri: geser sisi KIRI, kanan tetap
+  else if(k===5){ tL=keyOf(pts[0]); tR=keyOf(pp); }   // Entry-kanan: geser sisi KANAN, kiri tetap
+  else { tL=keyOf(pts[0]);     tR=keyOf(pts[5]); }    // pojok TP/SL: lebar tetap (level saja)
   if(fidxOf(tL)>fidxOf(tR)){ const tmp=tL; tL=tR; tR=tmp; }   // jaga kiri < kanan
   pts[0]=Object.assign({value:entry}, tL);   // Entry-kiri (tengah)
   pts[1]=Object.assign({value:tp},    tR);   // TP-kanan (pojok)
