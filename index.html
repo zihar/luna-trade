@@ -1512,6 +1512,11 @@ function nyTime(ms){
       hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms)).replace(',','');
   }catch(e){ return new Date(ms).toISOString().slice(0,16).replace('T',' '); }
 }
+// Candle Daily di-align buka 18:00 NY (sesi ICT/FOREX.com) → satu sesi membentang 18:00→18:00 (mayoritas
+// hari berikutnya). Konvensi trading-day: candle dinamai per hari TUTUP-nya (buka + durasi), bukan hari buka.
+// Contoh: sesi buka 17 Feb 18:00 (tutup 18 Feb 18:00) dilabeli "18 Feb". Hanya untuk D (W/MN tak diubah).
+const CLOSE_LABEL_TF={D:1};
+function labelTs(ms){ return CLOSE_LABEL_TF[currentTF] ? ms + DUR[currentTF] : ms; }
 // label tanggal crosshair sumbu-X: "Tue 30 Jun '26 10:00" (ada hari) — hormati timezone chart.
 // TF Daily ke atas (D/W/MN): tanpa jam → cukup hari + tanggal ("Tue 30 Jun '26"), krn 1 bar = ≥1 hari.
 function crosshairDate(ms){
@@ -1519,7 +1524,7 @@ function crosshairDate(ms){
     const dayOnly = DUR[currentTF] >= DUR.D;
     const opt={timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',year:'2-digit'};
     if(!dayOnly){ opt.hour='2-digit'; opt.minute='2-digit'; opt.hour12=false; }
-    const p=new Intl.DateTimeFormat('en-GB',opt).formatToParts(new Date(ms));
+    const p=new Intl.DateTimeFormat('en-GB',opt).formatToParts(new Date(labelTs(ms)));
     const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
     const base=`${g('weekday')} ${g('day')} ${g('month')} '${g('year')}`;
     return dayOnly ? base : `${base} ${g('hour')}:${g('minute')}`;
@@ -1529,7 +1534,7 @@ function crosshairDate(ms){
 function axisTickDate(ms, pattern){
   try{
     const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,year:'numeric',month:'2-digit',day:'2-digit',
-      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ms));
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(labelTs(ms)));
     const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
     return String(pattern||'YYYY-MM-DD HH:mm').replace('YYYY',g('year')).replace('MM',g('month'))
       .replace('DD',g('day')).replace('HH',g('hour')).replace('mm',g('minute')).replace('ss',g('second'));
@@ -5190,8 +5195,9 @@ function pickCutX(ts){   // ts bar → x tepi-kanan bar (center + setengah lebar
     return x+half;
   }catch(e){ return null; }
 }
+// label pick = crosshairDate → konsisten dgn sumbu/hover (ikut shift trading-day utk Daily + tanpa jam).
 function fmtCutDate(ts){
-  try{ return new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ts)); }
+  try{ return crosshairDate(ts); }
   catch(e){ return ''; }
 }
 function updatePickCut(ts){
@@ -5247,7 +5253,9 @@ $('#chart').addEventListener('click',()=>{
   // animasi: bar yang diklik meluncur ke tepi kanan (semua bar masih tampil),
   // lalu setelah animasi selesai data dipotong di titik itu → transisi mulus tanpa lompat.
   try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
-  setTimeout(()=>{ T=ts+DUR[currentTF]; lastLen=-1; render(true);
+  // pick EXCLUSIVE: T = buka bar yg diklik = tutup bar sebelumnya → bar terakhir tampil = 1 bar SEBELUM ts.
+  // Bar yg diklik belum muncul; step(1) berikutnya baru mengungkapnya (mulai backtest tepat di bar itu).
+  setTimeout(()=>{ T=ts; lastLen=-1; render(true);
     setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
 
