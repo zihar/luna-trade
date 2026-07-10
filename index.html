@@ -1188,6 +1188,11 @@
       <div class="ipick-list" id="ipickList"></div>
     </div>
   </div>
+  <span class="hdr-px" id="hdrPx" title="Harga live instrumen aktif (bid / ask)">
+    <span class="hdr-last" id="hdrLast">—</span>
+    <span class="hdr-chg" id="hdrChg"></span>
+    <span class="hdr-ba" id="hdrBa"></span>
+  </span>
   <span class="sep"></span>
   <span class="tfwrap">
     <span id="tfbtns"></span>
@@ -2387,7 +2392,7 @@ syncDateDisplay();
 currentTF = localStorage.getItem('br_tf')||'M15';
 guessPip(); highlightTF();
 // ganti pair → langsung load data terkini (tombol Load khusus backtest by tanggal)
-$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); loadInit(true); };
+$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); loadInit(true); };
 function guessPip(){
   const s=$('#instrument').value;
   // tabel di dalam fungsi: guessPip dipanggil saat init sebelum const global lain siap → hindari TDZ
@@ -2585,6 +2590,24 @@ function fmtPx(p){ if(p==null||isNaN(p)) return '—';
 const usdGrp=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 // render ticket order: simbol, tab arah, exec button, SL/TP sub, Init. Margin
 function updateOrderBtns(){ renderOrderPanel(); }
+// header price block: harga mid live + %change harian + bid/ask (instrumen aktif)
+function renderHeaderPrice(){
+  const box=$('#hdrPx'); if(!box) return;
+  const lt=liveTicks[inst], q=quoteCache[inst], dec=priceDecimals(), pip=pipOf(inst);
+  let bid, ask;
+  if(lt){ bid=lt.bid; ask=lt.ask; }
+  else if(q){ const s=pip*1.6; bid=q.last-s/2; ask=q.last+s/2; }
+  const lastEl=$('#hdrLast'), chgEl=$('#hdrChg'), baEl=$('#hdrBa');
+  if(bid==null||ask==null||!isFinite(bid)||!isFinite(ask)){
+    box.classList.remove('has'); lastEl.textContent='—'; chgEl.textContent=''; chgEl.className='hdr-chg'; baEl.textContent=''; return;
+  }
+  box.classList.add('has');
+  const mid=(bid+ask)/2, chg=q?q.chg:null;
+  lastEl.textContent=fmtPx(mid);
+  if(chg==null){ chgEl.textContent=''; chgEl.className='hdr-chg'; }
+  else { const up=chg>=0; chgEl.textContent=(up?'▲ +':'▼ ')+chg.toFixed(2)+'%'; chgEl.className='hdr-chg '+(up?'up':'down'); }
+  baEl.textContent=bid.toFixed(dec)+' / '+ask.toFixed(dec);
+}
 function renderOrderPanel(){
   document.querySelectorAll('.j-sym').forEach(s=>s.textContent=inst.replace('_',''));
   const flagHtml = ipkPair(inst);   // dual-chip identik picker (pengganti emoji generik)
@@ -4341,7 +4364,7 @@ async function fetchQuote(sym){
 }
 async function refreshQuotes(){
   await Promise.all(WATCH_SYMS.map(async s=>{ const q=await fetchQuote(s); if(q) quoteCache[s]=q; }));
-  renderWatch();
+  renderWatch(); renderHeaderPrice();
 }
 function pipOf(s){ return Math.pow(10, -(symDecimals(s)-1)); }   // pip per simbol (FX 1e-4, JPY 1e-2, dst)
 // batas atas spread indikatif (dalam pip) per instrumen. Closeout spread broker utk metal/kripto
@@ -4404,7 +4427,7 @@ function updateWatch(){
   });
 }
 function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); try{drawPaperLines();}catch(e){} loadInit(true);
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
@@ -4518,6 +4541,7 @@ function setLiveDot(){ const d=$('#wlLive'); if(d){ d.classList.toggle('on',pric
 function queuePriceRender(){
   if(priceRenderQueued) return; priceRenderQueued=true;
   requestAnimationFrame(()=>{ priceRenderQueued=false;
+    renderHeaderPrice();
     if(!$('#watchlist').classList.contains('hidden')) renderWatch();
     if(ipickOpen) updateIpickPrices();   // dropdown instrumen: refresh harga in-place saat terbuka
     if(live){ pushFormingCandle(); renderOrderPanel(); updatePriceTimer(); }  // gerak chart+panel tiap tick (Live)
