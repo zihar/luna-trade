@@ -1526,10 +1526,42 @@ function xAnchorFromPx(x){
   if(floatIdx <= li + 0.0001){ const t=pxToTime(x); return t!=null?{timestamp:t}:null; }   // in-range
   return {dataIndex: floatIdx};                                                              // future
 }
+// pixel-x (container-relative) → fractional dataIndex PRESISI. Dipakai jalur trendline supaya
+// titik mendarat tepat di kursor. convertFromPixel().dataIndex mengembalikan INTEGER (snap),
+// jadi fraksi sub-bar dihitung dari offset piksel terhadap bar integer itu (inverse linear
+// dataIndexToCoordinate). Index-space = chart (konsisten dgn overrideOverlay/convertToPixel).
+function fracAnchorFromPx(x){
+  const arr=revealed(currentTF); if(!arr.length) return null;
+  let c=chart.convertFromPixel({x,y:0},{paneId:'candle_pane'}); if(Array.isArray(c)) c=c[0];
+  const i=(c&&c.dataIndex!=null)?c.dataIndex:(arr.length-1);
+  const xi=idxToPx(i), bs=barSpacePx();
+  if(xi==null||!bs) return {dataIndex:i};
+  return {dataIndex: i + (x-xi)/bs};
+}
+// fractional dataIndex → wall-clock ms. In-data: interpolasi antar 2 bar tetangga (anti-gap
+// weekend). Future (idx>=li): ekstrapolasi linear DUR. Kebalikan dari tsToFracIndex.
+function fidxToTs(idx){
+  const a=revealed(currentTF); if(!a.length||idx==null) return null;
+  const li=a.length-1;
+  if(idx>=li) return Math.round(a[li].timestamp + (idx-li)*DUR[currentTF]);
+  if(idx<=0) return a[0].timestamp;
+  const i=Math.floor(idx), f=idx-i, t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
+  return Math.round(t0 + f*(t1-t0));
+}
+// wall-clock ms → fractional dataIndex. Future (vt>=last): ekstrapolasi DUR. In-data:
+// cari bar pengapit lalu interpolasi. Kebalikan dari fidxToTs.
+function tsToFracIndex(vt){
+  const a=revealed(currentTF); if(!a.length||vt==null) return null;
+  const li=a.length-1, lt=a[li].timestamp;
+  if(vt>=lt) return li + (vt-lt)/DUR[currentTF];
+  if(vt<=a[0].timestamp) return 0;
+  let lo=0,hi=li; while(lo<hi){ const m=(lo+hi)>>1; if(a[m].timestamp<vt) lo=m+1; else hi=m; }
+  const i=Math.max(0,lo-1), t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
+  const fr=(t1>t0)?(vt-t0)/(t1-t0):0; return i+fr;
+}
 // timestamp (virtual bila future) — untuk label/durasi/anchor teks
 function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
-  if(p.dataIndex!=null){ const a=revealed(currentTF); if(!a.length) return null;
-    const li=a.length-1; return Math.round(a[li].timestamp + (p.dataIndex-li)*DUR[currentTF]); } return null; }
+  if(p.dataIndex!=null) return fidxToTs(p.dataIndex); return null; }
 // objek key x untuk convertToPixel & rebuild point (pertahankan timestamp vs dataIndex)
 function keyOf(p){ return (p&&p.timestamp!=null)?{timestamp:p.timestamp}:{dataIndex:p&&p.dataIndex}; }
 // float index untuk ordering kiri/kanan & titik tengah
@@ -1590,6 +1622,9 @@ async function ensureM5Window(open,end){
   catch(e){ return null; }
 }
 const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1}; // box & penanda axis: dilewati
+// CATATAN: titik trendline kini beranchor dataIndex (tanpa timestamp) → refine M5 di bawah
+// (yang butuh p.timestamp) menjadi no-op untuk trendline. Magnet saat MENGGAMBAR tetap bekerja
+// (snap nilai OHLC via pendingClicks). Penyempurnaan X presisi-M5 untuk trendline = follow-up.
 async function refineMagnetPoints(id){
   try{
     const o=chart.getOverlayById(id); if(!o||MAGNET_REFINE_SKIP[o.name]) return;
@@ -1707,6 +1742,8 @@ klinecharts.registerOverlay({
   }
 });
 
+// state drag trendline presisi (intercept onPressedMoving; klinecharts default meng-snap ke bar)
+let tlDrag=null;
 // custom overlay: Trendline (2 titik) dengan teks opsional — klik 2× utk edit
 klinecharts.registerOverlay({
   name:'trendline', totalStep:3, needDefaultPointFigure:true,
@@ -1725,7 +1762,34 @@ klinecharts.registerOverlay({
       figs.push({type:'text',attrs:{x:px,y:ty,text:String(t),align:ha,baseline:bl},
         styles:{color:drawTextColor,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
-  }
+  },
+  // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
+  // ke indeks integer. Dengan return true di onPressedMoving, default itu dilewati dan kita tulis
+  // dataIndex PECAHAN sendiri (endpoint) / translasi semua titik (badan garis). e.x/e.y klinecharts
+  // = clientX-target.left (container-relative) → sama ruang dgn fracAnchorFromPx/pxToValue (OX=OY=0).
+  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o) tlDrag={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
+  onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points) return false;
+    const OX=0, OY=0;
+    const xa=fracAnchorFromPx(e.x-OX), v=pxToValue(e.y-OY);
+    if(!xa || v==null) return false;
+    const pts=o.points.map(p=>Object.assign({},p));
+    const key=e.figureKey||'';
+    if(key.indexOf('overlay_figure_point_')===0){       // seret SATU ujung
+      const i=e.figureIndex; if(pts[i]) pts[i]={dataIndex:xa.dataIndex, value:v};
+    } else {                                            // seret BADAN garis → translasi semua titik
+      if(!tlDrag) return false;
+      const sx=fracAnchorFromPx(tlDrag.x-OX), sv=pxToValue(tlDrag.y-OY);
+      if(!sx || sv==null) return false;
+      const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
+      for(let i=0;i<pts.length;i++){ const sp=tlDrag.pts[i]; if(!sp) continue;
+        const bi=(sp.dataIndex!=null)?sp.dataIndex:fidxOf(sp);
+        pts[i]={dataIndex: bi+dIdx, value: (sp.value!=null?sp.value:v)+dV}; }
+    }
+    try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(_){}
+    return true;                                        // lewati snap bawaan klinecharts
+  },
+  onPressedMoveEnd:(e)=>{ tlDrag=null; try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
+    try{scheduleSaveDraws();}catch(_){} return false; }
 });
 
 // garis horizontal/vertikal: override bawaan klinecharts agar penanda harga (axis Y) &
@@ -3437,6 +3501,15 @@ function delHooks(){ return {
         for(let k=0;k<o.points.length;k++){ const a=pxOf(toPt(pendingClicks[k])), b=pxOf(o.points[k]);
           if(!a||!b||Math.abs(a.x-b.x)>tolX||Math.abs(a.y-b.y)>6){ refine=false; break; } } }
       if(refine){ for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]); }
+      // Trendline: pindahkan anchor ke dataIndex PECAHAN (bukan timestamp) supaya garis & handle
+      // dirender presisi di titik klik. Fraksi presisi diambil dari fidx klik (pendingClicks) saat
+      // refine berhasil; fallback ke dataIndex titik / fidxOf (snap ke bar) bila desync.
+      if(o.name==='trendline'){ o.points=o.points.map((p,k)=>{ if(!p||p.value==null) return p;
+        const pc = refine ? pendingClicks[k] : null;
+        const idx = (pc && isFinite(pc.fidx)) ? pc.fidx
+                  : (p.dataIndex!=null && isFinite(p.dataIndex)) ? p.dataIndex
+                  : fidxOf(p);
+        return {dataIndex: idx, value: p.value}; }); }
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});
@@ -3509,9 +3582,13 @@ function buildDrawsFromArray(arr){
   arr.forEach(d=>{ try{
     if(!PERSIST_DRAW[d.name]||!Array.isArray(d.points)||!d.points.length) return;
     if(d.points.some(pt=>pt.vt==null)) return;   // lewati gambar rusak lama (titik anchorless → far-left)
-    const pts=d.points.map(pt=> pt.vt==null ? {value:pt.value}
-      : (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // future → dataIndex
-      : {timestamp:pt.vt, value:pt.value});
+    const pts=d.points.map(pt=>{
+      if(pt.vt==null) return {value:pt.value};
+      if(d.name==='trendline'){ const fi=tsToFracIndex(pt.vt);   // trendline: SELALU dataIndex pecahan (presisi)
+        return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
+      return (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // overlay lain: future → dataIndex
+        : {timestamp:pt.vt, value:pt.value};
+    });
     const base={name:d.name, points:pts};
     if(d.extendData!=null) base.extendData=d.extendData;
     if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
@@ -3566,13 +3643,17 @@ $('#redoBtn').onclick=redoDraw;
 $('#chart').addEventListener('mousedown', (ev)=>{
   if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
   const r=$('#chart').getBoundingClientRect();
-  const xa=xAnchorFromPx(ev.clientX-r.left), v=pxToValue(ev.clientY-r.top);
+  const px=ev.clientX-r.left, py=ev.clientY-r.top;
+  const xa=xAnchorFromPx(px), v=pxToValue(py);
   if(!xa||v==null) return;
+  // fidx = fractional dataIndex PRESISI di piksel klik (utk trendline; tsToPx meng-snap timestamp
+  // jadi tak bisa direkonstruksi dari timestamp di onDrawEnd). Field ekstra → tool lain mengabaikan.
+  const fa=fracAnchorFromPx(px), fidx=fa?fa.dataIndex:undefined;
   // magnet HANYA utk titik di dalam data (punya timestamp). Titik di area future (dataIndex,
   // tanpa candle) tak boleh di-snap: magnetSnap akan menariknya ke bar TERAKHIR → garis
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
-  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ev.clientX-r.left, ev.clientY-r.top); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value}); return; } }
-  pendingClicks.push(Object.assign({value:v}, xa));
+  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx}); return; } }
+  pendingClicks.push(Object.assign({value:v, fidx}, xa));
 }, true);
 
 // posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
