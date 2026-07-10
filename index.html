@@ -771,10 +771,17 @@
 
   /* toast feedback (alert/pending) */
   .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
-          background:var(--panel); border:1px solid var(--accent); color:var(--txt);
-          padding:9px 16px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
+          display:flex; align-items:center; gap:9px; max-width:min(440px,90vw);
+          background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--accent); color:var(--txt);
+          padding:9px 16px 9px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
           opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
   .toast.show{ opacity:1; top:18px; }
+  .toast .toast-ic{ flex:none; width:16px; height:16px; }
+  .toast .toast-msg{ min-width:0; }
+  .toast.t-success{ border-left-color:var(--green); } .toast.t-success .toast-ic{ color:var(--green); }
+  .toast.t-error{ border-left-color:var(--red); }     .toast.t-error .toast-ic{ color:var(--red); }
+  .toast.t-warn{ border-left-color:#e3b341; }          .toast.t-warn .toast-ic{ color:#e3b341; }
+  .toast.t-info{ border-left-color:var(--accent); }    .toast.t-info .toast-ic{ color:var(--accent); }
   /* hormati preferensi kurangi-gerak: matikan animasi/transisi non-esensial */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -3027,13 +3034,13 @@ function previewPosLevel(id,kind,v){
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
   if(id===REPLAY_ID){ if(!trade) return; trade[kind]=+v; if(kind==='sl') recalcRisk();
-    toast('✓ '+kind.toUpperCase()+' diperbarui'); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast(kind.toUpperCase()+' diperbarui','success'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah '+kind.toUpperCase())); drawPaperLines(); return; }
-      toast('✓ '+kind.toUpperCase()+' diperbarui'); await spSync(); drawPaperLines(); })
-    .catch(()=>{ toast('⚠ Tidak bisa terhubung ke server'); drawPaperLines(); });
+      if(!r.ok){ toast(d.error||'Gagal ubah '+kind.toUpperCase(),'error'); drawPaperLines(); return; }
+      toast(kind.toUpperCase()+' diperbarui','success'); await spSync(); drawPaperLines(); })
+    .catch(()=>{ toast('Tidak bisa terhubung ke server','error'); drawPaperLines(); });
 }
 function confirmPosLevel(id,kind,v){
   const p=posById(id); if(!p) return; const dec=decimalsFor(p.instrument);
@@ -3249,13 +3256,13 @@ function renderPosEdit(skipPriceInputs){
 function commitPosSLTP(){
   if(!editPos) return;
   if(editPos.id===REPLAY_ID){ if(trade){ trade.sl=editPos.slOn?+editPos.sl:null; trade.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(); }
-    toast('✓ SL/TP diperbarui'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast('SL/TP diperbarui','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast('⚠ '+(d.error||'Gagal ubah SL/TP')); return; }
-      toast('✓ SL/TP diperbarui'); closePositionEditor(); await spSync(); drawPaperLines(); })
-    .catch(()=>toast('⚠ Tidak bisa terhubung ke server'));
+      if(!r.ok){ toast(d.error||'Gagal ubah SL/TP','error'); return; }
+      toast('SL/TP diperbarui','success'); closePositionEditor(); await spSync(); drawPaperLines(); })
+    .catch(()=>toast('Tidak bisa terhubung ke server','error'));
 }
 function openPositionEditor(id){
   const p=posById(id); if(!p) return;
@@ -3334,7 +3341,7 @@ function checkPending(c){
          units:pending.units,trail:pending.trail,instrument:inst,time:c.timestamp,lineEntry:null,lineSL:null,lineTP:null};
   pending=null;
   drawPaperLines(); updateOpenTradeBox();
-  toast('✓ Pending executed @ '+fmt(trade.entry));
+  toast('Pending executed @ '+fmt(trade.entry),'success');
 }
 // ---------- partial close ----------
 function partialClose(frac){
@@ -3423,9 +3430,9 @@ const ServerPaperBroker = {
       const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(body)});
       const d=await r.json().catch(()=>({}));
-      if(!r.ok){ setStatus(d.error||'Order gagal',true); toast('⚠ '+(d.error||'Order gagal')); }
-      else { clearDraftLines(); toast('✓ '+(dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry)); await spSync(); }
-    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); toast('⚠ Tidak bisa terhubung ke server'); }
+      if(!r.ok){ setStatus(d.error||'Order gagal',true); toast(d.error||'Order gagal','error'); }
+      else { clearDraftLines(); toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry),'success'); await spSync(); }
+    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); toast('Tidak bisa terhubung ke server','error'); }
     if(btn) btn.disabled=false;
   },
   closeMarket(){ spCloseAll(); },
@@ -3436,7 +3443,7 @@ async function spClose(id){
     const r=await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
     const d=await r.json().catch(()=>({}));
     if(!r.ok) setStatus(d.error||'Close gagal',true);
-    else { toast('Closed #'+id+'  '+((d.pnlCcy>=0?'+':'')+usdFmt(d.pnlCcy))); await spSync(); }
+    else { toast('Closed #'+id+'  '+((d.pnlCcy>=0?'+':'')+usdFmt(d.pnlCcy)), d.pnlCcy>=0?'success':'info'); await spSync(); }
   }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
 }
 async function spCloseAll(){ for(const p of SP.positions.slice()){ await spClose(p.id); } }
@@ -4295,9 +4302,22 @@ function symDecimals(s){ if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
   return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
 // toast feedback ringan (alert berbunyi / pending tereksekusi) — terlihat tanpa mengandalkan setStatus
 let toastTimer=null;
-function toast(msg){
-  let el=$('#toast'); if(!el){ el=document.createElement('div'); el.id='toast'; el.className='toast'; document.body.appendChild(el); }
-  el.textContent=msg; el.classList.add('show');
+// ikon per varian (stroke=currentColor → ikut warna .toast-ic per tipe)
+const TOAST_IC={
+  success:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  error:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16.4" x2="12" y2="16.4"/></svg>',
+  warn:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13.5"/><line x1="12" y1="17" x2="12" y2="17"/></svg>',
+  info:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="7.6" x2="12" y2="7.6"/></svg>'
+};
+// toast(msg, type) — type: success | error | warning/warn | info (default). Backward-compatible.
+function toast(msg, type){
+  type = type||'info'; if(type==='warning') type='warn';
+  let el=$('#toast'); if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
+  el.className='toast t-'+type;
+  el.innerHTML=(TOAST_IC[type]||TOAST_IC.info)+'<span class="toast-msg"></span>';
+  el.querySelector('.toast-msg').textContent=msg;
+  void el.offsetWidth;                        // reflow → transisi re-trigger utk toast berturut
+  el.classList.add('show');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),3500);
 }
 // quote harga terkini (candle harian: candle terakhir = hari berjalan/incomplete = harga live)
@@ -4694,7 +4714,7 @@ function createAlertAt(price){
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
   alerts.push({sym:inst,price:p,id:null});
   saveAlerts(); drawAlertLines(); renderAlertList();
-  toast('🔔 Alert created at '+p);
+  toast('Alert created at '+p,'success');
 }
 // alert berbunyi saat candle simbol aktif menembus level (replay & live)
 function checkAlerts(c){
@@ -4703,7 +4723,7 @@ function checkAlerts(c){
   fired.forEach(a=>{
     const msg=`${a.sym} menyentuh ${a.price}`;
     try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
-    toast('🔔 '+msg);
+    toast(msg,'info');
   });
   alerts=alerts.filter(a=>!fired.includes(a));
   saveAlerts(); drawAlertLines(); renderAlertList();
