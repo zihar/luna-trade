@@ -2,46 +2,57 @@ package news
 
 import "strings"
 
-// Role = hubungan instrumen dengan USD (menentukan arah bias dari tekanan USD).
-type Role int
-
-const (
-	RoleUnknown  Role = iota
-	RoleQuoteUSD      // USD quote, base fiat asing: EUR_USD, GBP_USD, AUD_USD, NZD_USD
-	RoleBaseUSD       // USD base: USD_JPY, USD_CAD, USD_CHF
-	RoleGold          // logam mulia (inverse USD/yield): XAU_USD, XAG_USD
-	RoleDXY           // indeks USD
-)
-
 // fiat = mata uang fiat yang dikenali (untuk membedakan dari kripto).
 var fiat = map[string]bool{
 	"USD": true, "EUR": true, "GBP": true, "JPY": true, "CHF": true,
 	"CAD": true, "AUD": true, "NZD": true,
 }
 
-// InstrumentRole memetakan simbol ("BASE_QUOTE" atau "DXY") → Role. Kripto &
-// cross tanpa USD → RoleUnknown.
-func InstrumentRole(symbol string) Role {
+// Side = peran currency SEBUAH EVENT terhadap instrumen (menggeneralisasi Role yang
+// USD-only): currency event bisa di sisi base/quote pasangan, atau khusus USD utk gold/DXY.
+type Side int
+
+const (
+	SideNone    Side = iota
+	SideBase         // currency event = base pasangan (base↑ → pair↑)
+	SideQuote        // currency event = quote pasangan (quote↑ → pair↓)
+	SideGoldUSD      // event USD pada logam (USD↑ → gold↓)
+	SideDXYUSD       // event USD pada indeks DXY (USD↑ → DXY↑)
+)
+
+// SideOf menentukan peran `ccy` (currency event, mis. "GBP"/"USD") pada `symbol`.
+// Gold hanya bereaksi ke event USD; currency non-USD di gold / di luar pasangan / non-fiat → SideNone.
+func SideOf(symbol, ccy string) Side {
 	s := strings.ToUpper(strings.TrimSpace(symbol))
 	s = strings.ReplaceAll(s, "/", "_")
+	c := strings.ToUpper(strings.TrimSpace(ccy))
+	if !fiat[c] {
+		return SideNone
+	}
 	if s == "DXY" {
-		return RoleDXY
+		if c == "USD" {
+			return SideDXYUSD
+		}
+		return SideNone
 	}
 	parts := strings.SplitN(s, "_", 2)
 	if len(parts) != 2 {
-		return RoleUnknown
+		return SideNone
 	}
 	base, quote := parts[0], parts[1]
 	if base == "XAU" || base == "XAG" {
-		return RoleGold
+		if c == "USD" {
+			return SideGoldUSD
+		}
+		return SideNone
 	}
 	switch {
-	case quote == "USD" && fiat[base]:
-		return RoleQuoteUSD
-	case base == "USD" && fiat[quote]:
-		return RoleBaseUSD
+	case c == base && fiat[base] && fiat[quote]:
+		return SideBase
+	case c == quote && fiat[base] && fiat[quote]:
+		return SideQuote
 	}
-	return RoleUnknown
+	return SideNone
 }
 
 // Bias = arah dampak ke instrumen.
@@ -64,22 +75,23 @@ func (b Bias) String() string {
 	}
 }
 
-// InstrumentBias menurunkan bias instrumen dari tekanan USD (Lapis 2).
-func InstrumentBias(lean USDLean, role Role) Bias {
-	if lean == LeanNeutral || role == RoleUnknown {
+// BiasFrom menurunkan bias instrumen dari kekuatan currency event (lean) + sisi-nya (Lapis 2,
+// generalisasi lintas-currency). lean netral / SideNone → netral.
+func BiasFrom(lean USDLean, side Side) Bias {
+	if lean == LeanNeutral || side == SideNone {
 		return BiasNeutral
 	}
-	usdUp := lean == LeanHawkish
-	var bullishWhenUSDUp bool
-	switch role {
-	case RoleBaseUSD, RoleDXY:
-		bullishWhenUSDUp = true
-	case RoleQuoteUSD, RoleGold:
-		bullishWhenUSDUp = false
+	strong := lean == LeanHawkish // currency event menguat
+	var bullishWhenStrong bool
+	switch side {
+	case SideBase, SideDXYUSD:
+		bullishWhenStrong = true
+	case SideQuote, SideGoldUSD:
+		bullishWhenStrong = false
 	default:
 		return BiasNeutral
 	}
-	if usdUp == bullishWhenUSDUp {
+	if strong == bullishWhenStrong {
 		return BiasBullish
 	}
 	return BiasBearish
@@ -91,30 +103,32 @@ func PrettySymbol(symbol string) string {
 	return strings.ReplaceAll(s, "_", "/")
 }
 
-// Playbook menyusun narasi singkat (EN) pasca-rilis.
-func Playbook(lean USDLean, role Role, bias Bias, symbol string) string {
+// PlaybookFor menyusun narasi pasca-rilis (EN), currency-aware (menyebut currency event).
+func PlaybookFor(lean USDLean, side Side, bias Bias, ccy, symbol string) string {
 	sym := PrettySymbol(symbol)
-	if role == RoleUnknown {
-		return "No direct USD linkage for " + sym + "."
+	if side == SideNone {
+		return "No directional read for " + sym + "."
 	}
+	c := strings.ToUpper(strings.TrimSpace(ccy))
 	switch lean {
 	case LeanHawkish:
-		return "Strong data → hawkish Fed → USD up → " + bias.String() + " " + sym + "."
+		return "Strong " + c + " data → " + c + " up → " + bias.String() + " " + sym + "."
 	case LeanDovish:
-		return "Soft data → room for cuts → USD down → " + bias.String() + " " + sym + "."
+		return "Soft " + c + " data → " + c + " down → " + bias.String() + " " + sym + "."
 	default:
 		return "Small surprise → limited impact; " + sym + " likely technical-driven."
 	}
 }
 
-// PreScenario menyusun skenario kalau-maka (EN) untuk rilis yang BELUM keluar.
-func PreScenario(role Role, symbol string) string {
+// PreScenarioFor menyusun skenario kalau-maka (EN) untuk rilis yang BELUM keluar, currency-aware.
+func PreScenarioFor(side Side, ccy, symbol string) string {
 	sym := PrettySymbol(symbol)
-	if role == RoleUnknown {
-		return "No direct USD linkage for " + sym + "."
+	if side == SideNone {
+		return "No directional read for " + sym + "."
 	}
-	up := InstrumentBias(LeanHawkish, role)
-	down := InstrumentBias(LeanDovish, role)
-	return "Above forecast → USD up → " + up.String() + " " + sym +
+	c := strings.ToUpper(strings.TrimSpace(ccy))
+	up := BiasFrom(LeanHawkish, side)
+	down := BiasFrom(LeanDovish, side)
+	return "Above forecast → " + c + " up → " + up.String() + " " + sym +
 		"; below → " + down.String() + " " + sym + "."
 }

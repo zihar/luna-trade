@@ -2,48 +2,96 @@ package news
 
 import "testing"
 
-func TestInstrumentRole(t *testing.T) {
-	cases := map[string]Role{
-		"EUR_USD": RoleQuoteUSD, "GBP_USD": RoleQuoteUSD, "AUD_USD": RoleQuoteUSD, "NZD_USD": RoleQuoteUSD,
-		"USD_JPY": RoleBaseUSD, "USD_CAD": RoleBaseUSD, "USD_CHF": RoleBaseUSD,
-		"XAU_USD": RoleGold, "XAG_USD": RoleGold,
-		"DXY":     RoleDXY,
-		"EUR_JPY": RoleUnknown, "BTC_USD": RoleUnknown, "": RoleUnknown,
+func TestSideOf(t *testing.T) {
+	type tc struct {
+		sym, ccy string
+		want     Side
 	}
-	for sym, want := range cases {
-		if got := InstrumentRole(sym); got != want {
-			t.Errorf("InstrumentRole(%q) = %v; want %v", sym, got, want)
+	cases := []tc{
+		// USD pada pasangan USD (regresi perilaku lama)
+		{"EUR_USD", "USD", SideQuote}, {"GBP_USD", "USD", SideQuote}, {"AUD_USD", "USD", SideQuote},
+		{"USD_JPY", "USD", SideBase}, {"USD_CAD", "USD", SideBase}, {"USD_CHF", "USD", SideBase},
+		{"XAU_USD", "USD", SideGoldUSD}, {"XAG_USD", "USD", SideGoldUSD},
+		{"DXY", "USD", SideDXYUSD},
+		// currency NON-USD sebagai base/quote (fitur baru)
+		{"EUR_USD", "EUR", SideBase}, {"GBP_USD", "GBP", SideBase},
+		{"USD_JPY", "JPY", SideQuote}, {"USD_CHF", "CHF", SideQuote},
+		{"EUR_GBP", "EUR", SideBase}, {"EUR_GBP", "GBP", SideQuote},
+		// currency tak terkait pair / gold non-USD / non-fiat → none
+		{"EUR_USD", "JPY", SideNone}, {"XAU_USD", "EUR", SideNone},
+		{"DXY", "EUR", SideNone}, {"BTC_USD", "USD", SideNone},
+		{"EUR_USD", "BTC", SideNone}, {"", "USD", SideNone},
+		// toleran format & spasi/casing
+		{"eur/usd", "eur", SideBase}, {"GBP_USD", " gbp ", SideBase},
+	}
+	for _, c := range cases {
+		if got := SideOf(c.sym, c.ccy); got != c.want {
+			t.Errorf("SideOf(%q,%q) = %v; want %v", c.sym, c.ccy, got, c.want)
 		}
 	}
 }
 
-func TestInstrumentBias(t *testing.T) {
-	// USD hawkish (data kuat, USD↑)
-	if InstrumentBias(LeanHawkish, RoleQuoteUSD) != BiasBearish {
-		t.Error("hawkish + EUR/USD → bearish")
+func TestBiasFrom(t *testing.T) {
+	type tc struct {
+		lean USDLean
+		side Side
+		want Bias
 	}
-	if InstrumentBias(LeanHawkish, RoleBaseUSD) != BiasBullish {
-		t.Error("hawkish + USD/JPY → bullish")
+	cases := []tc{
+		// base menguat → pair naik; melemah → turun
+		{LeanHawkish, SideBase, BiasBullish}, {LeanDovish, SideBase, BiasBearish},
+		// quote menguat → pair turun; melemah → naik
+		{LeanHawkish, SideQuote, BiasBearish}, {LeanDovish, SideQuote, BiasBullish},
+		// gold inverse USD
+		{LeanHawkish, SideGoldUSD, BiasBearish}, {LeanDovish, SideGoldUSD, BiasBullish},
+		// DXY searah USD
+		{LeanHawkish, SideDXYUSD, BiasBullish}, {LeanDovish, SideDXYUSD, BiasBearish},
+		// neutral / none → neutral
+		{LeanNeutral, SideBase, BiasNeutral}, {LeanNeutral, SideGoldUSD, BiasNeutral},
+		{LeanHawkish, SideNone, BiasNeutral}, {LeanDovish, SideNone, BiasNeutral},
 	}
-	if InstrumentBias(LeanHawkish, RoleGold) != BiasBearish {
-		t.Error("hawkish + gold → bearish")
+	for _, c := range cases {
+		if got := BiasFrom(c.lean, c.side); got != c.want {
+			t.Errorf("BiasFrom(%v,%v) = %v; want %v", c.lean, c.side, got, c.want)
+		}
 	}
-	if InstrumentBias(LeanHawkish, RoleDXY) != BiasBullish {
-		t.Error("hawkish + DXY → bullish")
+}
+
+func TestPlaybookFor(t *testing.T) {
+	cases := []struct {
+		lean     USDLean
+		side     Side
+		bias     Bias
+		ccy, sym string
+		want     string
+	}{
+		{LeanHawkish, SideBase, BiasBullish, "GBP", "GBP_USD", "Strong GBP data → GBP up → bullish GBP/USD."},
+		{LeanDovish, SideQuote, BiasBullish, "JPY", "USD_JPY", "Soft JPY data → JPY down → bullish USD/JPY."},
+		{LeanHawkish, SideGoldUSD, BiasBearish, "USD", "XAU_USD", "Strong USD data → USD up → bearish XAU/USD."},
+		{LeanNeutral, SideBase, BiasNeutral, "EUR", "EUR_USD", "Small surprise → limited impact; EUR/USD likely technical-driven."},
+		{LeanHawkish, SideNone, BiasNeutral, "JPY", "EUR_USD", "No directional read for EUR/USD."},
 	}
-	// USD dovish (data lemah, USD↓) — kebalikan
-	if InstrumentBias(LeanDovish, RoleQuoteUSD) != BiasBullish {
-		t.Error("dovish + EUR/USD → bullish")
+	for _, c := range cases {
+		if got := PlaybookFor(c.lean, c.side, c.bias, c.ccy, c.sym); got != c.want {
+			t.Errorf("PlaybookFor(%v,%v,%v,%q,%q) = %q; want %q", c.lean, c.side, c.bias, c.ccy, c.sym, got, c.want)
+		}
 	}
-	if InstrumentBias(LeanDovish, RoleGold) != BiasBullish {
-		t.Error("dovish + gold → bullish")
+}
+
+func TestPreScenarioFor(t *testing.T) {
+	cases := []struct {
+		side     Side
+		ccy, sym string
+		want     string
+	}{
+		{SideBase, "GBP", "GBP_USD", "Above forecast → GBP up → bullish GBP/USD; below → bearish GBP/USD."},
+		{SideGoldUSD, "USD", "XAU_USD", "Above forecast → USD up → bearish XAU/USD; below → bullish XAU/USD."},
+		{SideNone, "JPY", "EUR_USD", "No directional read for EUR/USD."},
 	}
-	// neutral / unknown → neutral
-	if InstrumentBias(LeanNeutral, RoleGold) != BiasNeutral {
-		t.Error("neutral lean → neutral")
-	}
-	if InstrumentBias(LeanHawkish, RoleUnknown) != BiasNeutral {
-		t.Error("unknown role → neutral")
+	for _, c := range cases {
+		if got := PreScenarioFor(c.side, c.ccy, c.sym); got != c.want {
+			t.Errorf("PreScenarioFor(%v,%q,%q) = %q; want %q", c.side, c.ccy, c.sym, got, c.want)
+		}
 	}
 }
 
@@ -55,76 +103,16 @@ func TestBiasString(t *testing.T) {
 
 func TestPrettySymbol(t *testing.T) {
 	cases := map[string]string{
-		"XAU_USD":  "XAU/USD",
-		"DXY":      "DXY",
-		"eur_usd":  "EUR/USD",
-		"GBP_USD":  "GBP/USD",
-		"USD_JPY":  "USD/JPY",
+		"XAU_USD":   "XAU/USD",
+		"DXY":       "DXY",
+		"eur_usd":   "EUR/USD",
+		"GBP_USD":   "GBP/USD",
+		"USD_JPY":   "USD/JPY",
 		"  XAG_USD": "XAG/USD",
 	}
 	for input, want := range cases {
 		if got := PrettySymbol(input); got != want {
 			t.Errorf("PrettySymbol(%q) = %q; want %q", input, got, want)
 		}
-	}
-}
-
-func TestPlaybook(t *testing.T) {
-	// RoleUnknown: "No direct USD linkage for ..."
-	got := Playbook(LeanHawkish, RoleUnknown, BiasBearish, "BTC_USD")
-	want := "No direct USD linkage for BTC/USD."
-	if got != want {
-		t.Errorf("Playbook(LeanHawkish, RoleUnknown, ...) = %q; want %q", got, want)
-	}
-
-	// RoleGold + LeanHawkish + BiasBearish
-	got = Playbook(LeanHawkish, RoleGold, BiasBearish, "XAU_USD")
-	want = "Strong data → hawkish Fed → USD up → bearish XAU/USD."
-	if got != want {
-		t.Errorf("Playbook(LeanHawkish, RoleGold, BiasBearish, ...) = %q; want %q", got, want)
-	}
-
-	// LeanDovish case
-	got = Playbook(LeanDovish, RoleQuoteUSD, BiasBullish, "EUR_USD")
-	want = "Soft data → room for cuts → USD down → bullish EUR/USD."
-	if got != want {
-		t.Errorf("Playbook(LeanDovish, RoleQuoteUSD, BiasBullish, ...) = %q; want %q", got, want)
-	}
-
-	// LeanNeutral case (default)
-	got = Playbook(LeanNeutral, RoleBaseUSD, BiasNeutral, "USD_JPY")
-	want = "Small surprise → limited impact; USD/JPY likely technical-driven."
-	if got != want {
-		t.Errorf("Playbook(LeanNeutral, ...) = %q; want %q", got, want)
-	}
-}
-
-func TestPreScenario(t *testing.T) {
-	// RoleUnknown case
-	got := PreScenario(RoleUnknown, "BTC_USD")
-	want := "No direct USD linkage for BTC/USD."
-	if got != want {
-		t.Errorf("PreScenario(RoleUnknown, ...) = %q; want %q", got, want)
-	}
-
-	// RoleQuoteUSD (EUR_USD): hawkish → bearish, dovish → bullish
-	got = PreScenario(RoleQuoteUSD, "EUR_USD")
-	want = "Above forecast → USD up → bearish EUR/USD; below → bullish EUR/USD."
-	if got != want {
-		t.Errorf("PreScenario(RoleQuoteUSD, EUR_USD) = %q; want %q", got, want)
-	}
-
-	// RoleGold (hawkish → bearish, dovish → bullish)
-	got = PreScenario(RoleGold, "XAU_USD")
-	want = "Above forecast → USD up → bearish XAU/USD; below → bullish XAU/USD."
-	if got != want {
-		t.Errorf("PreScenario(RoleGold, XAU_USD) = %q; want %q", got, want)
-	}
-
-	// RoleBaseUSD (hawkish → bullish, dovish → bearish)
-	got = PreScenario(RoleBaseUSD, "USD_JPY")
-	want = "Above forecast → USD up → bullish USD/JPY; below → bearish USD/JPY."
-	if got != want {
-		t.Errorf("PreScenario(RoleBaseUSD, USD_JPY) = %q; want %q", got, want)
 	}
 }
