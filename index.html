@@ -2779,10 +2779,11 @@ $('#bottomToggle').onclick=()=>{ const b=$('#bottompanel'); const c=b.classList.
 window.addEventListener('resize',()=>{ try{drawEquity();}catch(e){} });
 // pulihkan kondisi hide/unhide terakhir — default hidden (collapse kecuali user pernah set tampil '0')
 if(localStorage.getItem('br_bottomHidden')!=='0'){ $('#bottompanel').classList.add('collapsed'); $('#bottomToggle').textContent='⏶'; }
-$('#speed').onchange=()=>{ if(playing){pause();play();} };
+$('#speed').onchange=()=>{};   // playFrame membaca speed tiap frame → tak perlu restart (restart = race re-entrancy)
 function togglePlay(){ playing?pause():play(); }
 function play(){
   if(T==null) return;
+  if(playing) return;   // sudah Play → jangan mulai loop frame kedua (anti re-entrancy)
   if(!replayMode){ stopLive(); setReplayUI(true); }
   playing=true; $('#playBtn').textContent='⏸'; try{syncReplayPill();}catch(e){}
   playFrame();
@@ -2792,7 +2793,7 @@ async function playFrame(){
   if(!playing) return;
   const arr=tfData[currentTF]; if(!arr||!arr.length){ pause(); return; }
   const rev=revealed(currentTF);
-  if(rev.length>=arr.length){ autoExtend(currentTF); pauseIfNoData(); if(playing) playTimer=setTimeout(playFrame,200); return; }
+  if(rev.length>=arr.length){ autoExtend(currentTF); pauseIfNoData(); return; }   // ujung data → pause (tekan Play lagi setelah extend)
   const dur=DUR[currentTF], speed=+$('#speed').value||1;
   const beforeLen=rev.length;
   T += Math.max(1, dur*speed*REPLAY_FRAME_MS/1000);   // maju proporsional speed (frame ~fixed)
@@ -5302,6 +5303,7 @@ function setReplayUI(on){
   applyPaperMode();   // replay → client-side; realtime → akun live server
 }
 function exitReplay(){
+  pause();                 // hentikan loop playback bila sedang Play (jangan lanjut melawan live mode)
   pickMode=false;
   replayPartial=null;
   setPickCut(false);
