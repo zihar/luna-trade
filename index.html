@@ -172,6 +172,9 @@
             background:var(--panel);border:1px solid var(--border);border-radius:10px;
             box-shadow:0 10px 30px rgba(0,0,0,.4)}
   .ind-menu.open{display:block}
+  .ctwrap{position:relative;display:inline-flex;align-items:center}
+  #ctBtn{display:inline-flex;align-items:center;justify-content:center}
+  #ctBtn.on{color:var(--accent);background:rgba(74,113,255,.14)}
   .ind-grp{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
            padding:7px 8px 3px}
   .ind-item{display:flex;align-items:center;gap:7px;height:30px;padding:0 8px;border-radius:7px;
@@ -1214,6 +1217,11 @@
   <span class="indwrap">
     <button id="indBtn" title="Indicators"><span class="ind-fx">ƒ<sub>x</sub></span><span class="ind-badge" id="indBadge" hidden></span></button>
     <div class="ind-menu" id="indMenu"></div>
+  </span>
+  <span class="sep"></span>
+  <span class="ctwrap">
+    <button id="ctBtn" title="Chart type" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v4M7 15v6M17 3v5M17 16v5"/><rect x="4" y="7" width="6" height="8" rx="1"/><rect x="14" y="8" width="6" height="8" rx="1"/></svg></button>
+    <div class="ind-menu" id="ctMenu" role="menu"></div>
   </span>
   <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
   <span id="replayCtrls">
@@ -5505,6 +5513,9 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); h
 // bg & grid disimpan PER-TEMA (light/dark) supaya setting global tetap berfungsi di kedua tema
 const CHART_DEFAULT={up:'#089981',down:'#f23645',upBorder:'#089981',downBorder:'#f23645',bgDark:'#101013',gridDark:'#1f1f24',bgLight:'#ffffff',gridLight:'#eceff3'};
 let chartCfg; try{ chartCfg=Object.assign({},CHART_DEFAULT,JSON.parse(localStorage.getItem('br_chartcfg')||'{}')); }catch(e){ chartCfg=Object.assign({},CHART_DEFAULT); }
+// tipe chart (klinecharts candle.type): candle_solid | candle_stroke | ohlc | area
+let chartType; try{ chartType=localStorage.getItem('br_charttype')||'candle_solid'; }catch(e){ chartType='candle_solid'; }
+if(!['candle_solid','candle_stroke','ohlc','area'].includes(chartType)) chartType='candle_solid';
 // style bar candle dari chartCfg (border fallback ke warna body utk cfg lama tanpa key border)
 function candleBarCfg(){ return {upColor:chartCfg.up,downColor:chartCfg.down,upBorderColor:chartCfg.upBorder||chartCfg.up,downBorderColor:chartCfg.downBorder||chartCfg.down,upWickColor:chartCfg.up,downWickColor:chartCfg.down}; }
 // migrasi skema lama {bg,grid} (dulu dipakai utk dark) → kunci per-tema
@@ -5517,9 +5528,9 @@ function applyChartCfg(){
   const grid = light ? chartCfg.gridLight : chartCfg.gridDark;
   try{ chart.setStyles({
     grid:{horizontal:{color:grid},vertical:{color:grid}},
-    candle:{bar:candleBarCfg()},
+    candle:{type:chartType, bar:candleBarCfg()},
   }); }catch(e){}
-  try{ secondaries.forEach(sc=>sc.chart.setStyles({grid:{horizontal:{color:grid},vertical:{color:grid}},candle:{bar:candleBarCfg()}})); }catch(e){}
+  try{ secondaries.forEach(sc=>sc.chart.setStyles({grid:{horizontal:{color:grid},vertical:{color:grid}},candle:{type:chartType, bar:candleBarCfg()}})); }catch(e){}
   const c=document.querySelector('.center'), ch=document.getElementById('chart');
   if(c) c.style.background=bg; if(ch) ch.style.background=bg;
 }
@@ -5595,6 +5606,33 @@ savedInd().forEach(addInd); updateIndBadge();   // pulihkan indikator tersimpan
   const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
   btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
   document.addEventListener('mousedown',e=>{ if(menu.classList.contains('open')&&!menu.contains(e.target)&&!btn.contains(e.target)) menu.classList.remove('open'); }, true);
+})();
+
+// ===================== chart type switcher (candle/hollow/bar/area) =====================
+(function(){
+  const CHART_TYPES=[
+    {v:'candle_solid', label:'Candles'},
+    {v:'candle_stroke',label:'Hollow candles'},
+    {v:'ohlc',         label:'Bars'},
+    {v:'area',         label:'Area'},
+  ];
+  const btn=$('#ctBtn'), menu=$('#ctMenu'); if(!btn||!menu) return;
+  const label=()=>{ const t=CHART_TYPES.find(t=>t.v===chartType); return t?t.label:'Candles'; };
+  function render(){
+    menu.innerHTML='<div class="ind-grp">Chart type</div>'+CHART_TYPES.map(t=>
+      `<div class="ind-item${t.v===chartType?' on':''}" data-ct="${t.v}"><span class="ind-check">✓</span>${t.label}</div>`).join('');
+    menu.querySelectorAll('.ind-item').forEach(el=>el.onclick=()=>{
+      chartType=el.dataset.ct;
+      try{ localStorage.setItem('br_charttype',chartType); }catch(e){}
+      try{ applyChartCfg(); }catch(e){}
+      render(); btn.title='Chart type: '+label();
+      try{ track('charttype',{type:chartType}); }catch(e){}
+      menu.classList.remove('open'); btn.setAttribute('aria-expanded','false');
+    });
+  }
+  btn.title='Chart type: '+label();
+  btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); btn.setAttribute('aria-expanded',open?'true':'false'); if(open) render(); };
+  document.addEventListener('mousedown',e=>{ if(menu.classList.contains('open')&&!menu.contains(e.target)&&!btn.contains(e.target)){ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); } }, true);
 })();
 
 // ===================== context menu: reset chart view =====================
@@ -5707,7 +5745,7 @@ function makeSecondary(slot){
 
   const light=document.body.classList.contains('light');
   const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
-  try{ c.setStyles({candle:{bar:candleBarCfg()}}); }catch(e){}   // ikut warna candle kustom user
+  try{ c.setStyles({candle:{type:chartType, bar:candleBarCfg()}}); }catch(e){}   // ikut warna & tipe candle kustom user
   attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
 
