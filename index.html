@@ -14,6 +14,7 @@
     --bg:#0e0f14; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
     --hdr:#a3a3aa; --luna-glow:#aeb9e8;   /* hdr: label tabel sedikit lebih terang · luna-glow: aksen brand bulan */
     --green:#54c88c; --red:#ff6f6f; --accent:#4a71ff;
+    --mag:#4a71ff; --mag-glow:rgba(74,113,255,.5);  /* reticle magnet: biru accent (warna tetap), hanya bentuk yg dirampingkan */
     --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#1b2f2a; --tint-sell:#3d1a1e;
     --inset:#0e0e11; --btn:#1b1b1f; --btn-hover:#26262b; --btn-border-hover:#3a3a40; --line:#26262b;
   }
@@ -21,6 +22,7 @@
     --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
     --hdr:#5a6273; --luna-glow:#5b6cc4;
     --green:#1a9d6e; --red:#d8504e; --accent:#3a5fe0;
+    --mag:#3a5fe0; --mag-glow:rgba(58,95,224,.4);  /* biru accent (warna tetap) */
     --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#e3f3ec; --tint-sell:#fbe9e9;
     --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
   }
@@ -182,9 +184,13 @@
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
   /* [magnet] buletan preview: penanda titik yg akan mendarat di OHLC terdekat saat menggambar */
   .mag-dot{ position:absolute; z-index:7; pointer-events:none; display:none;
-    width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border-radius:50%;
-    border:2px solid var(--accent); background:rgba(74,113,255,.28);
-    box-shadow:0 0 0 1px rgba(0,0,0,.28); }
+    width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%;
+    border:1.5px solid var(--mag); background:transparent;
+    box-shadow:0 0 0 1px rgba(0,0,0,.45), 0 0 5px var(--mag-glow); }
+  /* pin pusat: penanda pixel pasti — tengah reticle tetap kosong agar titik target terlihat */
+  .mag-dot::after{ content:''; position:absolute; left:50%; top:50%;
+    width:2px; height:2px; margin:-1px 0 0 -1px; border-radius:50%;
+    background:var(--mag); box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
   /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
   .axis-time{ position:absolute; z-index:6; pointer-events:none; display:none;
     transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
@@ -2087,7 +2093,7 @@ const darkStyles = {
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
   overlay:{ text:{color:'#fff', backgroundColor:'rgba(27,27,31,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
+    // buletan drag/draw (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
     point:{ color:'rgba(0,0,0,0)', borderColor:'#4a71ff', borderSize:1.5, radius:3,
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#4a71ff', activeBorderSize:1.5, activeRadius:4 } },
 };
@@ -2103,7 +2109,7 @@ const lightStyles = {
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
+    // buletan drag/draw (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
     point:{ color:'rgba(0,0,0,0)', borderColor:'#3a5fe0', borderSize:1.5, radius:3,
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
 };
@@ -3664,20 +3670,27 @@ $('#chart').addEventListener('mousedown', (ev)=>{
 // posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
 let lastPtr={x:innerWidth/2,y:innerHeight/2};
 
-// [magnet] preview live: buletan penanda di OHLC terdekat saat menggambar dgn magnet ON —
-// walau kursor jauh di atas/bawah candle, dot menempel di titik tempat drawing akan mendarat.
+// reticle preview live: penanda titik yg akan mendarat saat menggambar — tampil di SEMUA
+// kondisi draw. Magnet ON → menempel ke OHLC terdekat (walau kursor jauh dari candle);
+// magnet OFF / area future → mengikuti kursor persis (= titik yg akan di-drop).
 const magDot=document.createElement('div'); magDot.className='mag-dot'; $('#chart').appendChild(magDot);
 function hideMagDot(){ magDot.style.display='none'; }
 function updateMagDot(ev){
-  if(!(magnetOn && inProgressId)){ hideMagDot(); return; }
+  if(!inProgressId){ hideMagDot(); return; }   // hanya saat sedang menggambar (magnet on/off sama saja)
   const r=$('#chart').getBoundingClientRect();
   const px=ev.clientX-r.left, py=ev.clientY-r.top;
-  const xa=xAnchorFromPx(px), v=pxToValue(py);
-  if(!xa || v==null || xa.timestamp==null){ hideMagDot(); return; }   // area future: tak di-snap (sama spt saat klik)
-  const s=magnetSnap(tsOf(xa), v, px, py); if(!s){ hideMagDot(); return; }
-  let cp=chart.convertToPixel({timestamp:s.timestamp,value:s.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp)) cp=cp[0];
-  if(!cp){ hideMagDot(); return; }
-  magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block';
+  if(magnetOn){
+    const xa=xAnchorFromPx(px), v=pxToValue(py);
+    if(xa && v!=null && xa.timestamp!=null){   // di dalam data → snap ke OHLC
+      const s=magnetSnap(tsOf(xa), v, px, py);
+      if(s){
+        let cp=chart.convertToPixel({timestamp:s.timestamp,value:s.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp)) cp=cp[0];
+        if(cp){ magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block'; return; }
+      }
+    }
+  }
+  // magnet OFF (atau area future / gagal snap): reticle tepat di kursor
+  magDot.style.left=px+'px'; magDot.style.top=py+'px'; magDot.style.display='block';
 }
 $('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
 $('#chart').addEventListener('mouseleave',hideMagDot);
