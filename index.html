@@ -1728,7 +1728,9 @@ async function buildReplayPartial(tf){
   if(open>=T) return null;                        // T di boundary/gap → tak ada partial
   const end=arr[rev.length+1]?arr[rev.length+1].timestamp:open+DUR[tf];
   const fineTF=pickFineTF(tf, end-open); if(!fineTF) return null;
-  const fine=await ensureFineWindow(fineTF, open, Math.min(end, T+DUR[fineTF])); if(!fine||!fine.length) return null;
+  // window sub-bar = rentang PENUH bar kasar [open,end) → kunci cache STABIL antar-frame saat Play
+  // (fetch sekali per bar, bukan tiap frame). Anti-lookahead tetap dijaga loop di bawah (b.timestamp+fdur>T).
+  const fine=await ensureFineWindow(fineTF, open, end); if(!fine||!fine.length) return null;
   let o=null,h=-Infinity,l=Infinity,c=null, fdur=DUR[fineTF];
   for(const b of fine){
     if(b.timestamp<open) continue;
