@@ -2901,8 +2901,9 @@ async function liveRefresh(){
   if(atEdge){
     fresh.forEach(c=>onNewBar(c));             // cek pending + SL/TP pada candle baru
     T = a[a.length-1].timestamp + DUR[tf];
-    lastLen=-1; render(true);
-  }
+    render();                                  // incremental (updateData): candle baru di-append TANPA applyNewData.
+  }                                            //   applyNewData menyentak viewport ke bar terakhir → hilang posisi scroll/zoom
+                                               //   user (mis. sedang lihat histori). updateData mempertahankannya.
   // jika tidak atEdge: candle ikut tersimpan diam-diam, user tetap di posisi review-nya
 }
 
