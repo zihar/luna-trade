@@ -2354,7 +2354,12 @@ function reanchorFuturePoints(snap){
   snap.forEach(s=>{ (byId[s.id]||(byId[s.id]=[])).push(s); });
   Object.keys(byId).forEach(id=>{ try{ const o=chart.getOverlayById(id); if(!o||!o.points) return;
     const pts=o.points.map(p=>Object.assign({},p));
-    byId[id].forEach(s=>{ if(pts[s.i]){ delete pts[s.i].timestamp; pts[s.i].dataIndex = li + (s.vt-lt)/DUR[currentTF]; } });
+    // vt → dataIndex via tsToFracIndex (GAP-AWARE). Rumus linear li+(vt-lt)/DUR eksak hanya bila
+    // jarak antar-bar seragam; utk titik in-data (mis. trendline) yg melewati gap weekend, tiap jam
+    // gap dihitung sbg 1 bar hantu → "kegeser jauh". tsToFracIndex bisection ke bar nyata = presisi.
+    // Titik future (vt>=lt): tsToFracIndex jatuh ke ekstrapolasi linear yg sama → tanpa regresi.
+    byId[id].forEach(s=>{ if(pts[s.i]){ const fi=tsToFracIndex(s.vt);
+      pts[s.i].dataIndex = (fi!=null)?fi:(li+(s.vt-lt)/DUR[currentTF]); delete pts[s.i].timestamp; } });
     chart.overrideOverlay({id, points:pts});
   }catch(e){} });
 }
