@@ -236,6 +236,8 @@
   .dt-item:hover{background:rgba(74,113,255,.12)}
   .dt-item svg{width:17px;height:17px;flex:0 0 auto;color:var(--muted)}
   .dt-item.active,.dt-item.active svg{color:var(--accent)}
+  .dt-item .dt-sc{margin-left:auto;padding-left:18px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .dt-item.active .dt-sc{color:var(--accent)}
   body.eraser-on #chart{cursor:crosshair}
   a{color:var(--accent)}
   .speed{display:flex;gap:6px;align-items:center;margin-top:7px}
@@ -3945,27 +3947,27 @@ const DRAW_GROUPS=[
     {name:'eraser', title:'Eraser (click object to delete)', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 15l6-6 8 8-3 3H9zM14 5l5 5"/></svg>'},
   ]},
   {key:'trend', title:'Trend Lines', tools:[
-    {name:'trendline', title:'Trend Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
-    {name:'rayLine', title:'Ray', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="22" y2="2"/><circle cx="4" cy="20" r="1.7"/></svg>'},
-    {name:'straightLine', title:'Extended Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="22" x2="22" y2="2"/></svg>'},
-    {name:'horizontalStraightLine', title:'Horizontal Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
+    {name:'trendline', sc:'T', title:'Trend Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/></svg>'},
+    {name:'rayLine', sc:'Y', title:'Ray', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="22" y2="2"/><circle cx="4" cy="20" r="1.7"/></svg>'},
+    {name:'straightLine', sc:'E', title:'Extended Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="2" y1="22" x2="22" y2="2"/></svg>'},
+    {name:'horizontalStraightLine', sc:'H', title:'Horizontal Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="1.6"/></svg>'},
     {name:'horizontalRayLine', title:'Horizontal Ray', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="12" x2="22" y2="12"/><circle cx="4" cy="12" r="1.7"/></svg>'},
-    {name:'verticalStraightLine', title:'Vertical Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
-    {name:'priceLine', title:'Price Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="9" x2="21" y2="9" stroke-dasharray="3 3"/><path d="M3 15h10"/></svg>'},
+    {name:'verticalStraightLine', sc:'V', title:'Vertical Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="3" x2="12" y2="21"/><circle cx="12" cy="12" r="1.6"/></svg>'},
+    {name:'priceLine', sc:'P', title:'Price Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="9" x2="21" y2="9" stroke-dasharray="3 3"/><path d="M3 15h10"/></svg>'},
   ]},
   {key:'channel', title:'Channels', tools:[
     {name:'parallelStraightLine', title:'Parallel Channel', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="17" x2="21" y2="7"/><line x1="3" y1="21" x2="21" y2="11"/></svg>'},
     {name:'priceChannelLine', title:'Price Channel', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="16" x2="21" y2="8"/><line x1="3" y1="20" x2="21" y2="12"/><line x1="3" y1="12" x2="21" y2="4"/></svg>'},
   ]},
   {key:'fib', title:'Fibonacci', tools:[
-    {name:'fib3', title:'Fib Retracement', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
+    {name:'fib3', sc:'F', title:'Fib Retracement', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>'},
     {name:'fibonacciLine', title:'Fib Line', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="5" x2="20" y2="5"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="4" y1="20" x2="20" y2="20"/></svg>'},
   ]},
   {key:'shapes', title:'Shapes', tools:[
-    {name:'rect', title:'Rectangle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
-    {name:'circle', title:'Circle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>'},
+    {name:'rect', sc:'R', title:'Rectangle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>'},
+    {name:'circle', sc:'O', title:'Circle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>'},
     {name:'ellipse', title:'Ellipse', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>'},
-    {name:'arrow', title:'Arrow', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><path d="M20 4v6M20 4h-6"/></svg>'},
+    {name:'arrow', sc:'A', title:'Arrow', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><path d="M20 4v6M20 4h-6"/></svg>'},
   ]},
   {key:'positions', title:'Positions', tools:[
     {name:'longPosition', pos:'long', title:'Long Position', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 16 V8 M9.5 10.5 L12 8 l2.5 2.5"/></svg>'},
@@ -3973,7 +3975,7 @@ const DRAW_GROUPS=[
     {name:'dateRange', title:'Date Range', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 5 V19 M18 5 V19 M9 12 h6 M9 12 l2 -2 M9 12 l2 2 M15 12 l-2 -2 M15 12 l-2 2"/></svg>'},
   ]},
   {key:'text', title:'Text', tools:[
-    {name:'text', title:'Text', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
+    {name:'text', sc:'X', title:'Text', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
     {name:'callout', title:'Callout', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 16l-2 4 6-4"/></svg>'},
     {name:'simpleAnnotation', title:'Annotation', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v9"/><circle cx="12" cy="16" r="2"/></svg>'},
     {name:'simpleTag', title:'Tag', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h14l4-4-4-4H3z"/></svg>'},
@@ -4006,8 +4008,15 @@ let _flyOpenKey=null;
 function toolByName(n){ for(const g of DRAW_GROUPS){ const t=g.tools.find(x=>x.name===n); if(t) return t; } return null; }
 function lastToolOf(g){ const saved=localStorage.getItem('br_lasttool_'+g.key); return (saved&&g.tools.find(t=>t.name===saved))||g.tools[0]; }
 function closeFlyout(){ _fly.classList.remove('show'); _flyOpenKey=null; }
+// ---- keyboard shortcut drawing ala TradingView (Alt+huruf; Mac ⌥) ----
+const IS_MAC=/Mac|iPhone|iPad|iPod/.test((navigator.platform||'')+' '+(navigator.userAgent||''));
+function scLabel(sc){ return (IS_MAC?'⌥':'Alt+')+sc; }              // label hint/tooltip
+function catTitle(g,t){ return g.title+': '+t.title+(t.sc?' ('+scLabel(t.sc)+')':''); }
+// map dari e.code (fisik, OS/layout-independent) → {g,t}
+const SC_BY_CODE={}; DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ if(t.sc) SC_BY_CODE['Key'+t.sc]={g,t}; }));
+function activateShortcut(hit){ const catBtn=_dt.querySelector('.dt-cat[data-cat="'+hit.g.key+'"]'); if(catBtn) pickTool(hit.g, hit.t, catBtn); }
 function pickTool(g, t, catBtn){
-  catBtn.dataset.tool=t.name; catBtn.title=g.title+': '+t.title; catBtn.innerHTML=t.svg;
+  catBtn.dataset.tool=t.name; catBtn.title=catTitle(g,t); catBtn.innerHTML=t.svg;
   if(g.cursor){ setCursorMode(t.name); catBtn.classList.add('armed'); }
   else { try{localStorage.setItem('br_lasttool_'+g.key,t.name);}catch(_){} createDraw(t.name, catBtn); }
   closeFlyout();
@@ -4016,7 +4025,7 @@ function openFlyout(g, catBtn){
   _fly.innerHTML=''; _flyOpenKey=g.key;
   const cur=(g.cursor?cursorMode:lastToolOf(g).name);
   g.tools.forEach(t=>{ const it=document.createElement('div'); it.className='dt-item'+(t.name===cur?' active':'');
-    it.innerHTML=t.svg+'<span>'+t.title+'</span>';
+    it.innerHTML=t.svg+'<span>'+t.title+'</span>'+(t.sc?'<span class="dt-sc">'+scLabel(t.sc)+'</span>':'');
     it.onclick=(ev)=>{ ev.stopPropagation(); pickTool(g, t, catBtn); };
     _fly.appendChild(it); });
   const r=catBtn.getBoundingClientRect(); _fly.classList.add('show');
@@ -4027,7 +4036,7 @@ function buildDrawRail(){
   DRAW_GROUPS.forEach(g=>{
     const cat=document.createElement('button'); cat.className='dtool dt-cat'; cat.dataset.cat=g.key;
     const init=g.cursor?(toolByName(cursorMode)||g.tools[0]):lastToolOf(g);
-    cat.dataset.tool=init.name; cat.title=g.title+': '+init.title; cat.innerHTML=init.svg;
+    cat.dataset.tool=init.name; cat.title=catTitle(g,init); cat.innerHTML=init.svg;
     cat.onclick=(e)=>{ e.stopPropagation(); if(_flyOpenKey===g.key){ closeFlyout(); return; } openFlyout(g, cat); };
     _dt.appendChild(cat);
   });
@@ -5025,6 +5034,8 @@ $('#toggleTrades').classList.toggle('on',!_coll);
 // ===================== keyboard =====================
 window.addEventListener('keydown',e=>{
   if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+  // shortcut drawing ala TradingView — Alt+huruf (Mac ⌥). Pakai e.code (fisik) agar OS/layout-independent.
+  if(e.altKey && !e.ctrlKey && !e.metaKey){ const hit=SC_BY_CODE[e.code]; if(hit){ e.preventDefault(); activateShortcut(hit); return; } }
   // undo/redo objek gambar — Ctrl/⌘+Z, redo = Ctrl/⌘+Shift+Z atau Ctrl/⌘+Y
   if(e.ctrlKey||e.metaKey){
     const k=e.key.toLowerCase();
