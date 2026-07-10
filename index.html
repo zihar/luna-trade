@@ -658,7 +658,7 @@
                 border:1px solid var(--border); border-radius:6px; }
 
   /* watchlist (Markets) — gaya tabel TradeLocker */
-  .watchlist{ width:360px; background:var(--panel); border-left:1px solid var(--border);
+  .watchlist{ width:400px; background:var(--panel); border-left:1px solid var(--border);
               display:flex; flex-direction:column; overflow:hidden; min-height:0; flex:none; }
   .watchlist.hidden{ display:none; }
   /* daftar instrumen = bagian yg scroll; order panel docked tetap kebagian ruang di bawah */
@@ -671,13 +671,16 @@
   .nmk-toggle input{ accent-color:var(--luna-glow); cursor:pointer; margin:0; }
   .wl-live{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--muted); opacity:.45; }
   .wl-live.on{ background:var(--green); opacity:1; box-shadow:0 0 5px var(--green); }
-  .wl-row{ display:grid; grid-template-columns:minmax(46px,1fr) 58px 58px 44px 50px 50px; gap:6px; align-items:center;
-           padding:0 11px 0 12px; height:36px; cursor:pointer; font-size:12px; }
+  .wl-row{ display:grid; grid-template-columns:minmax(56px,1fr) 62px 62px 40px 58px 58px; gap:6px; align-items:center;
+           padding:0 12px; height:38px; cursor:pointer; font-size:12px; overflow:hidden;
+           border-left:2px solid transparent; }
   .wl-row:hover{ background:var(--btn-hover); }
-  .wl-row.on{ background:rgba(74,113,255,.16); }
-  .wl-row > span{ font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums; }
+  .wl-row.on{ background:rgba(74,113,255,.16); border-left-color:var(--accent); }
+  .wl-row > span{ font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums;
+                  white-space:nowrap; overflow:hidden; text-overflow:clip; }
   .wl-hdr{ color:var(--hdr); font-size:11px; font-weight:600; letter-spacing:.44px; text-transform:capitalize;
-           cursor:default; height:auto; padding:10px 11px 8px 12px; position:sticky; top:0; background:var(--panel); z-index:1; }
+           cursor:default; height:auto; padding:10px 12px 8px; border-left-color:transparent;
+           position:sticky; top:0; background:var(--panel); z-index:1; }
   .wl-hdr:hover{ background:var(--panel); }
   .wl-hdr > span{ font-family:inherit; }
   .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); }
@@ -1449,6 +1452,8 @@ let lotsManual = false;  // true setelah user ubah lot/stepper manual → Risk% 
 let alerts = [];         // price alert: {sym,price,id} (Fase 1d)
 let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)
 let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (Lapis 4)
+let wlBuilt = false;     // watchlist: node baris dibangun sekali, lalu di-update in-place (anti flicker)
+let wlNodes = {};        // sym -> {row,bid,ask,spr,hi,lo} referensi node span per baris
 let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
 let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
@@ -4301,14 +4306,40 @@ function maxSpreadPips(s){
   if(SYM_DECIMALS[s]!=null) return 200;                          // indices CFD → spread beberapa poin, longgar
   return 30;                            // FX major/minor & JPY (real biasanya 1–15, jadi aman)
 }
-function renderWatch(){
+// Watchlist di-render dua tahap: buildWatch() membuat node baris SEKALI, lalu
+// updateWatch() cuma menimpa textContent/class tiap tick. Ini mencegah kedip
+// (:hover/.on tak pernah lepas) & klik hilang (node tak diganti saat mouseup).
+function buildWatch(){
   const box=$('#wlRows'); if(!box) return;
-  const hdr=`<div class="wl-row wl-hdr">
+  box.innerHTML=`<div class="wl-row wl-hdr">
     <span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
-  const rows=WATCH_SYMS.map(s=>{
-    const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s), pip=pipOf(s), sym=s.replace('_','');
-    if(!q && !lt) return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}">
-      <span class="wl-sym">${sym}</span><span class="wl-bid">—</span><span class="wl-ask">—</span><span class="wl-spr">—</span><span class="wl-num">—</span><span class="wl-num">—</span></div>`;
+  wlNodes={};
+  WATCH_SYMS.forEach(s=>{
+    const row=document.createElement('div');
+    row.className='wl-row'; row.dataset.sym=s;
+    row.innerHTML=`<span class="wl-sym">${s.replace('_','')}</span>`
+      +`<span class="wl-bid">—</span><span class="wl-ask">—</span>`
+      +`<span class="wl-spr">—</span><span class="wl-num wl-hi">—</span><span class="wl-num wl-lo">—</span>`;
+    box.appendChild(row);
+    wlNodes[s]={ row, bid:row.querySelector('.wl-bid'), ask:row.querySelector('.wl-ask'),
+                 spr:row.querySelector('.wl-spr'), hi:row.querySelector('.wl-hi'), lo:row.querySelector('.wl-lo') };
+  });
+  // satu listener klik terdelegasi (bertahan lintas tick) → tak perlu re-bind per baris
+  box.onclick=e=>{ const r=e.target.closest('.wl-row[data-sym]'); if(r) selectSymbol(r.dataset.sym); };
+  wlBuilt=true;
+  updateWatch();
+}
+// util set teks hanya bila berubah (minim repaint)
+function setTxt(el,v){ if(el.textContent!==v) el.textContent=v; }
+function updateWatch(){
+  WATCH_SYMS.forEach(s=>{
+    const n=wlNodes[s]; if(!n) return;
+    n.row.classList.toggle('on', s===inst);
+    const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s), pip=pipOf(s);
+    if(!q && !lt){
+      setTxt(n.bid,'—'); setTxt(n.ask,'—'); setTxt(n.spr,'—'); setTxt(n.hi,'—'); setTxt(n.lo,'—');
+      n.row.removeAttribute('title'); return;
+    }
     let bid, ask, sprd;
     if(lt){ bid=lt.bid; ask=lt.ask; sprd=ask-bid; }                 // bid/ask realtime
     else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
@@ -4316,18 +4347,15 @@ function renderWatch(){
     const cap=maxSpreadPips(s)*pip;
     if(sprd>cap){ const mid=(bid+ask)/2; sprd=cap; bid=mid-cap/2; ask=mid+cap/2; }
     const chg=q?q.chg:0, up=chg>=0;
-    const hi=q&&q.hi!=null?q.hi.toFixed(dec):'—', lo=q&&q.lo!=null?q.lo.toFixed(dec):'—';
-    return `<div class="wl-row ${s===inst?'on':''}" data-sym="${s}" title="${(chg>=0?'+':'')+chg.toFixed(2)}% today">
-      <span class="wl-sym">${sym}</span>
-      <span class="wl-bid ${up?'up':'down'}">${bid.toFixed(dec)}</span>
-      <span class="wl-ask ${up?'up':'down'}">${ask.toFixed(dec)}</span>
-      <span class="wl-spr">${(sprd/pip).toFixed(1)}</span>
-      <span class="wl-num">${hi}</span>
-      <span class="wl-num">${lo}</span></div>`;
-  }).join('');
-  box.innerHTML=hdr+rows;
-  box.querySelectorAll('.wl-row[data-sym]').forEach(r=>r.onclick=()=>selectSymbol(r.dataset.sym));
+    setTxt(n.bid,bid.toFixed(dec)); n.bid.classList.toggle('up',up); n.bid.classList.toggle('down',!up);
+    setTxt(n.ask,ask.toFixed(dec)); n.ask.classList.toggle('up',up); n.ask.classList.toggle('down',!up);
+    setTxt(n.spr,(sprd/pip).toFixed(1));
+    setTxt(n.hi, q&&q.hi!=null?q.hi.toFixed(dec):'—');
+    setTxt(n.lo, q&&q.lo!=null?q.lo.toFixed(dec):'—');
+    n.row.title=(chg>=0?'+':'')+chg.toFixed(2)+'% today';
+  });
 }
+function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
 function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
@@ -4667,7 +4695,7 @@ $('#alertAdd').onclick=addAlert;
 const app=document.querySelector('.app');
 { const op=$('#orderpanel'), of=$('#orderForm'); if(op&&of) op.appendChild(of); }
 // ukuran tersimpan untuk Markets & Trades
-const savedMarketsW=()=> localStorage.getItem('br_marketsW') || '360';
+const savedMarketsW=()=> localStorage.getItem('br_marketsW') || '400';
 const savedTradesH =()=> localStorage.getItem('br_tradesH')  || '210';
 
 function setOrderDock(floating, keepPos){
@@ -5011,7 +5039,7 @@ function makeResizer(handle, axis, varName, lsKey){
     handle.setPointerCapture(e.pointerId); e.preventDefault(); });
   handle.addEventListener('pointermove',e=>{ if(!drag) return;
     const r=app.getBoundingClientRect(); let v;
-    if(axis==='x'){ v=Math.max(180, Math.min(r.width-260, r.right-e.clientX)); }
+    if(axis==='x'){ v=Math.max(360, Math.min(r.width-260, r.right-e.clientX)); }
     else         { v=Math.max(80,  Math.min(r.height*0.75, r.bottom-e.clientY)); }
     v=Math.round(v); app.style.setProperty(varName, v+'px'); localStorage.setItem(lsKey, v);
     try{chart.resize();}catch(err){}
