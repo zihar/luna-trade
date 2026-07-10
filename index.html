@@ -1629,7 +1629,8 @@ async function ensureM5Window(open,end){
   try{ const data=await fetchCandles('M5',{from:new Date(open).toISOString(), count}); m5WinCache[key]=data; return data; }
   catch(e){ return null; }
 }
-const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1}; // box & penanda axis: dilewati
+const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1,
+  priceLine:1, callout:1, simpleAnnotation:1, simpleTag:1}; // box & penanda axis & teks: dilewati
 // CATATAN: titik trendline kini beranchor dataIndex (tanpa timestamp) → refine M5 di bawah
 // (yang butuh p.timestamp) menjadi no-op untuk trendline. Magnet saat MENGGAMBAR tetap bekerja
 // (snap nilai OHLC via pendingClicks). Penyempurnaan X presisi-M5 untuk trendline = follow-up.
@@ -1671,9 +1672,24 @@ const DRAW_DEFAULT = {
   // Long/Short Position: warna & transparansi zona Profit (tgt) & Stop terpisah, per objek.
   longPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
   shortPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
+  // --- garis bawaan klinecharts yang di-ekspos ---
+  straightLine:{color:'#4a71ff',size:1,style:'solid'},
+  rayLine:{color:'#4a71ff',size:1,style:'solid'},
+  horizontalRayLine:{color:'#4a71ff',size:1,style:'solid'},
+  priceLine:{color:'#4a71ff',size:1,style:'dashed'},
+  parallelStraightLine:{color:'#4a71ff',size:1,style:'solid'},
+  priceChannelLine:{color:'#4a71ff',size:1,style:'solid'},
+  fibonacciLine:{color:'#4a71ff',size:1,style:'solid'},
+  // --- shape custom baru ---
+  circle:{color:'#4a71ff',size:1,style:'solid'},
+  ellipse:{color:'#4a71ff',size:1,style:'solid'},
+  arrow:{color:'#4a71ff',size:2,style:'solid'},
+  callout:{color:'#4a71ff',size:1,style:'solid',textAlign:'left',textValign:'top'},
 };
 // garis bawaan klinecharts (horizontal/vertical) — pakai styles.line, bukan createPointFigures
-const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1};
+const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1,
+  straightLine:1, rayLine:1, horizontalRayLine:1, priceLine:1,
+  parallelStraightLine:1, priceChannelLine:1, fibonacciLine:1};
 function klineLineStyles(st){ const ls=lsLine(st); return {line:Object.assign({color:st.color,size:st.size},ls)}; }
 const objStyle = {};   // overlayId -> {color,size,style}
 function dstyle(o){ return Object.assign({}, DRAW_DEFAULT[o&&o.name]||{color:'#4a71ff',size:1,style:'solid'}, objStyle[o&&o.id]||{}); }
@@ -3631,7 +3647,10 @@ function clearDrawings(){ drawIds.slice().forEach(id=>{ try{chart.removeOverlay(
 // area future (vt > candle terakhir) dipetakan ke dataIndex spt reanchorFuturePoints(). suppressDrawSave
 // menahan penyimpanan & efek-samping onDrawEnd selama proses clear/restore programatik.
 let suppressDrawSave=false, drawSaveTimer=null;
-const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,horizontalStraightLine:1,verticalStraightLine:1};
+const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
+  horizontalStraightLine:1,verticalStraightLine:1,
+  straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
+  circle:1,ellipse:1,arrow:1,callout:1,simpleAnnotation:1,simpleTag:1};
 function drawsKey(){ return 'br_draws_'+inst; }
 function serializeDraws(){
   const out=[];
