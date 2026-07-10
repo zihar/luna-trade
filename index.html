@@ -292,6 +292,8 @@
   .ctxitem{padding:7px 12px;border-radius:5px;cursor:pointer;font-size:13px;color:var(--txt);
            display:flex;align-items:center;gap:8px}
   .ctxitem:hover{background:var(--btn-hover)}
+  .ctxitem.disabled{color:var(--muted);opacity:.45;cursor:default;pointer-events:none}
+  .ctxsep{height:1px;background:var(--border);margin:4px 6px}
   /* editor teks inline di chart */
   .text-editor,.text-editor:focus,.text-editor:focus-visible{position:fixed;z-index:1100;background:var(--panel);color:var(--txt);
     border:1px solid var(--accent);caret-color:var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);outline:none;
@@ -3859,7 +3861,10 @@ const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className=
 function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Show all drawings':'Hide all drawings'; _hd.classList.toggle('armed',drawsHidden); }
 syncHideDrawBtn();
 _hd.onclick=()=>{ drawsHidden=!drawsHidden; applyDrawsVisibility(); syncHideDrawBtn(); };
-const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Delete all drawings'; _tr.innerHTML=TRASH_SVG; _tr.onclick=clearDrawings;
+const _tr=document.createElement('button'); _tr.className='dtool'; _tr.title='Remove drawings / indicators'; _tr.innerHTML=TRASH_SVG;
+// klik trash → menu flyout ala TradingView (buka ke kanan tombol). stopPropagation supaya
+// tak langsung ditutup oleh listener window-click yg menyembunyikan ctxMenu.
+_tr.onclick=(e)=>{ e.stopPropagation(); const r=_tr.getBoundingClientRect(); openRemoveMenu(r.right+6, r.top); };
 // toggle Magnet (snap ke nilai OHLC candle terdekat) — ala TradingView
 const MAGNET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 4 H4 v7 a8 8 0 0 0 16 0 V4 h-3 v7 a5 5 0 0 1-10 0 Z"/></svg>';
 const _mag=document.createElement('button'); _mag.id='magBtn'; _mag.className='dtool'; _mag.title='Magnet: snap point to nearest candle OHLC (on/off)'; _mag.innerHTML=MAGNET_SVG;
@@ -5119,6 +5124,10 @@ function removeInd(name){
   try{ chart.removeIndicator(pid, name); }catch(e){}
   delete activeInd[name];
 }
+function removeAllInd(){
+  Object.keys(activeInd).forEach(removeInd);
+  persistInd(); updateIndBadge(); try{ renderIndMenu(); }catch(e){}
+}
 function updateIndBadge(){
   const n=Object.keys(activeInd).length, b=$('#indBadge'), btn=$('#indBtn');
   if(b){ b.textContent=n; b.hidden=(n===0); }
@@ -5149,13 +5158,25 @@ ctxMenu.className='ctxmenu'; ctxMenu.style.display='none';
 document.body.appendChild(ctxMenu);
 function hideCtx(){ ctxMenu.style.display='none'; }
 function showCtx(x,y,items){
-  ctxMenu.innerHTML=items.map((it,i)=>`<div class="ctxitem" data-ci="${i}">${it.label}</div>`).join('');
+  ctxMenu.innerHTML=items.map((it,i)=> it.sep ? '<div class="ctxsep"></div>'
+      : `<div class="ctxitem${it.disabled?' disabled':''}" data-ci="${i}">${it.label}</div>`).join('');
   ctxMenu.style.display='block';
   const mw=ctxMenu.offsetWidth||190, mh=ctxMenu.offsetHeight||44;
   ctxMenu.style.left=Math.min(x,window.innerWidth-mw-6)+'px';
   ctxMenu.style.top =Math.min(y,window.innerHeight-mh-6)+'px';
-  ctxMenu.querySelectorAll('.ctxitem').forEach(el=>el.onclick=()=>{ hideCtx(); items[+el.dataset.ci].fn(); });
+  ctxMenu.querySelectorAll('.ctxitem:not(.disabled)').forEach(el=>el.onclick=()=>{ hideCtx(); items[+el.dataset.ci].fn(); });
 }
+// menu hapus ala TradingView: hapus SEMUA drawing / SEMUA indikator / dua-duanya, dgn hitungan live.
+function removeMenuItems(){
+  const nd=drawIds.length, ni=Object.keys(activeInd).length;
+  const dL=`drawing${nd===1?'':'s'}`, iL=`indicator${ni===1?'':'s'}`;
+  return [
+    {label:`Remove ${nd} ${dL}`,               disabled:nd===0,       fn:clearDrawings},
+    {label:`Remove ${ni} ${iL}`,               disabled:ni===0,       fn:removeAllInd},
+    {label:`Remove ${nd} ${dL} & ${ni} ${iL}`, disabled:(nd+ni)===0,  fn:()=>{ clearDrawings(); removeAllInd(); }},
+  ];
+}
+function openRemoveMenu(x,y){ showCtx(x,y,removeMenuItems()); }
 $('#chart').addEventListener('contextmenu',e=>{
   e.preventDefault();
   if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); showObjPopup(o, e.clientX, e.clientY); return; } }
@@ -5172,6 +5193,7 @@ $('#chart').addEventListener('contextmenu',e=>{
     if(nearIdx>=0) items.push({label:`✕ Delete alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
     items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
+  if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:clearDrawings}); }
   items.push({label:'↺ Reset chart view', fn:resetChartView});
   items.push({label:'⚙ Setting chart', fn:()=>{ track('chart_settings'); showChartSet(e.clientX, e.clientY); }});   // paling bawah
   showCtx(e.clientX, e.clientY, items);
