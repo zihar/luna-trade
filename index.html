@@ -182,6 +182,12 @@
   .ind-item.on{color:var(--accent)}
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
+  /* watermark identitas Luna — pojok kanan-atas, sangat samar, tak ganggu candle */
+  .chart-wm{ position:absolute; top:8px; right:13px; z-index:2; pointer-events:none; user-select:none;
+    display:flex; align-items:center; gap:6px; opacity:.06; }
+  .chart-wm .wm-glyph{ width:15px; height:15px; display:block; color:var(--luna-glow); }
+  .chart-wm .wm-t{ font:600 12px/1 var(--font-num); letter-spacing:.09em; color:var(--txt); white-space:nowrap; }
+  body.light .chart-wm{ opacity:.1; }
   /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
@@ -1480,6 +1486,7 @@ let liveTicks = {};      // bid/ask realtime per simbol dari SSE /api/prices (La
 let wlBuilt = false;     // watchlist: node baris dibangun sekali, lalu di-update in-place (anti flicker)
 let wlNodes = {};        // sym -> {row,bid,ask,spr,hi,lo} referensi node span per baris
 let priceTimerEl = null; // pill countdown candle berikutnya (mode Live)
+let chartWmEl = null;    // watermark identitas Luna di kanvas (crescent + simbol·TF)
 let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
 let formingSeed = null;      // candle incomplete OANDA (OHLC otoritatif periode berjalan) → seed wick
@@ -2356,7 +2363,10 @@ document.addEventListener('click',(e)=>{
   secondaries.forEach(sc=>{ try{ if(sc.menuEl.classList.contains('open') && inWrap!==sc.menuEl.parentElement) sc.closeMenu(); }catch(e){} });
 });
 // highlightTF dipanggil di banyak tempat saat currentTF berubah → rebuild bar (agar TF non-favorit aktif ikut tampil/hilang) & refresh menu bila terbuka.
-function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); }
+function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); updateChartWM(); }
+// watermark kanvas: crescent + "SIMBOL · TF" (ikut instrumen & timeframe aktif)
+function updateChartWM(){ if(!chartWmEl) return; const t=chartWmEl.querySelector('.wm-t');
+  if(t) t.textContent = inst.replace('_','') + ' · ' + (TF_LABEL[currentTF]||currentTF); }
 rebuildTFBar();
 
 // ===================== load awal =====================
@@ -2377,7 +2387,7 @@ syncDateDisplay();
 currentTF = localStorage.getItem('br_tf')||'M15';
 guessPip(); highlightTF();
 // ganti pair → langsung load data terkini (tombol Load khusus backtest by tanggal)
-$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); syncIpickTrigger(); loadInit(true); };
+$('#instrument').onchange = ()=>{ guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); loadInit(true); };
 function guessPip(){
   const s=$('#instrument').value;
   // tabel di dalam fungsi: guessPip dipanggil saat init sebelum const global lain siap → hindari TDZ
@@ -4394,7 +4404,7 @@ function updateWatch(){
   });
 }
 function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); try{drawPaperLines();}catch(e){} loadInit(true);
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); try{drawPaperLines();}catch(e){} loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
@@ -4645,6 +4655,11 @@ function pushFormingCandle(){
 function clearFormingBar(){ formingBar=null; }
 
 function initPriceTimer(){
+  chartWmEl=document.createElement('div');
+  chartWmEl.className='chart-wm'; chartWmEl.id='chartWm';
+  chartWmEl.innerHTML='<svg class="wm-glyph" viewBox="0 0 24 24" aria-hidden="true"><mask id="lunaCutWm"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle cx="11.6" cy="12" r="8.4" fill="currentColor" mask="url(#lunaCutWm)"/></svg><span class="wm-t"></span>';
+  $('#chart').appendChild(chartWmEl);
+  updateChartWM();
   priceTimerEl=document.createElement('div');
   priceTimerEl.className='price-timer'; priceTimerEl.id='priceTimer';
   $('#chart').appendChild(priceTimerEl);
