@@ -5370,7 +5370,7 @@ function pickBarAgain(){
 }
 function cycleSpeed(){
   const sp=$('#speed'); let i=RP_SPEEDS.indexOf(+sp.value); i=(i+1)%RP_SPEEDS.length;
-  sp.value=RP_SPEEDS[i]; sp.dispatchEvent(new Event('change'));   // restart playTimer bila sedang play
+  sp.value=RP_SPEEDS[i]; sp.dispatchEvent(new Event('change'));   // playFrame baca speed tiap frame (change kini no-op; dispatch dipertahankan bila ada listener lain)
   $('#rpSpeed').textContent=RP_SPEEDS[i]+'×';
 }
 $('#rpSelect').onclick=pickBarAgain;
