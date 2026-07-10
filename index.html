@@ -591,6 +591,17 @@
   .rp-step svg{ fill:currentColor; }
   .rp-speed{ font-family:var(--font-num); font-weight:700; font-size:12px; color:var(--muted); min-width:36px !important; line-height:1 !important; }
   .rp-speed:hover{ color:var(--txt); }
+  /* menu pilih speed (ala TradingView) — muncul di atas pill saat klik #rpSpeed */
+  .rp-speed-menu{ display:none; position:fixed; z-index:120; min-width:236px; padding:6px;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .rp-speed-menu.open{ display:block; }
+  .rp-speed-menu .rpm-hd{ color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:4px 8px 6px; }
+  .rp-speed-menu .rpm-row{ display:flex; align-items:center; gap:14px; padding:7px 8px; border-radius:6px; cursor:pointer; }
+  .rp-speed-menu .rpm-row:hover{ background:var(--btn-hover); }
+  .rp-speed-menu .rpm-row.on{ background:var(--btn); }
+  .rp-speed-menu .rpm-x{ font-family:var(--font-num); font-weight:700; font-size:13px; min-width:40px; color:var(--txt); }
+  .rp-speed-menu .rpm-d{ font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .rp-tf{ align-self:center; font-family:var(--font-num); font-weight:700; font-size:11px;
           letter-spacing:.04em; color:var(--muted); padding:0 9px; white-space:nowrap; }
   .rp-div{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
@@ -1211,12 +1222,15 @@
     <button id="nextBtn" title="Next (→)">⏩</button>
     <span class="rlabel">Speed</span>
     <select id="speed" title="Play speed (candles/sec)">
-      <option value="1">1×</option>
-      <option value="2">2×</option>
-      <option value="3" selected>3×</option>
-      <option value="5">5×</option>
       <option value="10">10×</option>
-      <option value="20">20×</option>
+      <option value="7">7×</option>
+      <option value="5">5×</option>
+      <option value="3" selected>3×</option>
+      <option value="1">1×</option>
+      <option value="0.5">0.5×</option>
+      <option value="0.3">0.3×</option>
+      <option value="0.2">0.2×</option>
+      <option value="0.1">0.1×</option>
     </select>
   </span>
   <span class="sep"></span>
@@ -1256,7 +1270,7 @@
           <button class="rp-play" id="rpPlay" title="Play / Pause (Space)" aria-label="Play or pause"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
           <button class="rp-step" id="rpNext" title="Next bar (→)" aria-label="Next bar"><svg viewBox="0 0 24 24"><path d="M6 5v14l9-7z"/><rect x="16" y="5" width="3" height="14" rx="1"/></svg></button>
           <span class="rp-div"></span>
-          <button class="rp-speed" id="rpSpeed" title="Playback speed — click to cycle" aria-label="Playback speed">3×</button>
+          <button class="rp-speed" id="rpSpeed" title="Playback speed — click to choose" aria-label="Playback speed">3×</button>
           <span class="rp-tf" id="rpTf">D</span>
           <span class="rp-div"></span>
           <button class="rp-close" id="rpExit" title="Exit replay → back to realtime" aria-label="Exit replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -5352,7 +5366,7 @@ $('#chart').addEventListener('click',()=>{
 // (step/togglePlay/exitReplay) + fitur baru "Select bar" = re-pick tanpa keluar replay.
 const RP_PLAY_SVG='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
 const RP_PAUSE_SVG='<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
-const RP_SPEEDS=[1,2,3,5,10,20];
+const RP_SPEEDS=[10,7,5,3,1,0.5,0.3,0.2,0.1];   // candles/detik; <1 = 1 candle per N detik
 function syncReplayPill(){
   const sp=$('#speed'); if(sp) $('#rpSpeed').textContent=sp.value+'×';
   if(typeof currentTF!=='undefined' && currentTF) $('#rpTf').textContent=currentTF;
@@ -5371,17 +5385,33 @@ function pickBarAgain(){
   // Tetap di posisi replay saat ini; user memilih bar dari histori yang sudah tampil.
   setStatus('Select bar: click a bar in view to move the replay start (no jump to now).');
 }
-function cycleSpeed(){
-  const sp=$('#speed'); let i=RP_SPEEDS.indexOf(+sp.value); i=(i+1)%RP_SPEEDS.length;
-  sp.value=RP_SPEEDS[i]; sp.dispatchEvent(new Event('change'));   // playFrame baca speed tiap frame (change kini no-op; dispatch dipertahankan bila ada listener lain)
-  $('#rpSpeed').textContent=RP_SPEEDS[i]+'×';
+// Menu pilih speed (ala TradingView): klik pill speed → daftar 10×…0.1×. playFrame baca #speed tiap
+// frame, jadi memilih cukup set #speed.value (tanpa restart loop). Speed <1 = 1 candle per N detik.
+function speedDesc(s){ return s>=1 ? (s+' upd per 1 sec') : ('1 upd per '+Math.round(1/s)+' sec'); }
+const rpSpeedMenu=document.createElement('div'); rpSpeedMenu.className='rp-speed-menu'; rpSpeedMenu.setAttribute('role','menu'); document.body.appendChild(rpSpeedMenu);
+function buildSpeedMenu(){
+  const cur=$('#speed')?+$('#speed').value:3;
+  rpSpeedMenu.innerHTML='<div class="rpm-hd">Replay Speed</div>'+RP_SPEEDS.map(s=>
+    `<div class="rpm-row${cur===s?' on':''}" role="menuitem" data-s="${s}"><span class="rpm-x">${s}×</span><span class="rpm-d">${speedDesc(s)}</span></div>`).join('');
+  rpSpeedMenu.querySelectorAll('.rpm-row').forEach(r=>r.onclick=()=>{ setReplaySpeed(r.dataset.s); closeSpeedMenu(); });
 }
+function setReplaySpeed(s){ const sp=$('#speed'); if(sp) sp.value=s; try{localStorage.setItem('br_speed',s);}catch(e){} try{syncReplayPill();}catch(e){} }
+function openSpeedMenu(){
+  buildSpeedMenu(); rpSpeedMenu.classList.add('open');
+  const b=$('#rpSpeed').getBoundingClientRect(), mw=rpSpeedMenu.offsetWidth, mh=rpSpeedMenu.offsetHeight;
+  let left=b.left+b.width/2-mw/2; left=Math.max(8,Math.min(left,window.innerWidth-mw-8));
+  rpSpeedMenu.style.left=left+'px'; rpSpeedMenu.style.top=Math.max(8,b.top-mh-8)+'px';   // di ATAS pill
+}
+function closeSpeedMenu(){ rpSpeedMenu.classList.remove('open'); }
 $('#rpSelect').onclick=pickBarAgain;
 $('#rpPrev').onclick=()=>step(-1);
 $('#rpPlay').onclick=togglePlay;
 $('#rpNext').onclick=()=>step(1);
-$('#rpSpeed').onclick=cycleSpeed;
+$('#rpSpeed').onclick=(e)=>{ e.stopPropagation(); rpSpeedMenu.classList.contains('open')?closeSpeedMenu():openSpeedMenu(); };
+document.addEventListener('mousedown',e=>{ if(rpSpeedMenu.classList.contains('open') && !rpSpeedMenu.contains(e.target) && !$('#rpSpeed').contains(e.target)) closeSpeedMenu(); }, true);
 $('#rpExit').onclick=exitReplay;
+// pulihkan speed tersimpan
+try{ const sv=localStorage.getItem('br_speed'); if(sv && $('#speed') && RP_SPEEDS.includes(+sv)) $('#speed').value=sv; }catch(e){}
 
 // ===================== popup setting objek gambar (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
