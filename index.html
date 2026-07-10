@@ -36,6 +36,10 @@
          padding:6px 11px;cursor:pointer;font-size:13px}
   button:hover{border-color:var(--btn-border-hover);background:var(--btn-hover)}
   button:disabled{opacity:.4;cursor:not-allowed}
+  /* fokus keyboard konsisten (hanya saat navigasi keyboard, bukan klik mouse) */
+  button:focus-visible, .railbtn:focus-visible, .tp-tabs button:focus-visible,
+  .pp-chip:focus-visible, .sw:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--ring); outline-offset:2px; }
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   /* BUY/SELL pastel ala TradeLocker (mint / salmon, teks gelap) */
   button.buy{background:var(--buy);border-color:var(--buy);color:#06291b;font-weight:700}
@@ -767,6 +771,10 @@
           padding:9px 16px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
           opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
   .toast.show{ opacity:1; top:18px; }
+  /* hormati preferensi kurangi-gerak: matikan animasi/transisi non-esensial */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  }
 
   /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
   .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:4px;
@@ -843,7 +851,7 @@
 
   /* ===================== popup setting objek gambar & chart (TradingView-like) ===================== */
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
-           border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:184px; }
+           border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
   /* pegangan drag untuk popup config tanpa header (objpop/fibpop/chartSet/pos-confirm) */
   .pp-grip{ display:flex; align-items:center; justify-content:center; height:14px; margin:-2px 0 8px;
@@ -918,19 +926,25 @@
   @media (prefers-reduced-motion: reduce){ .pos-pill, .pos-tag{ box-shadow:none; } }
   .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
   .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
-  .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
-  .sw.on{ border-color:var(--txt); }
-  .pp-chip{ padding:4px 10px; font-size:11px; color:var(--muted); background:var(--btn); border:1px solid var(--border); border-radius:5px; cursor:pointer; }
+  .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0;
+       box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); transition:transform .12s, box-shadow .12s; }
+  .sw:hover{ transform:scale(1.14); }
+  .sw.on{ border-color:var(--txt); box-shadow:inset 0 0 0 1px rgba(0,0,0,.3), 0 0 0 2px var(--panel), 0 0 0 3px var(--luna-glow); }
+  .pp-chip{ padding:4px 10px; font-size:11px; color:var(--muted); background:var(--btn); border:1px solid var(--border); border-radius:6px; cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
+  .pp-chip:hover{ color:var(--txt); border-color:var(--btn-border-hover); background:var(--btn-hover); }
   .pp-chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
-  .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:2px; }
+  .pp-chip.on:hover{ color:#fff; filter:brightness(1.06); }
+  .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:10px; margin-top:3px; }
   .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
-  .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; padding:2px; }
+  .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; padding:2px; transition:border-color .12s; }
+  .pp-color:hover{ border-color:var(--btn-border-hover); }
   .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }
   .pp-slider input[type=range]{ flex:1; min-width:0; }
   .pp-slider .pp-sval{ flex:0 0 auto; color:var(--muted); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
   /* editor level Fibonacci */
   .fibpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
-           border-radius:8px; padding:10px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
+           border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
+  .fp-color:hover,.fp-x:hover{ border-color:var(--btn-border-hover); }
   .fibpop.show{ display:block; }
   .fibpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 7px; }
   .fp-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
