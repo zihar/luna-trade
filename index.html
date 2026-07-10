@@ -2612,7 +2612,9 @@ function render(full){
   }
   if(full || hasPartial || lastLen<0 || draw.length<lastLen){ chart.applyNewData(draw); }
   else if(draw.length>lastLen){ for(let k=lastLen;k<draw.length;k++) chart.updateData(draw[k]); }
-  lastLen=draw.length;
+  // lastLen dilacak thd jumlah bar TUTUP nyata (data), BUKAN draw (+partial). Saat partial hilang
+  // (mis. pause→Next), draw.length>lastLen → updateData mendorong bar asli, bukan nyangkut synthetic.
+  lastLen=data.length;
   drawPaperLines();
   drawPendingLines();
   drawAlertLines();
