@@ -1495,6 +1495,7 @@ let chartWmEl = null;    // watermark identitas Luna di kanvas (crescent + simbo
 let axisTimeEl = null;   // label waktu sumbu-X saat hover area future
 let formingBar = null;       // candle berjalan (live) yg di-update tiap tick stream
 let formingSeed = null;      // candle incomplete OANDA (OHLC otoritatif periode berjalan) → seed wick
+let replayPartial = null;    // {tf,candle}: bar berjalan sintetis TF aktif @ cursor T (mode replay) — agregasi sub-bar s/d T, anti-lookahead
 let secondaries = [];        // panel chart sekunder (multi-chart, view-only) — diisi setLayout()
 let chartLayout = 1;         // jumlah panel: 1 | 2 | 4
 let formingTimer = null;     // poll seed forming dari OANDA (lebih sering dari liveRefresh)
@@ -1675,6 +1676,7 @@ function magnetSnap(time, value, px, py){
 // Daily buka 18:00 NY). Setelah gambar selesai, ambil M5 ON-DEMAND utk rentang tiap candle
 // yg di-magnet, lalu geser titik ke menit OHLC M5 yg sebenarnya → presisi saat pindah TF.
 const m5WinCache={};                    // key: "INST|barOpenMs" → array M5 candle (rentang 1 bar)
+const fineWinCache={};                  // key: "INST|fineTF|open|end" → array sub-bar (utk partial replay)
 function barRangeContaining(tf, ts){    // batas [open,end) bar TF `tf` yang memuat ts (anti-gap weekend)
   const arr=tfData[tf]; if(!arr||!arr.length||ts==null) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=ts) a=m+1; else b=m;}
@@ -1687,6 +1689,54 @@ async function ensureM5Window(open,end){
   const count=Math.min(5000, Math.ceil((end-open)/DUR.M5)+3);   // from+count (hindari konflik from+to+count OANDA)
   try{ const data=await fetchCandles('M5',{from:new Date(open).toISOString(), count}); m5WinCache[key]=data; return data; }
   catch(e){ return null; }
+}
+// ===== Bar Replay: partial "forming bar" untuk TF aktif @ cursor T =====
+// Saat ganti TF di tengah replay, bar TF-baru yg MEMUAT momen T belum "tutup" → revealed() membuangnya
+// → posisi tampak mundur (beda jam/hari). Solusi ala TradingView: gambar bar berjalan sintetis, di-agregasi
+// dari sub-bar TF lebih halus HANYA s/d T (anti-lookahead, tak bocor masa depan).
+// Pilih TF sub-bar terhalus yg wajar: DUR<coarse & jumlah bar dlm 1 periode ≤ 1000 (batasi ukuran fetch).
+function pickFineTF(coarseTF, spanMs){
+  for(const f of ['M1','M5','M15','M30','H1','H4']){
+    if(DUR[f]>=DUR[coarseTF]) break;
+    if(spanMs/DUR[f] <= 1000) return f;
+  }
+  return null;   // coarseTF sudah cukup halus → partial tak perlu
+}
+// Hybrid: pakai data ter-load bila menutupi [open,end); kalau tidak, fetch on-demand (di-cache).
+async function ensureFineWindow(fineTF, open, end){
+  const key=inst+'|'+fineTF+'|'+open+'|'+end; if(fineWinCache[key]) return fineWinCache[key];
+  const loaded=tfData[fineTF];
+  if(loaded && loaded.length && loaded[0].timestamp<=open && loaded[loaded.length-1].timestamp+DUR[fineTF]>=end){
+    const slice=loaded.filter(b=>b.timestamp>=open && b.timestamp<end);
+    if(slice.length){ fineWinCache[key]=slice; return slice; }
+  }
+  const count=Math.min(5000, Math.ceil((end-open)/DUR[fineTF])+3);
+  try{ const data=await fetchCandles(fineTF,{from:new Date(open).toISOString(), count});
+       const slice=data.filter(b=>b.timestamp>=open && b.timestamp<end); fineWinCache[key]=slice; return slice; }
+  catch(e){ return null; }
+}
+// Susun candle partial TF `tf` pada cursor T. Return {timestamp,open,high,low,close} atau null.
+async function buildReplayPartial(tf){
+  if(!replayMode || T==null) return null;
+  const arr=tfData[tf]; if(!arr||!arr.length) return null;
+  const rev=revealed(tf);                       // bar tertutup penuh ≤ T
+  const forming=arr[rev.length];                // bar pertama yg BELUM tutup (kandidat pemuat T)
+  if(!forming) return null;                      // T di/lewat ujung data → biarkan (perilaku normal)
+  const open=forming.timestamp;                  // HANYA open (waktu) dipakai; OHLC bar kasar diabaikan (anti-lookahead)
+  if(open>=T) return null;                        // T di boundary / dalam gap → bar belum mulai
+  const end=arr[rev.length+1]?arr[rev.length+1].timestamp:open+DUR[tf];
+  const fineTF=pickFineTF(tf, end-open); if(!fineTF) return null;
+  const fine=await ensureFineWindow(fineTF, open, Math.min(end, T+DUR[fineTF])); if(!fine||!fine.length) return null;
+  let o=null,h=-Infinity,l=Infinity,c=null, fdur=DUR[fineTF];
+  for(const b of fine){
+    if(b.timestamp<open) continue;
+    if(b.timestamp>=end) break;
+    if(b.timestamp+fdur>T) break;                 // sub-bar belum tutup pada T → stop (anti-lookahead)
+    if(o==null) o=b.open;
+    if(b.high>h) h=b.high; if(b.low<l) l=b.low; c=b.close;
+  }
+  if(o==null) return null;                         // belum ada sub-bar tertutup dlm bar ini
+  return {timestamp:open, open:o, high:h, low:l, close:c};
 }
 const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1,
   priceLine:1, callout:1, simpleAnnotation:1, simpleTag:1}; // box & penanda axis & teks: dilewati
@@ -2539,10 +2589,13 @@ async function switchTF(tf){
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
   clearFormingBar(); formingSeed=null;          // candle berjalan TF lama tak berlaku
   if(live) fetchFormingSeed();                   // seed OHLC periode utk TF baru secepatnya
+  // Bar Replay: momen T tetap → gambar bar berjalan sintetis TF baru (agar tak "mundur" ke bar kasar terakhir).
+  replayPartial=null;
+  if(replayMode){ try{ const c=await buildReplayPartial(tf); if(c) replayPartial={tf,candle:c}; }catch(e){} }
   lastLen=-1; render(true);
   if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
-  setStatus('TF → '+tf);
+  setStatus(replayMode ? ('TF → '+tf+' · '+nyTime(T)+' (NY)') : ('TF → '+tf));
 }
 
 // ===================== render =====================
@@ -2550,9 +2603,15 @@ function render(full){
   if(T==null) return;
   const boot=document.querySelector('.chart-boot'); if(boot) boot.remove();  // chart nyata siap → lepas placeholder
   const data=revealed(currentTF);
-  if(full || lastLen<0 || data.length<lastLen){ chart.applyNewData(data); }
-  else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
-  lastLen=data.length;
+  // Bar Replay: sisipkan bar berjalan sintetis (partial) sbg bar terakhir bila valid utk TF & cursor T saat ini.
+  let draw=data, hasPartial=false;
+  if(replayMode && replayPartial && replayPartial.tf===currentTF && replayPartial.candle){
+    const nextOpen = tfData[currentTF] && tfData[currentTF][data.length] ? tfData[currentTF][data.length].timestamp : null;
+    if(replayPartial.candle.timestamp===nextOpen){ draw=data.concat([replayPartial.candle]); hasPartial=true; }
+  }
+  if(full || hasPartial || lastLen<0 || draw.length<lastLen){ chart.applyNewData(draw); }
+  else if(draw.length>lastLen){ for(let k=lastLen;k<draw.length;k++) chart.updateData(draw[k]); }
+  lastLen=draw.length;
   drawPaperLines();
   drawPendingLines();
   drawAlertLines();
@@ -2703,6 +2762,7 @@ function step(d){
     if(idx<=0) return;
     T=arr[idx-1].timestamp+dur;
   }
+  replayPartial=null;   // T re-align ke grid TF aktif → bar partial tak relevan lagi
   render();
 }
 function pauseIfNoData(){ if(playing){ pause(); setStatus('Pulling data forward… press Play again.'); } }
@@ -5215,6 +5275,7 @@ function setReplayUI(on){
 }
 function exitReplay(){
   pickMode=false;
+  replayPartial=null;
   setPickCut(false);
   setReplayUI(false);
   const arr=tfData[currentTF];
@@ -5247,7 +5308,7 @@ $('#chart').addEventListener('click',()=>{
   // animasi: bar yang diklik meluncur ke tepi kanan (semua bar masih tampil),
   // lalu setelah animasi selesai data dipotong di titik itu → transisi mulus tanpa lompat.
   try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
-  setTimeout(()=>{ T=ts+DUR[currentTF]; lastLen=-1; render(true);
+  setTimeout(()=>{ T=ts+DUR[currentTF]; replayPartial=null; lastLen=-1; render(true);
     setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
 
