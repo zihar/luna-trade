@@ -1526,10 +1526,38 @@ function xAnchorFromPx(x){
   if(floatIdx <= li + 0.0001){ const t=pxToTime(x); return t!=null?{timestamp:t}:null; }   // in-range
   return {dataIndex: floatIdx};                                                              // future
 }
+// pixel-x (container-relative) → fractional dataIndex MENTAH dari mesin koordinat chart
+// (presisi, TANPA snap). Dipakai jalur trendline supaya titik mendarat tepat di kursor.
+function fracAnchorFromPx(x){
+  const arr=revealed(currentTF); if(!arr.length) return null;
+  let c=chart.convertFromPixel({x,y:0},{paneId:'candle_pane'}); if(Array.isArray(c)) c=c[0];
+  const idx=(c&&c.dataIndex!=null)?c.dataIndex:(arr.length-1);
+  return {dataIndex: idx};
+}
+// fractional dataIndex → wall-clock ms. In-data: interpolasi antar 2 bar tetangga (anti-gap
+// weekend). Future (idx>=li): ekstrapolasi linear DUR. Kebalikan dari tsToFracIndex.
+function fidxToTs(idx){
+  const a=revealed(currentTF); if(!a.length||idx==null) return null;
+  const li=a.length-1;
+  if(idx>=li) return Math.round(a[li].timestamp + (idx-li)*DUR[currentTF]);
+  if(idx<=0) return a[0].timestamp;
+  const i=Math.floor(idx), f=idx-i, t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
+  return Math.round(t0 + f*(t1-t0));
+}
+// wall-clock ms → fractional dataIndex. Future (vt>=last): ekstrapolasi DUR. In-data:
+// cari bar pengapit lalu interpolasi. Kebalikan dari fidxToTs.
+function tsToFracIndex(vt){
+  const a=revealed(currentTF); if(!a.length||vt==null) return null;
+  const li=a.length-1, lt=a[li].timestamp;
+  if(vt>=lt) return li + (vt-lt)/DUR[currentTF];
+  if(vt<=a[0].timestamp) return 0;
+  let lo=0,hi=li; while(lo<hi){ const m=(lo+hi)>>1; if(a[m].timestamp<vt) lo=m+1; else hi=m; }
+  const i=Math.max(0,lo-1), t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
+  const fr=(t1>t0)?(vt-t0)/(t1-t0):0; return i+fr;
+}
 // timestamp (virtual bila future) — untuk label/durasi/anchor teks
 function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
-  if(p.dataIndex!=null){ const a=revealed(currentTF); if(!a.length) return null;
-    const li=a.length-1; return Math.round(a[li].timestamp + (p.dataIndex-li)*DUR[currentTF]); } return null; }
+  if(p.dataIndex!=null) return fidxToTs(p.dataIndex); return null; }
 // objek key x untuk convertToPixel & rebuild point (pertahankan timestamp vs dataIndex)
 function keyOf(p){ return (p&&p.timestamp!=null)?{timestamp:p.timestamp}:{dataIndex:p&&p.dataIndex}; }
 // float index untuk ordering kiri/kanan & titik tengah
