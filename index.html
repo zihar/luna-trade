@@ -3465,6 +3465,11 @@ function delHooks(){ return {
         for(let k=0;k<o.points.length;k++){ const a=pxOf(toPt(pendingClicks[k])), b=pxOf(o.points[k]);
           if(!a||!b||Math.abs(a.x-b.x)>tolX||Math.abs(a.y-b.y)>6){ refine=false; break; } } }
       if(refine){ for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]); }
+      // Trendline: pindahkan anchor ke dataIndex PECAHAN (bukan timestamp) supaya garis & handle
+      // dirender presisi di titik klik (timestamp akan di-snap klinecharts ke pusat bar).
+      if(o.name==='trendline'){ o.points=o.points.map(p=>{ if(!p||p.value==null) return p;
+        const idx = (p.dataIndex!=null && isFinite(p.dataIndex)) ? p.dataIndex : fidxOf(p);
+        return {dataIndex: idx, value: p.value}; }); }
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});
