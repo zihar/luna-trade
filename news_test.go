@@ -122,7 +122,7 @@ func TestBuildCalendarMultiCurrency(t *testing.T) {
 	events := []news.Event{
 		// USD CPI rilis, surprise di atas → seharusnya berarah (non-neutral) utk GBP_USD
 		{Title: "CPI m/m", Country: "USD", Impact: "High", Time: now.Add(-2 * time.Hour), Forecast: "0.3%", Previous: "0.2%", Actual: "0.5%"},
-		// UK CPI rilis → Lite: verdict netral (tak dihitung arah)
+		// UK CPI rilis panas (3.4% > 3.1%) → GBP menguat → GBP_USD (GBP=base) → bullish
 		{Title: "CPI y/y", Country: "GBP", Impact: "High", Time: now.Add(-time.Hour), Forecast: "3.1%", Previous: "3.0%", Actual: "3.4%"},
 		// EUR event: TIDAK relevan utk GBP_USD → tak muncul
 		{Title: "German Factory Orders", Country: "EUR", Impact: "Medium", Time: now.Add(-3 * time.Hour), Actual: "1.0%"},
@@ -142,8 +142,9 @@ func TestBuildCalendarMultiCurrency(t *testing.T) {
 		}
 		if it.Currency == "GBP" {
 			sawGBP = true
-			if it.Verdict.Bias != "neutral" {
-				t.Fatalf("Lite: non-USD release must be neutral, got %q", it.Verdict.Bias)
+			// non-USD kini berarah: UK CPI panas → GBP menguat → GBP_USD bullish
+			if it.Verdict.Bias != "bullish" {
+				t.Fatalf("hot UK CPI → GBP up → GBP_USD bullish, got %q", it.Verdict.Bias)
 			}
 		}
 	}

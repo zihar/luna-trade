@@ -91,10 +91,9 @@ type calResponse struct {
 
 // buildCalendarResponse = fungsi murni (tanpa jaringan) → mudah di-test.
 func buildCalendarResponse(events []news.Event, instrument string, now, fetchedAt time.Time, stale bool) calResponse {
-	role := news.InstrumentRole(instrument)
 	// Tampilkan event High+Medium untuk mata uang relevan instrumen (kedua sisi pasangan;
-	// metal/DXY → USD saja). Bias ARAH hanya dihitung untuk event USD (engine Fase 1);
-	// event non-USD tampil informasional (verdict netral). Panel News & marker berbagi ini.
+	// metal/DXY → USD saja). Bias ARAH dihitung untuk SEMUA currency event (USD & non-USD)
+	// via SideOf/BiasFrom — currency di sisi base/quote pasangan (atau gold/DXY-USD) beri arah.
 	nameOf := func(title string) string {
 		if n := news.DefaultName(title); n != "" {
 			return n
@@ -124,21 +123,19 @@ func buildCalendarResponse(events []news.Event, instrument string, now, fetchedA
 				it.Currency = h.Country
 			}
 		}
+		// Sisi currency EVENT terhadap instrumen (generalisasi lintas-currency): USD & non-USD
+		// (GBP/EUR/JPY/…) sama-sama dapat arah selama currency-nya bagian pasangan / gold-USD / DXY.
+		side := news.SideOf(instrument, it.Currency)
 		if it.Released {
-			if strings.EqualFold(it.Currency, "USD") {
-				v := rel.Classify()
-				bias := news.InstrumentBias(v.Lean, role)
-				it.Verdict = calVerdict{
-					Surprise: v.Surprise.String(),
-					USDLean:  v.Lean.String(),
-					Bias:     bias.String(),
-					Label:    v.Label,
-					Playbook: news.Playbook(v.Lean, role, bias, instrument),
-					Tiebreak: v.Tiebreak,
-				}
-			} else {
-				// Lite: event non-USD tampil tanpa arah.
-				it.Verdict = calVerdict{Surprise: "unknown", USDLean: "neutral", Bias: "neutral", Label: "released"}
+			v := rel.Classify()
+			bias := news.BiasFrom(v.Lean, side)
+			it.Verdict = calVerdict{
+				Surprise: v.Surprise.String(),
+				USDLean:  v.Lean.String(),
+				Bias:     bias.String(),
+				Label:    v.Label,
+				Playbook: news.PlaybookFor(v.Lean, side, bias, it.Currency, instrument),
+				Tiebreak: v.Tiebreak,
 			}
 		} else {
 			it.Verdict = calVerdict{
@@ -146,7 +143,7 @@ func buildCalendarResponse(events []news.Event, instrument string, now, fetchedA
 				USDLean:  "neutral",
 				Bias:     "neutral",
 				Label:    "awaiting release",
-				Playbook: news.PreScenario(role, instrument),
+				Playbook: news.PreScenarioFor(side, it.Currency, instrument),
 			}
 			if next == nil && rel.Time.After(now) {
 				next = &nextRel{
