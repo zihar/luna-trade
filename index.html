@@ -2593,6 +2593,8 @@ async function switchTF(tf){
   currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF();
   clearFormingBar(); formingSeed=null;          // candle berjalan TF lama tak berlaku
   if(live) fetchFormingSeed();                   // seed OHLC periode utk TF baru secepatnya
+  replayPartial=null;
+  if(replayMode){ try{ const c=await buildReplayPartial(tf); if(c) replayPartial={tf,candle:c}; }catch(e){} }
   lastLen=-1; render(true);
   if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
@@ -2765,6 +2767,7 @@ function step(d){
     if(idx<=0) return;
     T=arr[idx-1].timestamp+dur;
   }
+  replayPartial=null;   // Step = 1 bar penuh → T re-align ke boundary, forming bar tak berlaku
   render();
 }
 function pauseIfNoData(){ if(playing){ pause(); setStatus('Pulling data forward… press Play again.'); } }
@@ -5278,6 +5281,7 @@ function setReplayUI(on){
 }
 function exitReplay(){
   pickMode=false;
+  replayPartial=null;
   setPickCut(false);
   setReplayUI(false);
   const arr=tfData[currentTF];
@@ -5312,7 +5316,7 @@ $('#chart').addEventListener('click',()=>{
   try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
   // pick EXCLUSIVE: T = buka bar yg diklik = tutup bar sebelumnya → bar terakhir tampil = 1 bar SEBELUM ts.
   // Bar yg diklik belum muncul; step(1) berikutnya baru mengungkapnya (mulai backtest tepat di bar itu).
-  setTimeout(()=>{ T=ts; lastLen=-1; render(true);
+  setTimeout(()=>{ T=ts; replayPartial=null; lastLen=-1; render(true);
     setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
 
