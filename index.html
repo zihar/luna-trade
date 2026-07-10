@@ -1750,6 +1750,67 @@ klinecharts.registerOverlay({
   }
 });
 
+// ===================== custom overlay: circle (pusat → tepi) =====================
+klinecharts.registerOverlay({
+  name:'circle', totalStep:3, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1];
+    const r=Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2); const st=dstyle(overlay); const rl=lsLine(st);
+    return [{type:'circle', attrs:{x:a.x,y:a.y,r},
+      styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}}];
+  }
+});
+// ===================== custom overlay: ellipse (bounding box 2 sudut) =====================
+klinecharts.registerOverlay({
+  name:'ellipse', totalStep:3, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const C=subBarCoords(overlay,coordinates); const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
+    const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
+    const rx=Math.abs(xs[1]-xs[0])/2, ry=Math.abs(ys[1]-ys[0])/2;
+    const st=dstyle(overlay); const rl=lsLine(st);
+    const pts=[]; const N=48; for(let i=0;i<=N;i++){ const t=i/N*2*Math.PI; pts.push({x:cx+rx*Math.cos(t), y:cy+ry*Math.sin(t)}); }
+    return [{type:'polygon', attrs:{coordinates:pts},
+      styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}}];
+  }
+});
+// ===================== custom overlay: arrow (pangkal → ujung, dgn kepala) =====================
+klinecharts.registerOverlay({
+  name:'arrow', totalStep:3, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1]; const st=dstyle(overlay); const ls=lsLine(st);
+    const ang=Math.atan2(b.y-a.y,b.x-a.x), hl=Math.max(10,st.size*6), spread=Math.PI/7;
+    const h1={x:b.x-hl*Math.cos(ang-spread), y:b.y-hl*Math.sin(ang-spread)};
+    const h2={x:b.x-hl*Math.cos(ang+spread), y:b.y-hl*Math.sin(ang+spread)};
+    const line=Object.assign({color:st.color,size:st.size},ls);
+    return [
+      {type:'line', attrs:{coordinates:[a,b]}, styles:line},
+      {type:'line', attrs:{coordinates:[h1,b]}, styles:line},
+      {type:'line', attrs:{coordinates:[h2,b]}, styles:line},
+    ];
+  }
+});
+// ===================== custom overlay: callout (anchor → kotak teks + penunjuk) =====================
+klinecharts.registerOverlay({
+  name:'callout', totalStep:3, needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1]; const st=dstyle(overlay); const ls=lsLine(st);
+    const t=(overlay&&overlay.extendData)? String(overlay.extendData):'Text';
+    const lines=t.split('\n'), lh=15, pad=6, cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
+    const bx=b.x-cw/2, by=b.y-ch/2;
+    const figs=[
+      {type:'line', attrs:{coordinates:[a,{x:b.x,y:b.y}]}, styles:Object.assign({color:st.color,size:st.size},ls)},
+      {type:'rect', attrs:{x:bx,y:by,width:cw,height:ch}, styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:ls.style}},
+    ];
+    lines.forEach((ln,i)=>figs.push({type:'text', attrs:{x:bx+pad,y:by+pad+i*lh, text:ln, align:'left', baseline:'top'},
+      styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}));
+    return figs;
+  }
+});
+
 // state drag trendline presisi (intercept onPressedMoving; klinecharts default meng-snap ke bar)
 let tlDrag=null;
 // custom overlay: Trendline (2 titik) dengan teks opsional — klik 2× utk edit
