@@ -3679,18 +3679,26 @@ function updateMagDot(ev){
   if(!inProgressId){ hideMagDot(); return; }   // hanya saat sedang menggambar (magnet on/off sama saja)
   const r=$('#chart').getBoundingClientRect();
   const px=ev.clientX-r.left, py=ev.clientY-r.top;
+  const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
+  // Reticle WAJIB memakai anchor yg IDENTIK dgn titik yg akan di-commit, lalu dirender lewat
+  // convertToPixel yg SAMA dgn mesin render → dijamin mendarat tepat di posisi titik sebenarnya.
+  // (Kursor mentah meleset: convertToPixel(timestamp) meny-snap ke bar utk tool non-trendline,
+  // sedang trendline beranchor dataIndex pecahan/presisi. Menyatukan jalur magnet ON/OFF.)
+  let anchor=null;
   if(magnetOn){
-    const xa=xAnchorFromPx(px), v=pxToValue(py);
-    if(xa && v!=null && xa.timestamp!=null){   // di dalam data → snap ke OHLC
-      const s=magnetSnap(tsOf(xa), v, px, py);
-      if(s){
-        let cp=chart.convertToPixel({timestamp:s.timestamp,value:s.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp)) cp=cp[0];
-        if(cp){ magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block'; return; }
-      }
-    }
+    const xa=xAnchorFromPx(px);
+    if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s) anchor={timestamp:s.timestamp, value:s.value}; }
   }
-  // magnet OFF (atau area future / gagal snap): reticle tepat di kursor
-  magDot.style.left=px+'px'; magDot.style.top=py+'px'; magDot.style.display='block';
+  if(!anchor){
+    const o=chart.getOverlayById(inProgressId), name=o&&o.name;
+    if(name==='trendline'){ const fa=fracAnchorFromPx(px); if(fa) anchor={dataIndex:fa.dataIndex, value:v}; }   // presisi sub-bar (fidx)
+    else { const xa=xAnchorFromPx(px); if(xa) anchor=Object.assign({value:v}, xa); }                            // timestamp/dataIndex (ikut snap render)
+  }
+  if(!anchor){ hideMagDot(); return; }
+  const key = anchor.timestamp!=null ? {timestamp:anchor.timestamp, value:anchor.value} : {dataIndex:anchor.dataIndex, value:anchor.value};
+  let cp=chart.convertToPixel(key,{paneId:'candle_pane',absolute:true}); if(Array.isArray(cp)) cp=cp[0];
+  if(!cp){ hideMagDot(); return; }
+  magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block';
 }
 $('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
 $('#chart').addEventListener('mouseleave',hideMagDot);
