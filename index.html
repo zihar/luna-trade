@@ -1722,7 +1722,7 @@ function expandBox(o){
   // & handle bertumpuk (tak bisa di-resize). Beri lebar minimum 1 bar ke kanan.
   if(Math.abs(fidxOf(Rxa)-fidxOf(Lxa)) < 0.5){ Rxa={dataIndex: fidxOf(Lxa)+1}; }
   const T=Math.max(p0.value,p1.value), B=Math.min(p0.value,p1.value);
-  const ext = o.name==='fib3' ? {zeroTop:p0.value>=p1.value} : o.extendData;  // fib: arah 0→1 ikut tarikan
+  const ext = o.name==='fib3' ? {zeroTop:p1.value>=p0.value} : o.extendData;  // fib: 100% di titik start, 0% di titik akhir (arah tarik) → tarik ke atas 0% di atas, ke bawah 0% di bawah
   const pts=new Array(8); writeBox(pts,Lxa,Rxa,T,B);
   try{ chart.overrideOverlay({id:o.id, points:pts, extendData:ext}); }catch(e){}
 }
@@ -1868,7 +1868,12 @@ function fibRowsOf(overlay,coordinates){
   const vals=overlay.points.map(p=>p.value).filter(v=>v!=null);
   if(vals.length<2) return null;
   const vTop=Math.max(...vals), vBot=Math.min(...vals);
-  const zeroTop = !(overlay.extendData && overlay.extendData.zeroTop===false);
+  // arah: dari extendData bila sudah final (box 8-titik); saat preview (2 titik, extendData belum ada)
+  // turunkan langsung dari tarikan → 0% di titik akhir, sama spt hasil final (anti-flip saat klik).
+  let zeroTop;
+  if(overlay.extendData && overlay.extendData.zeroTop!=null){ zeroTop = overlay.extendData.zeroTop!==false; }
+  else { const p0=overlay.points[0], p1=overlay.points[1];
+    zeroTop = (p0&&p1&&p0.value!=null&&p1.value!=null) ? (p1.value>=p0.value) : true; }
   const rows=fibLevels.map((lv,i)=>{
     const Lv=lv.value;
     const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
