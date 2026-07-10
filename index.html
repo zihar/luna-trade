@@ -1618,6 +1618,9 @@ async function ensureM5Window(open,end){
   catch(e){ return null; }
 }
 const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1}; // box & penanda axis: dilewati
+// CATATAN: titik trendline kini beranchor dataIndex (tanpa timestamp) → refine M5 di bawah
+// (yang butuh p.timestamp) menjadi no-op untuk trendline. Magnet saat MENGGAMBAR tetap bekerja
+// (snap nilai OHLC via pendingClicks). Penyempurnaan X presisi-M5 untuk trendline = follow-up.
 async function refineMagnetPoints(id){
   try{
     const o=chart.getOverlayById(id); if(!o||MAGNET_REFINE_SKIP[o.name]) return;
