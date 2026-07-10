@@ -2781,8 +2781,30 @@ window.addEventListener('resize',()=>{ try{drawEquity();}catch(e){} });
 if(localStorage.getItem('br_bottomHidden')!=='0'){ $('#bottompanel').classList.add('collapsed'); $('#bottomToggle').textContent='⏶'; }
 $('#speed').onchange=()=>{ if(playing){pause();play();} };
 function togglePlay(){ playing?pause():play(); }
-function play(){ if(T==null)return; if(!replayMode){ stopLive(); setReplayUI(true); } playing=true; $('#playBtn').textContent='⏸'; try{syncReplayPill();}catch(e){} playTimer=setInterval(()=>step(1),1000/(+$('#speed').value)); }
-function pause(){ playing=false; $('#playBtn').textContent='▶'; try{syncReplayPill();}catch(e){} clearInterval(playTimer); }
+function play(){
+  if(T==null) return;
+  if(!replayMode){ stopLive(); setReplayUI(true); }
+  playing=true; $('#playBtn').textContent='⏸'; try{syncReplayPill();}catch(e){}
+  playFrame();
+}
+// Loop frame halus: majukan T proporsional speed (bar/detik), render forming bar tiap frame.
+async function playFrame(){
+  if(!playing) return;
+  const arr=tfData[currentTF]; if(!arr||!arr.length){ pause(); return; }
+  const rev=revealed(currentTF);
+  if(rev.length>=arr.length){ autoExtend(currentTF); pauseIfNoData(); if(playing) playTimer=setTimeout(playFrame,200); return; }
+  const dur=DUR[currentTF], speed=+$('#speed').value||1;
+  const beforeLen=rev.length;
+  T += Math.max(1, dur*speed*REPLAY_FRAME_MS/1000);   // maju proporsional speed (frame ~fixed)
+  const after=revealed(currentTF);
+  for(let k=beforeLen;k<after.length;k++) onNewBar(after[k]);   // bar yg baru menutup → cek trade/alert
+  if(after.length-1 > arr.length-30) autoExtend(currentTF);
+  replayPartial=null;
+  try{ const c=await buildReplayPartial(currentTF); if(c) replayPartial={tf:currentTF,candle:c}; }catch(e){}
+  render();
+  if(playing) playTimer=setTimeout(playFrame, REPLAY_FRAME_MS);
+}
+function pause(){ playing=false; $('#playBtn').textContent='▶'; try{syncReplayPill();}catch(e){} clearTimeout(playTimer); clearInterval(playTimer); }
 
 // ===================== auto-extend forward =====================
 async function autoExtend(tf){
