@@ -1735,6 +1735,8 @@ klinecharts.registerOverlay({
   }
 });
 
+// state drag trendline presisi (intercept onPressedMoving; klinecharts default meng-snap ke bar)
+let tlDrag=null;
 // custom overlay: Trendline (2 titik) dengan teks opsional — klik 2× utk edit
 klinecharts.registerOverlay({
   name:'trendline', totalStep:3, needDefaultPointFigure:true,
@@ -1753,7 +1755,34 @@ klinecharts.registerOverlay({
       figs.push({type:'text',attrs:{x:px,y:ty,text:String(t),align:ha,baseline:bl},
         styles:{color:drawTextColor,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
-  }
+  },
+  // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
+  // ke indeks integer. Dengan return true di onPressedMoving, default itu dilewati dan kita tulis
+  // dataIndex PECAHAN sendiri (endpoint) / translasi semua titik (badan garis). e.x/e.y klinecharts
+  // = clientX-target.left (container-relative) → sama ruang dgn fracAnchorFromPx/pxToValue (OX=OY=0).
+  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o) tlDrag={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
+  onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points) return false;
+    const OX=0, OY=0;
+    const xa=fracAnchorFromPx(e.x-OX), v=pxToValue(e.y-OY);
+    if(!xa || v==null) return false;
+    const pts=o.points.map(p=>Object.assign({},p));
+    const key=e.figureKey||'';
+    if(key.indexOf('overlay_figure_point_')===0){       // seret SATU ujung
+      const i=e.figureIndex; if(pts[i]) pts[i]={dataIndex:xa.dataIndex, value:v};
+    } else {                                            // seret BADAN garis → translasi semua titik
+      if(!tlDrag) return false;
+      const sx=fracAnchorFromPx(tlDrag.x-OX), sv=pxToValue(tlDrag.y-OY);
+      if(!sx || sv==null) return false;
+      const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
+      for(let i=0;i<pts.length;i++){ const sp=tlDrag.pts[i]; if(!sp) continue;
+        const bi=(sp.dataIndex!=null)?sp.dataIndex:fidxOf(sp);
+        pts[i]={dataIndex: bi+dIdx, value: (sp.value!=null?sp.value:v)+dV}; }
+    }
+    try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(_){}
+    return true;                                        // lewati snap bawaan klinecharts
+  },
+  onPressedMoveEnd:(e)=>{ tlDrag=null; try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
+    try{scheduleSaveDraws();}catch(_){} return false; }
 });
 
 // garis horizontal/vertikal: override bawaan klinecharts agar penanda harga (axis Y) &
