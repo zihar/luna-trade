@@ -4823,8 +4823,13 @@ let newsState=null;   // respons /api/news/calendar last-good — dibagi panel &
 function newsMarkersEnabled(){ return localStorage.getItem('br_newsMarkers')!=='0'; }
 // Fetch kalender utk instrumen aktif → simpan ke newsState → render panel (bila terbuka)
 // & marker on-chart (bila enabled). Dipanggil saat chart ready, ganti instrumen, poll 60s.
+// dedupe fetch barengan utk instrumen sama (mis. saat boot: setNewsOpen(true) + initPriceTimer
+// memanggil berturut). Guard in-flight → tetap izinkan retry (setelah selesai) & ganti instrumen.
+let _newsInFlight={};
 function refreshNewsData(){
   const reqInst=newsCurrentInstrument();
+  if(_newsInFlight[reqInst]) return;    // sudah ada fetch berjalan utk instrumen ini
+  _newsInFlight[reqInst]=true;
   fetch('/api/news/calendar?instrument='+encodeURIComponent(reqInst))
     .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
     .then(d=>{ newsState=d;
@@ -4839,7 +4844,8 @@ function refreshNewsData(){
           +' <button id="newsRetry" class="wl-x">Retry</button></div>';
         const b=$('#newsRetry'); if(b) b.onclick=refreshNewsData;
       }
-    });
+    })
+    .finally(()=>{ delete _newsInFlight[reqInst]; });
 }
 function loadNews(){ refreshNewsData(); }   // kompat: pemanggil lama (selectSymbol, setNewsOpen)
 // ---- News on-chart markers (Fase 2): layer DOM tersinkron pan/zoom ----
