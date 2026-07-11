@@ -73,10 +73,31 @@ Timestamp = epoch **ms** (`time.Now().UnixMilli()`) — selaras dg client.
 - `checkAlertCross` end-to-end dg store in-memory/temp: create alert, feed ticks straddle → `MarkAlertTriggered` dipanggil sekali (one-shot; tick berikut tak re-fire karena active=0/keluar cache).
 - Store CRUD: Create→List→Delete ownership guard (user lain tak bisa hapus).
 
+## UI — Panel Alerts + dialog Create (v1, ala TradingView; `index.html`)
+UI alert lama (`.wl-alert` di `#watchlist`, `index.html:1313-1317`) saat ini **`display:none`** —
+diganti menjadi **section "Alerts" yang terlihat**:
+- **Panel Alerts** (di area kanan/Markets): header **"Alerts"** + tombol **"+"** (buka dialog Create).
+  Daftar item per alert:
+  - baris utama: **`<INST> Crossing <price>`** (mis. "XAUUSD Crossing 4,200.95").
+  - sub-baris: **`<INST> • Active`** (atau `• Triggered` bila `triggeredAt` ada tapi belum di-ack).
+  - aksi hapus (✕) per item → `removeAlert`.
+  - Kosong → hint "No alerts yet. Click + to add." (English, sesuai aturan teks UI).
+- **Dialog Create alert** (modal, esensial): judul **"Create alert on `<instrumen ▾>`"** (default
+  instrumen aktif `inst`; dropdown pilih dari daftar instrumen yg ada / reuse picker). **Condition:
+  Price → Crossing** (tetap "Crossing" di v1, tak bisa diganti). **Input harga** (default harga
+  live saat ini). Tombol **Create** / **Cancel**. Message otomatis `<INST> Crossing <price>` (tak
+  ada field terpisah v1). Notifikasi default (App+Toast+Sound) — tak ada toggle v1.
+  - Create → `POST /api/alerts {instrument, price}` → tutup dialog, refresh list.
+- Buang input lama `#alertPrice`/`#alertAdd` "+ Set" (diganti dialog). Klik-kanan chart
+  `createAlertAt(price)` tetap ada (quick-add tanpa dialog, langsung POST).
+- Styling ikut pola panel/menu yang ada (`--panel`,`--border`,`--btn`,`--txt`,`--muted`); modal ikut
+  pola dialog yg ada bila ada, atau overlay sederhana + backdrop. **DEFER v1:** tab Log, search,
+  sort, menu "…", Expiration, Message editable, notification toggles, multi-condition.
+
 ## Frontend (`index.html`)
-- **State**: `alerts=[{id, sym, price, oid}]` (`id`=server id, `oid`=overlay id). Buang `br_alerts`/`saveAlerts`.
+- **State**: `alerts=[{id, sym, price, oid, triggeredAt}]` (`id`=server id, `oid`=overlay id). Buang `br_alerts`/`saveAlerts`.
 - `loadAlerts()` → `await fetch('/api/alerts')` → isi `alerts` (map server→{id,sym:instrument,price}), `renderAlertList()`, `drawAlertLines()`.
-- `addAlert()`/`createAlertAt(price)` → `POST /api/alerts {instrument:inst, price}` → sukses: push {id:resp.id,...}, render. (Ganti localStorage.)
+- Create via **dialog** (`openAlertDialog()` dari tombol "+") & `createAlertAt(price)` (quick-add klik-kanan) → `POST /api/alerts {instrument, price}` → sukses: push {id:resp.id,...}, render. (Ganti localStorage & input `#alertPrice`.)
 - `removeAlert(i)` → `POST /api/alerts/delete {id}` → sukses: splice + hapus overlay + render.
 - **Poll** `alertPoll()` interval ~2s, **selalu saat login** (bukan hanya live-paper): `GET /api/alerts`.
   - Sinkron list (tambah/hapus perubahan server).
@@ -98,5 +119,6 @@ Auth/sesi, Hub/SSE harga, SL/TP paper (`paper_monitor.go`), logika replay lain. 
    - Reload → alert tetap ada (server), bukan localStorage.
    - **Replay:** alert bunyi intra-bar (simulasi) TANPA menghapus alert server; keluar replay → alert live masih ada & termonitor.
    - Belum login → panel alert kosong, tak error.
+   - **Panel Alerts terlihat**: tombol "+" buka dialog "Create alert on <inst>"; isi harga → Create → item "<INST> Crossing <price> · Active" muncul di list & garis di chart. Hapus (✕) → hilang di server. Klik-kanan chart → quick-add tetap jalan.
 3. Server jalan tanpa browser (monitor tetap men-trigger; terlihat saat browser buka lagi: alert triggered → toast + terhapus).
 4. Console bebas error JS.
