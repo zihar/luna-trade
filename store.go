@@ -9,6 +9,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -56,6 +57,9 @@ func (s *Store) migrate() error {
 		return err
 	}
 	if _, err := s.db.Exec(analyticsSchema); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(alertsSchema); err != nil {
 		return err
 	}
 	// Kolom tambahan (idempotent) — utk DB lama yg tabelnya sudah ada.
@@ -164,6 +168,20 @@ CREATE TABLE IF NOT EXISTS paper_accounts (
   balance  REAL NOT NULL                   -- cash/realized; init 10000 saat register
 );
 `
+
+// alertsSchema = tabel price alert per-user (server-side, one-shot: trigger → active=0).
+const alertsSchema = `
+CREATE TABLE IF NOT EXISTS price_alerts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  instrument TEXT NOT NULL,
+  price REAL NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  triggered_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_user ON price_alerts(user_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_active ON price_alerts(active);`
 
 // User = baris tabel users (subset yang dipakai auth).
 type User struct {
@@ -700,4 +718,94 @@ func (s *Store) UserActivities(sinceISO string) ([]UserActivity, error) {
 		}
 	}
 	return out, nil
+}
+
+// Alert = baris tabel price_alerts yang ditampilkan ke user pemiliknya.
+type Alert struct {
+	ID          int64
+	Instrument  string
+	Price       float64
+	Active      bool
+	CreatedAt   int64
+	TriggeredAt *int64
+}
+
+// AlertRow = baris alert aktif lintas-user, dipakai monitor harga.
+type AlertRow struct {
+	UserID     int64
+	ID         int64
+	Instrument string
+	Price      float64
+}
+
+// CreateAlert membuat price alert baru untuk user, aktif sejak dibuat.
+func (s *Store) CreateAlert(uid int64, instrument string, price float64, createdAt int64) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO price_alerts(user_id,instrument,price,active,created_at) VALUES(?,?,?,1,?)`,
+		uid, instrument, price, createdAt)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// ListAlerts mengembalikan alert milik user: yang masih aktif, atau yang sudah
+// triggered tapi belum di-ack (di-delete) oleh user.
+func (s *Store) ListAlerts(uid int64) ([]Alert, error) {
+	rows, err := s.db.Query(`SELECT id,instrument,price,active,created_at,triggered_at
+		FROM price_alerts WHERE user_id=? AND (active=1 OR triggered_at IS NOT NULL)
+		ORDER BY created_at DESC`, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Alert
+	for rows.Next() {
+		var a Alert
+		var act int
+		var trig *int64
+		if err := rows.Scan(&a.ID, &a.Instrument, &a.Price, &act, &a.CreatedAt, &trig); err != nil {
+			return nil, err
+		}
+		a.Active = act == 1
+		a.TriggeredAt = trig
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// DeleteAlert menghapus alert milik uid; error bila bukan pemilik atau tak ada.
+func (s *Store) DeleteAlert(uid, id int64) error {
+	res, err := s.db.Exec(`DELETE FROM price_alerts WHERE id=? AND user_id=?`, id, uid)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("alert not found")
+	}
+	return nil
+}
+
+// AllActiveAlerts mengembalikan semua alert aktif lintas-user, dipakai monitor harga.
+func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
+	rows, err := s.db.Query(`SELECT user_id,id,instrument,price FROM price_alerts WHERE active=1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AlertRow
+	for rows.Next() {
+		var r AlertRow
+		if err := rows.Scan(&r.UserID, &r.ID, &r.Instrument, &r.Price); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// MarkAlertTriggered menonaktifkan alert (one-shot) & mencatat waktu trigger.
+func (s *Store) MarkAlertTriggered(id, triggeredAt int64) error {
+	_, err := s.db.Exec(`UPDATE price_alerts SET active=0, triggered_at=? WHERE id=? AND active=1`, triggeredAt, id)
+	return err
 }
