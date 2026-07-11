@@ -749,7 +749,7 @@
 
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
-  .nmk{ position:absolute; bottom:15px; width:22px; height:22px; border-radius:50%;
+  .nmk{ position:absolute; bottom:34px; width:22px; height:22px; border-radius:50%;   /* di atas band label sumbu-X + pill tanggal crosshair (dulu 15px → menabrak) */
         transform:translateX(-50%); pointer-events:auto; cursor:pointer;
         display:grid; place-items:center; background:var(--panel-2); border:2px solid var(--muted);
         transition:transform .12s ease, box-shadow .18s ease; }
@@ -5109,12 +5109,9 @@ function nudgeNewsMarkers(){
   }
 }
 // ---- News marker popup (hover desktop / tap mobile) ----
-let _newsPop=null, _newsPopHideT=null;
+let _newsPop=null;
 function bindNewsMarker(el){
-  // Hover buka popup HANYA untuk mouse — pointer touch/pen dilewati agar tak balapan
-  // dgn tap→click (yg sudah men-toggle); tanpa ini tap mobile buka-lalu-tutup seketika.
-  el.addEventListener('pointerenter', (e)=>{ if(e.pointerType!=='mouse') return; clearTimeout(_newsPopHideT); openNewsPop(el); });
-  el.addEventListener('pointerleave', (e)=>{ if(e.pointerType!=='mouse') return; _newsPopHideT=setTimeout(closeNewsPop, 180); });
+  // Detail HANYA saat KLIK (bukan hover): klik toggle popup; klik-luar menutup (listener global).
   el.addEventListener('click', (e)=>{ e.stopPropagation();
     if(_newsPop && _newsPop._for===el){ closeNewsPop(); } else { openNewsPop(el); } });
 }
@@ -5139,9 +5136,7 @@ function openNewsPop(el){
       <div class="np-tm">${newsEsc(fmtLocalFull(r.time))}</div>
       <div class="np-grid">${grid}</div>
       ${r.released?newsBiasLine(r.verdict):''}</div>`;
-  pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside
-  pop.addEventListener('mouseenter', ()=>clearTimeout(_newsPopHideT));
-  pop.addEventListener('mouseleave', ()=>{ _newsPopHideT=setTimeout(closeNewsPop,180); });
+  pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside (tetap terbuka sampai klik-luar / klik marker lagi)
   $('#chart').appendChild(pop); _newsPop=pop;
   positionNewsPop();
 }
