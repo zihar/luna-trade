@@ -2554,7 +2554,17 @@ async function fetchCandles(tf,{count,to,from}){
   })).sort((a,b)=>a.timestamp-b.timestamp);
 }
 // hanya tampilkan error (merah); pesan info disembunyikan
-function setStatus(t,err){ const s=$('#status'); if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; } else { s.innerHTML=''; } }
+let statusTimer=null;
+function setStatus(t,err){
+  const s=$('#status'); if(!s) return;
+  clearTimeout(statusTimer); statusTimer=null;
+  if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; return; }   // error: merah, menetap sampai status berikut
+  if(!t){ s.innerHTML=''; return; }                            // setStatus('') → clear
+  // pesan informatif/sukses: DULU di-drop (innerHTML='') → feedback tak pernah tampil.
+  // Kini render warna netral lalu auto-clear agar tidak menumpuk di toolbar.
+  s.innerHTML=t; s.style.color='#89898b';
+  statusTimer=setTimeout(()=>{ s.innerHTML=''; },4000);
+}
 
 // ===================== ganti TF (chart tetap 1) =====================
 // Titik overlay di area future dibawa via dataIndex (relatif dataset TF saat ini). Saat ganti TF
@@ -2612,7 +2622,7 @@ async function switchTF(tf){
   lastLen=-1; render(true);
   if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
-  setStatus('TF → '+tf);
+  toast('Timeframe: '+tf,'success');
 }
 
 // ===================== render =====================
@@ -5272,8 +5282,8 @@ window.addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
   else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } }
-  else if(e.key.toLowerCase()==='b'){submitOrder('long')}
-  else if(e.key.toLowerCase()==='s'){submitOrder('short')}
+  // Catatan: dulu 'b'/'s' telanjang = submit market order (risiko eksekusi tak sengaja) — dihapus.
+  // Order tetap lewat tombol Buy/Sell di order panel.
 });
 
 // ===================== Bar Replay (mode chart, ala TradingView) =====================
@@ -5652,7 +5662,7 @@ function resetChartView(){
   try{ chart.setBarSpace(8); }catch(e){}     // reset level zoom waktu ke default
   try{ chart.setStyles({yAxis:{type:'normal'}}); }catch(e){} // reset zoom/skala HARGA (y-axis) → auto-calc (setAutoCalcTickFlag(true))
   try{ chart.scrollToRealTime(); }catch(e){} // tempel ke bar terbaru yang terungkap
-  setStatus('Chart view reset to default ('+currentTF+').');
+  toast('Chart view reset ('+currentTF+')','success');
 }
 
 // ===================== init =====================
