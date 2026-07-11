@@ -1538,6 +1538,7 @@ let formingBar = null;       // candle berjalan (live) yg di-update tiap tick st
 let formingSeed = null;      // candle incomplete OANDA (OHLC otoritatif periode berjalan) → seed wick
 let replayPartial = null;    // {tf,candle}: bar berjalan sintetis TF aktif @ cursor T (mode replay)
 const REPLAY_FRAME_MS = 40;  // ~25fps render saat Play halus
+let fillT = null;            // frontier eksekusi intra-bar: fill/alert sudah dievaluasi s/d ms ini (replay); hanya-maju
 let secondaries = [];        // panel chart sekunder (multi-chart, view-only) — diisi setLayout()
 let chartLayout = 1;         // jumlah panel: 1 | 2 | 4
 let formingTimer = null;     // poll seed forming dari OANDA (lebih sering dari liveRefresh)
@@ -2802,7 +2803,7 @@ function renderOrderPanel(){
 }
 
 // ===================== replay control =====================
-function step(d){
+async function step(d){
   if(T==null) return;
   if(!replayMode){ stopLive(); setReplayUI(true); }   // stepping = masuk mode Bar Replay
   const arr=tfData[currentTF], dur=DUR[currentTF];
@@ -2812,7 +2813,7 @@ function step(d){
   if(d>0){
     if(idx+1>=arr.length){ autoExtend(currentTF); pauseIfNoData(); return; }
     const ni=idx+1; T=arr[ni].timestamp+dur;
-    onNewBar(arr[ni]);
+    await evalFills(T);   // fill SL/TP/pending & alert intra-bar (sub-bar halus s/d T)
     if(arr.length-ni<30) autoExtend(currentTF);
   }else{
     if(idx<=0) return;
@@ -2846,13 +2847,12 @@ async function playFrame(){
   const rev=revealed(currentTF);
   if(rev.length>=arr.length){ autoExtend(currentTF); pauseIfNoData(); return; }   // ujung data → pause (tekan Play lagi setelah extend)
   const dur=DUR[currentTF], speed=+$('#speed').value||1;
-  const beforeLen=rev.length;
   T += Math.max(1, dur*speed*REPLAY_FRAME_MS/1000);   // maju proporsional speed (frame ~fixed)
   const after=revealed(currentTF);
-  for(let k=beforeLen;k<after.length;k++) onNewBar(after[k]);   // bar yg baru menutup → cek trade/alert
   // Lompati gap mati (weekend/libur): jika bar berikutnya baru buka setelah T, jangan merangkak lewat
   // waktu kosong — langsung ke pembukaannya. Tanpa ini, Jumat→Senin bisa puluhan detik chart diam.
   const nb=tfData[currentTF][after.length]; if(nb && nb.timestamp>T) T=nb.timestamp;
+  await evalFills(T);   // fill SL/TP/pending & alert intra-bar via sub-bar halus (pakai T final setelah gap-skip)
   if(after.length-1 > arr.length-30) autoExtend(currentTF);
   replayPartial=null;
   try{ const c=await buildReplayPartial(currentTF); if(c) replayPartial={tf:currentTF,candle:c}; }catch(e){}
@@ -3480,6 +3480,37 @@ function checkTrade(c){
 }
 // dipanggil tiap bar baru terungkap: cek pending dulu (bisa tereksekusi), lalu SL/TP, lalu alert
 function onNewBar(c){ checkPending(c); checkTrade(c); checkAlerts(c); }
+// ===== Bar Replay: eksekusi INTRA-BAR — fill SL/TP/pending & alert saat harga MENYENTUH level =====
+// Bukan menunggu bar tutup. Telusuri sub-bar TF halus kronologis dari frontier fillT s/d toT, lalu
+// checkPending→checkTrade→checkAlerts per sub-bar (urutan sentuh benar; SL prioritas dlm 1 sub-bar).
+// fillT hanya-maju → Prev tak re-fire. Anti-lookahead: hanya sub-bar tutup ≤ toT. Khusus mode replay;
+// jalur Live (SL/TP server-side + alert per-bar) tak disentuh. Fungsi cek dipakai apa adanya.
+async function evalFills(toT){
+  if(!replayMode || fillT==null){ fillT=toT; return; }   // masuk replay → set frontier tanpa fire
+  if(toT<=fillT) return;                                   // mundur/diam → jangan re-fire
+  const from=fillT;
+  if(trade || pending || (alerts&&alerts.length)){
+    let subs=null;
+    const fineTF=pickFineTF(currentTF, DUR[currentTF]), arr=tfData[currentTF];
+    if(fineTF && arr && arr.length){
+      const fdur=DUR[fineTF], acc=[];
+      let lo=0,h=arr.length; while(lo<h){const m=(lo+h)>>1; if(arr[m].timestamp<=toT) lo=m+1; else h=m;}
+      for(let i=lo-1;i>=0;i--){                            // bar kasar beririsan (from,toT] — telusuri mundur
+        const bOpen=arr[i].timestamp, bEnd=(i+1<arr.length?arr[i+1].timestamp:bOpen+DUR[currentTF]);
+        if(bEnd<=from) break;                               // sudah sepenuhnya sebelum frontier → stop
+        const win=await ensureFineWindow(fineTF,bOpen,bEnd);
+        if(win) for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push(b); }
+      }
+      acc.sort((a,b)=>a.timestamp-b.timestamp); subs=acc;
+    }
+    if(subs==null){                                         // fallback: bar currentTF sendiri (≤M5 / fetch gagal)
+      subs=[]; const d=DUR[currentTF];
+      for(const b of (arr||[])){ const c=b.timestamp+d; if(c>from && c<=toT) subs.push(b); }
+    }
+    for(const b of subs){ checkPending(b); checkTrade(b); checkAlerts(b); }
+  }
+  if(toT>fillT) fillT=toT;                                  // frontier hanya-maju (anti dobel-fire saat konkuren)
+}
 
 // ---------- pending order (limit/stop) ----------
 function placePending(dir){
@@ -5415,7 +5446,7 @@ function setReplayUI(on){
 function exitReplay(){
   pause();                 // hentikan loop playback bila sedang Play (jangan lanjut melawan live mode)
   pickMode=false;
-  replayPartial=null;
+  replayPartial=null; fillT=null;
   setPickCut(false);
   setReplayUI(false);
   const arr=tfData[currentTF];
@@ -5450,7 +5481,7 @@ $('#chart').addEventListener('click',()=>{
   try{ chart.scrollToTimestamp(ts, REPLAY_SCROLL_MS); }catch(e){}
   // pick EXCLUSIVE: T = buka bar yg diklik = tutup bar sebelumnya → bar terakhir tampil = 1 bar SEBELUM ts.
   // Bar yg diklik belum muncul; step(1) berikutnya baru mengungkapnya (mulai backtest tepat di bar itu).
-  setTimeout(()=>{ T=ts; replayPartial=null; lastLen=-1; render(true);
+  setTimeout(()=>{ T=ts; fillT=T; replayPartial=null; lastLen=-1; render(true);
     setStatus('Replay from '+nyTime(ts)+' (NY). Next/Play to advance.'); }, REPLAY_SCROLL_MS+30);
 });
 
