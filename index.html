@@ -4951,7 +4951,9 @@ async function removeAlert(i){
   const a=alerts[i]; if(!a) return;
   try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}
   if(a.oid!=null){ try{chart.removeOverlay(a.oid);}catch(e){} }
-  alerts.splice(i,1); renderAlertList(); drawAlertLines();
+  // cari ulang by id (bukan index yg ditangkap sebelum await) — alertPoll bisa menulis ulang `alerts` selama menunggu
+  const idx=alerts.findIndex(x=>x.id===a.id); if(idx>=0) alerts.splice(idx,1);
+  renderAlertList(); drawAlertLines();
 }
 // buat alert di harga tertentu (dipakai klik-kanan chart)
 function createAlertAt(price){
@@ -4972,6 +4974,33 @@ function checkAlerts(c){
     toast(msg,'info');
   });
 }
+// poll ~2s: surface alert yg ditrigger server (LIVE) → toast + Web Notification, lalu ack (hapus) — one-shot.
+let alertPollTimer=null;
+const shownTriggered=new Set();     // id alert triggered yg sudah ditampilkan (anti-dobel)
+async function alertPoll(){
+  try{
+    const r=await fetch('/api/alerts'); if(!r.ok) return;
+    const rows=await r.json();
+    // sinkron list dasar (untuk panel) — pertahankan oid overlay bila id sama
+    const byId={}; alerts.forEach(a=>byId[a.id]=a);
+    const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt, oid:(byId[a.id]&&byId[a.id].oid)||null}));
+    // deteksi triggered baru → toast + Notification + ack (hapus)
+    for(const a of rows){
+      if(a.triggeredAt!=null && !shownTriggered.has(a.id)){
+        shownTriggered.add(a.id);
+        const msg=a.instrument+' crossed '+a.price;
+        try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
+        toast(msg,'success');
+        try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}
+      }
+    }
+    // buang yg sudah di-ack dari list yg akan dirender
+    alerts=next.filter(a=>!(a.triggeredAt!=null && shownTriggered.has(a.id)));
+    renderAlertList(); drawAlertLines();
+  }catch(e){}
+}
+function startAlertPoll(){ if(alertPollTimer) return; alertPoll(); alertPollTimer=setInterval(alertPoll, 2000); }
+function stopAlertPoll(){ clearInterval(alertPollTimer); alertPollTimer=null; }
 $('#alertAdd').onclick=addAlert;
 // ===================== order panel: docked / mengambang (bebas digeser) =====================
 const app=document.querySelector('.app');
@@ -6027,6 +6056,7 @@ function bootApp(){
   loadInit();  // auto-load tanggal hari ini saat dibuka
   refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
   setLiveDot(); connectPriceStream();                   // harga realtime via SSE
+  startAlertPoll();                                     // poll ~2s: surface alert triggered server → toast/Notification
   initPriceTimer();                                     // countdown candle berikutnya
   initMultiChart();                                     // panel chart sekunder (multi-chart)
   applyPaperMode();                                     // boot = realtime → akun live server
@@ -6093,6 +6123,7 @@ function onAuthed(u){
   el.querySelector('#analyticsBtn').style.display = (u&&u.is_admin)?'block':'none';   // tombol Analytics khusus admin
 }
 async function doLogout(){
+  stopAlertPoll();
   try{ await fetch('/api/auth/logout',{method:'POST'}); }catch(e){}
   location.reload();
 }
