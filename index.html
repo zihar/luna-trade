@@ -2409,7 +2409,7 @@ const darkStyles = {
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
     // legend OHLC native (custom): O/H/L/C + change abs/% berwarna up/down; ikut crosshair; offset di bawah
     // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
-    tooltip:{ showRule:'always', showType:'standard', offsetTop:28, offsetLeft:11,
+    tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
@@ -2429,7 +2429,7 @@ const lightStyles = {
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
     // legend OHLC native (custom): O/H/L/C + change abs/% berwarna up/down; ikut crosshair; offset di bawah
     // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
-    tooltip:{ showRule:'always', showType:'standard', offsetTop:28, offsetLeft:11,
+    tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
@@ -2447,10 +2447,10 @@ new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{
 try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ try{ chart.resize(); }catch(e){} }); }catch(e){}
 
 // ===================== legend chart (OHLC + info instrumen, ala TradingView) =====================
-// Dua lapis di kiri-atas chart:
-//  • Baris-1 (overlay HTML #chartLegend): ikon pair + nama lengkap + TF; klik → picker instrumen.
-//  • Baris-2 (legend candle NATIVE klinecharts, custom di bawah): O/H/L/C + change abs/% (vs close bar
-//    sebelumnya), warna up/down. Native → ikut crosshair otomatis & legend indikator menumpuk di bawahnya.
+// Satu baris di kiri-atas chart (ala TradingView):
+//  • Info instrumen (overlay HTML #chartLegend, kiri): ikon pair + nama lengkap + TF; klik → picker.
+//  • OHLC + change abs/% (legend candle NATIVE klinecharts, custom): SEJAJAR di kanan nama via offsetLeft
+//    dinamis (= lebar blok nama). Native → ikut crosshair otomatis & legend indikator menumpuk di bawahnya.
 // candleTooltipCustom dipakai di darkStyles/lightStyles (custom candle.tooltip).
 function chartLegendColors(){
   return document.body.classList.contains('light')
@@ -2473,13 +2473,21 @@ function candleTooltipCustom(d){
     {title:t(''),  value:{text:`${sg}${f(chg)} (${sg}${pct.toFixed(2)}%)`, color:cc}},
   ];
 }
-// Baris-1 (info instrumen) hanya berubah saat ganti instrumen/TF; OHLC ditangani native (di atas).
+// Info instrumen (overlay HTML) hanya berubah saat ganti instrumen/TF; OHLC ditangani native (sejajar
+// di kanan-nya). Lebar blok nama variabel → geser offsetLeft OHLC native = ujung-kanan nama + jarak,
+// supaya keduanya SATU baris (ala TradingView) apa pun panjang namanya.
 function updateChartLegend(){
-  const pairEl=$('#clPair'), nameEl=$('#clName'), tfEl=$('#clTf');
+  const btn=$('#clInst'), pairEl=$('#clPair'), nameEl=$('#clName'), tfEl=$('#clTf');
   if(!nameEl) return;
   try{ if(pairEl) pairEl.innerHTML = ipkPair(inst); }catch(e){}
   nameEl.textContent = (ipkMeta(inst).name)||inst.replace('_','/');
   if(tfEl) tfEl.textContent = TF_LABEL[currentTF]||currentTF;
+  try{
+    const legLeft=parseInt(getComputedStyle($('#chartLegend')).left)||12;   // 12px
+    const marL=parseInt(getComputedStyle(btn).marginLeft)||0;               // -5px
+    const w=btn.offsetWidth;
+    if(w) chart.setStyles({ candle:{ tooltip:{ offsetLeft: legLeft+marL+w+6 } } });
+  }catch(e){}
 }
 (function initChartLegend(){
   const btn=$('#clInst');
@@ -2501,6 +2509,7 @@ function applyTheme(t){
   syncThemeUI(light);   // pemilih tema kini di dalam popup profil
   localStorage.setItem('br_theme', t);
   try{ drawEquity(); }catch(e){}   // warna kurva ikut tema
+  try{ updateChartLegend(); }catch(e){}   // setStyles tema mereset offsetLeft OHLC → pasang ulang
 }
 // sinkronkan segmented control tema di popup profil (aman bila popup belum dibuat)
 function syncThemeUI(light){
