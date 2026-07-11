@@ -209,6 +209,20 @@
   .chart-wm .wm-glyph{ width:15px; height:15px; display:block; color:var(--luna-glow); }
   .chart-wm .wm-t{ font:600 12px/1 var(--font-num); letter-spacing:.09em; color:var(--txt); white-space:nowrap; }
   body.light .chart-wm{ opacity:.1; }
+  /* legend kiri-atas (ala TradingView): baris info instrumen (klik→picker). OHLC = legend candle native. */
+  .chart-legend{ position:absolute; top:6px; left:12px; z-index:6; pointer-events:none; user-select:none; }
+  .cl-inst{ pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; gap:7px;
+    margin-left:-5px; padding:2px 6px 2px 5px; border:0; background:transparent; border-radius:7px;
+    color:var(--txt); font-family:'Inter',sans-serif; line-height:1; transition:background .12s ease; }
+  .cl-inst:hover{ background:var(--btn-hover); }
+  .cl-inst:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .cl-inst .cl-name{ font-size:13px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; }
+  .cl-inst .cl-tf{ font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap;
+    padding-left:8px; position:relative; }
+  .cl-inst .cl-tf::before{ content:'·'; position:absolute; left:1px; }
+  .cl-inst .cl-chev{ width:12px; height:12px; color:var(--muted); flex:0 0 auto; opacity:0; transition:opacity .12s ease; }
+  .cl-inst:hover .cl-chev, .cl-inst:focus-visible .cl-chev{ opacity:1; }
+  @media (prefers-reduced-motion: reduce){ .cl-inst, .cl-inst .cl-chev{ transition:none; } }
   /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
@@ -1345,7 +1359,7 @@
   </aside>
   <div class="center">
     <div id="chartgrid" class="lay-1">
-      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div><div class="chart-brand" aria-hidden="true"><svg class="glyph" viewBox="0 0 24 24" width="16" height="16"><mask id="lunaChartCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaChartCut)"/></svg>Luna&nbsp;Trade</div></div>
+      <div class="cpanel cpanel-pri" data-slot="0"><div id="chart"><div class="chart-boot" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44"><mask id="lunaBootCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="cl-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaBootCut)"/></svg></div><div class="chart-brand" aria-hidden="true"><svg class="glyph" viewBox="0 0 24 24" width="16" height="16"><mask id="lunaChartCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle class="luna-disc" cx="11.6" cy="12" r="8.4" mask="url(#lunaChartCut)"/></svg>Luna&nbsp;Trade</div><div class="chart-legend" id="chartLegend"><button type="button" class="cl-inst" id="clInst" aria-label="Switch instrument"><span class="ipick-pair cl-pair" id="clPair"></span><span class="cl-name" id="clName"></span><span class="cl-tf" id="clTf"></span><svg class="cl-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div></div>
         <div class="replay-watermark" aria-hidden="true">
           <svg class="wm-moon" viewBox="0 0 24 24"><mask id="lunaReplayCut"><rect width="24" height="24" fill="#fff"/><circle cx="15.6" cy="9.4" r="8.4" fill="#000"/></mask><circle cx="11.6" cy="12" r="8.4" fill="currentColor" mask="url(#lunaReplayCut)"/></svg>
           <span class="wm-text">Replay</span>
@@ -2387,18 +2401,17 @@ klinecharts.registerOverlay({
 const AXIS_FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
 const chTextStyle = bg => ({ backgroundColor:bg, color:'#fff', size:10, family:AXIS_FONT, weight:'bold',
   borderRadius:4, paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3 });
-// legend candle tanpa Volume (forex/backtester selalu 0) → lebih pendek, tak wrap di panel sempit
-const TOOLTIP_LEGEND = [
-  { title:'O', value:'{open}' }, { title:'H', value:'{high}' },
-  { title:'L', value:'{low}' }, { title:'C', value:'{close}' },
-];
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
     bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#89898b',
           upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
-    tooltip:{ rect:{color:'#1b1b1f'}, text:{color:'#fff'}, custom:TOOLTIP_LEGEND },
+    // legend OHLC native (custom): O/H/L/C + change abs/% berwarna up/down; ikut crosshair; offset di bawah
+    // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
+    tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
+      text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
+      custom:candleTooltipCustom },
   },
   xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
@@ -2414,7 +2427,11 @@ const lightStyles = {
     bar:{ upColor:'#089981',downColor:'#f23645',noChangeColor:'#999',
           upBorderColor:'#089981',downBorderColor:'#f23645',upWickColor:'#089981',downWickColor:'#f23645'},
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#fff'} } },
-    tooltip:{ rect:{color:'#ffffff'}, text:{color:'#1e242e'}, custom:TOOLTIP_LEGEND },
+    // legend OHLC native (custom): O/H/L/C + change abs/% berwarna up/down; ikut crosshair; offset di bawah
+    // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
+    tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
+      text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
+      custom:candleTooltipCustom },
   },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
@@ -2429,6 +2446,58 @@ new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{
 // Jaring pengaman: setelah web-font siap, satu re-measure bersih (sumbu klinecharts diukur ulang dgn Inter final)
 try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ try{ chart.resize(); }catch(e){} }); }catch(e){}
 
+// ===================== legend chart (OHLC + info instrumen, ala TradingView) =====================
+// Satu baris di kiri-atas chart (ala TradingView):
+//  • Info instrumen (overlay HTML #chartLegend, kiri): ikon pair + nama lengkap + TF; klik → picker.
+//  • OHLC + change abs/% (legend candle NATIVE klinecharts, custom): SEJAJAR di kanan nama via offsetLeft
+//    dinamis (= lebar blok nama). Native → ikut crosshair otomatis & legend indikator menumpuk di bawahnya.
+// candleTooltipCustom dipakai di darkStyles/lightStyles (custom candle.tooltip).
+function chartLegendColors(){
+  return document.body.classList.contains('light')
+    ? {up:'#1a9d6e', down:'#d8504e', mut:'#697280'}
+    : {up:'#54c88c', down:'#ff6f6f', mut:'#89898b'};
+}
+function candleTooltipCustom(d){
+  const c=d&&d.current; if(!c) return [];
+  const col=chartLegendColors(), dec=priceDecimals(), f=v=>(+v).toFixed(dec);
+  const vc = c.close>=c.open ? col.up : col.down;                 // O/H/L/C diwarnai arah bar
+  const prevClose = d.prev ? d.prev.close : c.open;
+  const chg=c.close-prevClose, pct=prevClose?chg/prevClose*100:0;
+  const cc = chg>=0 ? col.up : col.down, sg = chg>=0 ? '+' : '';
+  const t=(k)=>({text:k, color:col.mut});
+  return [
+    {title:t('O'), value:{text:f(c.open),  color:vc}},
+    {title:t('H'), value:{text:f(c.high),  color:vc}},
+    {title:t('L'), value:{text:f(c.low),   color:vc}},
+    {title:t('C'), value:{text:f(c.close), color:vc}},
+    {title:t(''),  value:{text:`${sg}${f(chg)} (${sg}${pct.toFixed(2)}%)`, color:cc}},
+  ];
+}
+// Info instrumen (overlay HTML) hanya berubah saat ganti instrumen/TF; OHLC ditangani native (sejajar
+// di kanan-nya). Lebar blok nama variabel → geser offsetLeft OHLC native = ujung-kanan nama + jarak,
+// supaya keduanya SATU baris (ala TradingView) apa pun panjang namanya.
+function updateChartLegend(){
+  const btn=$('#clInst'), pairEl=$('#clPair'), nameEl=$('#clName'), tfEl=$('#clTf');
+  if(!nameEl) return;
+  try{ if(pairEl) pairEl.innerHTML = ipkPair(inst); }catch(e){}
+  nameEl.textContent = (ipkMeta(inst).name)||inst.replace('_','/');
+  if(tfEl) tfEl.textContent = TF_LABEL[currentTF]||currentTF;
+  try{
+    const legLeft=parseInt(getComputedStyle($('#chartLegend')).left)||12;   // 12px
+    const marL=parseInt(getComputedStyle(btn).marginLeft)||0;               // -5px
+    const w=btn.offsetWidth;
+    if(w) chart.setStyles({ candle:{ tooltip:{ offsetLeft: legLeft+marL+w+6 } } });
+  }catch(e){}
+}
+(function initChartLegend(){
+  const btn=$('#clInst');
+  // stopPropagation: cegah listener outside-click global (#ipick) langsung menutup picker yg baru dibuka
+  if(btn){ btn.onclick=e=>{ e.stopPropagation(); openIpick(); };
+    btn.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); openIpick(); } }; }
+  // populate awal ditunda: IPK_META (const) dideklarasi setelah blok ini → hindari TDZ saat parse
+  setTimeout(()=>{ try{ updateChartLegend(); }catch(e){} }, 0);
+})();
+
 // ===================== tema gelap/terang =====================
 function applyTheme(t){
   const light = t==='light';
@@ -2440,6 +2509,7 @@ function applyTheme(t){
   syncThemeUI(light);   // pemilih tema kini di dalam popup profil
   localStorage.setItem('br_theme', t);
   try{ drawEquity(); }catch(e){}   // warna kurva ikut tema
+  try{ updateChartLegend(); }catch(e){}   // setStyles tema mereset offsetLeft OHLC → pasang ulang
 }
 // sinkronkan segmented control tema di popup profil (aman bila popup belum dibuat)
 function syncThemeUI(light){
@@ -2542,7 +2612,8 @@ document.addEventListener('click',(e)=>{
 // highlightTF dipanggil di banyak tempat saat currentTF berubah → rebuild bar (agar TF non-favorit aktif ikut tampil/hilang) & refresh menu bila terbuka.
 function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); updateChartWM(); }
 // watermark kanvas: crescent + "SIMBOL · TF" (ikut instrumen & timeframe aktif)
-function updateChartWM(){ if(!chartWmEl) return; const t=chartWmEl.querySelector('.wm-t');
+function updateChartWM(){ try{ updateChartLegend(); }catch(e){}   // legend kiri-atas ikut ganti instrumen/TF
+  if(!chartWmEl) return; const t=chartWmEl.querySelector('.wm-t');
   if(t) t.textContent = inst.replace('_','') + ' · ' + (TF_LABEL[currentTF]||currentTF); }
 rebuildTFBar();
 
@@ -2751,6 +2822,7 @@ function render(full){
   if(live) pushFormingCandle();   // re-append candle berjalan setelah data di-redraw
   updatePriceTimer();
   try{ repositionNewsMarkers(); }catch(e){}   // marker ikut pan/zoom/TF/playback
+  try{ updateChartLegend(); }catch(e){}       // baris info instrumen match data yg dimuat (inst/TF)
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
 // logam (XAU/XAG): 1 lot = 100 oz (konvensi TradeLocker). units di-kawat tetap = oz (1 oz = 1 unit).
