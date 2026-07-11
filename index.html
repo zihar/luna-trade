@@ -737,10 +737,10 @@
   .wl-chg{ font-family:var(--mono); font-size:10px; width:54px; text-align:right; color:var(--muted); }
   .wl-chg.up{ color:var(--green); } .wl-chg.down{ color:var(--red); }
   .wl-alert{ margin-top:4px; border-top:1px solid var(--border); padding-bottom:8px; }
-  #alertsPanel .al-add{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+  #alertsPane .al-add{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
                         border-radius:6px;background:var(--btn);border:1px solid var(--border);
                         color:var(--txt);font-size:16px;line-height:1;cursor:pointer }
-  #alertsPanel .al-add:hover{ background:var(--btn-hover) }
+  #alertsPane .al-add:hover{ background:var(--btn-hover) }
   .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
   .al-item:hover{ background:var(--btn-hover); }
   .al-main{ font-weight:600; color:var(--txt); font-size:13px; }
@@ -842,20 +842,35 @@
 
   /* ===================== layout 5-zona (TradeLocker) ===================== */
   .app{ flex:1; min-height:0; position:relative; display:grid;
-        grid-template-columns:56px 1fr var(--markets-w,300px);
+        grid-template-columns:56px 1fr var(--markets-w,300px) 44px;
         grid-template-rows:1fr var(--trades-h,210px);
-        grid-template-areas:"rail center markets" "rail trades trades"; }
+        grid-template-areas:"rail center markets rrail" "rail trades trades rrail"; }
 
   /* pembatas yang bisa digeser (resize Markets & Trades) */
   .rh{ position:absolute; z-index:60; background:transparent; transition:background .12s; }
   .rh:hover,.rh.drag{ background:var(--accent); }
   .rh-markets{ top:0; bottom:var(--trades-h,210px); width:7px;
-               right:calc(var(--markets-w,300px) - 3px); cursor:col-resize; }
+               right:calc(var(--markets-w,300px) + 41px); cursor:col-resize; }   /* +44px rail kanan, -3px pusat handle */
   .rh-markets.hidden{ display:none; }
-  .rh-trades{ left:56px; right:0; height:7px;
+  .rh-trades{ left:56px; right:44px; height:7px;
               bottom:calc(var(--trades-h,210px) - 3px); cursor:row-resize; }
   #rail{ grid-area:rail; background:var(--panel); border-right:1px solid var(--border);
          display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; }
+  /* rail kanan (mirror #rail) — akses panel Alerts, ala TradingView */
+  #rrail{ grid-area:rrail; background:var(--panel); border-left:1px solid var(--border);
+          display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; z-index:66; }
+  /* panel Alerts — slide-in overlay dari kanan (tak reflow grid) */
+  #alertsPane{ position:absolute; top:0; bottom:var(--trades-h,210px); right:44px;
+               width:300px; z-index:65; background:var(--panel);
+               border-left:1px solid var(--border); display:flex; flex-direction:column;
+               transform:translateX(calc(100% + 44px)); transition:transform .18s ease;
+               box-shadow:-18px 0 36px rgba(0,0,0,.30); }
+  #alertsPane.open{ transform:translateX(0); }
+  #alertsPane .ap-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px;
+     font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.05em; color:var(--txt);
+     border-bottom:1px solid var(--line); }
+  #alertsPane .ap-body{ flex:1; overflow:auto; padding:6px 6px 10px; }
+  @media (prefers-reduced-motion:reduce){ #alertsPane{ transition:none; } }
   .center{ grid-area:center; min-width:0; min-height:0; display:flex; flex-direction:column;
            position:relative; background:var(--bg); }
   #watchlist{ grid-area:markets; width:auto; flex:initial; }
@@ -1334,11 +1349,15 @@
   <div class="watchlist" id="watchlist">
     <div class="wl-head">Markets<span class="wl-live" id="wlLive" title="Live price disconnected"></span><span class="grow"></span><button class="wl-x" id="marketsClose" title="Hide Markets">✕</button></div>
     <div id="wlRows"></div>
-    <div class="wl-alert" id="alertsPanel">
-      <div class="wl-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button></div>
-      <div id="alertList"></div>
-    </div>
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
+  </div>
+  <!-- rail kanan (ala TradingView) + panel Alerts terpisah -->
+  <aside class="rrail" id="rrail">
+    <button class="railbtn" id="rrailAlerts" title="Alerts" aria-label="Alerts panel" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.4 1.6"/><path d="M5 3 2.2 5.6"/><path d="m19 3 2.8 2.6"/></svg></button>
+  </aside>
+  <div id="alertsPane" role="region" aria-label="Alerts">
+    <div class="ap-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button></div>
+    <div class="ap-body"><div id="alertList"></div></div>
   </div>
   <div class="alert-modal" id="alertModal" role="dialog" aria-modal="true">
     <div class="am-card">
@@ -5034,6 +5053,16 @@ async function alertPoll(){
 function startAlertPoll(){ if(alertPollTimer) return; alertPoll(); alertPollTimer=setInterval(alertPoll, 2000); }
 function stopAlertPoll(){ clearInterval(alertPollTimer); alertPollTimer=null; }
 $('#alertAddBtn').onclick=openAlertDialog;
+// rail kanan: buka/tutup panel Alerts (slide-in). Persist supaya tetap saat reload.
+function setAlertsPane(open){
+  $('#alertsPane').classList.toggle('open', open);
+  $('#rrailAlerts').classList.toggle('on', open);
+  $('#rrailAlerts').setAttribute('aria-pressed', open?'true':'false');
+  try{ localStorage.setItem('br_alertsPane', open?'1':'0'); }catch(e){}
+}
+function toggleAlertsPane(){ setAlertsPane(!$('#alertsPane').classList.contains('open')); }
+$('#rrailAlerts').onclick=toggleAlertsPane;
+try{ if(localStorage.getItem('br_alertsPane')==='1') setAlertsPane(true); }catch(e){}
 $('#amClose').onclick=closeAlertDialog; $('#amCancel').onclick=closeAlertDialog;
 $('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!(p>0)){ setStatus('Enter a valid price.',true); return; }
   const a=await createServerAlert(p);
