@@ -128,6 +128,24 @@
   .an-chips{display:flex;flex-wrap:wrap;gap:5px}
   .an-chip{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted)}
   .an-chip b{color:var(--txt);font-weight:600;margin-left:2px}
+  /* price alert: create dialog */
+  .alert-modal{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+  .alert-modal.open{display:flex}
+  .am-card{width:min(440px,92vw);background:var(--panel);border:1px solid var(--border);border-radius:12px;
+           box-shadow:var(--shadow);padding:16px}
+  .am-head{display:flex;align-items:center;font-size:16px;color:var(--txt);margin-bottom:12px}
+  .am-row{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .am-lbl{width:84px;color:var(--muted);font-size:13px}
+  .am-cond{flex:1;padding:8px 10px;background:var(--btn);border:1px solid var(--border);border-radius:8px;color:var(--txt)}
+  #amPrice{flex:1;padding:8px 10px;background:var(--btn);border:1px solid var(--accent);border-radius:8px;
+           color:var(--txt);font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  .am-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  .am-act button{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--btn);
+                 color:var(--txt);font-size:12px;cursor:pointer}
+  .am-act button:hover{background:var(--btn-hover)}
+  .am-act button.primary:hover{background:var(--accent);opacity:.9}
+  .am-x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px}
+  .am-x:hover{color:var(--txt)}
   .auth-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
                 background:rgba(8,8,11,.72);backdrop-filter:blur(6px)}
   .auth-card{width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--border);
@@ -719,12 +737,18 @@
   .wl-chg{ font-family:var(--mono); font-size:10px; width:54px; text-align:right; color:var(--muted); }
   .wl-chg.up{ color:var(--green); } .wl-chg.down{ color:var(--red); }
   .wl-alert{ margin-top:4px; border-top:1px solid var(--border); padding-bottom:8px; }
-  .wl-alert .row{ padding:0 10px; gap:6px; margin-bottom:0; }
-  .wl-alert input{ flex:1; min-width:0; }
-  .al-row{ display:flex; align-items:center; justify-content:space-between; padding:4px 11px;
-           font-size:11px; font-family:var(--mono); }
-  .al-row .al-x{ padding:1px 6px; font-size:10px; }
-  .al-empty{ padding:4px 11px; font-size:11px; color:var(--muted); }
+  #alertsPanel .al-add{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+                        border-radius:6px;background:var(--btn);border:1px solid var(--border);
+                        color:var(--txt);font-size:16px;line-height:1;cursor:pointer }
+  #alertsPanel .al-add:hover{ background:var(--btn-hover) }
+  .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
+  .al-item:hover{ background:var(--btn-hover); }
+  .al-main{ font-weight:600; color:var(--txt); font-size:13px; }
+  .al-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .al-st{ color:var(--green); } .al-st.trig{ color:var(--muted); }
+  .al-x{ position:absolute; right:6px; top:8px; background:none; border:0; color:var(--muted); cursor:pointer; }
+  .al-x:hover{ color:var(--red); }
+  .al-empty{ padding:8px 11px; font-size:12px; color:var(--muted); }
 
   /* News panel (shares grid-area:markets with #watchlist, radio toggle) */
   #newspanel{ grid-area:markets; overflow:auto; }
@@ -1310,12 +1334,19 @@
   <div class="watchlist" id="watchlist">
     <div class="wl-head">Markets<span class="wl-live" id="wlLive" title="Live price disconnected"></span><span class="grow"></span><button class="wl-x" id="marketsClose" title="Hide Markets">✕</button></div>
     <div id="wlRows"></div>
-    <div class="wl-alert" style="display:none">
-      <div class="wl-head">Price Alert</div>
-      <div class="row"><input id="alertPrice" type="number" step="0.0001" placeholder="alert level"><button id="alertAdd" class="primary">+ Set</button></div>
+    <div class="wl-alert" id="alertsPanel">
+      <div class="wl-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button></div>
       <div id="alertList"></div>
     </div>
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
+  </div>
+  <div class="alert-modal" id="alertModal" role="dialog" aria-modal="true">
+    <div class="am-card">
+      <div class="am-head">Create alert on <b id="amInst">—</b><span class="grow"></span><button class="am-x" id="amClose" title="Close">✕</button></div>
+      <div class="am-row"><span class="am-lbl">Condition</span><div class="am-cond">Price · Crossing</div></div>
+      <div class="am-row"><span class="am-lbl">Price</span><input type="number" step="0.0001" id="amPrice"></div>
+      <div class="am-act"><button id="amCancel">Cancel</button><button class="primary" id="amCreate">Create</button></div>
+    </div>
   </div>
   <div class="watchlist hidden" id="newspanel">
     <div class="wl-head">News<span class="grow"></span>
@@ -4925,11 +4956,13 @@ function drawAlertLines(){
   });
 }
 function renderAlertList(){
-  const box=$('#alertList'); if(!box) return;
-  box.innerHTML=alerts.length
-    ? alerts.map((a,i)=>`<div class="al-row"><span>🔔 ${a.sym} @ ${a.price}</span><button class="al-x" data-i="${i}">✕</button></div>`).join('')
-    : '<div class="al-empty">— no alerts yet —</div>';
-  box.querySelectorAll('.al-x').forEach(b=>b.onclick=()=>removeAlert(+b.dataset.i));
+  const el=$('#alertList'); if(!el) return;
+  el.innerHTML = alerts.length
+    ? alerts.map((a,i)=>`<div class="al-item"><div class="al-main">${a.sym.replace('_','')} Crossing ${a.price}</div>`
+        +`<div class="al-sub">${a.sym.replace('_','')} · <span class="al-st${a.triggeredAt?' trig':''}">${a.triggeredAt?'Triggered':'Active'}</span></div>`
+        +`<button class="al-x" data-i="${i}" title="Delete">✕</button></div>`).join('')
+    : '<div class="al-empty">No alerts yet. Click + to add.</div>';
+  el.querySelectorAll('.al-x').forEach(b=>b.onclick=()=>removeAlert(+b.dataset.i));
 }
 async function createServerAlert(price){
   const p=+(+price).toFixed(priceDecimals()); if(!p||p<=0) return null;
@@ -4942,11 +4975,14 @@ async function createServerAlert(price){
     track('alert',{inst}); renderAlertList(); drawAlertLines(); return a;
   }catch(e){ return null; }
 }
-function addAlert(){
-  const p=$('#alertPrice').value; if(!(+p)){ setStatus('Enter the alert level price first.',true); return; }
-  if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
-  createServerAlert(p).then(a=>{ if(a){ $('#alertPrice').value=''; toast('Alert set @ '+fmt(a.price),'success'); } });
+// dialog "Create alert on <INST>" — dipicu tombol + panel Alerts
+function openAlertDialog(){
+  $('#amInst').textContent=inst.replace('_','');
+  const m=liveMid?liveMid():null, cur=currentCandle();
+  $('#amPrice').value=(m!=null?m:(cur?cur.close:'')) || '';
+  $('#alertModal').classList.add('open'); setTimeout(()=>$('#amPrice').focus(),0);
 }
+function closeAlertDialog(){ $('#alertModal').classList.remove('open'); }
 async function removeAlert(i){
   const a=alerts[i]; if(!a) return;
   try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}
@@ -5004,7 +5040,11 @@ async function alertPoll(){
 }
 function startAlertPoll(){ if(alertPollTimer) return; alertPoll(); alertPollTimer=setInterval(alertPoll, 2000); }
 function stopAlertPoll(){ clearInterval(alertPollTimer); alertPollTimer=null; }
-$('#alertAdd').onclick=addAlert;
+$('#alertAddBtn').onclick=openAlertDialog;
+$('#amClose').onclick=closeAlertDialog; $('#amCancel').onclick=closeAlertDialog;
+$('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!p){ setStatus('Enter a price.',true); return; }
+  const a=await createServerAlert(p); if(a){ closeAlertDialog(); toast('Alert created @ '+fmt(a.price),'success'); } };
+$('#alertModal').addEventListener('mousedown',e=>{ if(e.target===$('#alertModal')) closeAlertDialog(); });
 // ===================== order panel: docked / mengambang (bebas digeser) =====================
 const app=document.querySelector('.app');
 { const op=$('#orderpanel'), of=$('#orderForm'); if(op&&of) op.appendChild(of); }
