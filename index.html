@@ -68,7 +68,6 @@
   .tf-star.fav{color:var(--accent);opacity:1}
   button.tool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent)}
   .grow{flex:1}
-  .status{font-size:12px;color:var(--muted)}
   /* --- auth (Fase 2a): avatar akun di pojok kanan + dropdown + overlay login/register --- */
   .user-menu{position:relative;display:inline-flex;align-items:center;margin-left:2px}
   .user-avatar{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--accent);
@@ -856,18 +855,30 @@
   .nmk-pop .np-bias.bullish{ color:var(--green); } .nmk-pop .np-bias.bearish{ color:var(--red); }
 
   /* toast feedback (alert/pending) */
+  /* --tc = warna aksen per tipe; satu variabel menggerakkan border kiri, ikon, & drain bar */
   .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
           display:flex; align-items:center; gap:9px; max-width:min(440px,90vw);
-          background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--accent); color:var(--txt);
-          padding:9px 16px 9px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
-          opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
+          background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--tc,var(--accent)); color:var(--txt);
+          padding:9px 10px 10px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
+          overflow:hidden; opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
   .toast.show{ opacity:1; top:18px; }
-  .toast .toast-ic{ flex:none; width:16px; height:16px; }
-  .toast .toast-msg{ min-width:0; }
-  .toast.t-success{ border-left-color:var(--green); } .toast.t-success .toast-ic{ color:var(--green); }
-  .toast.t-error{ border-left-color:var(--red); }     .toast.t-error .toast-ic{ color:var(--red); }
-  .toast.t-warn{ border-left-color:#e3b341; }          .toast.t-warn .toast-ic{ color:#e3b341; }
-  .toast.t-info{ border-left-color:var(--accent); }    .toast.t-info .toast-ic{ color:var(--accent); }
+  .toast .toast-ic{ flex:none; width:16px; height:16px; color:var(--tc,var(--accent)); }
+  .toast .toast-msg{ flex:1; min-width:0; }
+  /* kontainer pointer-events:none supaya tak memblok toolbar di belakang; hanya close yang interaktif */
+  .toast .toast-close{ flex:none; pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+          width:20px; height:20px; margin:-2px -2px -2px 2px; padding:0; border:0; border-radius:6px; background:transparent;
+          color:var(--muted); transition:color .15s, background .15s; }
+  .toast .toast-close:hover{ color:var(--txt); background:rgba(255,255,255,.07); }
+  .toast .toast-close:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .toast .toast-close svg{ width:13px; height:13px; }
+  /* drain bar: penuh → habis selama durasi = penanda sisa waktu sebelum auto-hilang */
+  .toast .toast-bar{ position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--tc,var(--accent));
+          opacity:.85; transform-origin:left center; transform:scaleX(1); }
+  .toast.t-success{ --tc:var(--green); }
+  .toast.t-error{ --tc:var(--red); }
+  .toast.t-warn{ --tc:#e3b341; }
+  .toast.t-info{ --tc:var(--accent); }
+  @media (prefers-reduced-motion: reduce){ .toast .toast-bar{ display:none; } }
   /* hormati preferensi kurangi-gerak: matikan animasi/transisi non-esensial */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -1343,7 +1354,6 @@
   <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
   <span class="grow" style="flex:1"></span>
   <span id="layoutbtns" title="Layout chart"></span>
-  <span class="status" id="status"></span>
 </div>
 
 <div class="app">
@@ -2724,17 +2734,13 @@ async function fetchCandles(tf,{count,to,from}){
     timestamp:Date.parse(c.time), open:+c.mid.o, high:+c.mid.h, low:+c.mid.l, close:+c.mid.c, volume:+(c.volume||0),
   })).sort((a,b)=>a.timestamp-b.timestamp);
 }
-// hanya tampilkan error (merah); pesan info disembunyikan
-let statusTimer=null;
+// setStatus(t,err) — dulu menulis ke #status di header (nempel ke profile). Kini HANYA error
+// (err=true) yang dimunculkan sbg toast; pesan info/progres (Fetching/Loaded/instruksi/cancel)
+// sengaja disenyapkan supaya toast hanya berisi yang penting. Konfirmasi aksi penting pakai
+// toast(...,'success') langsung di call-site-nya.
 function setStatus(t,err){
-  const s=$('#status'); if(!s) return;
-  clearTimeout(statusTimer); statusTimer=null;
-  if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; return; }   // error: merah, menetap sampai status berikut
-  if(!t){ s.innerHTML=''; return; }                            // setStatus('') → clear
-  // pesan informatif/sukses: DULU di-drop (innerHTML='') → feedback tak pernah tampil.
-  // Kini render warna netral lalu auto-clear agar tidak menumpuk di toolbar.
-  s.innerHTML=t; s.style.color='#89898b';
-  statusTimer=setTimeout(()=>{ s.innerHTML=''; },4000);
+  if(!t || !err) return;
+  toast(t, 'error');
 }
 
 // ===================== ganti TF (chart tetap 1) =====================
@@ -2793,7 +2799,6 @@ async function switchTF(tf){
   lastLen=-1; render(true);
   if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
-  toast('Timeframe: '+tf,'success');
 }
 
 // ===================== render =====================
@@ -3359,13 +3364,13 @@ function previewPosLevel(id,kind,v){
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
   if(id===REPLAY_ID){ if(!trade) return; trade[kind]=+v; if(kind==='sl') recalcRisk();
-    toast(kind.toUpperCase()+' diperbarui','success'); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast(kind.toUpperCase()+' updated','success'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast(d.error||'Gagal ubah '+kind.toUpperCase(),'error'); drawPaperLines(); return; }
-      toast(kind.toUpperCase()+' diperbarui','success'); await spSync(); drawPaperLines(); })
-    .catch(()=>{ toast('Tidak bisa terhubung ke server','error'); drawPaperLines(); });
+      if(!r.ok){ toast(d.error||'Could not update '+kind.toUpperCase(),'error'); drawPaperLines(); return; }
+      toast(kind.toUpperCase()+' updated','success'); await spSync(); drawPaperLines(); })
+    .catch(()=>{ toast('Could not connect to the server','error'); drawPaperLines(); });
 }
 function confirmPosLevel(id,kind,v){
   const p=posById(id); if(!p) return; const dec=decimalsFor(p.instrument);
@@ -3581,13 +3586,13 @@ function renderPosEdit(skipPriceInputs){
 function commitPosSLTP(){
   if(!editPos) return;
   if(editPos.id===REPLAY_ID){ if(trade){ trade.sl=editPos.slOn?+editPos.sl:null; trade.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(); }
-    toast('SL/TP diperbarui','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast('SL/TP updated','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast(d.error||'Gagal ubah SL/TP','error'); return; }
-      toast('SL/TP diperbarui','success'); closePositionEditor(); await spSync(); drawPaperLines(); })
-    .catch(()=>toast('Tidak bisa terhubung ke server','error'));
+      if(!r.ok){ toast(d.error||'Could not update SL/TP','error'); return; }
+      toast('SL/TP updated','success'); closePositionEditor(); await spSync(); drawPaperLines(); })
+    .catch(()=>toast('Could not connect to the server','error'));
 }
 function openPositionEditor(id){
   const p=posById(id); if(!p) return;
@@ -3677,7 +3682,7 @@ function placePending(dir){
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
            time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};   // waktu pembuatan → guard anti eval bar pra-pending saat re-tread
   clearDraftLines(); drawPendingLines(); updateOpenTradeBox();
-  setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting for price to be touched.');
+  toast(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting to be touched.','success');
 }
 function drawPendingLines(){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending&&pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} pending[k]=null; }});
@@ -3713,7 +3718,7 @@ function partialClose(frac){
   journal.push({time:trade.time,exitTime:cur.timestamp,dir:trade.dir,entry:trade.entry,exit,r,units,pnlCcy,balanceAfter:bal,partial:true});
   trade.units-=units;
   saveJournal(); renderStats(); renderJournal(); updateOpenTradeBox(); renderAcct();
-  setStatus('Partial close '+Math.round(frac*100)+'% @ '+fmt(exit)+'.');
+  toast('Partial close '+Math.round(frac*100)+'% @ '+fmt(exit),'success');
 }
 function closeTrade(exit,time){
   if(!trade) return;
@@ -3774,7 +3779,7 @@ const ServerPaperBroker = {
   mode:'paper-live',
   async market(dir){
     const units = currentLots()*unitsPer();
-    if(!(units>0)){ setStatus('Lot harus > 0.',true); return; }
+    if(!(units>0)){ setStatus('Lot must be greater than 0.',true); return; }
     // SL/TP harga absolut (server akan memantau & auto-close). Dihitung dari estimasi entry FE.
     const ba=curBidAsk(), cur=currentCandle();
     const entry = ba ? (dir==='short'?ba.bid:ba.ask) : (cur?cur.close:null);
@@ -3789,9 +3794,9 @@ const ServerPaperBroker = {
       const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(body)});
       const d=await r.json().catch(()=>({}));
-      if(!r.ok){ setStatus(d.error||'Order gagal',true); toast(d.error||'Order gagal','error'); }
+      if(!r.ok){ toast(d.error||'Order failed','error'); }
       else { clearDraftLines(); toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry),'success'); await spSync(); }
-    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); toast('Tidak bisa terhubung ke server','error'); }
+    }catch(e){ toast('Could not connect to the server','error'); }
     if(btn) btn.disabled=false;
   },
   closeMarket(){ spCloseAll(); },
@@ -3801,9 +3806,9 @@ async function spClose(id){
   try{
     const r=await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok) setStatus(d.error||'Close gagal',true);
+    if(!r.ok) setStatus(d.error||'Close failed',true);
     else { toast('Closed #'+id+'  '+((d.pnlCcy>=0?'+':'')+usdFmt(d.pnlCcy)), d.pnlCcy>=0?'success':'info'); await spSync(); }
-  }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
+  }catch(e){ setStatus('Could not connect to the server',true); }
 }
 async function spCloseAll(){ for(const p of SP.positions.slice()){ await spClose(p.id); } }
 
@@ -3889,7 +3894,7 @@ let orderDir = 'short';   // arah terpilih di tab Sell/Buy (default Sell, ala Tr
 function ordType(){ const b=document.querySelector('#ordType button.on'); return b?b.dataset.t:'market'; }
 function submitOrder(dir){
   if(spActive()){   // akun live: market-only (pending belum didukung server)
-    if(ordType()==='pending'){ setStatus('Pending belum didukung di akun live (market-only).',true); return; }
+    if(ordType()==='pending'){ setStatus("Pending orders aren't supported on live accounts (market only).",true); return; }
     broker.market(dir); return;
   }
   if(ordType()==='pending') placePending(dir); else broker.market(dir);
@@ -4702,7 +4707,7 @@ $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data
 $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-sp-close]'); if(b) spClose(+b.dataset.spClose); });
 function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal)); }
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
-$('#resetBtn').onclick=()=>{ if(spActive()){ setStatus('Reset hanya berlaku di Bar Replay — akun live tak bisa dihapus.',true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
+$('#resetBtn').onclick=()=>{ if(spActive()){ setStatus("Reset only applies in Bar Replay — live accounts can't be cleared.",true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
@@ -4722,6 +4727,7 @@ function symDecimals(s){ if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
   return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
 // toast feedback ringan (alert berbunyi / pending tereksekusi) — terlihat tanpa mengandalkan setStatus
 let toastTimer=null;
+const TOAST_MS=3800;   // durasi tampil + panjang animasi drain bar
 // ikon per varian (stroke=currentColor → ikut warna .toast-ic per tipe)
 const TOAST_IC={
   success:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -4730,15 +4736,24 @@ const TOAST_IC={
   info:'<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="7.6" x2="12" y2="7.6"/></svg>'
 };
 // toast(msg, type) — type: success | error | warning/warn | info (default). Backward-compatible.
+const TOAST_CLOSE_IC='<button class="toast-close" type="button" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>';
 function toast(msg, type){
   type = type||'info'; if(type==='warning') type='warn';
   let el=$('#toast'); if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
   el.className='toast t-'+type;
-  el.innerHTML=(TOAST_IC[type]||TOAST_IC.info)+'<span class="toast-msg"></span>';
+  el.innerHTML=(TOAST_IC[type]||TOAST_IC.info)+'<span class="toast-msg"></span>'+TOAST_CLOSE_IC+'<div class="toast-bar"></div>';
   el.querySelector('.toast-msg').textContent=msg;
+  const hide=()=>{ clearTimeout(toastTimer); toastTimer=null; el.classList.remove('show'); };
+  el.querySelector('.toast-close').onclick=hide;   // close paksa
+  const bar=el.querySelector('.toast-bar');
   void el.offsetWidth;                        // reflow → transisi re-trigger utk toast berturut
   el.classList.add('show');
-  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),3500);
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){   // drain bar penuh → habis selama TOAST_MS
+    bar.style.transition='none'; bar.style.transform='scaleX(1)';
+    void bar.offsetWidth;
+    bar.style.transition='transform '+TOAST_MS+'ms linear'; bar.style.transform='scaleX(0)';
+  }
+  clearTimeout(toastTimer); toastTimer=setTimeout(hide,TOAST_MS);
 }
 // quote harga terkini (candle harian: candle terakhir = hari berjalan/incomplete = harga live)
 async function fetchQuote(sym){
@@ -6072,7 +6087,6 @@ function resetChartView(){
   try{ chart.setBarSpace(8); }catch(e){}     // reset level zoom waktu ke default
   try{ chart.setStyles({yAxis:{type:'normal'}}); }catch(e){} // reset zoom/skala HARGA (y-axis) → auto-calc (setAutoCalcTickFlag(true))
   try{ chart.scrollToRealTime(); }catch(e){} // tempel ke bar terbaru yang terungkap
-  toast('Chart view reset ('+currentTF+')','success');
 }
 
 // ===================== init =====================
