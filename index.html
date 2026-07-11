@@ -2818,6 +2818,7 @@ async function step(d){
   }else{
     if(idx<=0) return;
     T=arr[idx-1].timestamp+dur;
+    fillT=T;   // mundur → turunkan frontier ke cursor baru: order/alert yg dibuat/diedit di sini ikut dievaluasi saat maju lagi (bukan ter-skip)
   }
   replayPartial=null;   // Step = 1 bar penuh → T re-align ke boundary, forming bar tak berlaku
   render();
@@ -3499,7 +3500,8 @@ async function evalFills(toT){
         const bOpen=arr[i].timestamp, bEnd=(i+1<arr.length?arr[i+1].timestamp:bOpen+DUR[currentTF]);
         if(bEnd<=from) break;                               // sudah sepenuhnya sebelum frontier → stop
         const win=await ensureFineWindow(fineTF,bOpen,bEnd);
-        if(win) for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push(b); }
+        if(win && win.length){ for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push(b); } }
+        else if(bEnd>from && bEnd<=toT) acc.push(arr[i]);   // fetch sub-bar gagal → fallback bar kasar (tutup penuh ≤ toT, tanpa lookahead) drpd drop diam-diam
       }
       acc.sort((a,b)=>a.timestamp-b.timestamp); subs=acc;
     }
