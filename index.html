@@ -4994,6 +4994,9 @@ async function alertPoll(){
         try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}
       }
     }
+    // hapus overlay milik alert triggered yg di-ack DULU (kalau tidak, garis nyangkut permanen —
+    // drawAlertLines hanya membersihkan overlay untuk entry yg masih di `alerts`).
+    next.forEach(a=>{ if(a.triggeredAt!=null && shownTriggered.has(a.id) && a.oid!=null){ try{chart.removeOverlay(a.oid);}catch(e){} } });
     // buang yg sudah di-ack dari list yg akan dirender
     alerts=next.filter(a=>!(a.triggeredAt!=null && shownTriggered.has(a.id)));
     renderAlertList(); drawAlertLines();
@@ -6051,7 +6054,7 @@ function initMultiChart(){
 // bootApp = semua inisialisasi yang menyentuh data server (candle, SSE, quotes).
 // Dipisah jadi fungsi supaya HANYA dijalankan setelah sesi tervalidasi.
 function bootApp(){
-  loadAlerts(); renderAlertList(); renderWatch();
+  renderAlertList(); renderWatch();   // alert awal dimuat oleh startAlertPoll()→alertPoll() (hindari GET /api/alerts ganda + race clobber oid)
   loadJournal(); renderStats(); renderJournal(); renderAcct();
   loadInit();  // auto-load tanggal hari ini saat dibuka
   refreshQuotes(); setInterval(refreshQuotes, 60000);   // watchlist quotes (fallback candle harian)
