@@ -842,28 +842,25 @@
 
   /* ===================== layout 5-zona (TradeLocker) ===================== */
   .app{ flex:1; min-height:0; position:relative; display:grid;
-        grid-template-columns:56px 1fr var(--markets-w,300px) 44px;
+        grid-template-columns:56px 1fr var(--markets-w,300px);
         grid-template-rows:1fr var(--trades-h,210px);
-        grid-template-areas:"rail center markets rrail" "rail trades trades rrail"; }
+        grid-template-areas:"rail center markets" "rail trades trades"; }
 
   /* pembatas yang bisa digeser (resize Markets & Trades) */
   .rh{ position:absolute; z-index:60; background:transparent; transition:background .12s; }
   .rh:hover,.rh.drag{ background:var(--accent); }
   .rh-markets{ top:0; bottom:var(--trades-h,210px); width:7px;
-               right:calc(var(--markets-w,300px) + 41px); cursor:col-resize; }   /* +44px rail kanan, -3px pusat handle */
+               right:calc(var(--markets-w,300px) - 3px); cursor:col-resize; }
   .rh-markets.hidden{ display:none; }
-  .rh-trades{ left:56px; right:44px; height:7px;
+  .rh-trades{ left:56px; right:0; height:7px;
               bottom:calc(var(--trades-h,210px) - 3px); cursor:row-resize; }
   #rail{ grid-area:rail; background:var(--panel); border-right:1px solid var(--border);
          display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; }
-  /* rail kanan (mirror #rail) — akses panel Alerts, ala TradingView */
-  #rrail{ grid-area:rrail; background:var(--panel); border-left:1px solid var(--border);
-          display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; z-index:66; }
-  /* panel Alerts — slide-in overlay dari kanan (tak reflow grid) */
-  #alertsPane{ position:absolute; top:0; bottom:var(--trades-h,210px); right:44px;
+  /* panel Alerts — slide-in overlay dari kanan (tak reflow grid); dibuka dari tombol di rail KIRI */
+  #alertsPane{ position:absolute; top:0; bottom:var(--trades-h,210px); right:0;
                width:300px; z-index:65; background:var(--panel);
                border-left:1px solid var(--border); display:flex; flex-direction:column;
-               transform:translateX(calc(100% + 44px)); transition:transform .18s ease;
+               transform:translateX(100%); transition:transform .18s ease;
                box-shadow:-18px 0 36px rgba(0,0,0,.30); }
   #alertsPane.open{ transform:translateX(0); }
   #alertsPane .ap-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px;
@@ -1313,6 +1310,7 @@
     <button class="railbtn" id="toggleOrder" title="Order panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg></button>
     <button class="railbtn" id="toggleTrades" title="Trades panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="14" x2="21" y2="14"/></svg></button>
     <button class="railbtn" id="toggleNews" title="News panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14H4z"/><path d="M17 8h3v9a2 2 0 0 1-2 2h-1"/><path d="M7 8h7M7 11h7M7 14h5"/></svg></button>
+    <button class="railbtn" id="railAlerts" title="Alerts panel" aria-label="Alerts panel" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.4 1.6"/><path d="M5 3 2.2 5.6"/><path d="m19 3 2.8 2.6"/></svg></button>
     <div class="raildiv"></div>
     <div class="drawtools" id="drawtools"></div>
     <div class="railspacer"></div>
@@ -1351,10 +1349,6 @@
     <div id="wlRows"></div>
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
   </div>
-  <!-- rail kanan (ala TradingView) + panel Alerts terpisah -->
-  <aside class="rrail" id="rrail">
-    <button class="railbtn" id="rrailAlerts" title="Alerts" aria-label="Alerts panel" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.4 1.6"/><path d="M5 3 2.2 5.6"/><path d="m19 3 2.8 2.6"/></svg></button>
-  </aside>
   <div id="alertsPane" role="region" aria-label="Alerts">
     <div class="ap-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button></div>
     <div class="ap-body"><div id="alertList"></div></div>
@@ -5056,12 +5050,12 @@ $('#alertAddBtn').onclick=openAlertDialog;
 // rail kanan: buka/tutup panel Alerts (slide-in). Persist supaya tetap saat reload.
 function setAlertsPane(open){
   $('#alertsPane').classList.toggle('open', open);
-  $('#rrailAlerts').classList.toggle('on', open);
-  $('#rrailAlerts').setAttribute('aria-pressed', open?'true':'false');
+  $('#railAlerts').classList.toggle('on', open);
+  $('#railAlerts').setAttribute('aria-pressed', open?'true':'false');
   try{ localStorage.setItem('br_alertsPane', open?'1':'0'); }catch(e){}
 }
 function toggleAlertsPane(){ setAlertsPane(!$('#alertsPane').classList.contains('open')); }
-$('#rrailAlerts').onclick=toggleAlertsPane;
+$('#railAlerts').onclick=toggleAlertsPane;
 try{ if(localStorage.getItem('br_alertsPane')==='1') setAlertsPane(true); }catch(e){}
 $('#amClose').onclick=closeAlertDialog; $('#amCancel').onclick=closeAlertDialog;
 $('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!(p>0)){ setStatus('Enter a valid price.',true); return; }
