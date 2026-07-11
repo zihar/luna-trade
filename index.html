@@ -3468,6 +3468,7 @@ function recalcRisk(){
 }
 function checkTrade(c){
   if(!trade) return;
+  if(trade.time!=null && c.timestamp < trade.time) return;   // jangan evaluasi bar SEBELUM entry (mis. re-tread Prev) → cegah spurious close / journal durasi-negatif
   let exit=null;
   if(trade.dir==='long'){ if(trade.sl!=null && c.low<=trade.sl) exit=trade.sl; else if(trade.tp!=null && c.high>=trade.tp) exit=trade.tp; }
   else{ if(trade.sl!=null && c.high>=trade.sl) exit=trade.sl; else if(trade.tp!=null && c.low<=trade.tp) exit=trade.tp; }
@@ -3530,7 +3531,7 @@ function placePending(dir){
   const type = dir==='long' ? (entry<cur.close?'limit':'stop') : (entry>cur.close?'limit':'stop');
   pending={dir,type,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
-           lineEntry:null,lineSL:null,lineTP:null};
+           time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};   // waktu pembuatan → guard anti eval bar pra-pending saat re-tread
   clearDraftLines(); drawPendingLines(); updateOpenTradeBox();
   setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting for price to be touched.');
 }
@@ -3548,6 +3549,7 @@ function clearPendingLines(){ if(!pending) return; ['lineEntry','lineSL','lineTP
 function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending cancelled.'); }
 function checkPending(c){
   if(!pending || trade) return;
+  if(pending.time!=null && c.timestamp < pending.time) return;   // jangan isi dari bar SEBELUM pending dibuat (re-tread Prev)
   if(!(c.low<=pending.entry && pending.entry<=c.high)) return;   // belum tersentuh
   clearPendingLines();
   trade={dir:pending.dir,entry:pending.entry,sl:pending.sl,tp:pending.tp,risk:pending.risk,
@@ -4926,7 +4928,7 @@ function addAlert(){
   const p=+$('#alertPrice').value; if(!p){ setStatus('Enter the alert level price first.',true); return; }
   track('alert',{inst});
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
-  alerts.push({sym:inst,price:p,id:null}); $('#alertPrice').value='';
+  alerts.push({sym:inst,price:p,id:null, time:(replayMode&&T!=null)?T:null}); $('#alertPrice').value='';   // di replay: waktu buat → guard anti-fire bar pra-alert saat re-tread
   saveAlerts(); drawAlertLines(); renderAlertList();
 }
 function removeAlert(i){ const a=alerts[i]; if(a&&a.id){ try{chart.removeOverlay(a.id);}catch(e){} } alerts.splice(i,1); saveAlerts(); drawAlertLines(); renderAlertList(); }
@@ -4935,13 +4937,13 @@ function createAlertAt(price){
   if(price==null||isNaN(price)) return;
   const p=+(+price).toFixed(priceDecimals());
   if(typeof Notification!=='undefined' && Notification.permission==='default'){ try{Notification.requestPermission();}catch(e){} }
-  alerts.push({sym:inst,price:p,id:null});
+  alerts.push({sym:inst,price:p,id:null, time:(replayMode&&T!=null)?T:null});
   saveAlerts(); drawAlertLines(); renderAlertList();
   toast('Alert created at '+p,'success');
 }
 // alert berbunyi saat candle simbol aktif menembus level (replay & live)
 function checkAlerts(c){
-  const fired=alerts.filter(a=>a.sym===inst && c.low<=a.price && a.price<=c.high);
+  const fired=alerts.filter(a=>a.sym===inst && c.low<=a.price && a.price<=c.high && (a.time==null || c.timestamp>=a.time));
   if(!fired.length) return;
   fired.forEach(a=>{
     const msg=`${a.sym} menyentuh ${a.price}`;
@@ -5442,7 +5444,7 @@ function setReplayUI(on){
   // floating pill + watermark crescent (aware mode replay)
   document.querySelector('.cpanel-pri').classList.toggle('replay-on', on);
   $('#replayPill').classList.toggle('on', on);
-  if(on){ syncReplayPill(); } else { $('#rpSelect').classList.remove('armed'); }
+  if(on){ syncReplayPill(); } else { $('#rpSelect').classList.remove('armed'); fillT=null; }   // keluar replay (Exit / Load / ganti instrumen) → frontier fill bersih (jangan basi lintas-sesi)
   applyPaperMode();   // replay → client-side; realtime → akun live server
 }
 function exitReplay(){
