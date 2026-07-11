@@ -250,7 +250,7 @@
   .kbd{display:inline-block;background:var(--inset);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted)}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .chartrow{flex:1;display:flex;min-height:0}
-  .drawtools{width:42px;background:var(--panel);border-right:1px solid var(--border);
+  .drawtools{width:50px;background:var(--panel);border-right:1px solid var(--border);
              display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0}
   .drawtools .spacer{flex:1}
   .dtool{width:32px;height:32px;display:flex;align-items:center;justify-content:center;padding:0;color:var(--muted)}
@@ -269,6 +269,34 @@
   .dt-item.active,.dt-item.active svg{color:var(--accent)}
   .dt-item .dt-sc{margin-left:auto;padding-left:18px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
   .dt-item.active .dt-sc{color:var(--accent)}
+  .dt-item .dt-nm{flex:1;min-width:0}                 /* nama tool mengisi ruang → hotkey+bintang rata kanan */
+  /* ikon rail dibungkus agar caret bisa jadi sibling tanpa tertimpa saat innerHTML ikon diganti */
+  .dt-ico{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+  /* tombol tetap FULL 32px; caret = tab tipis MENEMPEL di kanan tombol (ala TradingView).
+     ::before = slot bayangan kiri selebar caret → ikon tetap center di rail & sejajar tombol lain. */
+  .dt-catrow{display:flex;align-items:center;width:100%;height:32px}
+  .dt-catrow::before{content:"";flex:0 0 9px}
+  .dt-catrow .dt-cat{flex:0 0 32px;width:32px;height:32px}
+  .dt-caret{flex:0 0 9px;height:32px;display:flex;align-items:center;justify-content:center;
+            font-size:8px;line-height:1;color:var(--muted);opacity:0;transition:opacity .12s;cursor:pointer;
+            border-left:1px solid var(--border);border-radius:0 5px 5px 0}
+  .dt-catrow:hover .dt-caret{opacity:1}
+  .dt-caret:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+  /* header grup + bintang favorite di flyout (ala TradingView) */
+  .dt-fly-title{font-size:11px;letter-spacing:.06em;color:var(--muted);padding:6px 10px 4px;text-transform:uppercase}
+  .dt-fav{margin-left:8px;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;flex:0 0 auto}
+  .dt-fav.on{color:var(--accent)}
+  .dt-fav:hover{color:var(--txt)}
+  /* Favorites drawing bar: pill horizontal melayang di atas chart, bisa digeser via grip */
+  .favbar{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:40;display:none;
+          align-items:center;gap:1px;padding:4px 6px;border-radius:13px;background:var(--panel);
+          border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .favbar.show{display:inline-flex}
+  .favbar-grip{width:14px;height:20px;margin-right:3px;flex:0 0 auto;cursor:grab;color:var(--muted);opacity:.6;
+               background:radial-gradient(currentColor 1px,transparent 1.4px) 0 0/5px 6px}
+  .favbar.dragging{cursor:grabbing}
+  .favbar.dragging .favbar-grip{cursor:grabbing}
+  .favbar-btn{width:32px;height:32px}
   body.eraser-on #chart{cursor:crosshair}
   a{color:var(--accent)}
   .speed{display:flex;gap:6px;align-items:center;margin-top:7px}
@@ -4297,6 +4325,13 @@ let _flyOpenKey=null;
 function toolByName(n){ for(const g of DRAW_GROUPS){ const t=g.tools.find(x=>x.name===n); if(t) return t; } return null; }
 function lastToolOf(g){ const saved=localStorage.getItem('br_lasttool_'+g.key); return (saved&&g.tools.find(t=>t.name===saved))||g.tools[0]; }
 function closeFlyout(){ _fly.classList.remove('show'); _flyOpenKey=null; }
+// ---- favorites: bintang di flyout → bar melayang di atas chart (Image #3, ala TradingView) ----
+let favBar=null;                                                   // elemen bar; dibuat saat init rail
+let favTools=[]; try{ favTools=JSON.parse(localStorage.getItem('br_fav_tools')||'[]')||[]; }catch(_){ favTools=[]; }
+function groupOfTool(n){ for(const g of DRAW_GROUPS){ if(g.tools.some(t=>t.name===n)) return g; } return null; }
+function isFav(n){ return favTools.includes(n); }
+function toggleFav(n){ const i=favTools.indexOf(n); if(i>=0) favTools.splice(i,1); else favTools.push(n);
+  try{localStorage.setItem('br_fav_tools',JSON.stringify(favTools));}catch(_){} buildFavBar(); }
 // ---- keyboard shortcut drawing ala TradingView (Alt+huruf; Mac ⌥) ----
 const IS_MAC=/Mac|iPhone|iPad|iPod/.test((navigator.platform||'')+' '+(navigator.userAgent||''));
 function scLabel(sc){ return (IS_MAC?'⌥':'Alt+')+sc; }              // label hint/tooltip
@@ -4305,7 +4340,8 @@ function catTitle(g,t){ return g.title+': '+t.title+(t.sc?' ('+scLabel(t.sc)+')'
 const SC_BY_CODE={}; DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ if(t.sc) SC_BY_CODE['Key'+t.sc]={g,t}; }));
 function activateShortcut(hit){ const catBtn=_dt.querySelector('.dt-cat[data-cat="'+hit.g.key+'"]'); if(catBtn) pickTool(hit.g, hit.t, catBtn); }
 function pickTool(g, t, catBtn){
-  catBtn.dataset.tool=t.name; catBtn.title=catTitle(g,t); catBtn.innerHTML=t.svg;
+  catBtn.dataset.tool=t.name; catBtn.title=catTitle(g,t);
+  const _ico=catBtn.querySelector('.dt-ico'); if(_ico) _ico.innerHTML=t.svg; else catBtn.innerHTML=t.svg;
   if(g.cursor){ setCursorMode(t.name); catBtn.classList.add('armed'); }
   else { try{localStorage.setItem('br_lasttool_'+g.key,t.name);}catch(_){} createDraw(t.name, catBtn); }
   closeFlyout();
@@ -4313,25 +4349,78 @@ function pickTool(g, t, catBtn){
 function openFlyout(g, catBtn){
   _fly.innerHTML=''; _flyOpenKey=g.key;
   const cur=(g.cursor?cursorMode:lastToolOf(g).name);
+  const ttl=document.createElement('div'); ttl.className='dt-fly-title'; ttl.textContent=g.title.toUpperCase(); _fly.appendChild(ttl);
   g.tools.forEach(t=>{ const it=document.createElement('div'); it.className='dt-item'+(t.name===cur?' active':'');
-    it.innerHTML=t.svg+'<span>'+t.title+'</span>'+(t.sc?'<span class="dt-sc">'+scLabel(t.sc)+'</span>':'');
+    it.innerHTML=t.svg+'<span class="dt-nm">'+t.title+'</span>'+(t.sc?'<span class="dt-sc">'+scLabel(t.sc)+'</span>':'');
     it.onclick=(ev)=>{ ev.stopPropagation(); pickTool(g, t, catBtn); };
+    if(!g.cursor){                                                 // bintang favorite (overlay saja, bukan cursor)
+      const star=document.createElement('span'); star.className='dt-fav'+(isFav(t.name)?' on':'');
+      star.setAttribute('role','button'); star.setAttribute('aria-label','Favorite'); star.title='Toggle favorite';
+      star.textContent=isFav(t.name)?'★':'☆';
+      star.onclick=(ev)=>{ ev.stopPropagation(); toggleFav(t.name); const on=isFav(t.name); star.classList.toggle('on',on); star.textContent=on?'★':'☆'; };
+      it.appendChild(star);
+    }
     _fly.appendChild(it); });
-  const r=catBtn.getBoundingClientRect(); _fly.classList.add('show');
+  const r=(catBtn.closest('.dt-catrow')||catBtn).getBoundingClientRect(); _fly.classList.add('show');   // buka dari tepi kanan baris (lewat caret)
   let top=r.top; const fh=_fly.offsetHeight; if(top+fh>window.innerHeight-8) top=Math.max(8,window.innerHeight-8-fh);
   _fly.style.left=(r.right+6)+'px'; _fly.style.top=top+'px';
 }
 function buildDrawRail(){
   DRAW_GROUPS.forEach(g=>{
+    const row=document.createElement('div'); row.className='dt-catrow';
     const cat=document.createElement('button'); cat.className='dtool dt-cat'; cat.dataset.cat=g.key;
     const init=g.cursor?(toolByName(cursorMode)||g.tools[0]):lastToolOf(g);
-    cat.dataset.tool=init.name; cat.title=catTitle(g,init); cat.innerHTML=init.svg;
-    cat.onclick=(e)=>{ e.stopPropagation(); if(_flyOpenKey===g.key){ closeFlyout(); return; } openFlyout(g, cat); };
-    _dt.appendChild(cat);
+    cat.dataset.tool=init.name; cat.title=catTitle(g,init);
+    cat.innerHTML='<span class="dt-ico">'+init.svg+'</span>';
+    // klik badan ikon = arm langsung tool terakhir grup (1-klik ala TradingView)
+    cat.onclick=(e)=>{ e.stopPropagation(); pickTool(g, g.cursor?(toolByName(cursorMode)||g.tools[0]):lastToolOf(g), cat); };
+    // caret expand TERPISAH di kanan (muncul saat hover) = buka daftar tool
+    const caret=document.createElement('span'); caret.className='dt-caret'; caret.setAttribute('aria-hidden','true'); caret.textContent='▸';
+    caret.title='More '+g.title+' tools';
+    caret.onclick=(e)=>{ e.stopPropagation(); if(_flyOpenKey===g.key){ closeFlyout(); return; } openFlyout(g, cat); };
+    row.appendChild(cat); row.appendChild(caret);
+    _dt.appendChild(row);
   });
   const cc=_dt.querySelector('.dt-cat[data-cat="cursor"]'); if(cc) cc.classList.add('armed');
 }
 buildDrawRail();
+// ---- Favorites drawing bar: pill melayang di atas chart (anak .cpanel-pri, pola .replaypill) ----
+const _cpri=document.querySelector('.cpanel-pri');
+favBar=document.createElement('div'); favBar.className='favbar'; favBar.id='favBar';
+favBar.setAttribute('role','toolbar'); favBar.setAttribute('aria-label','Favorite drawing tools');
+if(_cpri) _cpri.appendChild(favBar);
+function buildFavBar(){
+  if(!favBar) return;
+  favBar.innerHTML='<span class="favbar-grip" aria-hidden="true"></span>';
+  favTools.forEach(name=>{ const t=toolByName(name), g=groupOfTool(name); if(!t||!g) return;
+    const b=document.createElement('button'); b.className='dtool favbar-btn'; b.title=catTitle(g,t); b.innerHTML=t.svg;
+    b.onclick=(e)=>{ e.stopPropagation(); const catBtn=_dt.querySelector('.dt-cat[data-cat="'+g.key+'"]'); if(catBtn) pickTool(g,t,catBtn); };
+    favBar.appendChild(b); });
+  favBar.classList.toggle('show', favTools.some(n=>toolByName(n)));   // tampil hanya bila ada favorite valid
+}
+// restore posisi tersimpan (relatif ke .cpanel-pri); default dock atas-tengah via CSS transform
+(function(){ try{ const p=JSON.parse(localStorage.getItem('br_favBarPos')||'null');
+  if(p&&typeof p.x==='number'&&typeof p.y==='number'){ favBar.style.transform='none'; favBar.style.left=p.x+'px'; favBar.style.top=p.y+'px'; }
+}catch(_){} })();
+// drag via grip — koordinat relatif container (favBar position:absolute di .cpanel-pri) + persist
+(function(){ if(!_cpri) return; let drag=false,sx,sy,ox,oy;
+  favBar.addEventListener('pointerdown',e=>{ if(!e.target.closest('.favbar-grip')) return;
+    const pr=_cpri.getBoundingClientRect(), br=favBar.getBoundingClientRect();
+    drag=true; sx=e.clientX; sy=e.clientY; ox=br.left-pr.left; oy=br.top-pr.top;
+    favBar.style.transform='none'; favBar.style.left=ox+'px'; favBar.style.top=oy+'px';
+    favBar.classList.add('dragging'); try{favBar.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault();
+  });
+  favBar.addEventListener('pointermove',e=>{ if(!drag) return;
+    const pr=_cpri.getBoundingClientRect();
+    let nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+    nx=Math.max(0,Math.min(pr.width-favBar.offsetWidth,nx)); ny=Math.max(0,Math.min(pr.height-favBar.offsetHeight,ny));
+    favBar.style.left=nx+'px'; favBar.style.top=ny+'px';
+    try{localStorage.setItem('br_favBarPos',JSON.stringify({x:nx,y:ny}));}catch(_){}
+  });
+  const stop=e=>{ if(!drag) return; drag=false; favBar.classList.remove('dragging'); try{favBar.releasePointerCapture(e.pointerId);}catch(_){} };
+  favBar.addEventListener('pointerup',stop); favBar.addEventListener('pointercancel',stop);
+})();
+buildFavBar();
 // terapkan cursor tersimpan saat load (tanpa membatalkan gambar)
 applyCursorStyle(cursorMode);
 document.body.classList.toggle('eraser-on', cursorMode==='eraser');
