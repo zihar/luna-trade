@@ -68,7 +68,6 @@
   .tf-star.fav{color:var(--accent);opacity:1}
   button.tool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent)}
   .grow{flex:1}
-  .status{font-size:12px;color:var(--muted)}
   /* --- auth (Fase 2a): avatar akun di pojok kanan + dropdown + overlay login/register --- */
   .user-menu{position:relative;display:inline-flex;align-items:center;margin-left:2px}
   .user-avatar{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--accent);
@@ -1343,7 +1342,6 @@
   <button id="redoBtn" class="hticon" title="Redo drawing (Ctrl/⌘+Y)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
   <span class="grow" style="flex:1"></span>
   <span id="layoutbtns" title="Layout chart"></span>
-  <span class="status" id="status"></span>
 </div>
 
 <div class="app">
@@ -2724,17 +2722,11 @@ async function fetchCandles(tf,{count,to,from}){
     timestamp:Date.parse(c.time), open:+c.mid.o, high:+c.mid.h, low:+c.mid.l, close:+c.mid.c, volume:+(c.volume||0),
   })).sort((a,b)=>a.timestamp-b.timestamp);
 }
-// hanya tampilkan error (merah); pesan info disembunyikan
-let statusTimer=null;
+// setStatus(t,err) — dulu menulis ke #status di header (nempel ke profile). Kini diteruskan
+// ke toast() supaya feedback tampil di pojok, bukan di samping avatar. t kosong = no-op.
 function setStatus(t,err){
-  const s=$('#status'); if(!s) return;
-  clearTimeout(statusTimer); statusTimer=null;
-  if(err){ s.innerHTML=t; s.style.color='#ff6f6f'; return; }   // error: merah, menetap sampai status berikut
-  if(!t){ s.innerHTML=''; return; }                            // setStatus('') → clear
-  // pesan informatif/sukses: DULU di-drop (innerHTML='') → feedback tak pernah tampil.
-  // Kini render warna netral lalu auto-clear agar tidak menumpuk di toolbar.
-  s.innerHTML=t; s.style.color='#89898b';
-  statusTimer=setTimeout(()=>{ s.innerHTML=''; },4000);
+  if(!t) return;
+  toast(t, err ? 'error' : 'info');
 }
 
 // ===================== ganti TF (chart tetap 1) =====================
@@ -3774,7 +3766,7 @@ const ServerPaperBroker = {
   mode:'paper-live',
   async market(dir){
     const units = currentLots()*unitsPer();
-    if(!(units>0)){ setStatus('Lot harus > 0.',true); return; }
+    if(!(units>0)){ setStatus('Lot must be greater than 0.',true); return; }
     // SL/TP harga absolut (server akan memantau & auto-close). Dihitung dari estimasi entry FE.
     const ba=curBidAsk(), cur=currentCandle();
     const entry = ba ? (dir==='short'?ba.bid:ba.ask) : (cur?cur.close:null);
@@ -3789,9 +3781,9 @@ const ServerPaperBroker = {
       const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(body)});
       const d=await r.json().catch(()=>({}));
-      if(!r.ok){ setStatus(d.error||'Order gagal',true); toast(d.error||'Order gagal','error'); }
+      if(!r.ok){ toast(d.error||'Order failed','error'); }
       else { clearDraftLines(); toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry),'success'); await spSync(); }
-    }catch(e){ setStatus('Tidak bisa terhubung ke server',true); toast('Tidak bisa terhubung ke server','error'); }
+    }catch(e){ toast('Could not connect to the server','error'); }
     if(btn) btn.disabled=false;
   },
   closeMarket(){ spCloseAll(); },
@@ -3801,9 +3793,9 @@ async function spClose(id){
   try{
     const r=await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok) setStatus(d.error||'Close gagal',true);
+    if(!r.ok) setStatus(d.error||'Close failed',true);
     else { toast('Closed #'+id+'  '+((d.pnlCcy>=0?'+':'')+usdFmt(d.pnlCcy)), d.pnlCcy>=0?'success':'info'); await spSync(); }
-  }catch(e){ setStatus('Tidak bisa terhubung ke server',true); }
+  }catch(e){ setStatus('Could not connect to the server',true); }
 }
 async function spCloseAll(){ for(const p of SP.positions.slice()){ await spClose(p.id); } }
 
@@ -3889,7 +3881,7 @@ let orderDir = 'short';   // arah terpilih di tab Sell/Buy (default Sell, ala Tr
 function ordType(){ const b=document.querySelector('#ordType button.on'); return b?b.dataset.t:'market'; }
 function submitOrder(dir){
   if(spActive()){   // akun live: market-only (pending belum didukung server)
-    if(ordType()==='pending'){ setStatus('Pending belum didukung di akun live (market-only).',true); return; }
+    if(ordType()==='pending'){ setStatus("Pending orders aren't supported on live accounts (market only).",true); return; }
     broker.market(dir); return;
   }
   if(ordType()==='pending') placePending(dir); else broker.market(dir);
@@ -4702,7 +4694,7 @@ $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data
 $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-sp-close]'); if(b) spClose(+b.dataset.spClose); });
 function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal)); }
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
-$('#resetBtn').onclick=()=>{ if(spActive()){ setStatus('Reset hanya berlaku di Bar Replay — akun live tak bisa dihapus.',true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
+$('#resetBtn').onclick=()=>{ if(spActive()){ setStatus("Reset only applies in Bar Replay — live accounts can't be cleared.",true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
   if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
