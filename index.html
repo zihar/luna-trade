@@ -3974,6 +3974,18 @@ function updateOpenTradeBox(){
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
+// Lepas seleksi objek gambar yang sudah jadi (Esc). selectedId=null saja TAK cukup: klinecharts
+// menyimpan state seleksi di OverlayStore._clickInstanceInfo (inilah yang menggambar handle). Bersihkan
+// lewat setClickInstanceInfo(instance:null) → memicu onDeselected (yang mereset selectedId) + re-render pane.
+// Jalur internal ini valid utk klinecharts@9.8.10 yang di-pin; try/catch + fallback jaga-jaga bila berubah.
+function deselectOverlay(){
+  try{
+    chart.getChartStore().getOverlayStore().setClickInstanceInfo(
+      {paneId:'', instance:null, figureType:0, figureKey:'', figureIndex:-1, attrsIndex:-1}, {}
+    );
+  }catch(_){}
+  selectedId=null;
+}
 // paksa render ulang overlay posisi saat select/hover → handle & teks muncul/hilang seketika.
 // HANYA utk posisi yg sudah lengkap (6 titik) & tidak sedang digambar — jangan ganggu proses draw.
 function posRerender(o){ try{
@@ -5676,7 +5688,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
-  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } }
+  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } else if(selectedId){ deselectOverlay(); } }
   // ('b'/'s' telanjang → submit order dihapus: huruf kini memicu symbol search, bukan eksekusi order)
 });
 
