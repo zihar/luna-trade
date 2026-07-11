@@ -5267,6 +5267,20 @@ app.style.setProperty('--trades-h', _coll?'36px':savedTradesH()+'px');
 $('#toggleTrades').classList.toggle('on',!_coll);
 
 // ===================== keyboard =====================
+// Hotkey timeframe ala TradingView: mulai ketik DIGIT → mode input TF (buffer),
+// menit → TF (5→M5, 60→H1, 240→H4). Unit letter menutup buffer: 1d→Daily, 1w→Weekly, 1M→Monthly.
+let tfBuf='', tfBufTimer=null;
+const MIN_TO_TF={}; for(const k in DUR){ const mn=DUR[k]/6e4; if(Number.isInteger(mn)) MIN_TO_TF[mn]=k; }
+function applyTFBuf(){
+  const b=tfBuf; tfBuf=''; clearTimeout(tfBufTimer); tfBufTimer=null;
+  if(!b) return;
+  let tf=null;
+  if(/^\d+$/.test(b)) tf=MIN_TO_TF[parseInt(b,10)];
+  else if(/^\d*d$/i.test(b)) tf='D';
+  else if(/^\d*w$/i.test(b)) tf='W';
+  else if(/^\d*M$/.test(b)) tf='MN';
+  if(tf && tf!==currentTF) try{ switchTF(tf); }catch(_){}
+}
 window.addEventListener('keydown',e=>{
   if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
   // shortcut drawing ala TradingView — Alt+huruf (Mac ⌥). Pakai e.code (fisik) agar OS/layout-independent.
@@ -5277,13 +5291,37 @@ window.addEventListener('keydown',e=>{
     if(k==='z'){ e.preventDefault(); e.shiftKey?redoDraw():undoDraw(); return; }
     if(k==='y'){ e.preventDefault(); redoDraw(); return; }
   }
+  // TF hotkey (digit → mode input TF) + type-to-search (huruf/'/' → symbol search).
+  // Digit memicu TF, huruf memicu search → tak ada tabrakan namespace.
+  {
+    const isDigit = e.key>='0' && e.key<='9';
+    const isUnit  = tfBuf && (e.key==='d'||e.key==='D'||e.key==='w'||e.key==='W'||e.key==='M');
+    if(isDigit || isUnit){
+      e.preventDefault();
+      tfBuf += (e.key==='D'?'d':e.key==='W'?'w':e.key);   // d/w di-lowercase; M (month) tetap kapital
+      clearTimeout(tfBufTimer);
+      if(isUnit) applyTFBuf();                             // unit = terminator → apply seketika
+      else tfBufTimer=setTimeout(applyTFBuf,800);
+      return;
+    }
+    if(tfBuf){
+      if(e.key==='Enter'){ e.preventDefault(); applyTFBuf(); return; }
+      if(e.key==='Escape'){ e.preventDefault(); tfBuf=''; clearTimeout(tfBufTimer); return; }
+      tfBuf=''; clearTimeout(tfBufTimer);                 // key lain → batalkan buffer, lanjut handling normal
+    }
+    if(!e.altKey && (e.key==='/' || /^[a-zA-Z]$/.test(e.key))){
+      e.preventDefault();
+      const seed = e.key==='/' ? '' : e.key;
+      try{ openIpick(); const q=$('#ipickQ'); if(q){ q.value=seed; renderIpick(seed); } }catch(_){}
+      return;
+    }
+  }
   if(e.key==='ArrowRight'){e.preventDefault();step(1)}
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
   else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } }
-  // Catatan: dulu 'b'/'s' telanjang = submit market order (risiko eksekusi tak sengaja) — dihapus.
-  // Order tetap lewat tombol Buy/Sell di order panel.
+  // ('b'/'s' telanjang → submit order dihapus: huruf kini memicu symbol search, bukan eksekusi order)
 });
 
 // ===================== Bar Replay (mode chart, ala TradingView) =====================
