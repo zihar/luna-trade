@@ -881,6 +881,25 @@
                border:1px solid var(--border); border-radius:4px; padding:2px 4px; }
 
   /* ===================== popup setting objek gambar & chart (TradingView-like) ===================== */
+  /* "Change interval" dialog — konfirmasi ganti TF via keyboard (ala TradingView), tema Luna */
+  .ivl-overlay{ position:fixed; inset:0; z-index:1500; display:none; align-items:center; justify-content:center; }
+  .ivl-overlay.show{ display:flex; }
+  .ivl-card{ background:var(--panel); border:1px solid var(--border); border-radius:16px;
+             box-shadow:var(--shadow); padding:22px 22px 18px; width:300px; }
+  .ivl-head{ display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:16px; }
+  .ivl-title{ font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--txt); letter-spacing:.01em; }
+  .ivl-info{ width:15px; height:15px; color:var(--muted); cursor:help; flex:none; }
+  .ivl-input{ width:100%; box-sizing:border-box; text-align:center; font-family:var(--font-num);
+              font-size:26px; font-weight:400; color:var(--txt); background:var(--inset);
+              border:1.5px solid var(--border); border-radius:11px; padding:12px 10px; outline:none;
+              transition:border-color .12s ease, box-shadow .12s ease; }
+  .ivl-input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
+  .ivl-input.invalid{ border-color:var(--red); }
+  .ivl-input.invalid:focus{ box-shadow:0 0 0 3px rgba(255,111,111,.25); }
+  .ivl-sub{ text-align:center; font-family:var(--font-display); font-size:12px; color:var(--muted);
+            margin-top:10px; min-height:15px; }
+  .ivl-sub.invalid{ color:var(--red); }
+  @media (prefers-reduced-motion: reduce){ .ivl-input{ transition:none; } }
   .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
            border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:184px; }
   .objpop.show{ display:block; }
@@ -5275,20 +5294,47 @@ app.style.setProperty('--trades-h', _coll?'36px':savedTradesH()+'px');
 $('#toggleTrades').classList.toggle('on',!_coll);
 
 // ===================== keyboard =====================
-// Hotkey timeframe ala TradingView: mulai ketik DIGIT → mode input TF (buffer),
-// menit → TF (5→M5, 60→H1, 240→H4). Unit letter menutup buffer: 1d→Daily, 1w→Weekly, 1M→Monthly.
-let tfBuf='', tfBufTimer=null;
+// Hotkey timeframe ala TradingView: ketik DIGIT di chart → buka dialog "Change interval"
+// (konfirmasi eksplisit, TIDAK langsung ganti TF). Enter apply, Esc/klik-luar batal.
 const MIN_TO_TF={}; for(const k in DUR){ const mn=DUR[k]/6e4; if(Number.isInteger(mn)) MIN_TO_TF[mn]=k; }
-function applyTFBuf(){
-  const b=tfBuf; tfBuf=''; clearTimeout(tfBufTimer); tfBufTimer=null;
-  if(!b) return;
-  let tf=null;
-  if(/^\d+$/.test(b)) tf=MIN_TO_TF[parseInt(b,10)];
-  else if(/^\d*d$/i.test(b)) tf='D';
-  else if(/^\d*w$/i.test(b)) tf='W';
-  else if(/^\d*M$/.test(b)) tf='MN';
-  if(tf && tf!==currentTF) try{ switchTF(tf); }catch(_){}
+const TF_HUMAN={M1:'1 minute',M2:'2 minutes',M4:'4 minutes',M5:'5 minutes',M10:'10 minutes',M15:'15 minutes',M30:'30 minutes',H1:'1 hour',H2:'2 hours',H3:'3 hours',H4:'4 hours',H6:'6 hours',H8:'8 hours',H12:'12 hours',D:'1 day',W:'1 week',MN:'1 month'};
+// string interval → kode TF (atau null bila tak tersedia). menit / Nm = menit, Nh = jam, Nd/Nw = day/week, NM (kapital) = month.
+function parseInterval(s){
+  s=(s||'').trim(); let m;
+  if(/^\d*M$/.test(s)) return 'MN';
+  if(m=s.match(/^(\d+)m?$/)) return MIN_TO_TF[+m[1]]||null;
+  if(m=s.match(/^(\d+)h$/i)) return MIN_TO_TF[+m[1]*60]||null;
+  if(/^\d*d$/i.test(s)) return 'D';
+  if(/^\d*w$/i.test(s)) return 'W';
+  return null;
 }
+const openIntervalDialog=(function(){
+  const ov=document.createElement('div'); ov.className='ivl-overlay';
+  ov.innerHTML=`<div class="ivl-card" role="dialog" aria-modal="true" aria-label="Change interval">`
+    +`<div class="ivl-head"><span class="ivl-title">Change interval</span>`
+    +`<svg class="ivl-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.4v.01"/><title>Type minutes (60 = 1 hour), or 4h · 1D · 1W · 1M. Enter to apply, Esc to cancel.</title></svg></div>`
+    +`<input class="ivl-input" inputmode="text" autocomplete="off" spellcheck="false" maxlength="6" aria-label="Interval">`
+    +`<div class="ivl-sub"></div></div>`;
+  document.body.appendChild(ov);
+  const card=ov.querySelector('.ivl-card'), input=ov.querySelector('.ivl-input'), sub=ov.querySelector('.ivl-sub');
+  let curTf=null;
+  function update(){
+    input.value=input.value.replace(/[^0-9dwhmDWM]/g,'');
+    curTf=parseInterval(input.value);
+    if(curTf){ sub.textContent=TF_HUMAN[curTf]||curTf; input.classList.remove('invalid'); sub.classList.remove('invalid'); }
+    else if(!input.value){ sub.textContent='Type an interval'; input.classList.remove('invalid'); sub.classList.remove('invalid'); }
+    else { sub.textContent='Not available'; input.classList.add('invalid'); sub.classList.add('invalid'); }
+  }
+  function close(){ ov.classList.remove('show'); }
+  function apply(){ if(curTf){ if(curTf!==currentTF) try{ switchTF(curTf); }catch(_){} close(); } }
+  input.addEventListener('input',update);
+  input.addEventListener('keydown',e=>{ e.stopPropagation();
+    if(e.key==='Enter'){ e.preventDefault(); apply(); }
+    else if(e.key==='Escape'){ e.preventDefault(); close(); } });
+  ov.addEventListener('mousedown',e=>{ if(!card.contains(e.target)) close(); });
+  return function(seed){ input.value=seed||''; ov.classList.add('show'); update();
+    input.focus(); const n=input.value.length; try{ input.setSelectionRange(n,n); }catch(_){} };
+})();
 window.addEventListener('keydown',e=>{
   if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
   // shortcut drawing ala TradingView — Alt+huruf (Mac ⌥). Pakai e.code (fisik) agar OS/layout-independent.
@@ -5299,24 +5345,10 @@ window.addEventListener('keydown',e=>{
     if(k==='z'){ e.preventDefault(); e.shiftKey?redoDraw():undoDraw(); return; }
     if(k==='y'){ e.preventDefault(); redoDraw(); return; }
   }
-  // TF hotkey (digit → mode input TF) + type-to-search (huruf/'/' → symbol search).
-  // Digit memicu TF, huruf memicu search → tak ada tabrakan namespace.
+  // Ketik DIGIT → buka dialog "Change interval" (konfirmasi, bukan ganti TF langsung).
+  // Ketik HURUF / '/' → symbol search. Digit vs huruf → tak ada tabrakan namespace.
   {
-    const isDigit = e.key>='0' && e.key<='9';
-    const isUnit  = tfBuf && (e.key==='d'||e.key==='D'||e.key==='w'||e.key==='W'||e.key==='M');
-    if(isDigit || isUnit){
-      e.preventDefault();
-      tfBuf += (e.key==='D'?'d':e.key==='W'?'w':e.key);   // d/w di-lowercase; M (month) tetap kapital
-      clearTimeout(tfBufTimer);
-      if(isUnit) applyTFBuf();                             // unit = terminator → apply seketika
-      else tfBufTimer=setTimeout(applyTFBuf,800);
-      return;
-    }
-    if(tfBuf){
-      if(e.key==='Enter'){ e.preventDefault(); applyTFBuf(); return; }
-      if(e.key==='Escape'){ e.preventDefault(); tfBuf=''; clearTimeout(tfBufTimer); return; }
-      tfBuf=''; clearTimeout(tfBufTimer);                 // key lain → batalkan buffer, lanjut handling normal
-    }
+    if(e.key>='0' && e.key<='9'){ e.preventDefault(); openIntervalDialog(e.key); return; }
     if(!e.altKey && (e.key==='/' || /^[a-zA-Z]$/.test(e.key))){
       e.preventDefault();
       const seed = e.key==='/' ? '' : e.key;
