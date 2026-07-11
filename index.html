@@ -384,11 +384,14 @@
   .ctxitem.disabled{color:var(--muted);opacity:.45;cursor:default;pointer-events:none}
   .ctxsep{height:1px;background:var(--border);margin:4px 6px}
   /* editor teks inline di chart */
-  .text-editor,.text-editor:focus,.text-editor:focus-visible{position:fixed;z-index:1100;background:var(--panel);color:var(--txt);
-    border:1px solid var(--accent);caret-color:var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);outline:none;
-    border-radius:3px;padding:2px 6px;font:13px/1.3 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    min-width:70px;min-height:18px;resize:none;text-align:center;overflow:hidden}
-  .text-editor::placeholder{ color:var(--muted); opacity:1; }
+  /* WYSIWYG: chrome minimal — transparan, tanpa kotak; hanya ring aksen tipis + caret.
+     font/ukuran/warna/align di-set inline oleh openOverlayTextEditor agar = teks canvas. */
+  .text-editor,.text-editor:focus,.text-editor:focus-visible{position:fixed;z-index:1100;background:transparent;color:var(--txt);
+    border:0;padding:0;margin:0;caret-color:var(--accent);outline:none;border-radius:2px;
+    box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+    min-width:24px;min-height:16px;resize:none;overflow:hidden;white-space:pre;
+    text-shadow:0 1px 2px rgba(0,0,0,.45)}
+  .text-editor::placeholder{ color:var(--muted); opacity:1; text-shadow:none; }
 
   /* ===================== polish pass ===================== */
   :root{ color-scheme:dark;
@@ -885,13 +888,14 @@
   }
 
   /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
-  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:4px;
-    background:transparent; border:none; color:var(--accent); font-size:12px; font-weight:600;
-    padding:2px 4px; cursor:pointer; white-space:nowrap;
-    transform:translate(-50%,-100%); text-shadow:0 1px 3px rgba(0,0,0,.65); }
+  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:5px;
+    background:var(--panel); border:1px solid var(--border); color:var(--txt); font-size:12px; font-weight:500;
+    padding:3px 9px; border-radius:6px; cursor:pointer; white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.28); transform:translate(-50%,-100%);
+    transition:border-color .12s ease, background .12s ease; }
   .addtext-btn.show{ display:inline-flex; }
-  .addtext-btn:hover{ color:var(--txt); }
-  .addtext-btn .pl{ font-weight:700; font-size:14px; line-height:1; }
+  .addtext-btn:hover{ background:var(--btn-hover); border-color:var(--accent); }
+  .addtext-btn .pl{ font-weight:700; font-size:13px; line-height:1; color:var(--accent); }
 
   /* ===================== layout 5-zona (TradeLocker) ===================== */
   .app{ flex:1; min-height:0; position:relative; display:grid;
@@ -2012,7 +2016,7 @@ klinecharts.registerOverlay({
       const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
       const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
       lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
-        styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
+        styles:{color:drawTextColor,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
     return figs;
   }
 });
@@ -2065,15 +2069,17 @@ klinecharts.registerOverlay({
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
     const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1]; const st=dstyle(overlay); const ls=lsLine(st);
-    const t=(overlay&&overlay.extendData)? String(overlay.extendData):'Text';
+    const raw=(overlay&&overlay.extendData)? String(overlay.extendData):'';
+    const empty=(raw===''), t = empty ? 'Add text' : raw;   // kosong → placeholder muted, bukan teks literal
     const lines=t.split('\n'), lh=15, pad=6, cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
     const bx=b.x-cw/2, by=b.y-ch/2;
     const figs=[
       {type:'line', attrs:{coordinates:[a,{x:b.x,y:b.y}]}, styles:Object.assign({color:st.color,size:st.size},ls)},
       {type:'rect', attrs:{x:bx,y:by,width:cw,height:ch}, styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:ls.style}},
     ];
+    if(overlay.id===editingTextId) return figs;   // sedang diedit → teks dirender oleh editor (kotak+penunjuk tetap tampil)
     lines.forEach((ln,i)=>figs.push({type:'text', attrs:{x:bx+pad,y:by+pad+i*lh, text:ln, align:'left', baseline:'top'},
-      styles:{color:drawTextColor,size:12,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}));
+      styles:{color:(empty?drawTextMuted:drawTextColor),size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}));
     return figs;
   }
 });
@@ -2096,7 +2102,7 @@ klinecharts.registerOverlay({
       const ty = va==='top' ? py-off : va==='bottom' ? py+off : py;
       const bl = va==='top' ? 'bottom' : va==='bottom' ? 'top' : 'middle';
       figs.push({type:'text',attrs:{x:px,y:ty,text:String(t),align:ha,baseline:bl},
-        styles:{color:drawTextColor,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
+        styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
   },
   // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
@@ -2316,6 +2322,7 @@ klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointF
 
 // custom overlay: Text bebas — 1 klik taruh titik, lalu editor inline (lihat editTextOverlay)
 let drawTextColor='#e8edf2';   // diperbarui oleh applyTheme agar kontras di light/dark
+let drawTextMuted='#89898b';   // warna placeholder (callout kosong) — ikut tema (= --muted)
 let editingTextId=null;        // id overlay teks yg sedang diedit → jangan dirender (cegah dobel dgn editor)
 klinecharts.registerOverlay({
   name:'text', totalStep:2, needDefaultPointFigure:true,
@@ -2331,7 +2338,7 @@ klinecharts.registerOverlay({
     const yTop = va==='top' ? y0 : va==='bottom' ? y0-(lines.length-1)*lh : y0-(lines.length-1)*lh/2;
     return lines.map((ln,i)=>({ type:'text',
       attrs:{x, y:yTop+i*lh, text:ln, align:ha, baseline:va},
-      styles:{color:(st.color||drawTextColor), size:(st.size||13), backgroundColor:'transparent', borderColor:'transparent',
+      styles:{color:(st.color||drawTextColor), size:(st.size||13), family:AXIS_FONT, backgroundColor:'transparent', borderColor:'transparent',
               paddingLeft:0, paddingRight:0, paddingTop:0, paddingBottom:0} }));
   }
 });
@@ -2513,6 +2520,7 @@ function applyTheme(t){
   const light = t==='light';
   document.body.classList.toggle('light', light);
   drawTextColor = light?'#1e242e':'#e8edf2';
+  drawTextMuted = light?'#697280':'#89898b';
   try{ chart.setStyles(light?lightStyles:darkStyles); }catch(e){}
   try{ secondaries.forEach(sc=>sc.chart.setStyles(light?lightStyles:darkStyles)); }catch(e){}
   try{ applyChartCfg(); }catch(e){}   // pertahankan warna chart kustom user di atas tema
@@ -4224,6 +4232,7 @@ function overlayTextAnchor(o){
   if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
   // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
   if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  if(o.name==='callout' && pts.length>=2){ const b=toPx(pts[1]); if(b) return {x:rect.left+b.x, y:rect.top+b.y}; }   // pusat kotak teks (titik ke-2), bukan jangkar penunjuk
   const p=pts[0]; if(!p) return null; const px=toPx(p);
   return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
 }
@@ -4235,10 +4244,30 @@ function openOverlayTextEditor(o, removeIfEmpty){
   if(textEditorEl){ try{textEditorEl.remove();}catch(e){} textEditorEl=null; }
   const ta=document.createElement('textarea');
   ta.className='text-editor'; ta.value=o.extendData||''; ta.rows=1;
-  ta.placeholder='Add text';
-  const isText=(o.name==='text');   // teks bebas: rata kiri & jangkar di titik klik (box pas di lokasi teks)
-  if(isText){ ta.style.textAlign='left'; ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-2)+'px'; ta.style.transform='none'; }
-  else      { ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-20)+'px'; ta.style.transform='translateX(-50%)'; }
+  ta.placeholder='Add text'; ta.wrap='off';   // wrap off → auto-size lebar ikut baris terpanjang
+  // WYSIWYG: editor pakai font/ukuran/warna/align PERSIS seperti figure canvas yang di-render
+  // (lihat createPointFigures tiap overlay) → tak ada "loncatan" gaya saat commit.
+  const st=dstyle(o), name=o.name;
+  const mir = name==='text'     ? { size:(st.size||13), color:(st.color||drawTextColor), lh:16, align:(st.textAlign||'left') }
+            : name==='callout'  ? { size:12, color:drawTextColor, lh:15, align:'left' }
+            : name==='rect'     ? { size:12, color:drawTextColor, lh:15, align:(st.textAlign||'center') }
+            : name==='trendline'? { size:10, color:drawTextColor, lh:14, align:(st.textAlign||'center') }
+            :                     { size:13, color:drawTextColor, lh:16, align:'left' };
+  ta.style.fontFamily=AXIS_FONT;
+  ta.style.fontSize=mir.size+'px';
+  ta.style.lineHeight=mir.lh+'px';
+  ta.style.color=mir.color;
+  ta.style.textAlign=mir.align;
+  // posisi in-place: samakan titik jangkar teks canvas ↔ pojok/tengah editor
+  if(name==='text'){                         // baseline 'top' di titik klik → pojok kiri-atas editor di situ
+    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-2)+'px'; ta.style.transform='none';
+  } else if(name==='callout'){               // teks rata kiri-atas di dalam kotak (pusat kotak = anchor)
+    const t=(o.extendData||'')||'Add text', lines=String(t).split('\n'), lh=15, pad=6;
+    const cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
+    ta.style.left=Math.round(x-cw/2+pad)+'px'; ta.style.top=Math.round(y-ch/2+pad)+'px'; ta.style.transform='none';
+  } else {                                   // rect/trendline: teks di tengah anchor
+    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y)+'px'; ta.style.transform='translate(-50%,-50%)';
+  }
   document.body.appendChild(ta); textEditorEl=ta;
   // sembunyikan teks overlay aslinya selagi editor terbuka → tidak dobel
   editingTextId=o.id; try{chart.overrideOverlay({id:o.id,points:o.points});}catch(e){}
@@ -4258,7 +4287,9 @@ function openOverlayTextEditor(o, removeIfEmpty){
     }else if(fresh && removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru (khusus Text)
     else { try{ const ov=chart.getOverlayById(o.id); if(ov) chart.overrideOverlay({id:o.id,points:ov.points}); }catch(e){} }  // batal edit: tampilkan lagi teks lama
   };
-  const grow=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; };
+  const grow=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px';
+    if(ta.value===''){ ta.style.width='64px'; }                              // ruang utk placeholder "Add text"
+    else { ta.style.width='0px'; ta.style.width=(ta.scrollWidth+2)+'px'; } };  // ring memeluk baris terpanjang
   ta.addEventListener('input',grow); grow();
   ta.addEventListener('keydown',ev=>{
     ev.stopPropagation();                              // Enter = baris baru (perilaku textarea default)
