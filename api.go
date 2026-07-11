@@ -33,6 +33,9 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/prices", requireUser(handlePrices))
 	mux.HandleFunc("POST /api/track", requireUser(handleTrack))         // analytics: catat event fitur
 	mux.HandleFunc("GET /api/analytics", requireUser(handleAnalytics))  // analytics: laporan (admin)
+	mux.HandleFunc("GET /api/alerts", requireUser(handleAlertsList))
+	mux.HandleFunc("POST /api/alerts", requireUser(handleAlertCreate))
+	mux.HandleFunc("POST /api/alerts/delete", requireUser(handleAlertDelete))
 }
 
 // handleTrack mencatat satu event pemakaian fitur (analytics DIY, lihat store.LogEvent).
@@ -121,6 +124,73 @@ func handleAnalytics(w http.ResponseWriter, r *http.Request) {
 		"users":        users,
 		"active_users": map[string]int{"d1": a1, "d7": a7, "d30": a30},
 	})
+}
+
+// alertView = tampilan JSON satu price alert untuk FE.
+type alertView struct {
+	ID          int64   `json:"id"`
+	Instrument  string  `json:"instrument"`
+	Price       float64 `json:"price"`
+	Active      bool    `json:"active"`
+	CreatedAt   int64   `json:"createdAt"`
+	TriggeredAt *int64  `json:"triggeredAt"`
+}
+
+// handleAlertsList mengembalikan price alert milik user (aktif atau sudah
+// triggered tapi belum di-ack).
+func handleAlertsList(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	rows, err := store.ListAlerts(uid)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	out := make([]alertView, 0, len(rows))
+	for _, a := range rows {
+		out = append(out, alertView{a.ID, a.Instrument, a.Price, a.Active, a.CreatedAt, a.TriggeredAt})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handleAlertCreate membuat price alert baru untuk instrumen & harga target.
+func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		Instrument string  `json:"instrument"`
+		Price      float64 `json:"price"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if req.Instrument == "" || req.Price <= 0 {
+		writeErr(w, http.StatusBadRequest, "instrument & price required")
+		return
+	}
+	now := time.Now().UnixMilli()
+	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, alertView{id, req.Instrument, req.Price, true, now, nil})
+}
+
+// handleAlertDelete menghapus (ack) satu price alert milik user.
+func handleAlertDelete(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if err := store.DeleteAlert(uid, req.ID); err != nil {
+		writeErr(w, http.StatusNotFound, "alert not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 // handlePrices = SSE harga realtime. Butuh OANDA_ACCOUNT_ID (stream upstream).
