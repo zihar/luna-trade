@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // loadDotEnv membaca file .env (jika ada) dan menyetel var yang belum di-set di
@@ -56,6 +57,11 @@ func host() string {
 // Package-level supaya handler API (api.go) bisa mengaksesnya. Boleh nil saat
 // belum ada DB_PATH yang valid — handler live yang akan menjaga nil-nya.
 var store *Store
+
+// candles = cache in-memory response /api/candles "terbaru" (lihat candlecache.go
+// & docs/candle-cache-plan.md). Meredam thundering-herd ke OANDA saat banyak user
+// membuka instrumen+TF sama berbarengan. ~(instrumen × TF) key → cap 80 aman.
+var candles = newCandleCache(80)
 
 func main() {
 	loadDotEnv(".env")
@@ -180,18 +186,44 @@ func candlesHandler(token string) http.HandlerFunc {
 		}
 		target := host() + "/v3/instruments/" + url.PathEscape(inst) + "/candles?" + p.Encode()
 
-		req, _ := http.NewRequest(http.MethodGet, target, nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept-Datetime-Format", "RFC3339")
-		resp, err := http.DefaultClient.Do(req)
+		// loader mengambil byte JSON mentah dari OANDA (dipakai langsung / di-cache).
+		loader := func() ([]byte, int, error) {
+			req, _ := http.NewRequest(http.MethodGet, target, nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept-Datetime-Format", "RFC3339")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, 0, err
+			}
+			return body, resp.StatusCode, nil
+		}
+
+		// Hanya cache request "terbaru" (tanpa `to`): di situ konsentrasi herd, dan
+		// key terbatas ke ~(instrumen × TF). Scroll historis (`to` != "") tersebar
+		// per-user → passthrough langsung. TTL 5s = CAP penyerap lonjakan; candle
+		// terkini bisa telat ≤5s (tak masalah utk chart; harga live via SSE).
+		cacheable := q.Get("to") == ""
+		var body []byte
+		var status int
+		var err error
+		if cacheable {
+			key := inst + "|" + gran + "|" + count + "||" + q.Get("from")
+			body, status, err = candles.fetch(key, 5*time.Second, loader)
+		} else {
+			body, status, err = loader()
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		defer resp.Body.Close()
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
+		w.WriteHeader(status)
+		w.Write(body)
 	}
 }

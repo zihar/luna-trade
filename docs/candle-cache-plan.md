@@ -1,6 +1,9 @@
 # Plan: Cache Candle Proxy (`/api/candles`) untuk Kapasitas Multi-User
 
-> Status: **RENCANA / belum dikerjakan** (dicatat 2026-07-06). Referensi saat siap.
+> Status: **SELESAI** (diimplementasikan 2026-07-11 — `candlecache.go` + wire di
+> `main.go:candlesHandler`, unit test `candlecache_test.go`). Doc ini = catatan desain.
+> Belum diverifikasi beban dengan OANDA nyata (butuh sesi login + counter upstream);
+> mekanisme dedupe terbukti via unit test (50 goroutine konkuren → 1 fetch, `-race`).
 
 ## Latar belakang
 Server produksi = EC2 **t4g.small** (2 vCPU arm64, **1.8 GB RAM**, disk ~4 GB sisa),
