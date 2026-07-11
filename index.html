@@ -4921,14 +4921,7 @@ function initPriceTimer(){
   updatePriceTimer();
 }
 
-async function loadAlerts(){
-  try{
-    const r=await fetch('/api/alerts'); if(!r.ok){ alerts=[]; renderAlertList(); drawAlertLines(); return; }
-    const rows=await r.json();
-    alerts=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt, oid:null}));
-    renderAlertList(); drawAlertLines();
-  }catch(e){ alerts=[]; }
-}
+// Muatan awal + refresh alert kini lewat alertPoll() (server source of truth); loadAlerts lama dibuang (dead).
 // saveAlerts dihapus — server jadi source of truth untuk data alert.
 // custom overlay: garis alert (horizontal) + badge ✕ kecil di ujung kanan utk hapus
 klinecharts.registerOverlay({
@@ -5042,8 +5035,10 @@ function startAlertPoll(){ if(alertPollTimer) return; alertPoll(); alertPollTime
 function stopAlertPoll(){ clearInterval(alertPollTimer); alertPollTimer=null; }
 $('#alertAddBtn').onclick=openAlertDialog;
 $('#amClose').onclick=closeAlertDialog; $('#amCancel').onclick=closeAlertDialog;
-$('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!p){ setStatus('Enter a price.',true); return; }
-  const a=await createServerAlert(p); if(a){ closeAlertDialog(); toast('Alert created @ '+fmt(a.price),'success'); } };
+$('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!(p>0)){ setStatus('Enter a valid price.',true); return; }
+  const a=await createServerAlert(p);
+  if(a){ closeAlertDialog(); toast('Alert created @ '+fmt(a.price),'success'); }
+  else { setStatus('Could not create alert. Try again.',true); } };
 $('#alertModal').addEventListener('mousedown',e=>{ if(e.target===$('#alertModal')) closeAlertDialog(); });
 // ===================== order panel: docked / mengambang (bebas digeser) =====================
 const app=document.querySelector('.app');
