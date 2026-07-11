@@ -2734,11 +2734,13 @@ async function fetchCandles(tf,{count,to,from}){
     timestamp:Date.parse(c.time), open:+c.mid.o, high:+c.mid.h, low:+c.mid.l, close:+c.mid.c, volume:+(c.volume||0),
   })).sort((a,b)=>a.timestamp-b.timestamp);
 }
-// setStatus(t,err) — dulu menulis ke #status di header (nempel ke profile). Kini diteruskan
-// ke toast() supaya feedback tampil di pojok, bukan di samping avatar. t kosong = no-op.
+// setStatus(t,err) — dulu menulis ke #status di header (nempel ke profile). Kini HANYA error
+// (err=true) yang dimunculkan sbg toast; pesan info/progres (Fetching/Loaded/instruksi/cancel)
+// sengaja disenyapkan supaya toast hanya berisi yang penting. Konfirmasi aksi penting pakai
+// toast(...,'success') langsung di call-site-nya.
 function setStatus(t,err){
-  if(!t) return;
-  toast(t, err ? 'error' : 'info');
+  if(!t || !err) return;
+  toast(t, 'error');
 }
 
 // ===================== ganti TF (chart tetap 1) =====================
@@ -2797,7 +2799,6 @@ async function switchTF(tf){
   lastLen=-1; render(true);
   if(loadTok!=null) chartLoad.hide(loadTok);     // candle TF baru sudah tergambar → baru tutup overlay
   reanchorFuturePoints(futSnap);                 // petakan ulang ke dataIndex TF baru
-  toast('Timeframe: '+tf,'success');
 }
 
 // ===================== render =====================
@@ -3681,7 +3682,7 @@ function placePending(dir){
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
            time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};   // waktu pembuatan → guard anti eval bar pra-pending saat re-tread
   clearDraftLines(); drawPendingLines(); updateOpenTradeBox();
-  setStatus(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting for price to be touched.');
+  toast(dir.toUpperCase()+' '+type+' pending @ '+fmt(entry)+' — waiting to be touched.','success');
 }
 function drawPendingLines(){
   ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending&&pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} pending[k]=null; }});
@@ -3717,7 +3718,7 @@ function partialClose(frac){
   journal.push({time:trade.time,exitTime:cur.timestamp,dir:trade.dir,entry:trade.entry,exit,r,units,pnlCcy,balanceAfter:bal,partial:true});
   trade.units-=units;
   saveJournal(); renderStats(); renderJournal(); updateOpenTradeBox(); renderAcct();
-  setStatus('Partial close '+Math.round(frac*100)+'% @ '+fmt(exit)+'.');
+  toast('Partial close '+Math.round(frac*100)+'% @ '+fmt(exit),'success');
 }
 function closeTrade(exit,time){
   if(!trade) return;
@@ -6086,7 +6087,6 @@ function resetChartView(){
   try{ chart.setBarSpace(8); }catch(e){}     // reset level zoom waktu ke default
   try{ chart.setStyles({yAxis:{type:'normal'}}); }catch(e){} // reset zoom/skala HARGA (y-axis) → auto-calc (setAutoCalcTickFlag(true))
   try{ chart.scrollToRealTime(); }catch(e){} // tempel ke bar terbaru yang terungkap
-  toast('Chart view reset ('+currentTF+')','success');
 }
 
 // ===================== init =====================
