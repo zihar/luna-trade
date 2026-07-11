@@ -3364,13 +3364,13 @@ function previewPosLevel(id,kind,v){
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
   if(id===REPLAY_ID){ if(!trade) return; trade[kind]=+v; if(kind==='sl') recalcRisk();
-    toast(kind.toUpperCase()+' diperbarui','success'); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast(kind.toUpperCase()+' updated','success'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast(d.error||'Gagal ubah '+kind.toUpperCase(),'error'); drawPaperLines(); return; }
-      toast(kind.toUpperCase()+' diperbarui','success'); await spSync(); drawPaperLines(); })
-    .catch(()=>{ toast('Tidak bisa terhubung ke server','error'); drawPaperLines(); });
+      if(!r.ok){ toast(d.error||'Could not update '+kind.toUpperCase(),'error'); drawPaperLines(); return; }
+      toast(kind.toUpperCase()+' updated','success'); await spSync(); drawPaperLines(); })
+    .catch(()=>{ toast('Could not connect to the server','error'); drawPaperLines(); });
 }
 function confirmPosLevel(id,kind,v){
   const p=posById(id); if(!p) return; const dec=decimalsFor(p.instrument);
@@ -3586,13 +3586,13 @@ function renderPosEdit(skipPriceInputs){
 function commitPosSLTP(){
   if(!editPos) return;
   if(editPos.id===REPLAY_ID){ if(trade){ trade.sl=editPos.slOn?+editPos.sl:null; trade.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(); }
-    toast('SL/TP diperbarui','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
+    toast('SL/TP updated','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(async r=>{ const d=await r.json().catch(()=>({}));
-      if(!r.ok){ toast(d.error||'Gagal ubah SL/TP','error'); return; }
-      toast('SL/TP diperbarui','success'); closePositionEditor(); await spSync(); drawPaperLines(); })
-    .catch(()=>toast('Tidak bisa terhubung ke server','error'));
+      if(!r.ok){ toast(d.error||'Could not update SL/TP','error'); return; }
+      toast('SL/TP updated','success'); closePositionEditor(); await spSync(); drawPaperLines(); })
+    .catch(()=>toast('Could not connect to the server','error'));
 }
 function openPositionEditor(id){
   const p=posById(id); if(!p) return;
