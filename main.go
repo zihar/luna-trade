@@ -105,6 +105,11 @@ func main() {
 	if cfg.Creds.AccountID != "" && os.Getenv("PAPER_SLTP_MONITOR") != "0" {
 		startPaperMonitor()
 	}
+	// Monitor price alert server-side (jalan walau browser ditutup).
+	// Butuh stream harga (OANDA_ACCOUNT_ID). Nonaktifkan via ALERT_MONITOR=0.
+	if cfg.Creds.AccountID != "" && os.Getenv("ALERT_MONITOR") != "0" {
+		startAlertMonitor()
+	}
 
 	mux := http.NewServeMux()
 	// Shell statik (index.html, assets/) publik; data di balik sesi (requireUser).
