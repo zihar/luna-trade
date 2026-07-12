@@ -4,7 +4,10 @@
 package main
 
 import (
+	"errors"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +58,25 @@ func (c *hlCache) get(now time.Time) (items []news.Headline, partial bool, fetch
 	}
 	c.items, c.partial, c.fetchedAt, c.ok = fresh, freshPartial, now, true
 	return c.items, c.partial, c.fetchedAt, false, nil
+}
+
+// handleNewsHeadlines melayani GET /api/news/headlines?instrument=XAU_USD.
+func handleNewsHeadlines(w http.ResponseWriter, r *http.Request) {
+	instrument := strings.TrimSpace(r.URL.Query().Get("instrument"))
+	if instrument == "" {
+		instrument = "XAU_USD"
+	}
+	now := time.Now().UTC()
+	items, partial, fetchedAt, stale, err := headlineCache.get(now)
+	if err != nil {
+		if errors.Is(err, news.ErrNoSource) {
+			writeJSON(w, http.StatusOK, hlResponse{Disabled: true, Instrument: instrument, Headlines: []hlItem{}})
+			return
+		}
+		writeErr(w, http.StatusServiceUnavailable, "Headlines unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, buildHeadlinesResponse(items, instrument, partial, fetchedAt, stale))
 }
 
 // ---- bentuk response JSON ----

@@ -14,6 +14,7 @@ dan lihat hasil R + journal. Data dari **OANDA v20**; tidak terhubung ke engine 
 cd ~/Projects/luna-trade
 export OANDA_TOKEN=<personal-access-token-v20>
 export OANDA_ENV=practice            # atau: live
+export FINNHUB_TOKEN=<finnhub-api-key>   # opsional: news headline feed; kosong = fitur mati
 go run .
 ```
 
