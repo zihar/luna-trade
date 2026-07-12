@@ -819,6 +819,30 @@
   .cal-fig{ color:var(--muted); } .cal-fig b{ color:var(--txt); }
   .cal-item.released{ background:color-mix(in srgb, var(--accent) 6%, transparent); }
 
+  /* News panel tabs (Calendar | News) — segmented di .wl-head */
+  .news-tabs{ display:inline-flex; background:var(--inset); border:1px solid var(--border); border-radius:7px; padding:2px; gap:2px; }
+  .news-tab{ font:600 11px 'Space Grotesk',Inter,sans-serif; letter-spacing:.02em; color:var(--muted);
+             background:none; border:0; padding:3px 11px; border-radius:5px; cursor:pointer; text-transform:none; }
+  .news-tab:hover{ color:var(--txt); background:var(--btn-hover); }
+  .news-tab.on{ color:var(--txt); background:var(--panel); }
+  .news-tab:focus-visible{ outline:2px solid var(--ring); outline-offset:1px; }
+  /* Headline list (part 2) — aksen --luna-glow = kelas "berita" (bukan order/harga) */
+  .hl-item{ display:block; text-decoration:none; border-bottom:1px solid var(--border);
+            border-left:2px solid transparent; padding:9px 4px 10px 8px; }
+  .hl-item:hover{ background:color-mix(in srgb, var(--luna-glow) 7%, transparent); border-left-color:var(--luna-glow); }
+  .hl-item:focus-visible{ outline:2px solid var(--ring); outline-offset:-2px; }
+  .hl-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:3px; }
+  .hl-src{ font:600 11px 'Space Grotesk',Inter,sans-serif; color:var(--hdr); letter-spacing:.01em;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hl-item:hover .hl-src{ color:var(--luna-glow); }
+  .hl-time{ font:11px var(--font-num,monospace); color:var(--muted); white-space:nowrap; }
+  .hl-title{ font:400 13px/1.35 Inter,sans-serif; color:var(--txt);
+             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .hl-more{ font:600 11px 'Space Grotesk',Inter,sans-serif; color:var(--luna-glow); margin-top:4px;
+            opacity:0; transition:opacity .15s; }
+  .hl-item:hover .hl-more, .hl-item:focus-visible .hl-more{ opacity:1; }
+  @media (prefers-reduced-motion: reduce){ .hl-more{ transition:none; } }
+
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
   .nmk{ position:absolute; bottom:34px; width:22px; height:22px; border-radius:50%;   /* di atas band label sumbu-X + pill tanggal crosshair (dulu 15px → menabrak) */
@@ -1430,10 +1454,16 @@
     </div>
   </div>
   <div class="watchlist hidden" id="newspanel">
-    <div class="wl-head">News<span class="grow"></span>
+    <div class="wl-head"><span class="news-tabs" role="tablist">
+        <button class="news-tab on" id="newsTabCalendar" role="tab" aria-selected="true">Calendar</button>
+        <button class="news-tab" id="newsTabNews" role="tab" aria-selected="false">News</button>
+      </span><span class="grow"></span>
       <label class="nmk-toggle" title="Show events on chart"><input type="checkbox" id="newsMarkerToggle"> On chart</label>
       <button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
     <div id="newsBody" class="news-body">
+      <div class="news-empty">Loading…</div>
+    </div>
+    <div id="newsHeadlinesBody" class="news-body hidden">
       <div class="news-empty">Loading…</div>
     </div>
   </div>
@@ -5387,6 +5417,7 @@ function newsMarkersEnabled(){ return localStorage.getItem('br_newsMarkers')!=='
 // memanggil berturut). Guard in-flight → tetap izinkan retry (setelah selesai) & ganti instrumen.
 let _newsInFlight={};
 function refreshNewsData(){
+  try{ refreshHeadlines(); }catch(e){}   // part 2: headline feed (guard in-flight sendiri)
   const reqInst=newsCurrentInstrument();
   if(_newsInFlight[reqInst]) return;    // sudah ada fetch berjalan utk instrumen ini
   _newsInFlight[reqInst]=true;
@@ -5541,6 +5572,68 @@ function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
 // (nama rilis, currency, forecast/previous/actual, playbook) sebelum masuk innerHTML —
 // mencegah injeksi script kalau respons feed dipalsukan/di-compromise.
 function newsEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// --- News headlines tab (part 2): daftar berita per-instrumen dari /api/news/headlines ---
+let headlinesState=null, _hlInFlight={}, _hlDisabled=false;
+function newsTab(){ return localStorage.getItem('br_newsTab')==='news' ? 'news' : 'calendar'; }
+function setNewsTab(tab){
+  const isNews = tab==='news' && !_hlDisabled;
+  localStorage.setItem('br_newsTab', isNews?'news':'calendar');
+  const c=$('#newsTabCalendar'), n=$('#newsTabNews');
+  if(c){ c.classList.toggle('on', !isNews); c.setAttribute('aria-selected', String(!isNews)); }
+  if(n){ n.classList.toggle('on', isNews); n.setAttribute('aria-selected', String(isNews)); }
+  $('#newsBody').classList.toggle('hidden', isNews);
+  $('#newsHeadlinesBody').classList.toggle('hidden', !isNews);
+  const lbl=$('#newsMarkerToggle') && $('#newsMarkerToggle').closest('.nmk-toggle');
+  if(lbl) lbl.style.display = isNews?'none':'';   // "On chart" hanya relevan utk Calendar
+  if(isNews && headlinesState) renderHeadlines(headlinesState);
+}
+// Fitur disabled (server tanpa FINNHUB_TOKEN) → sembunyikan seluruh toggle tab; panel jadi Calendar-only.
+function applyNewsTabsVisibility(){
+  const tabs=$('.news-tabs'); if(tabs) tabs.style.display = _hlDisabled?'none':'';
+  if(_hlDisabled && newsTab()==='news') setNewsTab('calendar');
+}
+function refreshHeadlines(){
+  const reqInst=newsCurrentInstrument();
+  if(_hlInFlight[reqInst]) return;
+  _hlInFlight[reqInst]=true;
+  fetch('/api/news/headlines?instrument='+encodeURIComponent(reqInst))
+    .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
+    .then(d=>{ headlinesState=d; _hlDisabled=!!d.disabled; applyNewsTabsVisibility();
+      if(newsTab()==='news' && !$('#newspanel').classList.contains('hidden')) renderHeadlines(d);
+    })
+    .catch(()=>{
+      if(newsTab()==='news' && !$('#newspanel').classList.contains('hidden')){
+        const b=$('#newsHeadlinesBody');
+        if(b) b.innerHTML='<div class="news-empty">Headlines unavailable. Retrying…</div>';
+      }
+    })
+    .finally(()=>{ delete _hlInFlight[reqInst]; });
+}
+function fmtRel(iso){
+  const t=Date.parse(iso); if(isNaN(t)) return '';
+  const s=Math.max(0,(Date.now()-t)/1000);
+  if(s<60) return 'just now';
+  const m=Math.floor(s/60); if(m<60) return m+'m ago';
+  const h=Math.floor(m/60); if(h<24) return h+'h ago';
+  return Math.floor(h/24)+'d ago';
+}
+function renderHeadlines(d){
+  const body=$('#newsHeadlinesBody'); if(!body) return;
+  if(d && d.disabled){ body.innerHTML='<div class="news-empty">Headlines are turned off.</div>'; return; }
+  const items=(d&&d.headlines)||[];
+  const pretty=newsEsc((d&&d.instrument||'').replace('_','/'));
+  if(!items.length){ body.innerHTML='<div class="news-empty">No recent headlines for '+pretty+'.</div>'; return; }
+  let html='';
+  if(d.stale) html+='<div class="news-regime" style="margin:8px 8px 2px">Delayed</div>';
+  for(const h of items){
+    html+=`<a class="hl-item" href="${newsEsc(h.url)}" target="_blank" rel="noopener">
+      <div class="hl-top"><span class="hl-src">${newsEsc(h.source||'News')}</span><span class="hl-time">${newsEsc(fmtRel(h.publishedAt))}</span></div>
+      <div class="hl-title">${newsEsc(h.title)}</div>
+      <div class="hl-more">Keep reading ↗</div></a>`;
+  }
+  body.innerHTML=html;
+}
 function renderNews(d){
   const body=$('#newsBody');
   const pretty=newsEsc((d.instrument||'').replace('_','/'));
@@ -5607,6 +5700,7 @@ function setNewsOpen(open){
     $('#toggleMarkets').classList.remove('on');
     np.classList.remove('hidden');
     if(typeof loadNews==='function') loadNews();                                 // fresh saat buka
+    setNewsTab(newsTab());             // sinkron UI tab (Calendar/News) ke preferensi tersimpan
     clearInterval(_newsCountdown); _newsCountdown=setInterval(tickNewsCountdown, 1000);   // countdown tiap detik
   }else{
     if(np.classList.contains('hidden')) return;    // sudah tertutup — no-op
@@ -5646,6 +5740,9 @@ $('#bottomToggle').onclick=toggleTrades;
 $('#marketsClose').onclick=toggleMarkets;     // sembunyikan dari header Markets
 $('#toggleNews').onclick=toggleNews;
 $('#newsClose').onclick=()=>setNewsOpen(false);
+{ const c=$('#newsTabCalendar'), n=$('#newsTabNews');
+  if(c) c.onclick=()=>setNewsTab('calendar');
+  if(n) n.onclick=()=>setNewsTab('news'); }
 document.querySelectorAll('.op-x').forEach(b=>b.onclick=toggleOrder);   // tutup dari header (sejajar chevron)
 
 // --- drag order panel dari mana saja KECUALI kontrol (tombol/input/label/stepper) ---
