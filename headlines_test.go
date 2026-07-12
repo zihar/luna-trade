@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -41,38 +42,34 @@ func TestBuildHeadlinesResponseCaps(t *testing.T) {
 	}
 }
 
-func TestHeadlineCacheStaleFallback(t *testing.T) {
-	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
-	calls := 0
-	c := &hlCache{fetch: func() ([]news.Headline, bool, error) {
-		calls++
-		if calls == 1 {
-			return []news.Headline{{ID: "1", Title: "Gold up", URL: "https://x/1", PublishedAt: now}}, false, nil
-		}
-		return nil, false, errors.New("boom")
+// swrCache[hlPayload]: cold sukses fresh; dalam TTL tak refetch; partial diteruskan.
+func TestHeadlineCacheColdThenFresh(t *testing.T) {
+	base := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
+	clk := newTestClock(base)
+	var calls int32
+	c := &swrCache[hlPayload]{ttl: hlTTL, now: clk.now, fetch: func() (hlPayload, error) {
+		atomic.AddInt32(&calls, 1)
+		return hlPayload{Items: []news.Headline{{ID: "1", Title: "Gold up", URL: "https://x/1", PublishedAt: base}}, Partial: true}, nil
 	}}
-	// 1st: live ok
-	items, _, _, stale, err := c.get(now)
-	if err != nil || stale || len(items) == 0 {
-		t.Fatalf("first get should be live ok, err=%v stale=%v n=%d", err, stale, len(items))
+	p, _, stale, err := c.get()
+	if err != nil || stale || len(p.Items) == 0 || !p.Partial {
+		t.Fatalf("cold get: n=%d partial=%v stale=%v err=%v", len(p.Items), p.Partial, stale, err)
 	}
-	// within TTL: no refetch
-	if _, _, _, _, _ = c.get(now.Add(30 * time.Second)); calls != 1 {
-		t.Fatalf("within TTL should not refetch, calls=%d", calls)
+	clk.set(base.Add(30 * time.Second))
+	if _, _, s, _ := c.get(); s {
+		t.Fatal("dalam TTL harus fresh")
 	}
-	// after TTL: refetch fails → serve stale last-good
-	items, _, _, stale, err = c.get(now.Add(2 * time.Minute))
-	if err != nil || !stale || len(items) == 0 {
-		t.Fatalf("after TTL fail should serve stale, err=%v stale=%v", err, stale)
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("dalam TTL tak boleh refetch, calls=%d", got)
 	}
 }
 
+// ErrNoSource (tak ada sumber aktif) diteruskan pada cold → handler jadikan disabled.
 func TestHeadlineCacheDisabled(t *testing.T) {
-	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
-	c := &hlCache{fetch: func() ([]news.Headline, bool, error) {
-		return nil, false, news.ErrNoSource
+	c := &swrCache[hlPayload]{ttl: hlTTL, fetch: func() (hlPayload, error) {
+		return hlPayload{}, news.ErrNoSource
 	}}
-	if _, _, _, _, err := c.get(now); !errors.Is(err, news.ErrNoSource) {
+	if _, _, _, err := c.get(); !errors.Is(err, news.ErrNoSource) {
 		t.Fatalf("want ErrNoSource passthrough, got %v", err)
 	}
 }

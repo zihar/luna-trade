@@ -62,6 +62,9 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(alertsSchema); err != nil {
 		return err
 	}
+	if _, err := s.db.Exec(newsSnapshotSchema); err != nil {
+		return err
+	}
 	// Kolom tambahan (idempotent) — utk DB lama yg tabelnya sudah ada.
 	s.addColumnIfMissing("users", "picture", "TEXT")
 	s.addColumnIfMissing("journal", "sl", "REAL") // SL/TP paper (server-side)

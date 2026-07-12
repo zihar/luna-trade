@@ -5,11 +5,9 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"luna-trade/internal/news"
@@ -18,36 +16,12 @@ import (
 // calTTL = umur cache feed. ≥ 5 menit untuk menghormati limit feed (2 unduh/5mnt).
 const calTTL = 10 * time.Minute
 
-var errFetch = errors.New("fetch gagal")
-
-// newsCache = cache in-memory feed kalender. fetch injectable untuk test.
-type newsCache struct {
-	mu        sync.Mutex
-	events    []news.Event
-	fetchedAt time.Time
-	ok        bool // pernah sukses minimal sekali
-	fetch     func() ([]news.Event, error)
-}
-
-var calCache = &newsCache{fetch: func() ([]news.Event, error) { return news.FetchCalendar(nil) }}
-
-// get mengembalikan event kalender; refetch bila TTL lewat. stale=true bila
-// menyajikan last-good karena refetch gagal. err hanya bila belum pernah sukses.
-func (c *newsCache) get(now time.Time) (events []news.Event, fetchedAt time.Time, stale bool, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.ok && now.Sub(c.fetchedAt) < calTTL {
-		return c.events, c.fetchedAt, false, nil
-	}
-	ev, ferr := c.fetch()
-	if ferr != nil {
-		if c.ok {
-			return c.events, c.fetchedAt, true, nil // last-good (basi)
-		}
-		return nil, time.Time{}, false, ferr
-	}
-	c.events, c.fetchedAt, c.ok = ev, now, true
-	return c.events, c.fetchedAt, false, nil
+// calCache = cache SWR kalender (serve-stale + refresh async + persist snapshot).
+// fetch injectable untuk test via literal swrCache.
+var calCache = &swrCache[[]news.Event]{
+	ttl:   calTTL,
+	key:   "calendar",
+	fetch: func() ([]news.Event, error) { return news.FetchCalendar(nil) },
 }
 
 // ---- bentuk response JSON ----
@@ -178,7 +152,7 @@ func handleNewsCalendar(w http.ResponseWriter, r *http.Request) {
 		instrument = "XAU_USD"
 	}
 	now := time.Now().UTC()
-	events, fetchedAt, stale, err := calCache.get(now)
+	events, fetchedAt, stale, err := calCache.get()
 	if err != nil {
 		writeErr(w, http.StatusServiceUnavailable, "News feed unavailable")
 		return
