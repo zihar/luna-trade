@@ -5473,7 +5473,13 @@ function refreshNewsData(){
   _newsInFlight[reqInst]=true;
   fetch('/api/news/calendar?instrument='+encodeURIComponent(reqInst))
     .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
-    .then(d=>{ newsState=d;
+    .then(d=>{
+      // Buang respons BASI: instrumen chart bisa sudah berganti saat fetch ini balik
+      // (boot: fetch default balapan dgn restore; atau ganti instrumen cepat). Tanpa ini,
+      // respons lama yg telat menimpa newsState (last-write-wins) → bias card/kalender/marker
+      // salah instrumen sampai poll berikutnya. (Cermin guard di refreshHeadlines.)
+      if(d && d.instrument && d.instrument!==newsCurrentInstrument()) return;
+      newsState=d;
       if(!$('#newspanel').classList.contains('hidden')) renderNews(d);
       if(newsMarkersEnabled() && typeof renderNewsMarkers==='function') renderNewsMarkers();
     })
