@@ -78,3 +78,42 @@ func TestRelevanceForUSDTreasuryNoCorporateFP(t *testing.T) {
 		t.Fatal("'Treasuries' should match a USD-side instrument")
 	}
 }
+
+// Sinkron spec §5.2 via word-boundary: token pendek match sebagai KATA UTUH.
+func TestRelevanceWholeWordSyncSpec(t *testing.T) {
+	cases := []struct {
+		name       string
+		instrument string
+		match      []string // harus relevan
+		noMatch    []string // harus TIDAK relevan (false-positive guard)
+	}{
+		{"ETH ticker", "ETH_USD",
+			[]string{"$ETH surges to new high", "ETH breaks resistance", "Ether rallies hard"},
+			[]string{"Traders debate whether Fed cuts", "Markets rally together", "New method for trading"}},
+		{"Dow index", "US30_USD",
+			[]string{"Dow closes higher on earnings", "The Dow jumps 400 points"},
+			[]string{"Download the new trading app"}},
+		{"BoE", "GBP_USD",
+			[]string{"BoE holds rates steady"},
+			[]string{"Boeing shares climb on orders"}},
+		{"Swiss franc", "USD_CHF",
+			[]string{"Swiss franc gains as SNB stays put", "The franc firms vs euro"},
+			[]string{"France cuts growth forecast"}},
+		{"DXY", "XAU_USD",
+			[]string{"DXY firms as yields climb"},
+			nil},
+	}
+	for _, tc := range cases {
+		m := RelevanceFor(tc.instrument)
+		for _, h := range tc.match {
+			if !m.matches(h, "") {
+				t.Errorf("%s: %q SHOULD match %s", tc.name, h, tc.instrument)
+			}
+		}
+		for _, h := range tc.noMatch {
+			if m.matches(h, "") {
+				t.Errorf("%s: %q must NOT match %s (false-positive)", tc.name, h, tc.instrument)
+			}
+		}
+	}
+}

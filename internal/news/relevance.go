@@ -1,11 +1,40 @@
 package news
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Matcher menentukan apakah sebuah berita relevan untuk instrumen tertentu.
-// include = daftar substring lowercase; ADA satu yang cocok di judul+ringkasan → relevan.
+// Dua tier:
+//   - include = substring lowercase (default). Cocok bila muncul di mana pun.
+//   - word    = token yang dicek sebagai KATA UTUH (word-boundary), untuk token
+//     pendek yang rawan false-positive sebagai substring (mis. "dow"→download,
+//     "boe"→Boeing, "franc"→France, "eth"→method/whether). Ini "escape hatch"
+//     yang disebut spec §5.2 ("word-boundary … bila test menunjukkan perlu").
+//
+// Relevan bila ADA satu keyword (tier mana pun) yang cocok di judul+ringkasan.
 type Matcher struct {
 	include []string
+	word    []string
+}
+
+// wordRe = regex word-boundary terprakompilasi per keyword `word` (dibangun sekali
+// di init dari currencyWordKeywords + assetWordKeywords).
+var wordRe = map[string]*regexp.Regexp{}
+
+func init() {
+	compile := func(m map[string][]string) {
+		for _, kws := range m {
+			for _, kw := range kws {
+				if _, ok := wordRe[kw]; !ok {
+					wordRe[kw] = regexp.MustCompile(`\b` + regexp.QuoteMeta(kw) + `\b`)
+				}
+			}
+		}
+	}
+	compile(currencyWordKeywords)
+	compile(assetWordKeywords)
 }
 
 // matches (internal) cek judul+ringkasan tanpa bergantung tipe Headline (Task 2).
@@ -16,11 +45,17 @@ func (m Matcher) matches(title, summary string) bool {
 			return true
 		}
 	}
+	for _, kw := range m.word {
+		if re := wordRe[kw]; re != nil && re.MatchString(hay) {
+			return true
+		}
+	}
 	return false
 }
 
-// currencyKeywords = kata kunci berita per mata uang fiat (lowercase). Token pendek
-// yang rawan false-positive (mis. "boe"→Boeing, "franc"→France) sengaja dihindari.
+// currencyKeywords = kata kunci berita SUBSTRING per mata uang fiat (lowercase).
+// Token pendek yang rawan false-positive sebagai substring dipindah ke
+// currencyWordKeywords (dicek word-boundary), bukan dibuang.
 var currencyKeywords = map[string][]string{
 	"USD": {"dollar", "greenback", "fed", "fomc", "treasury yield", "treasuries"},
 	"EUR": {"euro", "ecb", "eurozone"},
@@ -32,8 +67,17 @@ var currencyKeywords = map[string][]string{
 	"NZD": {"kiwi", "new zealand dollar", "rbnz"},
 }
 
-// assetKeywords = kata kunci berita per aset non-fiat (kode base ala IPK_META).
-// Token pendek rawan (mis. "dow"→download, "eth"→method) dihindari.
+// currencyWordKeywords = token pendek per fiat, dicek KATA UTUH (word-boundary) →
+// aman dari false-positive substring. Sinkron spec §5.2. Catatan: bare "treasury"
+// SENGAJA TIDAK di sini — "Bitcoin treasury" (korporat) itu kata utuh legit, jadi
+// word-boundary tak menolong; USD tetap pakai "treasury yield"/"treasuries".
+var currencyWordKeywords = map[string][]string{
+	"USD": {"dxy"},   // "DXY firms" ✓ (indeks dolar)
+	"GBP": {"boe"},   // "BoE holds" ✓ tapi "Boeing" ✗
+	"CHF": {"franc"}, // "Swiss franc" ✓ tapi "France" ✗
+}
+
+// assetKeywords = kata kunci berita SUBSTRING per aset non-fiat (kode base ala IPK_META).
 var assetKeywords = map[string][]string{
 	"XAU":   {"gold", "bullion", "xau"},
 	"XAG":   {"silver", "xag"},
@@ -46,12 +90,20 @@ var assetKeywords = map[string][]string{
 	"DJI":   {"dow jones"},
 	"RUT":   {"russell 2000"},
 	"DAX":   {"dax", "germany 40"},
-	"FTSE":  {"ftse"},
+	"FTSE":  {"ftse", "uk 100"},
 	"CAC":   {"cac 40"},
 	"STOXX": {"euro stoxx", "stoxx 50"},
 	"NKY":   {"nikkei"},
 	"ASX":   {"asx 200", "australia 200"},
 	"HSI":   {"hang seng"},
+}
+
+// assetWordKeywords = token pendek per aset, dicek KATA UTUH (word-boundary). Sinkron
+// spec §5.2: ETH → +eth/ether, DJI → +dow. "$ETH surges"/"Dow closes" ✓ tapi
+// "method"/"whether"/"download" ✗.
+var assetWordKeywords = map[string][]string{
+	"ETH": {"eth", "ether"},
+	"DJI": {"dow"},
 }
 
 // instrumentAssets memetakan simbol instrumen non-forex → kode aset (utk assetKeywords).
@@ -75,25 +127,35 @@ var cryptoInstruments = map[string]bool{
 //     KECUALI crypto (aset saja).
 func RelevanceFor(instrument string) Matcher {
 	norm := strings.ReplaceAll(strings.ToUpper(strings.TrimSpace(instrument)), "/", "_")
-	seen := map[string]bool{}
-	var include []string
+	seenInc, seenWord := map[string]bool{}, map[string]bool{}
+	var include, word []string
 	add := func(kws []string) {
 		for _, kw := range kws {
-			if !seen[kw] {
-				seen[kw] = true
+			if !seenInc[kw] {
+				seenInc[kw] = true
 				include = append(include, kw)
+			}
+		}
+	}
+	addWord := func(kws []string) {
+		for _, kw := range kws {
+			if !seenWord[kw] {
+				seenWord[kw] = true
+				word = append(word, kw)
 			}
 		}
 	}
 	for _, code := range instrumentAssets[norm] {
 		add(assetKeywords[code])
+		addWord(assetWordKeywords[code])
 	}
 	if !cryptoInstruments[norm] {
 		for _, ccy := range RelevantCurrencies(norm) {
 			add(currencyKeywords[ccy])
+			addWord(currencyWordKeywords[ccy])
 		}
 	}
-	return Matcher{include: include}
+	return Matcher{include: include, word: word}
 }
 
 // Matches = wrapper publik: relevan bila salah satu keyword muncul di Title+Summary.
