@@ -1963,7 +1963,14 @@ const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1,
 // _overrideInstance klinecharts mengabaikan flag ini & template built-in (ray/channel/fib) yg
 // default-nya true tak bisa di-edit → paksa false di instance saat draw selesai / restore.
 function applyXDateFlag(o){ try{ if(o) o.needDefaultXAxisFigure=false; }catch(_){}}
-function klineLineStyles(st){ const ls=lsLine(st); return {line:Object.assign({color:st.color,size:st.size},ls)}; }
+function klineLineStyles(st){ const ls=lsLine(st); return {
+  line:Object.assign({color:st.color,size:st.size},ls),
+  // tag price (Y) default klinecharts saat terpilih → pill seragam ala hover crosshair (Inter 10px bold,
+  // radius 4, padding 6/3), bg ikut warna objek. Juga menata label in-pane priceLine/fibonacciLine.
+  text:{color:'#fff', backgroundColor:st.color, borderColor:'rgba(0,0,0,0)',
+    size:10, family:AXIS_FONT, weight:'bold', borderRadius:4,
+    paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3}
+}; }
 const objStyle = {};   // overlayId -> {color,size,style}
 function dstyle(o){ return Object.assign({}, DRAW_DEFAULT[o&&o.name]||{color:'#4a71ff',size:1,style:'solid'}, objStyle[o&&o.id]||{}); }
 function setObjStyle(id, patch){
@@ -2187,7 +2194,7 @@ klinecharts.registerOverlay({
 });
 klinecharts.registerOverlay({
   name:'verticalStraightLine', totalStep:2, needDefaultPointFigure:true,
-  needDefaultXAxisFigure:false, needDefaultYAxisFigure:true,   // tag waktu (X) kita render sendiri & selalu
+  needDefaultXAxisFigure:false, needDefaultYAxisFigure:false,  // tag waktu (X) kita render sendiri & selalu; price (Y) tak perlu utk garis vertikal
   createPointFigures:({coordinates,bounding})=>{ const cx=coordinates[0].x; return [
     // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
     {type:'rect', attrs:{x:cx-6,y:0,width:12,height:bounding.height}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
