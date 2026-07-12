@@ -107,3 +107,24 @@ func TestAggregateAllFail(t *testing.T) {
 		t.Fatalf("all-fail should error (not ErrNoSource), got %v", err)
 	}
 }
+
+// panicSource = Source yang Fetch-nya panic — menguji isolasi panic Aggregate.
+type panicSource struct{ name string }
+
+func (p panicSource) Name() string                          { return p.name }
+func (p panicSource) Enabled() bool                         { return true }
+func (p panicSource) Fetch(*http.Client) ([]Headline, error) { panic("boom") }
+
+func TestAggregateIsolatesPanic(t *testing.T) {
+	ok := fakeSource{name: "ok", enabled: true, items: []Headline{{URL: "https://x.com/1", Title: "t"}}}
+	out, partial, err := Aggregate([]Source{panicSource{name: "boom"}, ok}, nil)
+	if err != nil {
+		t.Fatalf("panicking source should be isolated, not error: %v", err)
+	}
+	if !partial {
+		t.Fatal("want partial=true when a source panics")
+	}
+	if len(out) != 1 || out[0].Title != "t" {
+		t.Fatalf("surviving source's headline should remain, got %+v", out)
+	}
+}
