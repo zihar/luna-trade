@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -37,5 +38,41 @@ func TestBuildHeadlinesResponseCaps(t *testing.T) {
 	}
 	if !resp.Partial {
 		t.Fatal("partial flag should propagate")
+	}
+}
+
+func TestHeadlineCacheStaleFallback(t *testing.T) {
+	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
+	calls := 0
+	c := &hlCache{fetch: func() ([]news.Headline, bool, error) {
+		calls++
+		if calls == 1 {
+			return []news.Headline{{ID: "1", Title: "Gold up", URL: "https://x/1", PublishedAt: now}}, false, nil
+		}
+		return nil, false, errors.New("boom")
+	}}
+	// 1st: live ok
+	items, _, _, stale, err := c.get(now)
+	if err != nil || stale || len(items) == 0 {
+		t.Fatalf("first get should be live ok, err=%v stale=%v n=%d", err, stale, len(items))
+	}
+	// within TTL: no refetch
+	if _, _, _, _, _ = c.get(now.Add(30 * time.Second)); calls != 1 {
+		t.Fatalf("within TTL should not refetch, calls=%d", calls)
+	}
+	// after TTL: refetch fails → serve stale last-good
+	items, _, _, stale, err = c.get(now.Add(2 * time.Minute))
+	if err != nil || !stale || len(items) == 0 {
+		t.Fatalf("after TTL fail should serve stale, err=%v stale=%v", err, stale)
+	}
+}
+
+func TestHeadlineCacheDisabled(t *testing.T) {
+	now := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
+	c := &hlCache{fetch: func() ([]news.Headline, bool, error) {
+		return nil, false, news.ErrNoSource
+	}}
+	if _, _, _, _, err := c.get(now); !errors.Is(err, news.ErrNoSource) {
+		t.Fatalf("want ErrNoSource passthrough, got %v", err)
 	}
 }
