@@ -22,7 +22,7 @@ func (m Matcher) matches(title, summary string) bool {
 // currencyKeywords = kata kunci berita per mata uang fiat (lowercase). Token pendek
 // yang rawan false-positive (mis. "boe"→Boeing, "franc"→France) sengaja dihindari.
 var currencyKeywords = map[string][]string{
-	"USD": {"dollar", "greenback", "fed", "fomc", "treasury"},
+	"USD": {"dollar", "greenback", "fed", "fomc", "treasury yield", "treasuries"},
 	"EUR": {"euro", "ecb", "eurozone"},
 	"GBP": {"pound", "sterling", "bank of england"},
 	"JPY": {"yen", "boj", "bank of japan"},

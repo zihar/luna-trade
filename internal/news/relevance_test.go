@@ -62,3 +62,19 @@ func TestRelevanceForETHNoWordFalsePositive(t *testing.T) {
 		t.Fatal("'together' must not match ETH_USD")
 	}
 }
+
+func TestRelevanceForUSDTreasuryNoCorporateFP(t *testing.T) {
+	// "Bitcoin treasury" (korporat) JANGAN kejeblos ke instrumen USD/gold
+	gold := RelevanceFor("XAU_USD")
+	if gold.matches("Empery Digital shares rise after selling Bitcoin treasury to fund AI data center", "") {
+		t.Fatal("'Bitcoin treasury' must not match XAU_USD via bare 'treasury'")
+	}
+	// sinyal makro US Treasury yang asli TETAP cocok
+	eur := RelevanceFor("EUR_USD")
+	if !eur.matches("US Treasury yields climb as dollar firms", "") {
+		t.Fatal("'Treasury yields' + 'dollar' should still match a USD-side instrument")
+	}
+	if !eur.matches("Demand for Treasuries wanes ahead of auction", "") {
+		t.Fatal("'Treasuries' should match a USD-side instrument")
+	}
+}
