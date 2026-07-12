@@ -6027,14 +6027,24 @@ function indDef(name){ return IND_DEFS.find(d=>d.name===name); }
 function defParams(name){ const d=indDef(name); if(!d||!d.params) return null;
   return d.params.kind==='list' ? d.params.def.slice() : d.params.fields.map(f=>f.def); }
 function effParams(name){ const p=indParams[name]; return (p&&p.length) ? p.slice() : defParams(name); }
-function persistInd(){ try{ localStorage.setItem('br_indicators', JSON.stringify(Object.keys(activeInd))); }catch(e){} }
-function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function persistInd(){ try{ localStorage.setItem('br_indicators',
+  JSON.stringify(Object.keys(activeInd).map(n=>({name:n, calcParams:indParams[n]||null})))); }catch(e){} }
+function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); if(!Array.isArray(a)) return [];
+  return a.map(el=> typeof el==='string' ? {name:el, calcParams:null} : el).filter(x=>x&&x.name); }catch(e){ return []; } }
 function addInd(name){
-  const def=IND_DEFS.find(d=>d.name===name); if(!def||activeInd[name]) return;
+  const def=indDef(name); if(!def||activeInd[name]) return;
   try{
-    const pid = def.overlay ? chart.createIndicator(name, true, {id:'candle_pane'}) : chart.createIndicator(name);
+    const cp=effParams(name);
+    const val = cp ? {name, calcParams:cp} : name;
+    const pid = def.overlay ? chart.createIndicator(val, true, {id:'candle_pane'}) : chart.createIndicator(val);
     activeInd[name] = def.overlay ? 'candle_pane' : pid;   // overlay: paneId candle konstan; sub-pane: id dinamis
+    if(cp) indParams[name]=cp.slice();
   }catch(e){}
+}
+function setIndParams(name, calcParams){
+  indParams[name]=calcParams.slice();
+  try{ chart.overrideIndicator({name, calcParams}, activeInd[name]); }catch(e){}
+  persistInd();
 }
 function removeInd(name){
   const pid=activeInd[name]; if(pid==null) return;
@@ -6062,7 +6072,7 @@ function renderIndMenu(){
     track('indicator',{name, on: !!activeInd[name]});
   });
 }
-savedInd().forEach(addInd); updateIndBadge();   // pulihkan indikator tersimpan
+savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name); }); updateIndBadge();   // pulihkan indikator tersimpan
 (function(){
   const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
   btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
