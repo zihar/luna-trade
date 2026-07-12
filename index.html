@@ -1957,13 +1957,12 @@ const DRAW_DEFAULT = {
 const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1,
   straightLine:1, rayLine:1, horizontalRayLine:1, priceLine:1,
   parallelStraightLine:1, priceChannelLine:1, fibonacciLine:1};
-// Tag tanggal di sumbu X (default figure klinecharts) hanya relevan utk objek berbasis WAKTU.
-// verticalStraightLine render tag-nya sendiri (createXAxisFigures) → TIDAK pakai default (biar tak dobel).
-// Jadi hanya dateRange yg boleh pakai tag tanggal X default. Semua draw lain (garis miring/horizontal/
-// ray/channel/fib bawaan klinecharts) tak perlu tanggal di X. _overrideInstance klinecharts mengabaikan
-// flag ini & template built-in tak bisa di-edit → set langsung di instance saat draw selesai / restore.
-const X_AXIS_DATE_OK={dateRange:1};
-function applyXDateFlag(o){ try{ if(o) o.needDefaultXAxisFigure=!!X_AXIS_DATE_OK[o.name]; }catch(_){}}
+// Tag tanggal DEFAULT klinecharts di sumbu X (polos, tanpa pill) ditekan utk SEMUA overlay.
+// Objek berbasis waktu (vertical line, date range) render tag-nya sendiri via createXAxisFigures
+// dgn pill seragam ala hover crosshair (lihat xDateFig) → tak butuh default figure sama sekali.
+// _overrideInstance klinecharts mengabaikan flag ini & template built-in (ray/channel/fib) yg
+// default-nya true tak bisa di-edit → paksa false di instance saat draw selesai / restore.
+function applyXDateFlag(o){ try{ if(o) o.needDefaultXAxisFigure=false; }catch(_){}}
 function klineLineStyles(st){ const ls=lsLine(st); return {line:Object.assign({color:st.color,size:st.size},ls)}; }
 const objStyle = {};   // overlayId -> {color,size,style}
 function dstyle(o){ return Object.assign({}, DRAW_DEFAULT[o&&o.name]||{color:'#4a71ff',size:1,style:'solid'}, objStyle[o&&o.id]||{}); }
@@ -2158,6 +2157,14 @@ klinecharts.registerOverlay({
 // meng-gate "default axis figure" ke overlay yang sedang aktif; di sini kita render lewat
 // createY/XAxisFigures yang TIDAK ter-gate, jadi tag selalu nempel di axis.
 function axisTagColor(o){ return (o&&o.styles&&o.styles.line&&o.styles.line.color)||'#4a71ff'; }
+// pill tanggal di sumbu X — desain seragam persis label hover crosshair (crosshairDate +
+// chTextStyle: Inter 10px bold, radius 4, padding 6/3). Background ikut warna objek (axisTagColor),
+// bukan biru fixed spt hover. Dipakai semua overlay berbasis waktu (vertical line, date range).
+function xDateFig(x, ts, overlay){ return {type:'text', ignoreEvent:true,
+  attrs:{x, y:0, text:crosshairDate(ts), align:'center'},
+  styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)',
+    size:10, family:AXIS_FONT, weight:'bold', borderRadius:4,
+    paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3}}; }
 klinecharts.registerOverlay({
   name:'horizontalStraightLine', totalStep:2, needDefaultPointFigure:true,
   needDefaultXAxisFigure:false, needDefaultYAxisFigure:false,  // tag harga (Y) kita render sendiri; tanggal (X) tak perlu utk garis horizontal
@@ -2187,14 +2194,7 @@ klinecharts.registerOverlay({
     {type:'line', attrs:{coordinates:[{x:cx,y:0},{x:cx,y:bounding.height}]}} ]; },
   createXAxisFigures:({overlay,coordinates})=>{
     const c=coordinates[0], p=overlay.points[0], ts=tsOf(p); if(!c||!p||ts==null) return [];
-    // tag tanggal disamakan persis dgn label hover crosshair: crosshairDate (nama hari + bulan
-    // singkat + shift trading-day + drop jam di Daily+) & styling chTextStyle. Background tetap
-    // ikut warna garis (axisTagColor), bukan biru fixed spt hover.
-    return [{type:'text', ignoreEvent:true,
-      attrs:{x:c.x, y:0, text:crosshairDate(ts), align:'center'},
-      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)',
-        size:10, family:AXIS_FONT, weight:'bold', borderRadius:4,
-        paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3}}];
+    return [xDateFig(c.x, ts, overlay)];   // pill tanggal seragam ala hover crosshair
   }
 });
 
@@ -2390,7 +2390,14 @@ function barsBetween(t0,t1){
 }
 klinecharts.registerOverlay({
   name:'dateRange', totalStep:3, needDefaultPointFigure:true,
-  needDefaultXAxisFigure:true,   // objek berbasis waktu → tanggal di sumbu X (default figure) memang relevan
+  // tanggal di sumbu X kita render sendiri (createXAxisFigures) dgn pill seragam ala hover crosshair,
+  // bukan default figure klinecharts yg polos → needDefaultXAxisFigure tetap false.
+  createXAxisFigures:({overlay,coordinates})=>{
+    if(overlay.id!==selectedId && overlay.id!==hoverId) return [];   // tampil saat terpilih/hover (spt sebelumnya)
+    const figs=[];
+    coordinates.forEach((c,i)=>{ const ts=tsOf(overlay.points[i]); if(c&&ts!=null) figs.push(xDateFig(c.x, ts, overlay)); });
+    return figs;
+  },
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
     const C=subBarCoords(overlay,coordinates);
