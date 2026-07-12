@@ -2163,9 +2163,14 @@ klinecharts.registerOverlay({
     {type:'line', attrs:{coordinates:[{x:cx,y:0},{x:cx,y:bounding.height}]}} ]; },
   createXAxisFigures:({overlay,coordinates})=>{
     const c=coordinates[0], p=overlay.points[0], ts=tsOf(p); if(!c||!p||ts==null) return [];
+    // tag tanggal disamakan persis dgn label hover crosshair: crosshairDate (nama hari + bulan
+    // singkat + shift trading-day + drop jam di Daily+) & styling chTextStyle. Background tetap
+    // ikut warna garis (axisTagColor), bukan biru fixed spt hover.
     return [{type:'text', ignoreEvent:true,
-      attrs:{x:c.x, y:0, text:nyTime(ts), align:'center'},
-      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)'}}];
+      attrs:{x:c.x, y:0, text:crosshairDate(ts), align:'center'},
+      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)',
+        size:10, family:AXIS_FONT, weight:'bold', borderRadius:4,
+        paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3}}];
   }
 });
 
