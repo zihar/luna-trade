@@ -2161,9 +2161,14 @@ klinecharts.registerOverlay({
   createYAxisFigures:({overlay,coordinates,bounding,yAxis})=>{
     const c=coordinates[0], p=overlay.points[0]; if(!c||!p||p.value==null) return [];
     const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
+    // tag harga disamakan dgn gaya halus label hover crosshair: styling chTextStyle
+    // (Inter 10px bold, radius 4, padding 6/3). Background tetap ikut warna garis
+    // (axisTagColor), bukan biru fixed spt hover — mirror fix garis vertikal.
     return [{type:'text', ignoreEvent:true,
       attrs:{x:fromZero?0:bounding.width, y:c.y, text:fmtPx(p.value), align:fromZero?'left':'right', baseline:'middle'},
-      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)'}}];
+      styles:{color:'#fff', backgroundColor:axisTagColor(overlay), borderColor:'rgba(0,0,0,0)',
+        size:10, family:AXIS_FONT, weight:'bold', borderRadius:4,
+        paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3}}];
   }
 });
 klinecharts.registerOverlay({
