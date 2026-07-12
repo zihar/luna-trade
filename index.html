@@ -3322,7 +3322,7 @@ function renderPosDom(p){
   rec.entry.innerHTML =
     `<span class="pos-pill ${pnl>=0?'up':'down'}" data-open="1" title="Kelola posisi">`+
       `<span class="pos-arrow">${isSell?'▼':'▲'}</span><span class="pos-pnl">${posPnlStr(pnl)}</span>`+
-      `<button class="pos-x" data-close="1" title="Tutup posisi">×</button></span>`+chips;
+      `<button class="pos-x" data-close="1" title="Close position">×</button></span>`+chips;
   rec.entry.dataset.active='1';
   ['sl','tp'].forEach(k=>{
     if(!editing && pendingLevel && pendingLevel.id===p.id && pendingLevel.kind===k) return;  // preview drag menunggu konfirmasi → jangan timpa
@@ -3330,7 +3330,7 @@ function renderPosDom(p){
     if(!active){ rec[k].dataset.active='0'; rec[k].style.display='none'; rec[k].innerHTML=''; return; }
     if(editing){ const im=posLvlImpact({dir:p.dir,entry:p.entry,units:p.units,instrument:p.instrument,sl:ep.sl,tp:ep.tp},k);
       rec[k].innerHTML=`<span class="pos-tag"><span class="grip">⋮⋮</span>${k.toUpperCase()} ${im.usd} / ${im.pct}`+
-        `<button class="pos-x" data-del="${k}" title="Hapus ${k.toUpperCase()}">×</button></span>`;
+        `<button class="pos-x" data-del="${k}" title="Remove ${k.toUpperCase()}">×</button></span>`;
     } else { rec[k].innerHTML=`<span class="pos-tag">${k.toUpperCase()}</span>`; }
     rec[k].dataset.active='1';
   });
@@ -3348,7 +3348,7 @@ function stageLevel(id,k,on){ if(editingPosId!==id) openPositionEditor(id); if(!
 let posConfirmEl=null;
 function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
   if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); makeDraggable(posConfirmEl,'.pp-grip'); }
-  posConfirmEl.innerHTML=GRIP+`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Batal</button><button class="pc-yes">${yesLabel}</button></div>`;
+  posConfirmEl.innerHTML=GRIP+`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Cancel</button><button class="pc-yes">${yesLabel}</button></div>`;
   const hide=()=>posConfirmEl.classList.remove('show');
   posConfirmEl.querySelector('.pc-no').onclick=()=>{ hide(); if(onNo) onNo(); };
   posConfirmEl.querySelector('.pc-yes').onclick=()=>{ hide(); if(onYes) onYes(); };
@@ -3359,7 +3359,7 @@ function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
 }
 function confirmClosePos(id,anchor){
   if(id===REPLAY_ID){ miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle(); if(c) closeTrade(c.close,c.timestamp); drawPaperLines(); },null,anchor); return; }
-  miniConfirm(`Tutup posisi #${id}?`,'Tutup',()=>spClose(id),null,anchor);
+  miniConfirm(`Close position #${id}?`,'Close',()=>spClose(id),null,anchor);
 }
 // ---- drag SL/TP di view-mode: preview saat digeser, konfirmasi saat dilepas ----
 let pendingLevel=null;   // {id,kind,v} — garis yg sedang menunggu konfirmasi (jangan di-reset spSync)
@@ -3385,7 +3385,7 @@ function confirmPosLevel(id,kind,v){
   if(p[kind]!=null && (+v).toFixed(dec)===(+p[kind]).toFixed(dec)){ drawPaperLines(); return; }   // nilai tak berubah (mis. klik garis tanpa geser) → jangan munculkan konfirmasi
   pendingLevel={id,kind,v};
   const rec=posDom[id];
-  miniConfirm(`Ubah ${kind.toUpperCase()} ke ${(+v).toFixed(dec)}?`,'Simpan',
+  miniConfirm(`Change ${kind.toUpperCase()} to ${(+v).toFixed(dec)}?`,'Save',
     ()=>{ pendingLevel=null; savePosLevel(id,kind,v); },
     ()=>{ pendingLevel=null; drawPaperLines(); },
     rec&&rec[kind]);
@@ -3533,7 +3533,7 @@ function buildPosEditPanel(){
   if(posEditEl) return;
   posEditEl=document.createElement('div'); posEditEl.className='objpop pos-edit2';
   posEditEl.innerHTML=
-    `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Tutup">✕</button></div>`+
+    `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Close">✕</button></div>`+
     `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag"></span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
     `<div class="tl-sltp"><div class="tl-head">`+
       `<button type="button" class="tl-trail" id="peTrail" title="Trailing (segera)">Trail</button>`+
