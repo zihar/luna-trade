@@ -5884,10 +5884,10 @@ function showObjPopup(o, cx, cy){
   const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
   const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
   objPop.innerHTML=GRIP+(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
-    +`<div class="pp-lbl">Tebal</div><div class="pp-row">${ws}</div>`
-    +`<div class="pp-lbl">Gaya garis</div><div class="pp-row">${ss}</div>`
+    +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
+    +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
     +(hasText?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
-    +`<div class="pp-act">${isFib?'<button id="ppFib">⚙ Level &amp; Warna</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
+    +`<div class="pp-act">${isFib?'<button id="ppFib">⚙ Level &amp; Color</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
   objPop.style.top =Math.min(cy,window.innerHeight-(hasText?300:220))+'px';
   objPop.classList.add('show');
@@ -5928,11 +5928,11 @@ document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
 makeDraggable(fibPop, '.pp-grip');
 function showFibPop(cx,cy){
-  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Warna level"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
+  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Level color"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
   fibPop.innerHTML=GRIP+`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
     +`<div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Background</label>`
     +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div>`
-    +`<div class="fp-act"><button id="fpAdd">+ Tambah</button><button id="fpReset">Reset</button></div>`;
+    +`<div class="fp-act"><button id="fpAdd">+ Add</button><button id="fpReset">Reset</button></div>`;
   fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
   fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
   fibPop.classList.add('show');
