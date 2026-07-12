@@ -200,6 +200,10 @@
   .ind-check{width:13px;font-size:12px;color:var(--accent);opacity:0}
   .ind-item.on .ind-check{opacity:1}
   .ind-item.on{color:var(--accent)}
+  #indMenu .ind-item{ display:flex; align-items:center; gap:6px; }
+  #indMenu .ind-lbl{ flex:1; min-width:0; }
+  .ind-gear{ margin-left:auto; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:2px 4px; border-radius:4px; }
+  .ind-gear:hover{ color:var(--txt); background:var(--btn-hover); }
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
   /* watermark identitas Luna — pojok kanan-atas, sangat samar, tak ganggu candle */
@@ -6060,17 +6064,20 @@ function updateIndBadge(){
   if(b){ b.textContent=n; b.hidden=(n===0); }
   if(btn) btn.classList.toggle('on', n>0);
 }
+function openIndEditor(name){ console.log('openIndEditor', name); }  // STUB → Task 4
 function renderIndMenu(){
   const m=$('#indMenu'); if(!m) return;
   const grp=(title,items)=>`<div class="ind-grp">${title}</div>`+items.map(d=>
-    `<div class="ind-item${activeInd[d.name]?' on':''}" data-ind="${d.name}"><span class="ind-check">✓</span>${d.label}</div>`).join('');
+    `<div class="ind-item${activeInd[d.name]?' on':''}" data-ind="${d.name}"><span class="ind-check">✓</span><span class="ind-lbl">${d.label}</span><button class="ind-gear" data-gear="${d.name}" title="Settings">⚙</button></div>`).join('');
   m.innerHTML=grp('Overlays',IND_DEFS.filter(d=>d.overlay))+grp('Oscillators',IND_DEFS.filter(d=>!d.overlay));
-  m.querySelectorAll('.ind-item').forEach(el=>el.onclick=()=>{
+  m.querySelectorAll('.ind-item').forEach(el=>el.onclick=(ev)=>{
+    if(ev.target.closest('.ind-gear')) return;   // gear ditangani terpisah
     const name=el.dataset.ind;
     if(activeInd[name]) removeInd(name); else addInd(name);
     persistInd(); renderIndMenu(); updateIndBadge();
     track('indicator',{name, on: !!activeInd[name]});
   });
+  m.querySelectorAll('.ind-gear').forEach(g=>g.onclick=(ev)=>{ ev.stopPropagation(); openIndEditor(g.dataset.gear); });
 }
 savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name); }); updateIndBadge();   // pulihkan indikator tersimpan
 (function(){
