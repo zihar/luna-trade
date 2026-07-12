@@ -6003,14 +6003,30 @@ applyChartCfg();   // terapkan cfg tersimpan saat startup
 // Indikator bawaan KLineCharts di chart UTAMA. Overlay (MA/EMA/BOLL) numpang di pane
 // candle; osilator (VOL/MACD/RSI) di sub-pane sendiri. Parameter pakai default library.
 const IND_DEFS=[
-  {name:'MA',   label:'MA — Moving Average',        overlay:true },
-  {name:'EMA',  label:'EMA — Exp. Moving Average',  overlay:true },
-  {name:'BOLL', label:'BOLL — Bollinger Bands',     overlay:true },
-  {name:'VOL',  label:'VOL — Volume',               overlay:false},
-  {name:'MACD', label:'MACD',                       overlay:false},
-  {name:'RSI',  label:'RSI',                         overlay:false},
+  {name:'MA',   label:'MA — Moving Average',       overlay:true,
+    params:{kind:'list', label:'Period', def:[5,10,30,60], min:1, max:400, step:1}},
+  {name:'EMA',  label:'EMA — Exp. Moving Average', overlay:true,
+    params:{kind:'list', label:'Period', def:[6,12,20], min:1, max:400, step:1}},
+  {name:'BOLL', label:'BOLL — Bollinger Bands',    overlay:true,
+    params:{kind:'fixed', fields:[
+      {label:'Period', def:20, min:1, max:400, step:1},
+      {label:'StdDev', def:2,  min:0.1, max:10, step:0.1}]}},
+  {name:'VOL',  label:'VOL — Volume',              overlay:false,
+    params:{kind:'list', label:'Period', def:[5,10,20], min:1, max:400, step:1}},
+  {name:'MACD', label:'MACD',                      overlay:false,
+    params:{kind:'fixed', fields:[
+      {label:'Short', def:12, min:1, max:400, step:1},
+      {label:'Long',  def:26, min:1, max:400, step:1},
+      {label:'Signal',def:9,  min:1, max:400, step:1}]}},
+  {name:'RSI',  label:'RSI',                        overlay:false,
+    params:{kind:'list', label:'Period', def:[6,12,24], min:1, max:400, step:1}},
 ];
 const activeInd={};   // name -> paneId ('candle_pane' utk overlay, id sub-pane utk osilator)
+const indParams={};   // name -> calcParams[] efektif (kosong/absen = pakai default skema)
+function indDef(name){ return IND_DEFS.find(d=>d.name===name); }
+function defParams(name){ const d=indDef(name); if(!d||!d.params) return null;
+  return d.params.kind==='list' ? d.params.def.slice() : d.params.fields.map(f=>f.def); }
+function effParams(name){ const p=indParams[name]; return (p&&p.length) ? p.slice() : defParams(name); }
 function persistInd(){ try{ localStorage.setItem('br_indicators', JSON.stringify(Object.keys(activeInd))); }catch(e){} }
 function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
 function addInd(name){
