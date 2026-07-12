@@ -262,14 +262,93 @@ seperti sekarang).
   bersihkan `#newsCards`, muat relevansi instrumen baru.
 - Reuse timer 60s yang sama (bukan sistem toast biasa — kartu ini persisten & lebih kaya).
 
-## 8. Konfigurasi & deploy
+## 8. UI/UX — komponen visual (anatomi, bukan CSS final)
+
+Prinsip: komponen News **menyatu** dengan design system Luna, bukan identitas baru. CSS
+final dikerjakan saat implementasi PR-2/PR-3 (frontend-design + iterasi screenshot browser
+dgn token asli & feed nyata). Di sini hanya anatomi + token/komponen yang di-reuse.
+
+### 8.1 Bahasa warna semantik (signature)
+
+Sistem sudah memakai warna untuk **harga/order**: `--accent` biru (info trade),
+`--green`/`--red` (buy/sell). Berita = kelas informasi berbeda → diberi aksen brand
+**`--luna-glow` (#aeb9e8, crescent bulan)** di tepi kartu News. Sekali pandang user bisa
+bedakan "ini intel berita" vs "ini event order/harga". Bukan dekorasi — penanda kelas
+informasi, dan selaras dgn marker news on-chart (`.nmk`) yang sudah memakai `--luna-glow`.
+
+### 8.2 Tab toggle `[Calendar | News]` (Part 2)
+
+Di baris `.wl-head` header panel News (uppercase 10px yg sudah ada). Segmented compact:
+
+```
+┌ NEWS ─────────────── [ Calendar | News ] ─ ✕ ┐
+```
+
+Track `bg:var(--inset)` radius; segmen aktif `bg:var(--panel)` + `--txt`; nonaktif
+`--muted`; hover nonaktif → `--btn-hover`. Ikut idiom `--btn`. Persist `br_newsTab`.
+
+### 8.3 Kartu headline di list (Part 2)
+
+Echo struktur `.cal-item` (baris dipisah `border-bottom:var(--border)`, hover tint):
+
+```
+┌───────────────────────────────────┐
+│ Reuters · 12m ago                 │  source(--hdr,11px) · waktu(--font-num,--muted)
+│ Gold slips as dollar firms ahead  │  judul --txt 13px Inter, clamp 2 baris
+│ of Fed decision                   │
+│ Keep reading ↗                    │  --luna-glow; muncul jelas saat hover
+└───────────────────────────────────┘
+```
+
+- Seluruh baris klik → buka `url` tab baru (`rel="noopener"`); `↗` muncul saat hover;
+  teks "Keep reading" eksplisit untuk kejelasan + a11y.
+- Hover baris: `bg:color-mix(in srgb, var(--luna-glow) 6%, transparent)` (senada
+  `.cal-item.released` yg pakai `--accent 6%`).
+
+### 8.4 Kartu notif on-chart (Part 3)
+
+Sepupu `.toast` (border, radius 9px, `--shadow`) tapi: posisi `absolute` **kanan-atas
+`#chart` di bawah wordmark**, persisten, `border-left:3px solid var(--luna-glow)`
+(bukan `--accent` toast → menegaskan "berita").
+
+```
+┌────────────────────────────────────────┐
+│ ◐ GOLD · Reuters            12m ago  ✕ │  crescent + badge(pill) + source · waktu · dismiss
+│ Gold slips as dollar firms ahead of    │  judul clamp 2 baris
+│ Fed decision                           │
+│ Keep reading ↗                         │  --luna-glow
+└────────────────────────────────────────┘  ▏border-left --luna-glow
+```
+
+- Badge derive dari `IPK_META` (GOLD / EUR/USD / BTC / S&P 500) → payload tak bawa badge.
+- Glyph crescent ◐ mengikat ke brand (favicon/watermark). Stack ke bawah, cap 3 FIFO.
+
+### 8.5 Motion & a11y (quality floor)
+
+- Masuk: slide+fade halus dari kanan (idiom transisi `.toast`: `opacity` + `translate`).
+  Keluar: fade. **Hormati `prefers-reduced-motion`** → tanpa translate (juga backlog P2).
+- Fokus keyboard terlihat pada toggle, "Keep reading", ✕. ✕ ber-`aria-label="Dismiss"`.
+- Kontras teks di atas `--panel` (txt #fff / muted #89898b) sudah standar sistem.
+
+### 8.6 Copy (English, interface voice — lihat memory ui-text-english)
+
+| State | Teks |
+|---|---|
+| Empty | `No recent headlines for {instrument}.` |
+| Loading | `Loading…` (senada `.news-empty` existing) |
+| Unavailable | `Headlines unavailable. Retrying…` |
+| Stale | badge kecil `Delayed` (`--muted`), bukan alarm |
+
+Aksi konsisten sepanjang flow: tautan selalu "Keep reading"; ✕ = Dismiss.
+
+## 9. Konfigurasi & deploy
 
 - `.env` + `.env.example`: tambah `FINNHUB_TOKEN=` (kosong = fitur mati, app tetap jalan).
 - Deploy EC2 (lihat memory bar-replay-deploy): tambah `FINNHUB_TOKEN` ke
   `/etc/bar-replay.env`, `systemctl restart`.
 - README: dokumentasikan env baru + catatan "News headlines opsional".
 
-## 9. Strategi test
+## 10. Strategi test
 
 - **Murni / unit** (`internal/news`, ala `classify_test.go`/`calendar_test.go`):
   - `NormalizeFinnhub`: JSON contoh → `[]Headline` (+ error saat bentuk salah).
@@ -282,7 +361,7 @@ seperti sekarang).
   `FINNHUB_TOKEN`). Cek: tab toggle, filter per-instrumen, Keep reading, kartu muncul
   hanya utk id baru, manual dismiss, cap 3, ganti instrumen tak spam backlog.
 
-## 10. Dekomposisi PR (implementasi bertahap)
+## 11. Dekomposisi PR (implementasi bertahap)
 
 1. **PR-1 feed (backend):** `internal/news/headlines.go` + `relevance.go` + `headlines.go`
    + route + env + test. Verifikasi: `go build` + `go test ./...` + curl endpoint
@@ -293,7 +372,7 @@ seperti sekarang).
 
 Tiap PR rebase harian ke main (index.html monolitik → rawan konflik; lihat `CLAUDE.md`).
 
-## 11. Risiko & catatan
+## 12. Risiko & catatan
 
 - **Presisi keyword-map** = risiko utama Finnhub. Ditangani via tabel keyword
   spesifik-domain + unit-test positif/negatif; tuning iteratif setelah lihat feed nyata.
