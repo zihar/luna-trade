@@ -909,6 +909,14 @@
   .nc-more{ font:600 11px 'Space Grotesk',Inter,sans-serif; color:var(--luna-glow); margin-top:4px;
             display:inline-block; text-decoration:none; }
   @media (prefers-reduced-motion: reduce){ .nc-card{ transition:none; transform:none; } }
+  /* Varian kartu event high-impact (aksen amber, judul non-link) */
+  .nc-card.nc-evt{ border-left-color:#e0a63a; }
+  .nc-evt .nc-badge{ color:#e0a63a; }
+  .nc-evt .nc-title{ -webkit-line-clamp:3; }
+  .nc-evrow{ margin-top:6px; }
+  .nc-bias{ font:600 11px 'Space Grotesk',Inter,sans-serif; padding:2px 8px; border-radius:20px; }
+  .nc-bias.up{ color:var(--green); background:rgba(46,204,113,.14); }
+  .nc-bias.down{ color:var(--red); background:rgba(255,111,111,.14); }
 
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
@@ -1524,6 +1532,7 @@
         <button class="news-tab" id="newsTabNews" role="tab" aria-selected="false">News</button>
       </span><span class="grow"></span>
       <label class="nmk-toggle" title="Show events on chart"><input type="checkbox" id="newsMarkerToggle"> On chart</label>
+      <label class="nmk-toggle" title="Notify high-impact events (reminder + release)"><input type="checkbox" id="newsNotifyToggle"> Alerts</label>
       <button class="wl-x" id="newsClose" title="Hide News" aria-label="Close">✕</button></div>
     <div id="newsBody" class="news-body">
       <div class="news-empty">Loading…</div>
@@ -5316,6 +5325,8 @@ function initPriceTimer(){
   // News: fetch data saat chart ready + poll 60s (marker tampil walau panel tertutup).
   try{ refreshNewsData(); }catch(e){}
   clearInterval(_newsTimer); _newsTimer=setInterval(()=>{ try{ refreshNewsData(); }catch(e){} }, 60000);
+  // Scheduler notif high-impact: cek reminder (T-5mnt) tiap 30s meski panel tertutup (data dari newsState).
+  clearInterval(_newsNotifyTimer); _newsNotifyTimer=setInterval(()=>{ try{ checkNewsNotify(); }catch(e){} }, 30000);
   // Reposisi marker saat pan/zoom (reposition & popup didefinisikan di Task 3/4; try/catch aman bila belum ada).
   try{ chart.subscribeAction('onScroll', ()=>{ try{ repositionNewsMarkers(); }catch(e){} }); }catch(e){}
   try{ chart.subscribeAction('onZoom',   ()=>{ try{ repositionNewsMarkers(); }catch(e){} }); }catch(e){}
@@ -5500,7 +5511,7 @@ function toggleMarkets(){
 }
 // --- News panel: fetch & render (bias card, next-release countdown, weekly calendar) ---
 function newsCurrentInstrument(){ return inst || 'XAU_USD'; }   // `inst` = instrumen chart aktif (lihat selectSymbol)
-let _newsTimer=null, _newsCountdown=null;
+let _newsTimer=null, _newsCountdown=null, _newsNotifyTimer=null;
 let newsState=null;   // respons /api/news/calendar last-good — dibagi panel & marker on-chart
 // Toggle marker on-chart (Fase 2). Default ON. '0' = off.
 function newsMarkersEnabled(){ return localStorage.getItem('br_newsMarkers')!=='0'; }
@@ -5525,6 +5536,7 @@ function refreshNewsData(){
       newsState=d;
       if(!$('#newspanel').classList.contains('hidden')) renderNews(d);
       if(newsMarkersEnabled() && typeof renderNewsMarkers==='function') renderNewsMarkers();
+      try{ checkNewsNotify(); }catch(e){}   // deteksi rilis/reminder segera tiap data baru
     })
     .catch(()=>{
       // Panel terbuka → tampilkan error Fase 1. Marker: pertahankan last-good (jangan hapus).
@@ -5808,20 +5820,98 @@ function updateNewsCards(d){
   const badge=newsBadge(inst);
   for(const h of fresh){
     _newsCardShownIds.add(h.id);
-    const card=document.createElement('div'); card.className='nc-card';
-    card.innerHTML=`<div class="nc-top"><span class="nc-badge">◐ ${newsEsc(badge)}</span>`
+    pushChartCard(`<div class="nc-top"><span class="nc-badge">◐ ${newsEsc(badge)}</span>`
       +`<span class="nc-src">${newsEsc(h.source||'News')}</span>`
       +`<span class="nc-time">${newsEsc(fmtRel(h.publishedAt))}</span>`
       +`<button class="nc-x" aria-label="Dismiss">✕</button></div>`
       +`<a class="nc-title" href="${newsEsc(h.url)}" target="_blank" rel="noopener">${newsEsc(h.title)}</a>`
-      +`<a class="nc-more" href="${newsEsc(h.url)}" target="_blank" rel="noopener">Keep reading ↗</a>`;
-    c.insertBefore(card, c.firstChild);                 // terbaru di atas
-    card.querySelector('.nc-x').onclick=()=>dismissNewsCard(card);
-    requestAnimationFrame(()=>card.classList.add('in'));
+      +`<a class="nc-more" href="${newsEsc(h.url)}" target="_blank" rel="noopener">Keep reading ↗</a>`);
   }
-  while(c.children.length>3) c.lastChild.remove();      // cap 3 FIFO (buang terlama = paling bawah)
   const newMax=fresh.reduce((a,h)=>{ const t=Date.parse(h.publishedAt); return t>a?t:a; }, wmT);
   setNewsSeen(inst, new Date(newMax).toISOString());
+}
+// Sisip kartu on-chart baru (terbaru di atas, animasi masuk, cap 3 FIFO). Dipakai bersama
+// oleh headline feed (updateNewsCards) & notif event high-impact (fireNewsNotif).
+function pushChartCard(html, cls){
+  const c=ensureNewsCards();
+  const card=document.createElement('div'); card.className='nc-card'+(cls?(' '+cls):'');
+  card.innerHTML=html;
+  c.insertBefore(card, c.firstChild);
+  const x=card.querySelector('.nc-x'); if(x) x.onclick=()=>dismissNewsCard(card);
+  requestAnimationFrame(()=>card.classList.add('in'));
+  while(c.children.length>3) c.lastChild.remove();      // cap 3 FIFO (buang terlama = paling bawah)
+  return card;
+}
+
+// ===== Notif event ekonomi high-impact (OS Notification + fallback kartu on-chart) =====
+// Sumber data: newsState (poll 60s, ter-scope instrumen aktif). Dua momen: reminder T-5mnt
+// & saat rilis (actual+bias). Dedup per-event via id (time|name), anti-backlog saat load/switch,
+// persist lintas-reload di br_newsNotified. Default ON; toggle bell di header News.
+const NEWS_NOTIFY_LEAD=5;                              // menit sebelum rilis utk reminder
+let _newsNotifyInst=null;                              // instrumen yg set notif-nya sudah di-seed
+const _newsNotified={rem:new Set(), rel:new Set()};    // event id yg sudah dinotif per-kind (instrumen aktif)
+let _newsPermAsked=false;                              // guard minta izin OS sekali/sesi
+function newsNotifOn(){ return localStorage.getItem('br_newsNotify')!=='0'; }   // default ON
+function evId(r){ return r.time+'|'+r.name; }
+function newsNotifMap(){ try{ return JSON.parse(localStorage.getItem('br_newsNotified')||'{}'); }catch(e){ return {}; } }
+function saveNewsNotif(inst){ const m=newsNotifMap();
+  m[inst]={rem:[..._newsNotified.rem].slice(-80), rel:[..._newsNotified.rel].slice(-80)};   // cap agar tak tumbuh tanpa batas
+  try{ localStorage.setItem('br_newsNotified', JSON.stringify(m)); }catch(e){} }
+// Seed anti-backlog + muat dedup tersimpan. Event yg SUDAH rilis / sudah mepet (≤lead) saat
+// load/ganti-instrumen ditandai "sudah dinotif" → hanya transisi BARU setelah ini yg menembak.
+function seedNewsNotify(d){
+  const inst=d.instrument;
+  _newsNotified.rem.clear(); _newsNotified.rel.clear();
+  const saved=newsNotifMap()[inst];
+  if(saved){ (saved.rem||[]).forEach(x=>_newsNotified.rem.add(x)); (saved.rel||[]).forEach(x=>_newsNotified.rel.add(x)); }
+  const now=Date.now();
+  (d.releases||[]).forEach(r=>{
+    if(String(r.impact||'').toLowerCase()!=='high') return;
+    const id=evId(r);
+    if(r.released) _newsNotified.rel.add(id);
+    else if((Date.parse(r.time)-now)/60000 <= NEWS_NOTIFY_LEAD) _newsNotified.rem.add(id);
+  });
+  _newsNotifyInst=inst; saveNewsNotif(inst);
+}
+// Scan newsState: tembak reminder (≤lead, belum rilis) & notif rilis (actual masuk). Idempoten.
+function checkNewsNotify(){
+  if(!newsNotifOn() || !newsState || !Array.isArray(newsState.releases)) return;
+  const inst=newsState.instrument;
+  if(_newsNotifyInst!==inst){ seedNewsNotify(newsState); return; }   // siklus seed: jangan tembak backlog
+  const now=Date.now(); let dirty=false;
+  for(const r of newsState.releases){
+    if(String(r.impact||'').toLowerCase()!=='high') continue;
+    const id=evId(r);
+    if(!r.released){
+      const mins=(Date.parse(r.time)-now)/60000;
+      if(mins>0 && mins<=NEWS_NOTIFY_LEAD && !_newsNotified.rem.has(id)){ _newsNotified.rem.add(id); dirty=true; fireNewsNotif('rem', r, mins); }
+    }else if(!_newsNotified.rel.has(id)){ _newsNotified.rel.add(id); dirty=true; fireNewsNotif('rel', r); }
+  }
+  if(dirty) saveNewsNotif(inst);
+}
+// Kirim satu notif: OS Notification (bila izin granted) + kartu on-chart (selalu, sbg jejak in-app).
+function fireNewsNotif(kind, r, mins){
+  const cur=r.currency||'', badge=newsBadge(newsState?newsState.instrument:newsCurrentInstrument());
+  let osMsg, metaTxt, titleTxt, extra='';
+  if(kind==='rem'){
+    const m=Math.max(1,Math.round(mins));
+    osMsg=`High-impact in ${m} min: ${r.name} (${cur})`;
+    metaTxt=`in ${m} min`; titleTxt=`${r.name} (${cur})`;
+  }else{
+    const bias=(r.verdict&&r.verdict.bias)||'neutral';
+    const dir = bias==='bullish'?'Bullish':(bias==='bearish'?'Bearish':'');
+    osMsg=`${r.name} released: ${r.actual||'?'} vs ${r.forecast||'?'} forecast`+(dir?` → ${cur} ${dir}`:'');
+    metaTxt='Released'; titleTxt=`${r.name}: ${r.actual||'?'} vs ${r.forecast||'?'}`;
+    if(dir) extra=`<div class="nc-evrow"><span class="nc-bias ${bias==='bullish'?'up':'down'}">${newsEsc(cur+' '+dir)}</span></div>`;
+  }
+  try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — High-impact', {body:osMsg}); }catch(e){}
+  let timeTxt=''; try{ timeTxt=new Date(r.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }catch(e){}
+  pushChartCard(`<div class="nc-top"><span class="nc-badge">🔔 ${newsEsc(badge)}</span>`
+    +`<span class="nc-src">${newsEsc(metaTxt)}</span>`
+    +`<span class="nc-time">${newsEsc(timeTxt)}</span>`
+    +`<button class="nc-x" aria-label="Dismiss">✕</button></div>`
+    +`<div class="nc-title">${newsEsc(titleTxt)}</div>`+extra, 'nc-evt');
+  try{ track('news_notify',{kind, name:r.name}); }catch(e){}
 }
 function renderNews(d){
   const body=$('#newsBody');
@@ -5935,6 +6025,8 @@ function setNewsOpen(open){
     $('#toggleMarkets').classList.remove('on');
     np.classList.remove('hidden');
     if(typeof loadNews==='function') loadNews();                                 // fresh saat buka
+    // Minta izin OS lazily saat panel dibuka (gesture user). Sekali/sesi; hanya bila notif ON.
+    try{ if(newsNotifOn() && !_newsPermAsked && typeof Notification!=='undefined' && Notification.permission==='default'){ Notification.requestPermission(); _newsPermAsked=true; } }catch(e){}
     setNewsTab(newsTab());             // sinkron UI tab (Calendar/News) ke preferensi tersimpan
     clearInterval(_newsCountdown); _newsCountdown=setInterval(tickNewsCountdown, 1000);   // countdown tiap detik
   }else{
@@ -5969,6 +6061,18 @@ $('#toggleTrades').onclick=toggleTrades;
     localStorage.setItem('br_newsMarkers', cb.checked?'1':'0');
     if(typeof closeNewsPop==='function') closeNewsPop();
     renderNewsMarkers();   // enabled=false → renderNewsMarkers menyembunyikan & mengosongkan layer
+  });
+})();
+// Toggle notif high-impact — default ON; menyalakan minta izin OS (gesture).
+(function initNewsNotifyToggle(){
+  const cb=$('#newsNotifyToggle'); if(!cb) return;
+  cb.checked=newsNotifOn();
+  cb.addEventListener('change', ()=>{
+    localStorage.setItem('br_newsNotify', cb.checked?'1':'0');
+    if(cb.checked){
+      try{ if(typeof Notification!=='undefined' && Notification.permission==='default'){ Notification.requestPermission(); _newsPermAsked=true; } }catch(e){}
+      toast('High-impact alerts on','info');
+    }else toast('High-impact alerts off','info');
   });
 })();
 $('#bottomToggle').onclick=toggleTrades;
