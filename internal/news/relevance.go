@@ -95,3 +95,6 @@ func RelevanceFor(instrument string) Matcher {
 	}
 	return Matcher{include: include}
 }
+
+// Matches = wrapper publik: relevan bila salah satu keyword muncul di Title+Summary.
+func (m Matcher) Matches(h Headline) bool { return m.matches(h.Title, h.Summary) }
