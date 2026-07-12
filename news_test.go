@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,28 +156,109 @@ func TestBuildCalendarMultiCurrency(t *testing.T) {
 	}
 }
 
-func TestNewsCacheStaleFallback(t *testing.T) {
-	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
-	calls := 0
-	c := &newsCache{fetch: func() ([]news.Event, error) {
-		calls++
-		if calls == 1 {
-			return sampleEvents(now), nil
-		}
-		return nil, errFetch
+// testClock = clock atomik (unix-nano) yang aman dibaca dari goroutine refresh.
+type testClock struct{ ns atomic.Int64 }
+
+func newTestClock(t time.Time) *testClock { c := &testClock{}; c.ns.Store(t.UnixNano()); return c }
+func (c *testClock) now() time.Time       { return time.Unix(0, c.ns.Load()).UTC() }
+func (c *testClock) set(t time.Time)      { c.ns.Store(t.UnixNano()) }
+
+// cold fetch sinkron sukses → serve fresh; dalam TTL tak refetch.
+func TestSWRColdThenFresh(t *testing.T) {
+	base := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	clk := newTestClock(base)
+	var calls int32
+	c := &swrCache[[]news.Event]{ttl: calTTL, now: clk.now, fetch: func() ([]news.Event, error) {
+		atomic.AddInt32(&calls, 1)
+		return sampleEvents(base), nil
 	}}
-	// 1st: live ok
-	ev, _, stale, err := c.get(now)
+	ev, _, stale, err := c.get()
 	if err != nil || stale || len(ev) == 0 {
-		t.Fatalf("first get should be live ok")
+		t.Fatalf("cold get: ev=%d stale=%v err=%v", len(ev), stale, err)
 	}
-	// within TTL: no refetch
-	if _, _, _, _ = c.get(now.Add(1 * time.Minute)); calls != 1 {
-		t.Fatalf("within TTL should not refetch, calls=%d", calls)
+	clk.set(base.Add(time.Minute))
+	if _, _, s, _ := c.get(); s {
+		t.Fatal("dalam TTL harus fresh (stale=false)")
 	}
-	// after TTL: refetch fails → serve stale last-good
-	ev, _, stale, err = c.get(now.Add(11 * time.Minute))
-	if err != nil || !stale || len(ev) == 0 {
-		t.Fatalf("after TTL fail should serve stale, err=%v stale=%v", err, stale)
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("dalam TTL tak boleh refetch, calls=%d", got)
 	}
+}
+
+// cold fetch gagal (belum pernah sukses) → error (perilaku 503 lama).
+func TestSWRColdFailErr(t *testing.T) {
+	c := &swrCache[[]news.Event]{ttl: calTTL, fetch: func() ([]news.Event, error) {
+		return nil, errors.New("boom")
+	}}
+	if _, _, _, err := c.get(); err == nil {
+		t.Fatal("cold fetch gagal harus return err")
+	}
+}
+
+// setelah TTL: serve last-good SEKETIKA (stale=true) + refresh async.
+func TestSWRServeStaleThenRefreshAsync(t *testing.T) {
+	base := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	clk := newTestClock(base)
+	release := make(chan struct{})
+	called := make(chan struct{}, 8)
+	c := &swrCache[[]news.Event]{ttl: calTTL, now: clk.now, fetch: func() ([]news.Event, error) {
+		called <- struct{}{}
+		<-release // fetch diblok sampai test mengizinkan
+		return sampleEvents(base), nil
+	}}
+	// warm last-good (ok=true) di base → get pertama fresh, tanpa fetch sinkron
+	c.loadSnapshot(sampleEvents(base), base)
+
+	clk.set(base.Add(calTTL + time.Minute)) // majukan clock → basi
+
+	// stale get harus KEMBALI SEKETIKA meski refresh diblok
+	done := make(chan struct{})
+	go func() {
+		ev, _, stale, err := c.get()
+		if err != nil || !stale || len(ev) == 0 {
+			t.Errorf("stale get harus serve last-good seketika: stale=%v err=%v n=%d", stale, err, len(ev))
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("get() memblok menunggu refresh — SWR harus serve seketika")
+	}
+	// refresh async harus terpicu
+	select {
+	case <-called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("refresh async tak terpicu")
+	}
+	close(release) // lepaskan refresh
+}
+
+// banyak get konkuren yang basi → cuma SATU refresh berjalan (anti-herd).
+func TestSWRAntiHerd(t *testing.T) {
+	base := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	clk := newTestClock(base)
+	var fetches int32
+	started := make(chan struct{}, 64)
+	gate := make(chan struct{})
+	c := &swrCache[[]news.Event]{ttl: calTTL, now: clk.now, fetch: func() ([]news.Event, error) {
+		atomic.AddInt32(&fetches, 1)
+		started <- struct{}{}
+		<-gate // tahan refresh selama batch berjalan
+		return sampleEvents(base), nil
+	}}
+	// warm (ok=true) dengan fetchedAt lama → semua get langsung basi
+	c.loadSnapshot(sampleEvents(base), base.Add(-time.Hour))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); c.get() }()
+	}
+	wg.Wait() // semua get kembali seketika (stale served), tak menunggu refresh
+	<-started // tepat satu refresh dimulai
+	if got := atomic.LoadInt32(&fetches); got != 1 {
+		t.Fatalf("anti-herd: want 1 refresh, got %d", got)
+	}
+	close(gate)
 }

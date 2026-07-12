@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"luna-trade/internal/news"
@@ -27,37 +26,21 @@ func hlSources() []news.Source {
 	}
 }
 
-// hlCache = cache in-memory hasil agregat. fetch injectable utk test.
-type hlCache struct {
-	mu        sync.Mutex
-	items     []news.Headline
-	partial   bool
-	fetchedAt time.Time
-	ok        bool
-	fetch     func() ([]news.Headline, bool, error)
+// hlPayload = payload cache headlines (items + flag partial dari Aggregate).
+// Field exported agar aman di-JSON untuk persist snapshot.
+type hlPayload struct {
+	Items   []news.Headline `json:"items"`
+	Partial bool            `json:"partial"`
 }
 
-var headlineCache = &hlCache{fetch: func() ([]news.Headline, bool, error) {
-	return news.Aggregate(hlSources(), nil)
-}}
-
-// get mengembalikan headline agregat; refetch bila TTL lewat. stale=true bila menyajikan
-// last-good karena refetch gagal. err (mis. ErrNoSource) hanya bila belum pernah sukses.
-func (c *hlCache) get(now time.Time) (items []news.Headline, partial bool, fetchedAt time.Time, stale bool, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.ok && now.Sub(c.fetchedAt) < hlTTL {
-		return c.items, c.partial, c.fetchedAt, false, nil
-	}
-	fresh, freshPartial, ferr := c.fetch()
-	if ferr != nil {
-		if c.ok {
-			return c.items, c.partial, c.fetchedAt, true, nil // last-good (basi)
-		}
-		return nil, false, time.Time{}, false, ferr
-	}
-	c.items, c.partial, c.fetchedAt, c.ok = fresh, freshPartial, now, true
-	return c.items, c.partial, c.fetchedAt, false, nil
+// headlineCache = cache SWR headlines (serve-stale + refresh async + persist snapshot).
+var headlineCache = &swrCache[hlPayload]{
+	ttl: hlTTL,
+	key: "headlines",
+	fetch: func() (hlPayload, error) {
+		items, partial, err := news.Aggregate(hlSources(), nil)
+		return hlPayload{Items: items, Partial: partial}, err
+	},
 }
 
 // handleNewsHeadlines melayani GET /api/news/headlines?instrument=XAU_USD.
@@ -66,8 +49,7 @@ func handleNewsHeadlines(w http.ResponseWriter, r *http.Request) {
 	if instrument == "" {
 		instrument = "XAU_USD"
 	}
-	now := time.Now().UTC()
-	items, partial, fetchedAt, stale, err := headlineCache.get(now)
+	p, fetchedAt, stale, err := headlineCache.get()
 	if err != nil {
 		if errors.Is(err, news.ErrNoSource) {
 			writeJSON(w, http.StatusOK, hlResponse{Disabled: true, Instrument: instrument, Headlines: []hlItem{}})
@@ -76,7 +58,7 @@ func handleNewsHeadlines(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusServiceUnavailable, "Headlines unavailable")
 		return
 	}
-	writeJSON(w, http.StatusOK, buildHeadlinesResponse(items, instrument, partial, fetchedAt, stale))
+	writeJSON(w, http.StatusOK, buildHeadlinesResponse(p.Items, instrument, p.Partial, fetchedAt, stale))
 }
 
 // ---- bentuk response JSON ----

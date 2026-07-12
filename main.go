@@ -87,6 +87,11 @@ func main() {
 	st.logReady(dbPath)
 	store = st
 
+	// Warm cache News dari snapshot persist → request pertama pasca-restart langsung
+	// serve (stale) + refresh async, tanpa cold-block/503.
+	calCache.warm()
+	headlineCache.warm()
+
 	// Konfigurasi + connector broker aktif (single-user).
 	cfg = loadConfig()
 	conn = buildConnector(cfg)
