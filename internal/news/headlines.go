@@ -8,8 +8,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -86,6 +88,15 @@ func DedupeMerge(in []Headline) []Headline {
 	return out
 }
 
+// tokenRe menyamarkan nilai token API di pesan error: url.Error memuat URL lengkap
+// termasuk ?token=RAHASIA, jadi harus diredaksi sebelum di-log.
+var tokenRe = regexp.MustCompile(`token=[^&\s"]+`)
+
+// redactToken membuang nilai token dari teks error agar aman di-log.
+func redactToken(err error) string {
+	return tokenRe.ReplaceAllString(err.Error(), "token=REDACTED")
+}
+
 // Aggregate fan-out KONKUREN ke semua sumber Enabled(), lalu merge+dedupe+sort desc.
 // partial=true bila ≥1 sumber gagal tapi ada yang sukses. err=ErrNoSource bila nol
 // Enabled; err lain hanya bila SEMUA sumber Enabled gagal. Panic per-sumber diisolasi.
@@ -123,9 +134,10 @@ func Aggregate(sources []Source, client *http.Client) (out []Headline, partial b
 
 	var merged []Headline
 	okCount, failCount := 0, 0
-	for _, r := range results {
+	for i, r := range results {
 		if r.err != nil {
 			failCount++
+			log.Printf("news: sumber %s gagal: %s", enabled[i].Name(), redactToken(r.err))
 			continue
 		}
 		okCount++

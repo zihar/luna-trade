@@ -3,6 +3,7 @@ package news
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -126,5 +127,16 @@ func TestAggregateIsolatesPanic(t *testing.T) {
 	}
 	if len(out) != 1 || out[0].Title != "t" {
 		t.Fatalf("surviving source's headline should remain, got %+v", out)
+	}
+}
+
+func TestRedactToken(t *testing.T) {
+	err := errors.New(`Get "https://finnhub.io/api/v1/news?category=general&token=SECRET123": dial tcp: i/o timeout`)
+	got := redactToken(err)
+	if strings.Contains(got, "SECRET123") {
+		t.Fatalf("token leaked in redacted error: %q", got)
+	}
+	if !strings.Contains(got, "token=REDACTED") {
+		t.Fatalf("expected token=REDACTED marker, got %q", got)
 	}
 }
