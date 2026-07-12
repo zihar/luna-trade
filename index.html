@@ -1103,6 +1103,14 @@
   .fp-bg input[type=range]{ flex:1; min-width:0; }
   .fp-bg #fpBgVal{ flex:0 0 auto; color:var(--muted); width:32px; text-align:right; }
   .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
+  /* editor parameter indikator (numpang chrome .objpop) */
+  .ind-editor{ width:200px; }
+  .ind-editor .ie-title{ color:var(--txt); font-weight:600; font-size:12px; text-transform:none; letter-spacing:0; }
+  .ind-editor .ie-listrow{ display:flex; gap:6px; align-items:center; }
+  .ind-editor .ie-num{ flex:1; min-width:0; }
+  .ind-editor .ie-x{ flex:0 0 auto; width:24px; padding:4px 0; font-size:14px; line-height:1; color:var(--muted); background:transparent; border:0; cursor:pointer; }
+  .ind-editor .ie-x:disabled{ opacity:.3; cursor:default; }
+  .ind-editor .ie-add{ flex:1; font-size:11px; padding:6px 0; color:var(--accent); }
   .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
@@ -6064,7 +6072,49 @@ function updateIndBadge(){
   if(b){ b.textContent=n; b.hidden=(n===0); }
   if(btn) btn.classList.toggle('on', n>0);
 }
-function openIndEditor(name){ console.log('openIndEditor', name); }  // STUB → Task 4
+// editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
+let indEditorEl=null, indEditorName=null;
+function openIndEditor(name){
+  const def=indDef(name); if(!def||!def.params) return;
+  if(!activeInd[name]){ addInd(name); persistInd(); renderIndMenu(); updateIndBadge(); }
+  if(!indEditorEl){ indEditorEl=document.createElement('div'); indEditorEl.className='objpop ind-editor'; document.body.appendChild(indEditorEl); makeDraggable(indEditorEl,'.pp-grip'); }
+  indEditorName=name; renderIndEditor();
+  const b=$('#indBtn').getBoundingClientRect();
+  indEditorEl.style.left=Math.max(8,Math.min(b.left, innerWidth-240))+'px';
+  indEditorEl.style.top=(b.bottom+6)+'px';
+  indEditorEl.classList.add('show');
+}
+function closeIndEditor(){ if(indEditorEl) indEditorEl.classList.remove('show'); indEditorName=null; }
+function renderIndEditor(){
+  const name=indEditorName, def=indDef(name), p=def.params; const cp=(effParams(name)||[]).slice();
+  let body='';
+  if(p.kind==='fixed'){
+    body=p.fields.map((f,i)=>`<div class="pp-lbl">${f.label}</div><div class="pp-row"><input type="number" class="ie-num" data-i="${i}" min="${f.min}" max="${f.max}" step="${f.step||1}" value="${cp[i]!=null?cp[i]:f.def}"></div>`).join('');
+  } else {
+    const rows=cp.map((v,i)=>`<div class="pp-row ie-listrow"><input type="number" class="ie-num" data-i="${i}" min="${p.min}" max="${p.max}" step="${p.step||1}" value="${v}"><button class="ie-x" data-i="${i}" title="Remove"${cp.length<=1?' disabled':''}>×</button></div>`).join('');
+    body=`<div class="pp-lbl">${p.label}</div>${rows}<div class="pp-row"><button class="ie-add">+ Add</button></div>`;
+  }
+  indEditorEl.innerHTML=GRIP+`<div class="pp-lbl ie-title">${def.label}</div>${body}<div class="pp-act"><button class="ie-reset">Reset to default</button></div>`;
+  const readNums=()=>[...indEditorEl.querySelectorAll('.ie-num')].map(inp=>parseFloat(inp.value));
+  const clampField=(i,val)=>{ const f=(p.kind==='fixed')?p.fields[i]:p; return Math.min(f.max,Math.max(f.min,val)); };
+  // basis array TERKINI dari input DOM (bukan closure cp yg basi setelah edit) → +Add/remove tak buang edit.
+  // fallback ke nilai terakhir yg diterapkan bila ada input kosong/NaN.
+  const curArr=()=>{ const a=readNums(); return a.some(v=>!isFinite(v)) ? (effParams(name)||[]).slice() : a.map((v,i)=>clampField(i,v)); };
+  let deb=null;
+  indEditorEl.querySelectorAll('.ie-num').forEach(inp=>inp.oninput=()=>{
+    clearTimeout(deb); deb=setTimeout(()=>{
+      const arr=readNums(); if(arr.some(v=>!isFinite(v))) return;   // input kosong/NaN → jangan terapkan
+      setIndParams(name, arr.map((v,i)=>clampField(i,v)));
+    },150);
+  });
+  if(p.kind==='list'){
+    indEditorEl.querySelectorAll('.ie-x').forEach(x=>x.onclick=()=>{ const arr=curArr(); if(arr.length<=1) return; arr.splice(+x.dataset.i,1); setIndParams(name,arr); renderIndEditor(); });
+    const add=indEditorEl.querySelector('.ie-add'); if(add) add.onclick=()=>{ const arr=curArr(); arr.push(arr[arr.length-1]||p.def[0]||14); setIndParams(name,arr); renderIndEditor(); };
+  }
+  indEditorEl.querySelector('.ie-reset').onclick=()=>{ setIndParams(name, defParams(name)); renderIndEditor(); };
+}
+document.addEventListener('mousedown',e=>{ if(indEditorEl&&indEditorEl.classList.contains('show') && !indEditorEl.contains(e.target) && !e.target.closest('#indMenu') && !e.target.closest('#indBtn')) closeIndEditor(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && indEditorEl&&indEditorEl.classList.contains('show')) closeIndEditor(); });
 function renderIndMenu(){
   const m=$('#indMenu'); if(!m) return;
   const grp=(title,items)=>`<div class="ind-grp">${title}</div>`+items.map(d=>
