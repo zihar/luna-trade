@@ -1957,6 +1957,13 @@ const DRAW_DEFAULT = {
 const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1,
   straightLine:1, rayLine:1, horizontalRayLine:1, priceLine:1,
   parallelStraightLine:1, priceChannelLine:1, fibonacciLine:1};
+// Tag tanggal di sumbu X (default figure klinecharts) hanya relevan utk objek berbasis WAKTU.
+// verticalStraightLine render tag-nya sendiri (createXAxisFigures) → TIDAK pakai default (biar tak dobel).
+// Jadi hanya dateRange yg boleh pakai tag tanggal X default. Semua draw lain (garis miring/horizontal/
+// ray/channel/fib bawaan klinecharts) tak perlu tanggal di X. _overrideInstance klinecharts mengabaikan
+// flag ini & template built-in tak bisa di-edit → set langsung di instance saat draw selesai / restore.
+const X_AXIS_DATE_OK={dateRange:1};
+function applyXDateFlag(o){ try{ if(o) o.needDefaultXAxisFigure=!!X_AXIS_DATE_OK[o.name]; }catch(_){}}
 function klineLineStyles(st){ const ls=lsLine(st); return {line:Object.assign({color:st.color,size:st.size},ls)}; }
 const objStyle = {};   // overlayId -> {color,size,style}
 function dstyle(o){ return Object.assign({}, DRAW_DEFAULT[o&&o.name]||{color:'#4a71ff',size:1,style:'solid'}, objStyle[o&&o.id]||{}); }
@@ -2153,7 +2160,7 @@ klinecharts.registerOverlay({
 function axisTagColor(o){ return (o&&o.styles&&o.styles.line&&o.styles.line.color)||'#4a71ff'; }
 klinecharts.registerOverlay({
   name:'horizontalStraightLine', totalStep:2, needDefaultPointFigure:true,
-  needDefaultXAxisFigure:true, needDefaultYAxisFigure:false,   // tag harga (Y) kita render sendiri & selalu
+  needDefaultXAxisFigure:false, needDefaultYAxisFigure:false,  // tag harga (Y) kita render sendiri; tanggal (X) tak perlu utk garis horizontal
   createPointFigures:({coordinates,bounding})=>{ const cy=coordinates[0].y; return [
     // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
     {type:'rect', attrs:{x:0,y:cy-6,width:bounding.width,height:12}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
@@ -2383,6 +2390,7 @@ function barsBetween(t0,t1){
 }
 klinecharts.registerOverlay({
   name:'dateRange', totalStep:3, needDefaultPointFigure:true,
+  needDefaultXAxisFigure:true,   // objek berbasis waktu → tanggal di sumbu X (default figure) memang relevan
   createPointFigures:({overlay,coordinates})=>{
     if(coordinates.length<2) return [];
     const C=subBarCoords(overlay,coordinates);
@@ -4026,6 +4034,7 @@ function posRerender(o){ try{
 function delHooks(){ return {
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
+    applyXDateFlag(o);   // buang tanggal sumbu X utk draw non-waktu (built-in klinecharts set flag ini true)
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
     // Tempelkan klik presisi ke titik final by-index (klik & titik urut sama), lalu JARING
     // PENGAMAN: klinecharts kadang menaruh titik di area future TANPA anchor (timestamp &
@@ -4141,6 +4150,7 @@ function buildDrawsFromArray(arr){
     if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
     const id=chart.createOverlay(Object.assign(base,delHooks()));
     if(id){ drawIds.push(id);
+      try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // restore full-point tak picu onDrawEnd → set flag di sini
       if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
   }catch(e){} });
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
