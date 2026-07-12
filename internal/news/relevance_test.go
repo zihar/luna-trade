@@ -47,3 +47,18 @@ func TestRelevanceNoShortTokenFalsePositive(t *testing.T) {
 		t.Fatal("'Boeing' must not match Bank of England (GBP)")
 	}
 }
+
+func TestRelevanceForETHNoWordFalsePositive(t *testing.T) {
+	m := RelevanceFor("ETH_USD")
+	// real ethereum headline → relevan
+	if !m.matches("Ethereum upgrade goes live", "") {
+		t.Fatal("ethereum headline should match ETH_USD")
+	}
+	// kata umum yang MENGANDUNG substring 'ether' → JANGAN cocok
+	if m.matches("Traders debate whether the Fed will cut rates", "") {
+		t.Fatal("'whether' must not match ETH_USD")
+	}
+	if m.matches("Markets rally together as risk appetite returns", "") {
+		t.Fatal("'together' must not match ETH_USD")
+	}
+}

@@ -38,7 +38,7 @@ var assetKeywords = map[string][]string{
 	"XAU":   {"gold", "bullion", "xau"},
 	"XAG":   {"silver", "xag"},
 	"BTC":   {"bitcoin", "btc"},
-	"ETH":   {"ethereum", "ether"},
+	"ETH":   {"ethereum"},
 	"LTC":   {"litecoin", "ltc"},
 	"BCH":   {"bitcoin cash", "bch"},
 	"SPX":   {"s&p 500", "s&p500", "spx"},
