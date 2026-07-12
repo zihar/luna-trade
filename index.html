@@ -844,6 +844,27 @@
   .hl-item:hover .hl-more, .hl-item:focus-visible .hl-more{ opacity:1; }
   @media (prefers-reduced-motion: reduce){ .hl-more{ transition:none; } }
 
+  /* News notif cards on-chart (part 3) — sepupu .toast, aksen --luna-glow = "berita" */
+  #newsCards{ position:absolute; top:44px; right:66px; z-index:7; display:flex; flex-direction:column; gap:8px;
+              width:min(300px,42vw); pointer-events:none; }
+  .nc-card{ background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--luna-glow);
+            border-radius:9px; box-shadow:var(--shadow); padding:9px 10px 10px 11px; pointer-events:auto;
+            opacity:0; transform:translateX(12px); transition:opacity .25s, transform .25s; }
+  .nc-card.in{ opacity:1; transform:none; }
+  .nc-top{ display:flex; align-items:center; gap:6px; margin-bottom:3px;
+           font:600 11px 'Space Grotesk',Inter,sans-serif; }
+  .nc-badge{ color:var(--luna-glow); white-space:nowrap; }
+  .nc-src{ color:var(--hdr); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nc-time{ color:var(--muted); font:11px var(--font-num,monospace); margin-left:auto; white-space:nowrap; }
+  .nc-x{ background:none; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
+  .nc-x:hover{ color:var(--txt); } .nc-x:focus-visible{ outline:2px solid var(--ring); outline-offset:1px; }
+  .nc-title{ font:400 13px/1.35 Inter,sans-serif; color:var(--txt); text-decoration:none;
+             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .nc-title:hover{ color:var(--luna-glow); }
+  .nc-more{ font:600 11px 'Space Grotesk',Inter,sans-serif; color:var(--luna-glow); margin-top:4px;
+            display:inline-block; text-decoration:none; }
+  @media (prefers-reduced-motion: reduce){ .nc-card{ transition:none; transform:none; } }
+
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
   .nmk{ position:absolute; bottom:34px; width:22px; height:22px; border-radius:50%;   /* di atas band label sumbu-X + pill tanggal crosshair (dulu 15px → menabrak) */
@@ -5602,6 +5623,7 @@ function refreshHeadlines(){
     .then(r=>{ if(!r.ok) throw new Error('http'); return r.json(); })
     .then(d=>{ headlinesState=d; _hlDisabled=!!d.disabled; applyNewsTabsVisibility();
       if(newsTab()==='news' && !$('#newspanel').classList.contains('hidden')) renderHeadlines(d);
+      try{ updateNewsCards(d); }catch(e){}   // part 3: kartu notif on-chart (walau panel tertutup)
     })
     .catch(()=>{
       if(newsTab()==='news' && !$('#newspanel').classList.contains('hidden')){
@@ -5634,6 +5656,55 @@ function renderHeadlines(d){
       <div class="hl-more">Keep reading ↗</div></a>`;
   }
   body.innerHTML=html;
+}
+
+// --- News notif cards on-chart (part 3): headline BARU (per-instrumen) → kartu kanan-atas ---
+let _newsCardShownIds=new Set();   // id yg sudah ditampilkan sesi ini (cegah dobel lintas sumber/telat)
+let _newsCardsInst=null;           // instrumen yg kartunya sedang tampil (utk bersihkan saat ganti)
+function newsSeenMap(){ try{ return JSON.parse(localStorage.getItem('br_newsSeen')||'{}'); }catch(e){ return {}; } }
+function setNewsSeen(inst, iso){ const m=newsSeenMap(); m[inst]=iso; try{ localStorage.setItem('br_newsSeen', JSON.stringify(m)); }catch(e){} }
+function ensureNewsCards(){ let c=$('#newsCards'); if(!c){ c=document.createElement('div'); c.id='newsCards'; $('#chart').appendChild(c); } return c; }
+// Badge pendek instrumen (◐ prefix di render). Gold/Silver diberi nama; crypto/indeks pakai base; forex pair.
+function newsBadge(inst){
+  if(inst==='XAU_USD') return 'GOLD'; if(inst==='XAG_USD') return 'SILVER';
+  const m=(typeof ipkMeta==='function')?ipkMeta(inst):null;
+  if(m && (m.grp==='Crypto'||m.grp==='Indices')) return m.base||inst;
+  return inst.replace('_','/');
+}
+function dismissNewsCard(el){ el.classList.remove('in'); setTimeout(()=>{ try{el.remove();}catch(e){} }, 260); }
+// Dipanggil tiap headlinesState terupdate (refreshHeadlines). Boot/ganti-instrumen: set watermark
+// tanpa tampilkan backlog; hanya headline lebih baru dari watermark yg memicu kartu.
+function updateNewsCards(d){
+  if(!d || d.disabled) return;
+  const inst=d.instrument;
+  if(inst!==newsCurrentInstrument()) return;            // respons basi (sudah ganti instrumen)
+  const c=ensureNewsCards();
+  if(_newsCardsInst!==inst){ c.innerHTML=''; _newsCardsInst=inst; }  // ganti instrumen → bersihkan kartu lama
+  const items=(d.headlines||[]);
+  const maxTs=items.reduce((a,h)=>{ const t=Date.parse(h.publishedAt); return (!isNaN(t)&&t>a)?t:a; }, 0);
+  const seen=newsSeenMap(), wm=seen[inst];
+  if(wm===undefined){ if(maxTs) setNewsSeen(inst, new Date(maxTs).toISOString()); return; }  // boot: no backlog
+  const wmT=Date.parse(wm)||0;
+  const fresh=items.filter(h=>{ const t=Date.parse(h.publishedAt); return !isNaN(t)&&t>wmT && !_newsCardShownIds.has(h.id); })
+                   .sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt));   // lama→baru
+  if(!fresh.length) return;
+  const badge=newsBadge(inst);
+  for(const h of fresh){
+    _newsCardShownIds.add(h.id);
+    const card=document.createElement('div'); card.className='nc-card';
+    card.innerHTML=`<div class="nc-top"><span class="nc-badge">◐ ${newsEsc(badge)}</span>`
+      +`<span class="nc-src">${newsEsc(h.source||'News')}</span>`
+      +`<span class="nc-time">${newsEsc(fmtRel(h.publishedAt))}</span>`
+      +`<button class="nc-x" aria-label="Dismiss">✕</button></div>`
+      +`<a class="nc-title" href="${newsEsc(h.url)}" target="_blank" rel="noopener">${newsEsc(h.title)}</a>`
+      +`<a class="nc-more" href="${newsEsc(h.url)}" target="_blank" rel="noopener">Keep reading ↗</a>`;
+    c.insertBefore(card, c.firstChild);                 // terbaru di atas
+    card.querySelector('.nc-x').onclick=()=>dismissNewsCard(card);
+    requestAnimationFrame(()=>card.classList.add('in'));
+  }
+  while(c.children.length>3) c.lastChild.remove();      // cap 3 FIFO (buang terlama = paling bawah)
+  const newMax=fresh.reduce((a,h)=>{ const t=Date.parse(h.publishedAt); return t>a?t:a; }, wmT);
+  setNewsSeen(inst, new Date(newMax).toISOString());
 }
 function renderNews(d){
   const body=$('#newsBody');
