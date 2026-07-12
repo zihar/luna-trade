@@ -6013,7 +6013,8 @@ applyChartCfg();   // terapkan cfg tersimpan saat startup
 
 // ===================== indikator teknikal (ƒx) =====================
 // Indikator bawaan KLineCharts di chart UTAMA. Overlay (MA/EMA/BOLL) numpang di pane
-// candle; osilator (VOL/MACD/RSI) di sub-pane sendiri. Parameter pakai default library.
+// candle; osilator (VOL/MACD/RSI) di sub-pane sendiri. Parameter (calcParams) bisa diedit
+// per-indikator via skema `params` di IND_DEFS + editor gear ⚙ (default = default library).
 const IND_DEFS=[
   {name:'MA',   label:'MA — Moving Average',       overlay:true,
     params:{kind:'list', label:'Period', def:[5,10,30,60], min:1, max:400, step:1}},
@@ -6080,7 +6081,7 @@ function openIndEditor(name){
   if(!indEditorEl){ indEditorEl=document.createElement('div'); indEditorEl.className='objpop ind-editor'; document.body.appendChild(indEditorEl); makeDraggable(indEditorEl,'.pp-grip'); }
   indEditorName=name; renderIndEditor();
   const b=$('#indBtn').getBoundingClientRect();
-  indEditorEl.style.left=Math.max(8,Math.min(b.left, innerWidth-240))+'px';
+  indEditorEl.style.left=Math.max(8,Math.min(b.left, innerWidth-208))+'px';
   indEditorEl.style.top=(b.bottom+6)+'px';
   indEditorEl.classList.add('show');
 }
@@ -6103,6 +6104,7 @@ function renderIndEditor(){
   let deb=null;
   indEditorEl.querySelectorAll('.ie-num').forEach(inp=>inp.oninput=()=>{
     clearTimeout(deb); deb=setTimeout(()=>{
+      if(name!==indEditorName) return;   // editor sudah ganti indikator sebelum timer fire → jangan tulis silang
       const arr=readNums(); if(arr.some(v=>!isFinite(v))) return;   // input kosong/NaN → jangan terapkan
       setIndParams(name, arr.map((v,i)=>clampField(i,v)));
     },150);
