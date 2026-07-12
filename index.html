@@ -4148,7 +4148,25 @@ function delHooks(){ return {
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); return false; },
 };}
-function createDraw(name,btn,extra){
+// Instant-drop ala TradingView: shortcut H/V → garis langsung terpasang di posisi cursor
+// tanpa klik. Titik diambil dari cursor terakhir (lastPtr); null bila cursor di LUAR chart
+// (mis. shortcut ditekan saat pointer tak di atas chart) → fallback ke mode gambar biasa.
+const INSTANT_DROP={horizontalStraightLine:1, verticalStraightLine:1};
+function instantDropPoint(name){
+  const el=$('#chart'), r=el.getBoundingClientRect();
+  const px=lastPtr.x-r.left, py=lastPtr.y-r.top;
+  if(px<0||py<0||px>r.width||py>r.height) return null;
+  const v=pxToValue(py); if(v==null) return null;
+  // anchor X (timestamp in-range / dataIndex future) WAJIB utk kedua garis: walau x tak
+  // relevan visual utk horizontal, serializeDraws melewati titik tanpa `vt` → tanpa anchor X
+  // garis tak ter-persist & tak masuk history undo (sama spt garis yg digambar manual: klik
+  // memberi timestamp dari posisi-x). vertical: snap ke bar spt onDrawEnd (x memang relevan).
+  const xa=xAnchorFromPx(px); if(!xa) return null;
+  const np=Object.assign({value:v}, xa);
+  if(name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
+  return np;
+}
+function createDraw(name,btn,extra,instant){
   track('draw',{tool:name});
   try{
     pendingClicks=[];
@@ -4159,8 +4177,17 @@ function createDraw(name,btn,extra){
     // nempel ke OHLC candle terdekat saat ditarik, bukan cuma titik yg sudah diklik. Presisi
     // sub-bar (timestamp M5) tetap disempurnakan oleh pendingClicks + refineMagnetPoints di onDrawEnd.
     if(magnetOn) base.mode='strong_magnet';
+    // instant-drop (H/V via shortcut): pre-fill 1 titik → overlay langsung jadi (tak masuk mode gambar)
+    let dropped=false;
+    if(instant && INSTANT_DROP[name]){ const pt=instantDropPoint(name); if(pt){ base.points=[pt]; dropped=true; } }
     const id=chart.createOverlay(Object.assign(base,delHooks(),extra||{}));
-    if(id){ drawIds.push(id); inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
+    if(id){ drawIds.push(id);
+      if(dropped){   // sudah jadi (bukan mode gambar): onDrawEnd TAK terpanggil → tangani manual
+        inProgressId=null; disarmIcons();
+        try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // spt jalur restore
+        selectedId=id; scheduleSaveDraws();                          // pilih + persist + catat history utk undo
+      } else { inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
+    }
     else setStatus('Failed to activate '+name,true);
   }catch(e){ setStatus('Drawing error: '+e.message,true); }
 }
@@ -4556,12 +4583,13 @@ function scLabel(sc){ return (IS_MAC?'⌥':'Alt+')+sc; }              // label h
 function catTitle(g,t){ return g.title+': '+t.title+(t.sc?' ('+scLabel(t.sc)+')':''); }
 // map dari e.code (fisik, OS/layout-independent) → {g,t}
 const SC_BY_CODE={}; DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ if(t.sc) SC_BY_CODE['Key'+t.sc]={g,t}; }));
-function activateShortcut(hit){ const catBtn=_dt.querySelector('.dt-cat[data-cat="'+hit.g.key+'"]'); if(catBtn) pickTool(hit.g, hit.t, catBtn); }
-function pickTool(g, t, catBtn){
+// instant=true → jalur SHORTCUT: H/V langsung drop di posisi cursor tanpa klik (lihat createDraw)
+function activateShortcut(hit){ const catBtn=_dt.querySelector('.dt-cat[data-cat="'+hit.g.key+'"]'); if(catBtn) pickTool(hit.g, hit.t, catBtn, true); }
+function pickTool(g, t, catBtn, instant){
   catBtn.dataset.tool=t.name; catBtn.title=catTitle(g,t);
   const _ico=catBtn.querySelector('.dt-ico'); if(_ico) _ico.innerHTML=t.svg; else catBtn.innerHTML=t.svg;
   if(g.cursor){ setCursorMode(t.name); catBtn.classList.add('armed'); }
-  else { try{localStorage.setItem('br_lasttool_'+g.key,t.name);}catch(_){} createDraw(t.name, catBtn); }
+  else { try{localStorage.setItem('br_lasttool_'+g.key,t.name);}catch(_){} createDraw(t.name, catBtn, null, instant); }
   closeFlyout();
 }
 function openFlyout(g, catBtn){
