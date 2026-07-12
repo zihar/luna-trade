@@ -1,7 +1,10 @@
 package news
 
 import (
+	"errors"
+	"net/http"
 	"testing"
+	"time"
 )
 
 func TestCanonicalURL(t *testing.T) {
@@ -38,5 +41,69 @@ func TestMatchesWrapper(t *testing.T) {
 	m := RelevanceFor("XAU_USD")
 	if !m.Matches(Headline{Title: "Gold hits record", Summary: ""}) {
 		t.Fatal("Matches wrapper should delegate to matches()")
+	}
+}
+
+// fakeSource = Source palsu utk menguji Aggregate tanpa jaringan.
+type fakeSource struct {
+	name    string
+	enabled bool
+	items   []Headline
+	err     error
+}
+
+func (f fakeSource) Name() string { return f.name }
+func (f fakeSource) Enabled() bool { return f.enabled }
+func (f fakeSource) Fetch(*http.Client) ([]Headline, error) { return f.items, f.err }
+
+func TestAggregateMergesAndSorts(t *testing.T) {
+	t0 := time.Date(2026, 7, 12, 9, 0, 0, 0, time.UTC)
+	a := fakeSource{name: "a", enabled: true, items: []Headline{
+		{URL: "https://x.com/1", Title: "old", PublishedAt: t0},
+		{URL: "https://x.com/2", Title: "new", PublishedAt: t0.Add(time.Hour)},
+	}}
+	// sumber b memuat duplikat /2 (tanpa summary) + gagal? tidak, sukses.
+	b := fakeSource{name: "b", enabled: true, items: []Headline{
+		{URL: "https://x.com/2?utm_source=b", Title: "new", PublishedAt: t0.Add(time.Hour)},
+	}}
+	out, partial, err := Aggregate([]Source{a, b}, nil)
+	if err != nil || partial {
+		t.Fatalf("want ok non-partial, got err=%v partial=%v", err, partial)
+	}
+	if len(out) != 2 {
+		t.Fatalf("want 2 after dedupe, got %d", len(out))
+	}
+	if out[0].Title != "new" {
+		t.Fatalf("want newest first, got %q", out[0].Title)
+	}
+}
+
+func TestAggregatePartialOnOneFailure(t *testing.T) {
+	ok := fakeSource{name: "ok", enabled: true, items: []Headline{{URL: "https://x.com/1", Title: "t"}}}
+	bad := fakeSource{name: "bad", enabled: true, err: errors.New("boom")}
+	out, partial, err := Aggregate([]Source{ok, bad}, nil)
+	if err != nil {
+		t.Fatalf("one failure should not error, got %v", err)
+	}
+	if !partial {
+		t.Fatal("want partial=true when a source fails")
+	}
+	if len(out) != 1 {
+		t.Fatalf("want 1 from surviving source, got %d", len(out))
+	}
+}
+
+func TestAggregateNoSource(t *testing.T) {
+	_, _, err := Aggregate([]Source{fakeSource{name: "off", enabled: false}}, nil)
+	if !errors.Is(err, ErrNoSource) {
+		t.Fatalf("want ErrNoSource, got %v", err)
+	}
+}
+
+func TestAggregateAllFail(t *testing.T) {
+	bad := fakeSource{name: "bad", enabled: true, err: errors.New("boom")}
+	_, _, err := Aggregate([]Source{bad}, nil)
+	if err == nil || errors.Is(err, ErrNoSource) {
+		t.Fatalf("all-fail should error (not ErrNoSource), got %v", err)
 	}
 }

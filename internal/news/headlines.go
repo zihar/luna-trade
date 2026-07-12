@@ -7,9 +7,12 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -81,4 +84,59 @@ func DedupeMerge(in []Headline) []Headline {
 		out = append(out, h)
 	}
 	return out
+}
+
+// Aggregate fan-out KONKUREN ke semua sumber Enabled(), lalu merge+dedupe+sort desc.
+// partial=true bila ≥1 sumber gagal tapi ada yang sukses. err=ErrNoSource bila nol
+// Enabled; err lain hanya bila SEMUA sumber Enabled gagal. Panic per-sumber diisolasi.
+func Aggregate(sources []Source, client *http.Client) (out []Headline, partial bool, err error) {
+	var enabled []Source
+	for _, s := range sources {
+		if s != nil && s.Enabled() {
+			enabled = append(enabled, s)
+		}
+	}
+	if len(enabled) == 0 {
+		return nil, false, ErrNoSource
+	}
+
+	type res struct {
+		hs  []Headline
+		err error
+	}
+	results := make([]res, len(enabled))
+	var wg sync.WaitGroup
+	for i, s := range enabled {
+		wg.Add(1)
+		go func(i int, s Source) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					results[i] = res{err: fmt.Errorf("panic sumber %s: %v", s.Name(), r)}
+				}
+			}()
+			hs, e := s.Fetch(client)
+			results[i] = res{hs: hs, err: e}
+		}(i, s)
+	}
+	wg.Wait()
+
+	var merged []Headline
+	okCount, failCount := 0, 0
+	for _, r := range results {
+		if r.err != nil {
+			failCount++
+			continue
+		}
+		okCount++
+		merged = append(merged, r.hs...)
+	}
+	if okCount == 0 {
+		return nil, false, fmt.Errorf("news: semua %d sumber gagal", failCount)
+	}
+	merged = DedupeMerge(merged)
+	sort.SliceStable(merged, func(i, j int) bool {
+		return merged[i].PublishedAt.After(merged[j].PublishedAt)
+	})
+	return merged, failCount > 0, nil
 }
