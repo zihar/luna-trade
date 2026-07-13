@@ -5619,16 +5619,25 @@ function repositionNewsMarkers(){
     if(x==null || x<0 || x>W){ el.style.display='none'; return; }
     el.style.display=''; el.style.left=x+'px';
   });
-  nudgeNewsMarkers();
+  stackNewsMarkers();
   if(typeof repositionNewsPop==='function') repositionNewsPop();   // ikutkan popup terbuka (Task 4)
 }
-// Dua badge berdekatan (<24px, ≈ lebar badge) → geser kecil ke kanan agar keduanya bisa di-hover.
-function nudgeNewsMarkers(){
+// Marker di waktu (≈ posisi-x) sama → tumpuk VERTIKAL atas-bawah di x yang sama (ala TradingView),
+// bukan geser horizontal (yg dulu melencengkan posisi waktu). Cluster berdasarkan kedekatan-x,
+// samakan x anggota ke marker terkiri, lalu offset `bottom` per anggota. Selalu set bottom tiap
+// marker (juga tunggal → base) agar layout lama ter-reset saat zoom/pan mengubah cluster.
+function stackNewsMarkers(){
   const layer=_newsLayer; if(!layer) return;
+  const BASE=34, STEP=25, NEAR=20;   // px: bottom awal (samakan CSS), tinggi tumpuk, ambang overlap
   const vis=[...layer.querySelectorAll('.nmk')].filter(e=>e.style.display!=='none')
     .map(e=>({e,x:parseFloat(e.style.left)||0})).sort((p,q)=>p.x-q.x);
-  for(let i=1;i<vis.length;i++){
-    if(vis[i].x - vis[i-1].x < 24){ vis[i].x=vis[i-1].x+24; vis[i].e.style.left=vis[i].x+'px'; }   // ≈ lebar badge
+  let i=0;
+  while(i<vis.length){
+    let j=i+1;
+    while(j<vis.length && vis[j].x - vis[j-1].x < NEAR) j++;   // [i,j) = satu run marker yg saling menimpa
+    const cx=vis[i].x;                                          // samakan ke x anggota terkiri
+    for(let k=i;k<j;k++){ const m=vis[k].e; m.style.left=cx+'px'; m.style.bottom=(BASE+(k-i)*STEP)+'px'; }
+    i=j;
   }
 }
 // ---- News marker popup (hover desktop / tap mobile) ----
