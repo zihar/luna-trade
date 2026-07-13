@@ -917,6 +917,13 @@
   .nc-bias{ font:600 11px 'Space Grotesk',Inter,sans-serif; padding:2px 8px; border-radius:20px; }
   .nc-bias.up{ color:var(--green); background:rgba(46,204,113,.14); }
   .nc-bias.down{ color:var(--red); background:rgba(255,111,111,.14); }
+  /* Daftar event saat >1 rilis di waktu sama (coalesced) */
+  .nc-evlist{ margin-top:5px; font:400 12px/1.4 Inter,sans-serif; color:var(--txt);
+              display:flex; flex-direction:column; gap:3px; }
+  .nc-evline{ display:flex; align-items:center; gap:6px; }
+  .nc-evline .nc-evn{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
+  .nc-evline b{ font-variant-numeric:tabular-nums; }
+  .nc-evline .nc-bias{ padding:1px 6px; font-size:10px; }
 
   /* News on-chart markers (Fase 2) — tick di sumbu waktu; glow --luna-glow utk event terdekat */
   #newsMarkers{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
@@ -5878,40 +5885,61 @@ function checkNewsNotify(){
   if(!newsNotifOn() || !newsState || !Array.isArray(newsState.releases)) return;
   const inst=newsState.instrument;
   if(_newsNotifyInst!==inst){ seedNewsNotify(newsState); return; }   // siklus seed: jangan tembak backlog
-  const now=Date.now(); let dirty=false;
+  const now=Date.now();
+  const freshRem={}, freshRel={};    // time → [release] event high-impact yg baru memicu (belum dinotif)
   for(const r of newsState.releases){
     if(String(r.impact||'').toLowerCase()!=='high') continue;
     const id=evId(r);
     if(!r.released){
       const mins=(Date.parse(r.time)-now)/60000;
-      if(mins>0 && mins<=NEWS_NOTIFY_LEAD && !_newsNotified.rem.has(id)){ _newsNotified.rem.add(id); dirty=true; fireNewsNotif('rem', r, mins); }
-    }else if(!_newsNotified.rel.has(id)){ _newsNotified.rel.add(id); dirty=true; fireNewsNotif('rel', r); }
+      if(mins>0 && mins<=NEWS_NOTIFY_LEAD && !_newsNotified.rem.has(id)) (freshRem[r.time]=freshRem[r.time]||[]).push(r);
+    }else if(!_newsNotified.rel.has(id)) (freshRel[r.time]=freshRel[r.time]||[]).push(r);
   }
+  let dirty=false;
+  // Gabung event ber-waktu-sama → satu notif per grup (mis. batch NFP jam 12:30).
+  for(const t in freshRem){ const g=freshRem[t]; g.forEach(r=>_newsNotified.rem.add(evId(r))); dirty=true; fireNewsNotif('rem', g, (Date.parse(t)-now)/60000); }
+  for(const t in freshRel){ const g=freshRel[t]; g.forEach(r=>_newsNotified.rel.add(evId(r))); dirty=true; fireNewsNotif('rel', g); }
   if(dirty) saveNewsNotif(inst);
 }
-// Kirim satu notif: OS Notification (bila izin granted) + kartu on-chart (selalu, sbg jejak in-app).
-function fireNewsNotif(kind, r, mins){
-  const cur=r.currency||'', badge=newsBadge(newsState?newsState.instrument:newsCurrentInstrument());
-  let osMsg, metaTxt, titleTxt, extra='';
+// Kirim satu notif utk SEGRUP event (≥1) ber-waktu-sama: OS Notification (bila izin granted)
+// + kartu on-chart (selalu, sbg jejak in-app). group = array release; n=1 → format tunggal.
+function fireNewsNotif(kind, group, mins){
+  const badge=newsBadge(newsState?newsState.instrument:newsCurrentInstrument());
+  const curTxt=[...new Set(group.map(r=>r.currency).filter(Boolean))].join(', ');
+  const n=group.length;
+  let timeTxt=''; try{ timeTxt=new Date(group[0].time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }catch(e){}
+  const dirOf=r=>{ const b=(r.verdict&&r.verdict.bias)||'neutral'; return b==='bullish'?'up':(b==='bearish'?'down':''); };
+  let osMsg, metaTxt, titleTxt, body='';
   if(kind==='rem'){
-    const m=Math.max(1,Math.round(mins));
-    osMsg=`High-impact in ${m} min: ${r.name} (${cur})`;
-    metaTxt=`in ${m} min`; titleTxt=`${r.name} (${cur})`;
+    const m=Math.max(1,Math.round(mins)); metaTxt=`in ${m} min`;
+    if(n===1){ const r=group[0]; titleTxt=`${r.name} (${r.currency})`; osMsg=`High-impact in ${m} min: ${r.name} (${r.currency})`; }
+    else{
+      titleTxt=`${n} high-impact events${curTxt?` (${curTxt})`:''}`;
+      body=`<div class="nc-evlist">${group.map(r=>newsEsc(r.name)).join(' · ')}</div>`;
+      osMsg=`${n} high-impact in ${m} min${curTxt?` (${curTxt})`:''}: ${group.map(r=>r.name).join(', ')}`;
+    }
   }else{
-    const bias=(r.verdict&&r.verdict.bias)||'neutral';
-    const dir = bias==='bullish'?'Bullish':(bias==='bearish'?'Bearish':'');
-    osMsg=`${r.name} released: ${r.actual||'?'} vs ${r.forecast||'?'} forecast`+(dir?` → ${cur} ${dir}`:'');
-    metaTxt='Released'; titleTxt=`${r.name}: ${r.actual||'?'} vs ${r.forecast||'?'}`;
-    if(dir) extra=`<div class="nc-evrow"><span class="nc-bias ${bias==='bullish'?'up':'down'}">${newsEsc(cur+' '+dir)}</span></div>`;
+    metaTxt='Released';
+    const dlong=d=>d==='up'?'Bullish':'Bearish';
+    if(n===1){ const r=group[0], d=dirOf(r);
+      titleTxt=`${r.name}: ${r.actual||'?'} vs ${r.forecast||'?'}`;
+      if(d) body=`<div class="nc-evrow"><span class="nc-bias ${d}">${newsEsc((r.currency||'')+' '+dlong(d))}</span></div>`;
+      osMsg=`${r.name} released: ${r.actual||'?'} vs ${r.forecast||'?'} forecast`+(d?` → ${r.currency} ${dlong(d)}`:'');
+    }else{
+      titleTxt=`${n} high-impact released${curTxt?` (${curTxt})`:''}`;
+      body=`<div class="nc-evlist">`+group.map(r=>{ const d=dirOf(r);
+        return `<div class="nc-evline"><span class="nc-evn">${newsEsc(r.name)}</span><b>${newsEsc(r.actual||'?')}</b>`+(d?`<span class="nc-bias ${d}">${d==='up'?'Bull':'Bear'}</span>`:'')+`</div>`;
+      }).join('')+`</div>`;
+      osMsg=`${n} high-impact released${curTxt?` (${curTxt})`:''}: `+group.map(r=>`${r.name} ${r.actual||'?'}`).join(', ');
+    }
   }
   try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — High-impact', {body:osMsg}); }catch(e){}
-  let timeTxt=''; try{ timeTxt=new Date(r.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }catch(e){}
   pushChartCard(`<div class="nc-top"><span class="nc-badge">🔔 ${newsEsc(badge)}</span>`
     +`<span class="nc-src">${newsEsc(metaTxt)}</span>`
     +`<span class="nc-time">${newsEsc(timeTxt)}</span>`
     +`<button class="nc-x" aria-label="Dismiss">✕</button></div>`
-    +`<div class="nc-title">${newsEsc(titleTxt)}</div>`+extra, 'nc-evt');
-  try{ track('news_notify',{kind, name:r.name}); }catch(e){}
+    +`<div class="nc-title">${newsEsc(titleTxt)}</div>`+body, 'nc-evt');
+  try{ track('news_notify',{kind, count:n, name:group.map(r=>r.name).join(',')}); }catch(e){}
 }
 function renderNews(d){
   const body=$('#newsBody');
