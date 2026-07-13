@@ -2805,6 +2805,11 @@ rebuildTFBar();
 
 // ===================== load awal =====================
 $('#instrument').value = localStorage.getItem('br_inst')||'EUR_USD';
+// Sinkron `inst` ke instrumen tersimpan SEKARANG (bukan nanti di loadInit yg await font ~700ms):
+// refreshNewsData boot (initPriceTimer) berjalan sebelum loadInit set inst → tanpa ini fetch
+// calendar boot memakai default 'EUR_USD' lalu di-drop stale-guard saat inst berubah → marker
+// news baru muncul di poll 60s / saat buka panel. Set awal = fetch boot pakai instrumen benar.
+inst = $('#instrument').value;
 $('#date').value = new Date().toISOString().slice(0,10);   // default: hari ini
 // tampilan tanggal ala "Senin, 13 May 2026" (hari Indonesia, bulan Inggris)
 function fmtBacktestDate(v){
