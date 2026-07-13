@@ -940,6 +940,9 @@
   .nmk-sev i{ width:2px; border-radius:1px; background:currentColor; }
   .nmk-sev i:nth-child(1){ height:3px; } .nmk-sev i:nth-child(2){ height:5px; } .nmk-sev i:nth-child(3){ height:7px; }
   .nmk.impact-high .nmk-sev{ color:var(--red); } .nmk.impact-medium .nmk-sev{ color:#e0a63a; }
+  .nmk-count{ position:absolute; top:-7px; left:-7px; min-width:16px; height:16px; padding:0 3px; border-radius:8px;
+        background:var(--luna-glow); color:#0b0e14; border:1.5px solid var(--bg);
+        font:700 9px 'Space Grotesk',Inter,sans-serif; display:grid; place-items:center; line-height:1; }
   .nmk.is-next{ box-shadow:0 0 0 2px var(--bg), 0 0 10px 2px rgba(174,185,232,.85); }
   .nmk.is-next::after{ content:""; position:absolute; inset:-4px; border-radius:50%;
         border:1.5px solid var(--luna-glow); animation:nmkPulse 2.4s ease-in-out infinite; }
@@ -964,6 +967,16 @@
   .nmk-pop .np-grid{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; font-size:13px; }
   .nmk-pop .np-grid .k{ color:var(--muted); } .nmk-pop .np-grid .v{ font-weight:600; text-align:right; }
   .nmk-pop .cal-surprise{ padding-top:11px; border-top:1px solid var(--border); }
+  /* Popup multi-event (≥2 rilis di waktu sama): header ringkas + daftar kartu scrollable, bar impact kiri */
+  .nmk-pop.np-multi{ width:264px; }
+  .nmk-pop .np-mhd{ display:flex; align-items:baseline; gap:8px; padding:11px 15px 9px; border-bottom:1px solid var(--border); }
+  .nmk-pop .np-mc{ font:600 13px 'Space Grotesk',Inter,sans-serif; color:var(--txt); }
+  .nmk-pop .np-mt{ margin-left:auto; color:var(--muted); font:11px var(--mono,monospace); }
+  .nmk-pop .np-scroll{ max-height:min(54vh,340px); overflow-y:auto; }
+  .nmk-pop .np-evt{ padding:11px 15px; border-left:3px solid transparent; }
+  .nmk-pop .np-evt + .np-evt{ border-top:1px solid var(--border); }
+  .nmk-pop .np-evt.impact-high{ border-left-color:var(--red); }
+  .nmk-pop .np-evt.impact-medium{ border-left-color:#e0a63a; }
 
   /* toast feedback (alert/pending) */
   /* --tc = warna aksen per tipe; satu variabel menggerakkan border kiri, ikon, & drain bar */
@@ -5584,22 +5597,28 @@ function renderNewsMarkers(){
   layer.style.display='';
   const rels=(newsState&&newsState.releases)||[];
   const now=Date.now();
-  let nextIdx=-1, nextT=Infinity;
-  rels.forEach((r,i)=>{ const t=Date.parse(r.time); if(!isNaN(t)&&t>now&&t<nextT){ nextT=t; nextIdx=i; } });
+  // Gabung event ber-WAKTU-sama jadi SATU marker (detailnya berjajar di popup saat diklik, ala
+  // TradingView). Grup by timestamp; badge = highest-impact anggota; count badge bila >1.
+  const groups=new Map();   // isoTime → [idx release]
+  rels.forEach((r,i)=>{ if(isNaN(Date.parse(r.time))) return; if(!groups.has(r.time)) groups.set(r.time, []); groups.get(r.time).push(i); });
+  let nextKey=null, nextT=Infinity;
+  for(const key of groups.keys()){ const t=Date.parse(key); if(t>now&&t<nextT){ nextT=t; nextKey=key; } }
   if(typeof closeNewsPop==='function') closeNewsPop();   // tutup popup terbuka; ticknya akan didetach oleh rebuild
   layer.innerHTML='';
-  rels.forEach((r,i)=>{
-    if(isNaN(Date.parse(r.time))) return;   // timestamp rusak → skip
+  for(const [key, idxs] of groups){
+    const anyHigh=idxs.some(i=>String(rels[i].impact||'').toLowerCase()==='high');
     const el=document.createElement('div');
-    el.className='nmk '+nmkImpactClass(r.impact)+(i===nextIdx?' is-next':'');
-    el.dataset.idx=i;
-    el.title=(r.currency||'')+' '+(r.name||'');   // fallback native tooltip
-    const sev=String(r.impact||'').toLowerCase()==='high'?3:2;
-    el.innerHTML=`<span class="nmk-fl">${currencyFlag(r.currency)}</span>`
-      +`<span class="nmk-sev">${'<i></i>'.repeat(sev)}</span>`;
+    el.className='nmk '+(anyHigh?'impact-high':'impact-medium')+(key===nextKey?' is-next':'');
+    el.dataset.idxs=idxs.join(','); el.dataset.time=key;
+    el.title=idxs.map(i=>(rels[i].currency||'')+' '+(rels[i].name||'')).join(', ');   // fallback native tooltip
+    const curs=[...new Set(idxs.map(i=>rels[i].currency).filter(Boolean))];
+    const fl=curs.length===1 ? currencyFlag(curs[0]) : currencyFlag(rels[idxs[0]].currency);
+    el.innerHTML=`<span class="nmk-fl">${fl}</span>`
+      +`<span class="nmk-sev">${'<i></i>'.repeat(anyHigh?3:2)}</span>`
+      +(idxs.length>1?`<span class="nmk-count">${idxs.length}</span>`:'');
     if(typeof bindNewsMarker==='function') bindNewsMarker(el);
     layer.appendChild(el);
-  });
+  }
   repositionNewsMarkers();
 }
 // Set posisi X tiap tick: event lampau (ts<=lastTs) → tsToPx; mendatang → idxToPx via
@@ -5613,8 +5632,8 @@ function repositionNewsMarkers(){
   try{ const sz=chart.getSize('candle_pane','main'); if(sz&&sz.width) W=sz.width; }catch(e){}   // batas kanan = area plot (tanpa sumbu harga)
   const rels=(newsState&&newsState.releases)||[];
   layer.querySelectorAll('.nmk').forEach(el=>{
-    const r=rels[+el.dataset.idx]; const t=r?Date.parse(r.time):NaN;
-    if(!r||isNaN(t)){ el.style.display='none'; return; }
+    const t=Date.parse(el.dataset.time||'');
+    if(isNaN(t)){ el.style.display='none'; return; }
     let x = t<=lt ? tsToPx(t) : idxToPx(li+(t-lt)/dur);
     if(x==null || x<0 || x>W){ el.style.display='none'; return; }
     el.style.display=''; el.style.left=x+'px';
@@ -5638,9 +5657,9 @@ function bindNewsMarker(el){
   el.addEventListener('click', (e)=>{ e.stopPropagation();
     if(_newsPop && _newsPop._for===el){ closeNewsPop(); } else { openNewsPop(el); } });
 }
-function openNewsPop(el){
-  const r=((newsState&&newsState.releases)||[])[+el.dataset.idx]; if(!r) return;
-  closeNewsPop();
+// Isi detail satu event (header + grid + surprise gauge). showTime=false utk daftar multi
+// (waktu sudah tampil sekali di header grup).
+function newsEvtInner(r, showTime){
   const impCls=nmkImpactClass(r.impact);
   const sev='<i></i>'.repeat(String(r.impact||'').toLowerCase()==='high'?3:2);
   const rows=[['Actual', r.released?(r.actual||'—'):'—'],['Forecast', r.forecast||'—'],['Previous', r.previous||'—']];
@@ -5650,14 +5669,28 @@ function openNewsPop(el){
   const surprise = sb?`<div class="cal-surprise ${sb.biasClass}" style="margin-top:12px">
       <span class="cal-delta">${sb.glyph} ${sb.delta?newsEsc(sb.delta)+' ':''}${sb.word}</span>
       ${sb.biasClass!=='neutral'?`<span class="cal-biastag">→ ${newsEsc(sb.biasLabel)}</span>`:''}</div>`:'';
-  const pop=document.createElement('div'); pop.className='nmk-pop'; pop._for=el;
-  pop.innerHTML=`<div class="np-acc ${impCls}"></div><div class="np-body">
-      <div class="np-hd"><span class="np-fl">${currencyFlag(r.currency)}</span>
+  return `<div class="np-hd"><span class="np-fl">${currencyFlag(r.currency)}</span>
         <span class="np-nm">${newsEsc(r.currency)} ${newsEsc(r.name)}</span>
         <span class="np-chip ${impCls}"><span class="nmk-sev">${sev}</span>${newsEsc(r.impact)}</span></div>
-      <div class="np-tm">${newsEsc(fmtLocalFull(r.time))}</div>
-      <div class="np-grid">${grid}</div>
-      ${surprise}</div>`;
+      ${showTime?`<div class="np-tm">${newsEsc(fmtLocalFull(r.time))}</div>`:''}
+      <div class="np-grid">${grid}</div>${surprise}`;
+}
+function openNewsPop(el){
+  const rels=(newsState&&newsState.releases)||[];
+  const idxs=(el.dataset.idxs||'').split(',').map(Number).filter(i=>rels[i]);
+  if(!idxs.length) return;
+  closeNewsPop();
+  const pop=document.createElement('div'); pop.className='nmk-pop'; pop._for=el;
+  if(idxs.length===1){
+    const r=rels[idxs[0]];
+    pop.innerHTML=`<div class="np-acc ${nmkImpactClass(r.impact)}"></div><div class="np-body">${newsEvtInner(r,true)}</div>`;
+  }else{
+    // >1 event di waktu sama → header ringkas + daftar kartu berjajar (scroll), bar impact di kiri.
+    pop.classList.add('np-multi');
+    const tm=fmtLocalFull(rels[idxs[0]].time);
+    pop.innerHTML=`<div class="np-mhd"><span class="np-mc">${idxs.length} events</span><span class="np-mt">${newsEsc(tm)}</span></div>`
+      +`<div class="np-scroll">`+idxs.map(i=>`<div class="np-evt ${nmkImpactClass(rels[i].impact)}">${newsEvtInner(rels[i],false)}</div>`).join('')+`</div>`;
+  }
   pop.addEventListener('click', (e)=>e.stopPropagation());   // klik di dalam popup tak memicu close-outside (tetap terbuka sampai klik-luar / klik marker lagi)
   $('#chart').appendChild(pop); _newsPop=pop;
   positionNewsPop();
