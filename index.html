@@ -2628,6 +2628,28 @@ const lightStyles = {
     point:{ color:'rgba(0,0,0,0)', borderColor:'#3a5fe0', borderSize:1.5, radius:3,
             activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
 };
+// ===================== QT Fractal (Modul C) — util waktu NY (DST-aware) =====================
+// Anchor Quarterly Theory selalu America/New_York, independen dari timezone tampilan user.
+const _qtDtf = new Intl.DateTimeFormat('en-US', {timeZone:NY_TZ, hourCycle:'h23',
+  year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short'});
+const _qtDOW = {Sun:1,Mon:2,Tue:3,Wed:4,Thu:5,Fri:6,Sat:7};
+function nyParts(ts){
+  const p = {}; for(const {type,value} of _qtDtf.formatToParts(ts)) p[type]=value;
+  return {y:+p.year, mo:+p.month, d:+p.day, h:+p.hour, min:+p.minute, dow:_qtDOW[p.weekday]};
+}
+// Cari epoch-ms utk waktu dinding NY (y,mo,d,h,min). Offset NY = -5 (EST) / -4 (EDT);
+// coba kedua offset, pilih yang saat di-nyParts kembali persis ke input (hindari jam ilang/dobel DST).
+function nyTimestamp(y, mo, d, h, min){
+  min = min || 0;
+  for(const off of [4,5]){                     // jam yg ditambah ke waktu NY utk dapat UTC
+    const guess = Date.UTC(y, mo-1, d, h+off, min);
+    const p = nyParts(guess);
+    if(p.y===y && p.mo===mo && p.d===d && p.h===h && p.min===min) return guess;
+  }
+  // fallback (transisi DST): pakai offset EST.
+  return Date.UTC(y, mo-1, d, h+5, min);
+}
+
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{repositionNewsMarkers();}catch(e){} }).observe($('#chart'));
 // Jaring pengaman: setelah web-font siap, satu re-measure bersih (sumbu klinecharts diukur ulang dgn Inter final)
