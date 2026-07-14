@@ -6765,9 +6765,9 @@ function defParams(name){ const d=indDef(name); if(!d||!d.params) return null;
   return d.params.kind==='list' ? d.params.def.slice() : d.params.fields.map(f=>f.def); }
 function effParams(name){ const p=indParams[name]; return (p&&p.length) ? p.slice() : defParams(name); }
 function persistInd(){ try{ localStorage.setItem('br_indicators',
-  JSON.stringify(Object.keys(activeInd).map(n=>({name:n, calcParams:indParams[n]||null})))); }catch(e){} }
+  JSON.stringify(Object.keys(activeInd).map(n=>({name:n, calcParams:indParams[n]||null, hidden:!!hiddenInd[n]})))); }catch(e){} }
 function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); if(!Array.isArray(a)) return [];
-  return a.map(el=> typeof el==='string' ? {name:el, calcParams:null} : el).filter(x=>x&&x.name); }catch(e){ return []; } }
+  return a.map(el=> typeof el==='string' ? {name:el, calcParams:null, hidden:false} : {name:el.name, calcParams:el.calcParams||null, hidden:!!el.hidden}).filter(x=>x&&x.name); }catch(e){ return []; } }
 function addInd(name){
   const def=indDef(name); if(!def||activeInd[name]) return;
   try{
@@ -6834,6 +6834,16 @@ function renderIndLegends(){
       `<div class="ind-leg-vals"></div>`+
     `</div>`;
   }).join('');
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg;
+    el.querySelectorAll('[data-leg-act]').forEach(btn=>btn.onclick=(ev)=>{
+      ev.stopPropagation();
+      const act=btn.dataset.legAct;
+      if(act==='gear') openIndEditor(name);
+      else if(act==='eye') toggleIndVisible(name);
+      else if(act==='rm'){ removeInd(name); persistInd(); updateIndBadge(); try{ renderIndMenu(); }catch(e){} }
+    });
+  });
   positionIndLegends();
   try{ updateIndLegendValues(null); }catch(e){}
 }
@@ -6880,6 +6890,13 @@ function updateIndLegendValues(di){
     box.innerHTML=html;
     box.style.display = html ? '' : 'none';
   });
+}
+function toggleIndVisible(name){
+  if(!activeInd[name]) return;
+  const vis = !!hiddenInd[name];   // saat ini hidden → jadikan visible
+  hiddenInd[name] = !vis ? true : false;
+  try{ chart.overrideIndicator({name, visible: !hiddenInd[name]}, indLegPaneId(name)); }catch(e){}
+  persistInd(); renderIndLegends();
 }
 try{ chart.subscribeAction('onCrosshairChange', d=>{
   try{ const di=(d && typeof d.dataIndex==='number') ? d.dataIndex : null; updateIndLegendValues(di); }catch(e){}
@@ -6975,7 +6992,9 @@ function renderIndMenu(){
   });
   m.querySelectorAll('.ind-gear').forEach(g=>g.onclick=(ev)=>{ ev.stopPropagation(); openIndEditor(g.dataset.gear); });
 }
-savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name); }); updateIndBadge();   // pulihkan indikator tersimpan
+savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name);
+  if(s.hidden && activeInd[s.name]){ hiddenInd[s.name]=true; try{ chart.overrideIndicator({name:s.name, visible:false}, activeInd[s.name]); }catch(e){} } });
+updateIndBadge(); try{ renderIndLegends(); }catch(e){}   // pulihkan indikator tersimpan (termasuk status hidden)
 (function(){
   const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
   btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
