@@ -6835,6 +6835,7 @@ function renderIndLegends(){
     `</div>`;
   }).join('');
   positionIndLegends();
+  try{ updateIndLegendValues(null); }catch(e){}
 }
 function positionIndLegends(){
   const wrap=indLegendWrap; if(!wrap) return;
@@ -6850,6 +6851,39 @@ function positionIndLegends(){
     el.style.display=''; el.style.top=(top+4)+'px';
   });
 }
+function lastBarIndex(){ try{ const dl=chart.getDataList(); return dl.length?dl.length-1:null; }catch(e){ return null; } }
+function indLineColors(){ try{ const s=chart.getStyles(); const l=s&&s.indicator&&s.indicator.lines;
+  return Array.isArray(l)? l.map(x=>x&&x.color).filter(Boolean) : []; }catch(e){ return []; } }
+function fmtIndNum(name,v){ if(v==null||!isFinite(v)) return null;
+  const d=indDef(name); const dec=(d&&d.overlay)?decimalsFor(inst):2; return (+v).toFixed(dec); }
+function updateIndLegendValues(di){
+  const wrap=indLegendWrap; if(!wrap) return;
+  if(di==null) di=lastBarIndex(); if(di==null) return;
+  const colors=indLineColors();
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg; const box=el.querySelector('.ind-leg-vals'); if(!box) return;
+    let html=''; let li=0;
+    try{
+      const ind=chart.getIndicatorByPaneId(indLegPaneId(name), name);
+      const row=ind && ind.result ? ind.result[di] : null;
+      if(ind && row){
+        (ind.figures||[]).forEach(fig=>{
+          if(!fig || fig.key==null) return;
+          const raw=row[fig.key]; const num=fmtIndNum(name, raw);
+          const isLine=(fig.type==null || fig.type==='line');
+          const col=isLine ? (colors[li%Math.max(1,colors.length)]||'var(--muted)') : 'var(--muted)';
+          if(isLine) li++;
+          if(num!=null) html+=`<span style="color:${col}">${num}</span>`;
+        });
+      }
+    }catch(e){}
+    box.innerHTML=html;
+    box.style.display = html ? '' : 'none';
+  });
+}
+try{ chart.subscribeAction('onCrosshairChange', d=>{
+  try{ const di=(d && typeof d.dataIndex==='number') ? d.dataIndex : null; updateIndLegendValues(di); }catch(e){}
+}); }catch(e){}
 // editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
 let indEditorEl=null, indEditorName=null;
 function openIndEditor(name){
