@@ -2136,6 +2136,8 @@ const DRAW_DEFAULT = {
   circle:{color:'#4a71ff',size:1,style:'solid'},
   ellipse:{color:'#4a71ff',size:1,style:'solid'},
   arrow:{color:'#4a71ff',size:2,style:'solid'},
+  arrowMarkUp:{color:'#089981',size:2,style:'solid'},
+  arrowMarkDown:{color:'#f23645',size:2,style:'solid'},
   callout:{color:'#4a71ff',size:1,style:'solid',textAlign:'left',textValign:'top'},
 };
 // garis bawaan klinecharts (horizontal/vertical) — pakai styles.line, bukan createPointFigures
@@ -2293,6 +2295,29 @@ klinecharts.registerOverlay({
     return figs;
   }
 });
+
+// ===================== custom overlay: arrow mark up / down (marker 1-klik, ukuran tetap) =====================
+// Silhouette panah berukuran pixel-tetap di titik klik (anchor = ujung/tip panah).
+function arrowMarkFigures(dir){ // dir: -1 = up (tip di atas), +1 = down (tip di bawah)
+  return ({overlay,coordinates})=>{
+    if(!coordinates.length) return [];
+    const p=subBarCoords(overlay,coordinates)[0]; const st=dstyle(overlay);
+    const H=22, hh=10, hw=7, sw=3;          // tinggi total, tinggi kepala, ½ lebar kepala, ½ lebar batang
+    const x=p.x, y=p.y, d=dir;               // tip di (x,y); tumbuh ke arah -d
+    const pts=[
+      {x:x,      y:y},                        // tip
+      {x:x+hw,   y:y+d*hh},                   // bahu kanan
+      {x:x+sw,   y:y+d*hh},                   // dalam kanan
+      {x:x+sw,   y:y+d*H},                    // bawah kanan
+      {x:x-sw,   y:y+d*H},                    // bawah kiri
+      {x:x-sw,   y:y+d*hh},                   // dalam kiri
+      {x:x-hw,   y:y+d*hh},                   // bahu kiri
+    ];
+    return [{type:'polygon', attrs:{coordinates:pts}, styles:{style:'fill', color:st.color}}];
+  };
+}
+klinecharts.registerOverlay({ name:'arrowMarkUp',   totalStep:2, needDefaultPointFigure:true, createPointFigures:arrowMarkFigures(-1) });
+klinecharts.registerOverlay({ name:'arrowMarkDown', totalStep:2, needDefaultPointFigure:true, createPointFigures:arrowMarkFigures(+1) });
 
 // state drag trendline presisi (intercept onPressedMoving; klinecharts default meng-snap ke bar)
 let tlDrag=null;
@@ -4475,7 +4500,7 @@ let suppressDrawSave=false, drawSaveTimer=null;
 const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
   horizontalStraightLine:1,verticalStraightLine:1,
   straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
-  circle:1,ellipse:1,arrow:1,callout:1,simpleAnnotation:1,simpleTag:1};
+  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,callout:1,simpleAnnotation:1,simpleTag:1};
 function drawsKey(){ return 'br_draws_'+inst; }
 function serializeDraws(){
   const out=[];
@@ -4804,6 +4829,7 @@ const DRAW_GROUPS=[
     {name:'circle', sc:'O', title:'Circle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>'},
     {name:'ellipse', title:'Ellipse', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>'},
     {name:'arrow', sc:'A', title:'Arrow', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><path d="M20 4v6M20 4h-6"/></svg>'},
+    {name:'arrowMarkUp', title:'Arrow Mark Up', svg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l6 8h-4v10h-4V11H6z"/></svg>'},
   ]},
   {key:'positions', title:'Positions', tools:[
     // Long/Short monokrom: arah = siluet dominan (bukan detail mungil spt ikon lama). Dua sinyal:
