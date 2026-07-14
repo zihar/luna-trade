@@ -6846,6 +6846,7 @@ function renderIndLegends(){
   });
   positionIndLegends();
   try{ updateIndLegendValues(null); }catch(e){}
+  requestAnimationFrame(()=>{ try{ positionIndLegends(); }catch(e){} });
 }
 function positionIndLegends(){
   const wrap=indLegendWrap; if(!wrap) return;
@@ -6901,6 +6902,12 @@ function toggleIndVisible(name){
 try{ chart.subscribeAction('onCrosshairChange', d=>{
   try{ const di=(d && typeof d.dataIndex==='number') ? d.dataIndex : null; updateIndLegendValues(di); }catch(e){}
 }); }catch(e){}
+// posisi sub-pane bergeser saat resize / tambah-hapus pane / scroll → reposisi legend.
+try{ const host=document.getElementById('chart');
+  if(host && window.ResizeObserver){ new ResizeObserver(()=>{ try{ positionIndLegends(); }catch(e){} }).observe(host); }
+}catch(e){}
+try{ chart.subscribeAction('onScroll', ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
+try{ chart.subscribeAction('onZoom',   ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
 // editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
 let indEditorEl=null, indEditorName=null;
 function openIndEditor(name){
