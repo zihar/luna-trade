@@ -206,8 +206,8 @@
   .ind-gear:hover{ color:var(--txt); background:var(--btn-hover); }
   /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
   .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
-  .ind-leg{ position:absolute; left:12px; display:flex; flex-direction:column; gap:1px;
-    pointer-events:none; font:600 11.5px/1.25 'Inter',sans-serif; white-space:nowrap; }
+  .ind-leg{ position:absolute; left:12px; pointer-events:none;
+    font:600 11.5px/1.25 'Inter',sans-serif; white-space:nowrap; }
   .ind-leg-head{ display:inline-flex; align-items:center; gap:6px; pointer-events:auto;
     padding:1px 4px; margin-left:-4px; border-radius:6px; transition:background .12s ease; }
   .ind-leg-head:hover{ background:color-mix(in srgb, var(--panel) 78%, transparent); }
@@ -215,10 +215,11 @@
   .ind-leg-params{ color:var(--muted); font-weight:500; }
   .ind-leg.hidden .ind-leg-name, .ind-leg.hidden .ind-leg-params{ opacity:.45; }
   .ind-leg-vals{ display:inline-flex; gap:8px; color:var(--muted); font-weight:500; }
-  .ind-leg-btns{ display:none; align-items:center; gap:2px; }
-  .ind-leg-head:hover .ind-leg-btns{ display:inline-flex; }
-  .ind-leg-btn{ display:inline-flex; align-items:center; justify-content:center; background:transparent;
+  .ind-leg-btns{ display:inline-flex; align-items:center; gap:1px; }
+  .ind-leg-btn{ display:none; align-items:center; justify-content:center; background:transparent;
     border:0; color:var(--muted); cursor:pointer; line-height:1; padding:2px; border-radius:4px; }
+  .ind-leg-head:hover .ind-leg-btn{ display:inline-flex; }
+  .ind-leg.hidden .leg-eye{ display:inline-flex; }   /* mata-tertutup tetap tampak sbg penanda saat hidden */
   .ind-leg-btn svg{ width:13px; height:13px; display:block; }
   .ind-leg-btn:hover{ color:var(--txt); background:var(--btn-hover); }
   .ind-leg-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
@@ -6829,13 +6830,13 @@ function renderIndLegends(){
       `<div class="ind-leg-head">`+
         `<span class="ind-leg-name">${d?d.name:name}</span>`+
         `<span class="ind-leg-params">${legParamsText(name)}</span>`+
+        `<span class="ind-leg-vals"></span>`+
         `<span class="ind-leg-btns">`+
           `<button class="ind-leg-btn leg-eye" data-leg-act="eye" title="${hid?'Show':'Hide'}" aria-label="${hid?'Show':'Hide'}">${hid?EYEOFF_SVG:EYE_SVG}</button>`+
           `<button class="ind-leg-btn leg-gear" data-leg-act="gear" title="Settings" aria-label="Settings">${GEAR_SVG}</button>`+
           `<button class="ind-leg-btn leg-rm" data-leg-act="rm" title="Remove" aria-label="Remove">${XMARK_SVG}</button>`+
         `</span>`+
       `</div>`+
-      `<div class="ind-leg-vals"></div>`+
     `</div>`;
   }).join('');
   wrap.querySelectorAll('.ind-leg').forEach(el=>{
@@ -6877,6 +6878,7 @@ function updateIndLegendValues(di){
   const colors=indLineColors();
   wrap.querySelectorAll('.ind-leg').forEach(el=>{
     const name=el.dataset.leg; const box=el.querySelector('.ind-leg-vals'); if(!box) return;
+    if(hiddenInd[name]){ box.innerHTML=''; box.style.display='none'; return; }   // hidden → tanpa nilai live
     let html=''; let li=0;
     try{
       const ind=chart.getIndicatorByPaneId(indLegPaneId(name), name);
@@ -6898,10 +6900,17 @@ function updateIndLegendValues(di){
 }
 function toggleIndVisible(name){
   if(!activeInd[name]) return;
-  const vis = !!hiddenInd[name];   // saat ini hidden → jadikan visible
-  hiddenInd[name] = !vis ? true : false;
+  hiddenInd[name] = !hiddenInd[name];
   try{ chart.overrideIndicator({name, visible: !hiddenInd[name]}, indLegPaneId(name)); }catch(e){}
-  persistInd(); renderIndLegends();
+  persistInd();
+  // update baris terkait DI TEMPAT (bukan rebuild innerHTML penuh) → tombol tak berkedip & state hover tak reset
+  const el = indLegendWrap && indLegendWrap.querySelector('.ind-leg[data-leg="'+name+'"]');
+  if(!el){ renderIndLegends(); return; }
+  const hid=!!hiddenInd[name]; el.classList.toggle('hidden', hid);
+  const eye=el.querySelector('.leg-eye');
+  if(eye){ const lbl=hid?'Show':'Hide'; eye.innerHTML=hid?EYEOFF_SVG:EYE_SVG; eye.title=lbl; eye.setAttribute('aria-label',lbl); }
+  if(hid){ const vb=el.querySelector('.ind-leg-vals'); if(vb){ vb.innerHTML=''; vb.style.display='none'; } }
+  else updateIndLegendValues(null);
 }
 try{ chart.subscribeAction('onCrosshairChange', d=>{
   try{ const di=(d && typeof d.dataIndex==='number') ? d.dataIndex : null; updateIndLegendValues(di); }catch(e){}
