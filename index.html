@@ -6023,9 +6023,11 @@ function updateNewsCards(d){
   const seen=newsSeenMap(), wm=seen[inst];
   if(wm===undefined){ if(maxTs) setNewsSeen(inst, new Date(maxTs).toISOString()); return; }  // boot: no backlog
   const wmT=Date.parse(wm)||0;
-  const fresh=items.filter(h=>{ const t=Date.parse(h.publishedAt); return !isNaN(t)&&t>wmT && !_newsCardShownIds.has(h.id); })
+  const NEWS_CARD_MAX_AGE_MS=30*60*1000;   // hanya headline ≤30mnt yg boleh jadi kartu on-chart (cegah backlog di tab baru)
+  const now=Date.now();
+  const fresh=items.filter(h=>{ const t=Date.parse(h.publishedAt); return !isNaN(t)&&t>wmT && (now-t)<=NEWS_CARD_MAX_AGE_MS && !_newsCardShownIds.has(h.id); })
                    .sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt));   // lama→baru
-  if(!fresh.length) return;
+  if(!fresh.length){ if(maxTs>wmT) setNewsSeen(inst, new Date(maxTs).toISOString()); return; }  // maju watermark lewati item lama yg di-skip
   const badge=newsBadge(inst);
   for(const h of fresh){
     _newsCardShownIds.add(h.id);
@@ -6036,7 +6038,7 @@ function updateNewsCards(d){
       +`<a class="nc-title" href="${newsEsc(h.url)}" target="_blank" rel="noopener">${newsEsc(h.title)}</a>`
       +`<a class="nc-more" href="${newsEsc(h.url)}" target="_blank" rel="noopener">Keep reading ↗</a>`);
   }
-  const newMax=fresh.reduce((a,h)=>{ const t=Date.parse(h.publishedAt); return t>a?t:a; }, wmT);
+  const newMax=Math.max(maxTs, wmT);   // maju ke item terbaru di feed (bukan hanya yg tampil) → item lama tak di-scan ulang
   setNewsSeen(inst, new Date(newMax).toISOString());
 }
 // Sisip kartu on-chart baru (terbaru di atas, animasi masuk, cap 3 FIFO). Dipakai bersama
