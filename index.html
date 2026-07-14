@@ -204,6 +204,25 @@
   #indMenu .ind-lbl{ flex:1; min-width:0; }
   .ind-gear{ margin-left:auto; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:2px 4px; border-radius:4px; }
   .ind-gear:hover{ color:var(--txt); background:var(--btn-hover); }
+  /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
+  .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
+  .ind-leg{ position:absolute; left:12px; pointer-events:none;
+    font:600 11.5px/1.25 'Inter',sans-serif; white-space:nowrap; }
+  .ind-leg-head{ display:inline-flex; align-items:center; gap:6px; pointer-events:auto;
+    padding:1px 4px; margin-left:-4px; border-radius:6px; transition:background .12s ease; }
+  .ind-leg-head:hover{ background:color-mix(in srgb, var(--panel) 78%, transparent); }
+  .ind-leg-name{ color:var(--txt); }
+  .ind-leg-params{ color:var(--muted); font-weight:500; }
+  .ind-leg.hidden .ind-leg-name, .ind-leg.hidden .ind-leg-params{ opacity:.45; }
+  .ind-leg-vals{ display:inline-flex; gap:8px; color:var(--muted); font-weight:500; }
+  .ind-leg-btns{ display:inline-flex; align-items:center; gap:1px; }
+  .ind-leg-btn{ display:none; align-items:center; justify-content:center; background:transparent;
+    border:0; color:var(--muted); cursor:pointer; line-height:1; padding:2px; border-radius:4px; }
+  .ind-leg-head:hover .ind-leg-btn{ display:inline-flex; }
+  .ind-leg.hidden .leg-eye{ display:inline-flex; }   /* mata-tertutup tetap tampak sbg penanda saat hidden */
+  .ind-leg-btn svg{ width:13px; height:13px; display:block; }
+  .ind-leg-btn:hover{ color:var(--txt); background:var(--btn-hover); }
+  .ind-leg-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
   /* watermark identitas Luna — pojok kanan-atas, sangat samar, tak ganggu candle */
@@ -2600,6 +2619,7 @@ const darkStyles = {
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
+  indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
@@ -2620,6 +2640,7 @@ const lightStyles = {
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
+  indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
@@ -4881,6 +4902,9 @@ const _sp=document.createElement('div'); _sp.className='spacer'; _dt.appendChild
 let drawsHidden=false;
 const EYE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.8 4.6A11 11 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-3.2 4.1M6.5 6.5A18.3 18.3 0 0 0 2 12s3.6 7 10 7a10.8 10.8 0 0 0 4.4-.9"/></svg>';
+// ikon aksi bergaya sama (stroke currentColor, 24-grid) — dipakai tombol legend indikator & lainnya
+const GEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+const XMARK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 function applyDrawsVisibility(){ drawIds.forEach(id=>{ try{chart.overrideOverlay({id, visible:!drawsHidden});}catch(e){} }); }
 const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className='dtool';
 function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Show all drawings':'Hide all drawings'; _hd.classList.toggle('armed',drawsHidden); }
@@ -6746,9 +6770,9 @@ function defParams(name){ const d=indDef(name); if(!d||!d.params) return null;
   return d.params.kind==='list' ? d.params.def.slice() : d.params.fields.map(f=>f.def); }
 function effParams(name){ const p=indParams[name]; return (p&&p.length) ? p.slice() : defParams(name); }
 function persistInd(){ try{ localStorage.setItem('br_indicators',
-  JSON.stringify(Object.keys(activeInd).map(n=>({name:n, calcParams:indParams[n]||null})))); }catch(e){} }
+  JSON.stringify(Object.keys(activeInd).map(n=>({name:n, calcParams:indParams[n]||null, hidden:!!hiddenInd[n]})))); }catch(e){} }
 function savedInd(){ try{ const a=JSON.parse(localStorage.getItem('br_indicators')||'[]'); if(!Array.isArray(a)) return [];
-  return a.map(el=> typeof el==='string' ? {name:el, calcParams:null} : el).filter(x=>x&&x.name); }catch(e){ return []; } }
+  return a.map(el=> typeof el==='string' ? {name:el, calcParams:null, hidden:false} : {name:el.name, calcParams:el.calcParams||null, hidden:!!el.hidden}).filter(x=>x&&x.name); }catch(e){ return []; } }
 function addInd(name){
   const def=indDef(name); if(!def||activeInd[name]) return;
   try{
@@ -6757,6 +6781,7 @@ function addInd(name){
     const pid = def.overlay ? chart.createIndicator(val, true, {id:'candle_pane'}) : chart.createIndicator(val);
     activeInd[name] = def.overlay ? 'candle_pane' : pid;   // overlay: paneId candle konstan; sub-pane: id dinamis
     if(cp) indParams[name]=cp.slice();
+    try{ renderIndLegends(); }catch(e){}
   }catch(e){}
 }
 function setIndParams(name, calcParams){
@@ -6768,6 +6793,7 @@ function removeInd(name){
   const pid=activeInd[name]; if(pid==null) return;
   try{ chart.removeIndicator(pid, name); }catch(e){}
   delete activeInd[name];
+  delete hiddenInd[name]; try{ renderIndLegends(); }catch(e){}
 }
 function removeAllInd(){
   Object.keys(activeInd).forEach(removeInd);
@@ -6778,6 +6804,123 @@ function updateIndBadge(){
   if(b){ b.textContent=n; b.hidden=(n===0); }
   if(btn) btn.classList.toggle('on', n>0);
 }
+// ===== legend on-chart per-indikator (ala TradingView) =====
+// Dibangun HTML overlay penuh (legend indikator native dimatikan via styles). Nilai live &
+// posisi pane dibaca lewat API publik klinecharts 9.8.10 (getIndicatorByPaneId/getSize),
+// semua try/catch → gagal = degradasi anggun (angka/posisi diabaikan, kontrol tetap jalan).
+const hiddenInd={};   // name -> true bila plot di-hide (pane tetap ada)
+let indLegendWrap=null;
+function ensureIndLegendWrap(){
+  if(indLegendWrap && indLegendWrap.isConnected) return indLegendWrap;
+  const host=document.getElementById('chart'); if(!host) return null;
+  indLegendWrap=document.createElement('div'); indLegendWrap.className='ind-legends';
+  host.appendChild(indLegendWrap); return indLegendWrap;
+}
+function indLegPaneId(name){ return activeInd[name]; }   // 'candle_pane' utk overlay; id sub-pane utk osilator
+function legParamsText(name){ const p=effParams(name); const d=indDef(name);
+  if(!p||!p.length) return '';
+  if(d.params && d.params.kind==='controls') return '';   // QT: params non-numerik → tak ditampilkan
+  return p.join(' '); }
+function renderIndLegends(){
+  const wrap=ensureIndLegendWrap(); if(!wrap) return;
+  const names=Object.keys(activeInd);
+  wrap.innerHTML=names.map(name=>{
+    const d=indDef(name); const hid=!!hiddenInd[name];
+    return `<div class="ind-leg${hid?' hidden':''}" data-leg="${name}">`+
+      `<div class="ind-leg-head">`+
+        `<span class="ind-leg-name">${d?d.name:name}</span>`+
+        `<span class="ind-leg-params">${legParamsText(name)}</span>`+
+        `<span class="ind-leg-vals"></span>`+
+        `<span class="ind-leg-btns">`+
+          `<button class="ind-leg-btn leg-eye" data-leg-act="eye" title="${hid?'Show':'Hide'}" aria-label="${hid?'Show':'Hide'}">${hid?EYEOFF_SVG:EYE_SVG}</button>`+
+          `<button class="ind-leg-btn leg-gear" data-leg-act="gear" title="Settings" aria-label="Settings">${GEAR_SVG}</button>`+
+          `<button class="ind-leg-btn leg-rm" data-leg-act="rm" title="Remove" aria-label="Remove">${XMARK_SVG}</button>`+
+        `</span>`+
+      `</div>`+
+    `</div>`;
+  }).join('');
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg;
+    el.querySelectorAll('[data-leg-act]').forEach(btn=>btn.onclick=(ev)=>{
+      ev.stopPropagation();
+      const act=btn.dataset.legAct;
+      if(act==='gear') openIndEditor(name);
+      else if(act==='eye') toggleIndVisible(name);
+      else if(act==='rm'){ removeInd(name); persistInd(); updateIndBadge(); try{ renderIndMenu(); }catch(e){} }
+    });
+  });
+  positionIndLegends();
+  try{ updateIndLegendValues(null); }catch(e){}
+  requestAnimationFrame(()=>{ try{ positionIndLegends(); }catch(e){} });
+}
+function positionIndLegends(){
+  const wrap=indLegendWrap; if(!wrap) return;
+  // overlay indikator (candle pane) di-stack di bawah baris info instrumen (top ~30px).
+  // osilator: top = top pane-nya (getSize('root')). Fallback: sembunyikan bila getSize gagal.
+  let overlayTop=30;
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg; const pid=indLegPaneId(name); const d=indDef(name);
+    if(d && d.overlay){ el.style.top=overlayTop+'px'; el.style.display=''; overlayTop+=el.offsetHeight+2; return; }
+    let top=null;
+    try{ const b=chart.getSize(pid,'root'); if(b && isFinite(b.top)) top=b.top; }catch(e){}
+    if(top==null){ el.style.display='none'; return; }
+    el.style.display=''; el.style.top=(top+4)+'px';
+  });
+}
+function lastBarIndex(){ try{ const dl=chart.getDataList(); return dl.length?dl.length-1:null; }catch(e){ return null; } }
+function indLineColors(){ try{ const s=chart.getStyles(); const l=s&&s.indicator&&s.indicator.lines;
+  return Array.isArray(l)? l.map(x=>x&&x.color).filter(Boolean) : []; }catch(e){ return []; } }
+function fmtIndNum(name,v){ if(v==null||!isFinite(v)) return null;
+  const d=indDef(name); const dec=(d&&d.overlay)?decimalsFor(inst):2; return (+v).toFixed(dec); }
+function updateIndLegendValues(di){
+  const wrap=indLegendWrap; if(!wrap) return;
+  if(di==null) di=lastBarIndex(); if(di==null) return;
+  const colors=indLineColors();
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg; const box=el.querySelector('.ind-leg-vals'); if(!box) return;
+    if(hiddenInd[name]){ box.innerHTML=''; box.style.display='none'; return; }   // hidden → tanpa nilai live
+    let html=''; let li=0;
+    try{
+      const ind=chart.getIndicatorByPaneId(indLegPaneId(name), name);
+      const row=ind && ind.result ? ind.result[di] : null;
+      if(ind && row){
+        (ind.figures||[]).forEach(fig=>{
+          if(!fig || fig.key==null) return;
+          const raw=row[fig.key]; const num=fmtIndNum(name, raw);
+          const isLine=(fig.type==null || fig.type==='line');
+          const col=isLine ? (colors[li%Math.max(1,colors.length)]||'var(--muted)') : 'var(--muted)';
+          if(isLine) li++;
+          if(num!=null) html+=`<span style="color:${col}">${num}</span>`;
+        });
+      }
+    }catch(e){}
+    box.innerHTML=html;
+    box.style.display = html ? '' : 'none';
+  });
+}
+function toggleIndVisible(name){
+  if(!activeInd[name]) return;
+  hiddenInd[name] = !hiddenInd[name];
+  try{ chart.overrideIndicator({name, visible: !hiddenInd[name]}, indLegPaneId(name)); }catch(e){}
+  persistInd();
+  // update baris terkait DI TEMPAT (bukan rebuild innerHTML penuh) → tombol tak berkedip & state hover tak reset
+  const el = indLegendWrap && indLegendWrap.querySelector('.ind-leg[data-leg="'+name+'"]');
+  if(!el){ renderIndLegends(); return; }
+  const hid=!!hiddenInd[name]; el.classList.toggle('hidden', hid);
+  const eye=el.querySelector('.leg-eye');
+  if(eye){ const lbl=hid?'Show':'Hide'; eye.innerHTML=hid?EYEOFF_SVG:EYE_SVG; eye.title=lbl; eye.setAttribute('aria-label',lbl); }
+  if(hid){ const vb=el.querySelector('.ind-leg-vals'); if(vb){ vb.innerHTML=''; vb.style.display='none'; } }
+  else updateIndLegendValues(null);
+}
+try{ chart.subscribeAction('onCrosshairChange', d=>{
+  try{ const di=(d && typeof d.dataIndex==='number') ? d.dataIndex : null; updateIndLegendValues(di); }catch(e){}
+}); }catch(e){}
+// posisi sub-pane bergeser saat resize / tambah-hapus pane / scroll → reposisi legend.
+try{ const host=document.getElementById('chart');
+  if(host && window.ResizeObserver){ new ResizeObserver(()=>{ try{ positionIndLegends(); }catch(e){} }).observe(host); }
+}catch(e){}
+try{ chart.subscribeAction('onScroll', ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
+try{ chart.subscribeAction('onZoom',   ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
 // editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
 let indEditorEl=null, indEditorName=null;
 function openIndEditor(name){
@@ -6869,7 +7012,9 @@ function renderIndMenu(){
   });
   m.querySelectorAll('.ind-gear').forEach(g=>g.onclick=(ev)=>{ ev.stopPropagation(); openIndEditor(g.dataset.gear); });
 }
-savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name); }); updateIndBadge();   // pulihkan indikator tersimpan
+savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name);
+  if(s.hidden && activeInd[s.name]){ hiddenInd[s.name]=true; try{ chart.overrideIndicator({name:s.name, visible:false}, activeInd[s.name]); }catch(e){} } });
+updateIndBadge(); try{ renderIndLegends(); }catch(e){}   // pulihkan indikator tersimpan (termasuk status hidden)
 (function(){
   const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
   btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
