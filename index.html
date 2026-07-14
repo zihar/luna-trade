@@ -2649,6 +2649,39 @@ function nyTimestamp(y, mo, d, h, min){
   // fallback (transisi DST): pakai offset EST.
   return Date.UTC(y, mo-1, d, h+5, min);
 }
+// Anchor siklus QT (epoch-ms, NY wall-clock) + level/quarter/label. Level: 1=Session 2=Daily 3=Weekly 4=Monthly.
+const MS_DAY = 86400000, MS_WK = 604800000, MS_Q90 = 5400000;
+function qtSessStart(t){ const {y,mo,d,h}=nyParts(t); const sh = h>=18?18 : h<6?0 : h<12?6 : 12; return nyTimestamp(y,mo,d,sh,0); }
+function qtDayStart(t){ const p=nyParts(t); if(p.h<18){ const pr=nyParts(t-18*3600000); return nyTimestamp(pr.y,pr.mo,pr.d,18,0);} return nyTimestamp(p.y,p.mo,p.d,18,0); }
+function qtWeekStart(t){
+  const p=nyParts(t); const sunMs=t-(p.dow-1)*MS_DAY; const s=nyParts(sunMs); let s18=nyTimestamp(s.y,s.mo,s.d,18,0);
+  if(t<s18){ const pr=nyParts(t-MS_WK); const sun2=pr.dow; const s2=nyParts((t-MS_WK)-(sun2-1)*MS_DAY); s18=nyTimestamp(s2.y,s2.mo,s2.d,18,0);} return s18;
+}
+function qtMonthAnchor(y,mo){ const dow1=nyParts(nyTimestamp(y,mo,1,12,0)).dow; const fmDay=1+((2-dow1+7)%7); return qtWeekStart(nyTimestamp(y,mo,fmDay,12,0)); }
+function qtMonthCycleStart(t){
+  const {y,mo}=nyParts(t); const aThis=qtMonthAnchor(y,mo); let cs=aThis;
+  if(t<aThis){ const py=mo===1?y-1:y, pmo=mo===1?12:mo-1; cs=qtMonthAnchor(py,pmo); }
+  else { const ny=mo===12?y+1:y, nmo=mo===12?1:mo+1; const aNext=qtMonthAnchor(ny,nmo); if(t>=aNext) cs=aNext; }
+  return cs;
+}
+function qtCycleStart(lvl,t){ return lvl===2?qtDayStart(t) : lvl===3?qtWeekStart(t) : lvl===4?qtMonthCycleStart(t) : qtSessStart(t); }
+function qtLevel(tfSec, opt){
+  const auto = tfSec<=300?1 : tfSec<=900?2 : tfSec<=3600?3 : tfSec<=14400?4 : 0;
+  return opt==='session'?1 : opt==='daily'?2 : opt==='weekly'?3 : opt==='monthly'?4 : auto;
+}
+function qtQuarter(lvl,t){
+  if(lvl===1){ let q=Math.floor((t-qtSessStart(t))/MS_Q90); return q<0?0:q>3?3:q; }
+  if(lvl===2){ const h=nyParts(t).h; return h>=18?0 : h<6?1 : h<12?2 : 3; }
+  if(lvl===3){ const off=Math.round((qtDayStart(t)-qtWeekStart(t))/MS_DAY); return off<0?-1 : off<=4?off : -1; }
+  if(lvl===4){ const off=Math.round((qtWeekStart(t)-qtMonthCycleStart(t))/MS_WK); return off<0?-1 : off<=3?off : off===4?4 : -1; }
+  return -1;
+}
+function qtLabelText(lvl,t,q){
+  if(lvl===1){ const h=nyParts(t).h; const sn=h>=18?'Asia':h<6?'London':h<12?'NY-AM':'PM'; return `${sn} · Q${q+1}`; }
+  if(lvl===2){ const sn=q===0?'Asia':q===1?'London':q===2?'NY-AM':'PM'; return `${sn} · Q${q+1}`; }
+  if(lvl===3){ const dn=['Mon','Tue','Wed','Thu','Fri'][q]||'Fri'; return q<=3?`${dn} · Q${q+1}`:`${dn} · sp`; }
+  return q<=3?`W${q+1} · Q${q+1}`:`W5 · sp`;
+}
 
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{repositionNewsMarkers();}catch(e){} }).observe($('#chart'));
