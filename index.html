@@ -4500,7 +4500,7 @@ let suppressDrawSave=false, drawSaveTimer=null;
 const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
   horizontalStraightLine:1,verticalStraightLine:1,
   straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
-  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,callout:1,simpleAnnotation:1,simpleTag:1};
+  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,arrowMarkDown:1,callout:1,simpleAnnotation:1,simpleTag:1};
 function drawsKey(){ return 'br_draws_'+inst; }
 function serializeDraws(){
   const out=[];
@@ -4830,6 +4830,7 @@ const DRAW_GROUPS=[
     {name:'ellipse', title:'Ellipse', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>'},
     {name:'arrow', sc:'A', title:'Arrow', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><path d="M20 4v6M20 4h-6"/></svg>'},
     {name:'arrowMarkUp', title:'Arrow Mark Up', svg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l6 8h-4v10h-4V11H6z"/></svg>'},
+    {name:'arrowMarkDown', title:'Arrow Mark Down', svg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21l6-8h-4V3h-4v10H6z"/></svg>'},
   ]},
   {key:'positions', title:'Positions', tools:[
     // Long/Short monokrom: arah = siluet dominan (bukan detail mungil spt ikon lama). Dua sinyal:
