@@ -6186,7 +6186,7 @@ function fireNewsNotif(kind, group, mins){
   const badge=newsBadge(newsState?newsState.instrument:newsCurrentInstrument());
   const curTxt=[...new Set(group.map(r=>r.currency).filter(Boolean))].join(', ');
   const n=group.length;
-  let timeTxt=fmtTzTime(group[0].time);   // jam dalam chartTZ ("jam server" terpilih)
+  let timeTxt='at '+fmtTzTime(group[0].time);   // jam EVENT dalam chartTZ; awalan "at" agar tak dikira jam kartu muncul (label relatif "in N min" bisa basi saat kartu persist)
   const dirOf=r=>{ const b=(r.verdict&&r.verdict.bias)||'neutral'; return b==='bullish'?'up':(b==='bearish'?'down':''); };
   let osMsg, metaTxt, titleTxt, body='';
   if(kind==='rem'){
