@@ -2306,12 +2306,12 @@ function arrowMarkFigures(dir){ // dir: -1 = up (tip di atas), +1 = down (tip di
     const x=p.x, y=p.y, d=dir;               // tip di (x,y); tumbuh ke arah -d
     const pts=[
       {x:x,      y:y},                        // tip
-      {x:x+hw,   y:y+d*hh},                   // bahu kanan
-      {x:x+sw,   y:y+d*hh},                   // dalam kanan
-      {x:x+sw,   y:y+d*H},                    // bawah kanan
-      {x:x-sw,   y:y+d*H},                    // bawah kiri
-      {x:x-sw,   y:y+d*hh},                   // dalam kiri
-      {x:x-hw,   y:y+d*hh},                   // bahu kiri
+      {x:x+hw,   y:y-d*hh},                   // bahu kanan
+      {x:x+sw,   y:y-d*hh},                   // dalam kanan
+      {x:x+sw,   y:y-d*H},                    // bawah kanan
+      {x:x-sw,   y:y-d*H},                    // bawah kiri
+      {x:x-sw,   y:y-d*hh},                   // dalam kiri
+      {x:x-hw,   y:y-d*hh},                   // bahu kiri
     ];
     return [{type:'polygon', attrs:{coordinates:pts}, styles:{style:'fill', color:st.color}}];
   };
