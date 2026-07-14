@@ -2633,9 +2633,13 @@ const lightStyles = {
 const _qtDtf = new Intl.DateTimeFormat('en-US', {timeZone:NY_TZ, hourCycle:'h23',
   year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short'});
 const _qtDOW = {Sun:1,Mon:2,Tue:3,Wed:4,Thu:5,Fri:6,Sat:7};
+const _qtNyCache = new Map();   // memo nyParts (pure per-ts) → redam Intl.formatToParts per tick
 function nyParts(ts){
+  let r = _qtNyCache.get(ts); if(r) return r;
   const p = {}; for(const {type,value} of _qtDtf.formatToParts(ts)) p[type]=value;
-  return {y:+p.year, mo:+p.month, d:+p.day, h:+p.hour, min:+p.minute, dow:_qtDOW[p.weekday]};
+  r = {y:+p.year, mo:+p.month, d:+p.day, h:+p.hour, min:+p.minute, dow:_qtDOW[p.weekday]};
+  if(_qtNyCache.size > 20000) _qtNyCache.clear();   // batasi pertumbuhan (jarang tercapai)
+  _qtNyCache.set(ts, r); return r;
 }
 // Cari epoch-ms utk waktu dinding NY (y,mo,d,h,min). Offset NY = -5 (EST) / -4 (EDT);
 // coba kedua offset, pilih yang saat di-nyParts kembali persis ke input (hindari jam ilang/dobel DST).
