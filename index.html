@@ -204,6 +204,23 @@
   #indMenu .ind-lbl{ flex:1; min-width:0; }
   .ind-gear{ margin-left:auto; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:2px 4px; border-radius:4px; }
   .ind-gear:hover{ color:var(--txt); background:var(--btn-hover); }
+  /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
+  .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
+  .ind-leg{ position:absolute; left:12px; display:flex; flex-direction:column; gap:1px;
+    pointer-events:none; font:600 11.5px/1.25 'Inter',sans-serif; white-space:nowrap; }
+  .ind-leg-head{ display:inline-flex; align-items:center; gap:6px; pointer-events:auto;
+    padding:1px 4px; margin-left:-4px; border-radius:6px; transition:background .12s ease; }
+  .ind-leg-head:hover{ background:color-mix(in srgb, var(--panel) 78%, transparent); }
+  .ind-leg-name{ color:var(--txt); }
+  .ind-leg-params{ color:var(--muted); font-weight:500; }
+  .ind-leg.hidden .ind-leg-name, .ind-leg.hidden .ind-leg-params{ opacity:.45; }
+  .ind-leg-vals{ display:inline-flex; gap:8px; color:var(--muted); font-weight:500; }
+  .ind-leg-btns{ display:none; align-items:center; gap:2px; }
+  .ind-leg-head:hover .ind-leg-btns{ display:inline-flex; }
+  .ind-leg-btn{ background:transparent; border:0; color:var(--muted); cursor:pointer;
+    font-size:12px; line-height:1; padding:2px 3px; border-radius:4px; }
+  .ind-leg-btn:hover{ color:var(--txt); background:var(--btn-hover); }
+  .ind-leg-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
   .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
   #chart{flex:1;min-height:0;position:relative}
   /* watermark identitas Luna — pojok kanan-atas, sangat samar, tak ganggu candle */
@@ -2600,6 +2617,7 @@ const darkStyles = {
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
+  indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
@@ -2620,6 +2638,7 @@ const lightStyles = {
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
       custom:candleTooltipCustom },
   },
+  indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
@@ -6757,6 +6776,7 @@ function addInd(name){
     const pid = def.overlay ? chart.createIndicator(val, true, {id:'candle_pane'}) : chart.createIndicator(val);
     activeInd[name] = def.overlay ? 'candle_pane' : pid;   // overlay: paneId candle konstan; sub-pane: id dinamis
     if(cp) indParams[name]=cp.slice();
+    try{ renderIndLegends(); }catch(e){}
   }catch(e){}
 }
 function setIndParams(name, calcParams){
@@ -6768,6 +6788,7 @@ function removeInd(name){
   const pid=activeInd[name]; if(pid==null) return;
   try{ chart.removeIndicator(pid, name); }catch(e){}
   delete activeInd[name];
+  delete hiddenInd[name]; try{ renderIndLegends(); }catch(e){}
 }
 function removeAllInd(){
   Object.keys(activeInd).forEach(removeInd);
@@ -6777,6 +6798,57 @@ function updateIndBadge(){
   const n=Object.keys(activeInd).length, b=$('#indBadge'), btn=$('#indBtn');
   if(b){ b.textContent=n; b.hidden=(n===0); }
   if(btn) btn.classList.toggle('on', n>0);
+}
+// ===== legend on-chart per-indikator (ala TradingView) =====
+// Dibangun HTML overlay penuh (legend indikator native dimatikan via styles). Nilai live &
+// posisi pane dibaca lewat API publik klinecharts 9.8.10 (getIndicatorByPaneId/getSize),
+// semua try/catch → gagal = degradasi anggun (angka/posisi diabaikan, kontrol tetap jalan).
+const hiddenInd={};   // name -> true bila plot di-hide (pane tetap ada)
+let indLegendWrap=null;
+function ensureIndLegendWrap(){
+  if(indLegendWrap && indLegendWrap.isConnected) return indLegendWrap;
+  const host=document.getElementById('chart'); if(!host) return null;
+  indLegendWrap=document.createElement('div'); indLegendWrap.className='ind-legends';
+  host.appendChild(indLegendWrap); return indLegendWrap;
+}
+function indLegPaneId(name){ return activeInd[name]; }   // 'candle_pane' utk overlay; id sub-pane utk osilator
+function legParamsText(name){ const p=effParams(name); const d=indDef(name);
+  if(!p||!p.length) return '';
+  if(d.params && d.params.kind==='controls') return '';   // QT: params non-numerik → tak ditampilkan
+  return p.join(' '); }
+function renderIndLegends(){
+  const wrap=ensureIndLegendWrap(); if(!wrap) return;
+  const names=Object.keys(activeInd);
+  wrap.innerHTML=names.map(name=>{
+    const d=indDef(name); const hid=!!hiddenInd[name];
+    return `<div class="ind-leg${hid?' hidden':''}" data-leg="${name}">`+
+      `<div class="ind-leg-head">`+
+        `<span class="ind-leg-name">${d?d.name:name}</span>`+
+        `<span class="ind-leg-params">${legParamsText(name)}</span>`+
+        `<span class="ind-leg-btns">`+
+          `<button class="ind-leg-btn leg-eye" data-leg-act="eye" title="${hid?'Show':'Hide'}">${hid?'&#128584;':'&#128065;'}</button>`+
+          `<button class="ind-leg-btn leg-gear" data-leg-act="gear" title="Settings">&#9881;</button>`+
+          `<button class="ind-leg-btn leg-rm" data-leg-act="rm" title="Remove">&times;</button>`+
+        `</span>`+
+      `</div>`+
+      `<div class="ind-leg-vals"></div>`+
+    `</div>`;
+  }).join('');
+  positionIndLegends();
+}
+function positionIndLegends(){
+  const wrap=indLegendWrap; if(!wrap) return;
+  // overlay indikator (candle pane) di-stack di bawah baris info instrumen (top ~30px).
+  // osilator: top = top pane-nya (getSize('root')). Fallback: sembunyikan bila getSize gagal.
+  let overlayTop=30;
+  wrap.querySelectorAll('.ind-leg').forEach(el=>{
+    const name=el.dataset.leg; const pid=indLegPaneId(name); const d=indDef(name);
+    if(d && d.overlay){ el.style.top=overlayTop+'px'; el.style.display=''; overlayTop+=el.offsetHeight+2; return; }
+    let top=null;
+    try{ const b=chart.getSize(pid,'root'); if(b && isFinite(b.top)) top=b.top; }catch(e){}
+    if(top==null){ el.style.display='none'; return; }
+    el.style.display=''; el.style.top=(top+4)+'px';
+  });
 }
 // editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
 let indEditorEl=null, indEditorName=null;
