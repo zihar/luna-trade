@@ -185,10 +185,11 @@
   #indBtn.on{color:var(--accent);background:rgba(74,113,255,.14)}
   .ind-badge{min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--accent);color:#fff;
              font-size:10px;font-weight:700;line-height:15px;text-align:center}
-  .ind-menu{display:none;position:absolute;top:36px;left:0;z-index:60;width:230px;padding:5px;
+  /* .dropmenu: dropdown sederhana generik (dipakai chart type switcher #ctMenu) */
+  .dropmenu{display:none;position:absolute;top:36px;left:0;z-index:60;width:230px;padding:5px;
             background:var(--panel);border:1px solid var(--border);border-radius:10px;
             box-shadow:0 10px 30px rgba(0,0,0,.4)}
-  .ind-menu.open{display:block}
+  .dropmenu.open{display:block}
   .ctwrap{position:relative;display:inline-flex;align-items:center}
   #ctBtn{display:inline-flex;align-items:center;justify-content:center}
   #ctBtn.on{color:var(--accent);background:rgba(74,113,255,.14)}
@@ -200,10 +201,36 @@
   .ind-check{width:13px;font-size:12px;color:var(--accent);opacity:0}
   .ind-item.on .ind-check{opacity:1}
   .ind-item.on{color:var(--accent)}
-  #indMenu .ind-item{ display:flex; align-items:center; gap:6px; }
-  #indMenu .ind-lbl{ flex:1; min-width:0; }
-  .ind-gear{ margin-left:auto; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:2px 4px; border-radius:4px; }
-  .ind-gear:hover{ color:var(--txt); background:var(--btn-hover); }
+  /* modal Indicators (search + kategori) — pengganti dropdown ƒx lama */
+  .ind-modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.5); }
+  .ind-modal[hidden]{ display:none; }
+  .ind-modal-box{ width:min(560px,92vw); max-height:min(70vh,560px); display:flex; flex-direction:column;
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .ind-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px 8px; }
+  .ind-modal-title{ font:700 14px/1 'Inter',sans-serif; color:var(--txt); }
+  .ind-modal-x{ background:transparent; border:0; color:var(--muted); font-size:20px; cursor:pointer;
+    line-height:1; padding:2px 6px; border-radius:6px; }
+  .ind-modal-x:hover{ color:var(--txt); background:var(--btn-hover); }
+  .ind-modal-search{ padding:0 14px 10px; }
+  .ind-modal-search input{ width:100%; height:34px; padding:0 10px; border-radius:8px;
+    border:1px solid var(--border); background:var(--bg,transparent); color:var(--txt); font-size:13px; }
+  .ind-modal-search input:focus{ outline:none; border-color:var(--accent); }
+  .ind-modal-body{ display:flex; min-height:0; flex:1; border-top:1px solid var(--border); }
+  .ind-modal-cats{ width:130px; padding:8px; border-right:1px solid var(--border); overflow-y:auto; }
+  .ind-cat{ padding:7px 9px; border-radius:7px; font-size:12.5px; color:var(--muted); cursor:pointer; }
+  .ind-cat:hover{ background:var(--btn-hover); color:var(--txt); }
+  .ind-cat.on{ background:rgba(74,113,255,.14); color:var(--accent); font-weight:600; }
+  .ind-modal-list{ flex:1; padding:8px; overflow-y:auto; }
+  .ind-row{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; }
+  .ind-row:hover{ background:var(--btn-hover); }
+  .ind-row-main{ flex:1; min-width:0; }
+  .ind-row-name{ font:600 13px/1.2 'Inter',sans-serif; color:var(--txt); }
+  .ind-row.on .ind-row-name{ color:var(--accent); }
+  .ind-row-desc{ font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ind-row-badge{ font-size:11px; color:var(--accent); opacity:0; }
+  .ind-row.on .ind-row-badge{ opacity:1; }
+  .ind-empty{ padding:18px 10px; color:var(--muted); font-size:12.5px; text-align:center; }
   /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
   .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
   .ind-leg{ position:absolute; left:12px; pointer-events:none;
@@ -1476,12 +1503,24 @@
   <span class="sep"></span>
   <span class="indwrap">
     <button id="indBtn" title="Indicators"><span class="ind-fx">ƒ<sub>x</sub></span><span class="ind-badge" id="indBadge" hidden></span></button>
-    <div class="ind-menu" id="indMenu"></div>
+    <div class="ind-modal" id="indModal" hidden>
+      <div class="ind-modal-box" role="dialog" aria-label="Indicators">
+        <div class="ind-modal-head">
+          <span class="ind-modal-title">Indicators</span>
+          <button class="ind-modal-x" id="indModalX" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="ind-modal-search"><input type="text" id="indSearch" placeholder="Search indicators" autocomplete="off"></div>
+        <div class="ind-modal-body">
+          <div class="ind-modal-cats" id="indCats"></div>
+          <div class="ind-modal-list" id="indList"></div>
+        </div>
+      </div>
+    </div>
   </span>
   <span class="sep"></span>
   <span class="ctwrap">
     <button id="ctBtn" title="Chart type" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v4M7 15v6M17 3v5M17 16v5"/><rect x="4" y="7" width="6" height="8" rx="1"/><rect x="14" y="8" width="6" height="8" rx="1"/></svg></button>
-    <div class="ind-menu" id="ctMenu" role="menu"></div>
+    <div class="dropmenu" id="ctMenu" role="menu"></div>
   </span>
   <button id="replayPick" title="Pick replay start point directly on the chart">⏮ Bar Replay</button>
   <span id="replayCtrls">
@@ -6737,24 +6776,24 @@ applyChartCfg();   // terapkan cfg tersimpan saat startup
 // candle; osilator (VOL/MACD/RSI) di sub-pane sendiri. Parameter (calcParams) bisa diedit
 // per-indikator via skema `params` di IND_DEFS + editor gear ⚙ (default = default library).
 const IND_DEFS=[
-  {name:'MA',   label:'MA — Moving Average',       overlay:true,
+  {name:'MA',   label:'MA — Moving Average',       desc:'Trend-following average', overlay:true,
     params:{kind:'list', label:'Period', def:[5,10,30,60], min:1, max:400, step:1}},
-  {name:'EMA',  label:'EMA — Exp. Moving Average', overlay:true,
+  {name:'EMA',  label:'EMA — Exp. Moving Average', desc:'Weighted recent-price average', overlay:true,
     params:{kind:'list', label:'Period', def:[6,12,20], min:1, max:400, step:1}},
-  {name:'BOLL', label:'BOLL — Bollinger Bands',    overlay:true,
+  {name:'BOLL', label:'BOLL — Bollinger Bands',    desc:'Volatility bands ±σ', overlay:true,
     params:{kind:'fixed', fields:[
       {label:'Period', def:20, min:1, max:400, step:1},
       {label:'StdDev', def:2,  min:0.1, max:10, step:0.1}]}},
-  {name:'VOL',  label:'VOL — Volume',              overlay:false,
+  {name:'VOL',  label:'VOL — Volume',              desc:'Traded volume per bar', overlay:false,
     params:{kind:'list', label:'Period', def:[5,10,20], min:1, max:400, step:1}},
-  {name:'MACD', label:'MACD',                      overlay:false,
+  {name:'MACD', label:'MACD',                      desc:'Momentum: MA convergence', overlay:false,
     params:{kind:'fixed', fields:[
       {label:'Short', def:12, min:1, max:400, step:1},
       {label:'Long',  def:26, min:1, max:400, step:1},
       {label:'Signal',def:9,  min:1, max:400, step:1}]}},
-  {name:'RSI',  label:'RSI',                        overlay:false,
+  {name:'RSI',  label:'RSI',                        desc:'Momentum oscillator 0–100', overlay:false,
     params:{kind:'list', label:'Period', def:[6,12,24], min:1, max:400, step:1}},
-  {name:'QT', label:'QT Fractal — Quarterly Theory', overlay:true,
+  {name:'QT', label:'QT Fractal — Quarterly Theory', desc:'Quarterly Theory fractal', overlay:true,
     params:{kind:'controls', controls:[
       {type:'select', label:'Level', options:['Auto (by TF)','Session','Daily','Weekly','Monthly'], def:0},
       {type:'number', label:'Cycles', def:4, min:1, max:20, step:1},
@@ -6797,7 +6836,7 @@ function removeInd(name){
 }
 function removeAllInd(){
   Object.keys(activeInd).forEach(removeInd);
-  persistInd(); updateIndBadge(); try{ renderIndMenu(); }catch(e){}
+  persistInd(); updateIndBadge(); try{ renderIndModalState(); renderIndLegends(); }catch(e){}
 }
 function updateIndBadge(){
   const n=Object.keys(activeInd).length, b=$('#indBadge'), btn=$('#indBtn');
@@ -6846,7 +6885,7 @@ function renderIndLegends(){
       const act=btn.dataset.legAct;
       if(act==='gear') openIndEditor(name);
       else if(act==='eye') toggleIndVisible(name);
-      else if(act==='rm'){ removeInd(name); persistInd(); updateIndBadge(); try{ renderIndMenu(); }catch(e){} }
+      else if(act==='rm'){ removeInd(name); persistInd(); updateIndBadge(); try{ renderIndModalState(); }catch(e){} }
     });
   });
   positionIndLegends();
@@ -6921,11 +6960,11 @@ try{ const host=document.getElementById('chart');
 }catch(e){}
 try{ chart.subscribeAction('onScroll', ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
 try{ chart.subscribeAction('onZoom',   ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
-// editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di menu ƒx.
+// editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di legend on-chart.
 let indEditorEl=null, indEditorName=null;
 function openIndEditor(name){
   const def=indDef(name); if(!def||!def.params) return;
-  if(!activeInd[name]){ addInd(name); persistInd(); renderIndMenu(); updateIndBadge(); }
+  if(!activeInd[name]){ addInd(name); persistInd(); renderIndModalState(); updateIndBadge(); }
   if(!indEditorEl){ indEditorEl=document.createElement('div'); indEditorEl.className='objpop ind-editor'; document.body.appendChild(indEditorEl); makeDraggable(indEditorEl,'.pp-grip'); }
   indEditorName=name; renderIndEditor();
   const b=$('#indBtn').getBoundingClientRect();
@@ -6996,29 +7035,52 @@ function renderIndEditor(){
   }
   indEditorEl.querySelector('.ie-reset').onclick=()=>{ setIndParams(name, defParams(name)); renderIndEditor(); };
 }
-document.addEventListener('mousedown',e=>{ if(indEditorEl&&indEditorEl.classList.contains('show') && !indEditorEl.contains(e.target) && !e.target.closest('#indMenu') && !e.target.closest('#indBtn')) closeIndEditor(); });
+document.addEventListener('mousedown',e=>{ if(indEditorEl&&indEditorEl.classList.contains('show') && !indEditorEl.contains(e.target) && !e.target.closest('#indBtn')) closeIndEditor(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && indEditorEl&&indEditorEl.classList.contains('show')) closeIndEditor(); });
-function renderIndMenu(){
-  const m=$('#indMenu'); if(!m) return;
-  const grp=(title,items)=>`<div class="ind-grp">${title}</div>`+items.map(d=>
-    `<div class="ind-item${activeInd[d.name]?' on':''}" data-ind="${d.name}"><span class="ind-check">✓</span><span class="ind-lbl">${d.label}</span><button class="ind-gear" data-gear="${d.name}" title="Settings">⚙</button></div>`).join('');
-  m.innerHTML=grp('Overlays',IND_DEFS.filter(d=>d.overlay))+grp('Oscillators',IND_DEFS.filter(d=>!d.overlay));
-  m.querySelectorAll('.ind-item').forEach(el=>el.onclick=(ev)=>{
-    if(ev.target.closest('.ind-gear')) return;   // gear ditangani terpisah
+// ===== modal Indicators (search + kategori) — pengganti dropdown ƒx lama =====
+let indModalCat='All', indModalQ='';
+function indCatOf(d){ return d.overlay?'Overlays':'Oscillators'; }
+function openIndModal(){ const m=$('#indModal'); if(!m) return; m.hidden=false; renderIndModal();
+  const s=$('#indSearch'); if(s){ s.value=indModalQ; setTimeout(()=>s.focus(),0); } }
+function closeIndModal(){ const m=$('#indModal'); if(m) m.hidden=true; }
+function renderIndModal(){
+  const cats=['All','Overlays','Oscillators'];
+  const cbox=$('#indCats'); if(cbox) cbox.innerHTML=cats.map(c=>`<div class="ind-cat${c===indModalCat?' on':''}" data-cat="${c}">${c}</div>`).join('');
+  renderIndModalState();
+  const cb=$('#indCats'); if(cb) cb.querySelectorAll('.ind-cat').forEach(el=>el.onclick=()=>{ indModalCat=el.dataset.cat; renderIndModal(); });
+}
+function renderIndModalState(){
+  const list=$('#indList'); if(!list) return;
+  const q=indModalQ.trim().toLowerCase();
+  const items=IND_DEFS.filter(d=>{
+    if(indModalCat!=='All' && indCatOf(d)!==indModalCat) return false;
+    if(!q) return true;
+    return (d.name+' '+d.label+' '+(d.desc||'')).toLowerCase().includes(q);
+  });
+  const qEsc=indModalQ.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));   // echo aman (hindari self-XSS)
+  list.innerHTML = items.length ? items.map(d=>
+    `<div class="ind-row${activeInd[d.name]?' on':''}" data-ind="${d.name}">`+
+      `<div class="ind-row-main"><div class="ind-row-name">${d.label}</div>`+
+      `<div class="ind-row-desc">${d.desc||''}</div></div>`+
+      `<span class="ind-row-badge">Added &#10003;</span>`+
+    `</div>`).join('') : `<div class="ind-empty">No indicators match "${qEsc}"</div>`;
+  list.querySelectorAll('.ind-row').forEach(el=>el.onclick=()=>{
     const name=el.dataset.ind;
     if(activeInd[name]) removeInd(name); else addInd(name);
-    persistInd(); renderIndMenu(); updateIndBadge();
+    persistInd(); updateIndBadge(); renderIndModalState();
     track('indicator',{name, on: !!activeInd[name]});
   });
-  m.querySelectorAll('.ind-gear').forEach(g=>g.onclick=(ev)=>{ ev.stopPropagation(); openIndEditor(g.dataset.gear); });
 }
 savedInd().forEach(s=>{ if(s.calcParams) indParams[s.name]=s.calcParams.slice(); addInd(s.name);
   if(s.hidden && activeInd[s.name]){ hiddenInd[s.name]=true; try{ chart.overrideIndicator({name:s.name, visible:false}, activeInd[s.name]); }catch(e){} } });
 updateIndBadge(); try{ renderIndLegends(); }catch(e){}   // pulihkan indikator tersimpan (termasuk status hidden)
 (function(){
-  const btn=$('#indBtn'), menu=$('#indMenu'); if(!btn||!menu) return;
-  btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle('open'); if(open) renderIndMenu(); };
-  document.addEventListener('mousedown',e=>{ if(menu.classList.contains('open')&&!menu.contains(e.target)&&!btn.contains(e.target)) menu.classList.remove('open'); }, true);
+  const btn=$('#indBtn'), modal=$('#indModal'); if(!btn||!modal) return;
+  btn.onclick=(e)=>{ e.stopPropagation(); openIndModal(); };
+  const x=$('#indModalX'); if(x) x.onclick=closeIndModal;
+  modal.addEventListener('mousedown',e=>{ if(e.target===modal) closeIndModal(); });   // klik backdrop
+  const s=$('#indSearch'); if(s) s.oninput=()=>{ indModalQ=s.value; renderIndModalState(); };
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !modal.hidden) closeIndModal(); });
 })();
 
 // ===================== chart type switcher (candle/hollow/bar/area) =====================
