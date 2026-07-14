@@ -2654,8 +2654,10 @@ const MS_DAY = 86400000, MS_WK = 604800000, MS_Q90 = 5400000;
 function qtSessStart(t){ const {y,mo,d,h}=nyParts(t); const sh = h>=18?18 : h<6?0 : h<12?6 : 12; return nyTimestamp(y,mo,d,sh,0); }
 function qtDayStart(t){ const p=nyParts(t); if(p.h<18){ const pr=nyParts(t-18*3600000); return nyTimestamp(pr.y,pr.mo,pr.d,18,0);} return nyTimestamp(p.y,p.mo,p.d,18,0); }
 function qtWeekStart(t){
-  const p=nyParts(t); const sunMs=t-(p.dow-1)*MS_DAY; const s=nyParts(sunMs); let s18=nyTimestamp(s.y,s.mo,s.d,18,0);
-  if(t<s18){ const pr=nyParts(t-MS_WK); const sun2=pr.dow; const s2=nyParts((t-MS_WK)-(sun2-1)*MS_DAY); s18=nyTimestamp(s2.y,s2.mo,s2.d,18,0);} return s18;
+  const p=nyParts(t); const noon=nyTimestamp(p.y,p.mo,p.d,12,0);
+  const s=nyParts(noon-(p.dow-1)*MS_DAY); let s18=nyTimestamp(s.y,s.mo,s.d,18,0);
+  if(t<s18){ const pw=t-MS_WK; const pr=nyParts(pw); const prNoon=nyTimestamp(pr.y,pr.mo,pr.d,12,0);
+    const s2=nyParts(prNoon-(pr.dow-1)*MS_DAY); s18=nyTimestamp(s2.y,s2.mo,s2.d,18,0);} return s18;
 }
 function qtMonthAnchor(y,mo){ const dow1=nyParts(nyTimestamp(y,mo,1,12,0)).dow; const fmDay=1+((2-dow1+7)%7); return qtWeekStart(nyTimestamp(y,mo,fmDay,12,0)); }
 function qtMonthCycleStart(t){
