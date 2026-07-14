@@ -2718,7 +2718,31 @@ function registerCustomIndicators(){
       indicator.extendData = { segments: qtBuildSegments(dataList, lvl, cp[1]|0 || 4), fill: !!cp[2], label: cp[3]!==0, lvl };
       return dataList.map(() => ({}));   // per-bar ringan → klinecharts anggap "punya data"
     },
-    draw: () => false   // diisi Task 5
+    draw: ({ ctx, indicator, xAxis, yAxis }) => {
+      const ed = indicator.extendData; if(!ed || !ed.segments || !ed.segments.length) return false;
+      const NEUTRAL = '#8892a6';                       // warna netral PR-1 (warna fase AMD → PR-2)
+      ctx.save();
+      ctx.font = '10px -apple-system,system-ui,sans-serif';
+      for(const s of ed.segments){
+        // xAxis.convertToPixel butuh dataIndex (bukan timestamp) di klinecharts 9.8.10 →
+        // konversi via tsToFracIndex (gap-aware, sudah dipakai trendline/overlay lain).
+        const i1 = tsToFracIndex(s.startTs), i2 = tsToFracIndex(s.endTs);
+        if(i1==null || i2==null || !isFinite(i1) || !isFinite(i2)) continue;
+        const x1 = xAxis.convertToPixel(i1), x2 = xAxis.convertToPixel(i2);
+        const yT = yAxis.convertToPixel(s.hi), yB = yAxis.convertToPixel(s.lo);
+        if(!isFinite(x1) || !isFinite(x2) || !isFinite(yT) || !isFinite(yB)) continue;
+        const x = Math.min(x1,x2), w = Math.max(2, Math.abs(x2-x1)), y = Math.min(yT,yB), h = Math.max(1, Math.abs(yB-yT));
+        if(ed.fill){ ctx.fillStyle = 'rgba(136,146,166,0.10)'; ctx.fillRect(x, y, w, h); }
+        ctx.strokeStyle = NEUTRAL; ctx.lineWidth = 1; ctx.setLineDash([2,2]);
+        ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+        if(ed.label){
+          ctx.fillStyle = NEUTRAL; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+          ctx.fillText(s.text, x + w - 2, y + h - 2);
+        }
+      }
+      ctx.restore();
+      return false;
+    }
   });
 }
 registerCustomIndicators();
