@@ -1817,6 +1817,7 @@ const tfData = {};       // { 'M15':[{timestamp,open,high,low,close,volume}], ..
 let currentTF = 'M15';
 let T = null;            // cursor time (ms) = close-time candle TF tampil saat ini
 let lastLen = -1;
+let chartHasPartial = false;   // bar terakhir di chart adalah forming bar sintetis (replay) → perlu tahu utk buang/timpa
 let playing = false, playTimer = null;
 let live = false, liveTimer = null;
 let trade = null;        // {dir,entry,sl,tp,risk,units,trail,time,lineEntry,lineSL,lineTP}
@@ -3174,16 +3175,25 @@ function render(full){
   if(T==null) return;
   const boot=document.querySelector('.chart-boot'); if(boot) boot.remove();  // chart nyata siap → lepas placeholder
   const data=revealed(currentTF);
-  // Bar Replay: sisipkan forming bar (partial) sbg bar terakhir bila valid utk TF & cursor T saat ini.
-  let draw=data, hasPartial=false;
+  // Bar Replay: forming bar (partial) valid sbg bar terakhir utk TF & cursor T saat ini?
+  let hasPartial=false;
   if(replayMode && replayPartial && replayPartial.tf===currentTF && replayPartial.candle){
     const nextOpen = tfData[currentTF] && tfData[currentTF][data.length] ? tfData[currentTF][data.length].timestamp : null;
-    if(replayPartial.candle.timestamp===nextOpen){ draw=data.concat([replayPartial.candle]); hasPartial=true; }
+    if(replayPartial.candle.timestamp===nextOpen) hasPartial=true;
   }
-  if(full || hasPartial || lastLen<0 || draw.length<lastLen){ chart.applyNewData(draw); }
-  else if(draw.length>lastLen){ for(let k=lastLen;k<draw.length;k++) chart.updateData(draw[k]); }
-  // lastLen dilacak thd jumlah bar TUTUP nyata (data), BUKAN draw (+partial). Saat partial hilang
-  // (mis. pause→Next), draw.length>lastLen → updateData mendorong bar asli, bukan nyangkut synthetic.
+  // Bar TUTUP: incremental. applyNewData HANYA saat full/boot/menyusut, atau saat partial lama harus
+  // dibuang tanpa ada bar tutup baru yang menimpanya. Forming bar TAK PERNAH lewat applyNewData:
+  // applyNewData menyentak viewport ke tepi kanan → pan/zoom user hilang tiap frame saat Play.
+  // Dorong forming bar via updateData (sama seperti Live/pushFormingCandle) → posisi scroll
+  // dipertahankan; auto-follow hanya terjadi bila user memang di tepi kanan (perilaku ala TradingView).
+  const needFull = full || lastLen<0 || data.length<lastLen
+                 || (chartHasPartial && !hasPartial && data.length===lastLen);
+  if(needFull){ chart.applyNewData(data); }
+  else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
+  // Forming bar: timestamp selalu = open bar berikutnya → saat bar itu benar-benar menutup,
+  // updateData(dataTutup) menimpanya di tempat (transisi partial→closed mulus, tak ada bar nyangkut).
+  if(hasPartial) chart.updateData(replayPartial.candle);
+  chartHasPartial=hasPartial;
   lastLen=data.length;
   drawPaperLines();
   drawPendingLines();
