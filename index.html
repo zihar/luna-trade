@@ -7057,12 +7057,13 @@ function renderIndModalState(){
     if(!q) return true;
     return (d.name+' '+d.label+' '+(d.desc||'')).toLowerCase().includes(q);
   });
+  const qEsc=indModalQ.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));   // echo aman (hindari self-XSS)
   list.innerHTML = items.length ? items.map(d=>
     `<div class="ind-row${activeInd[d.name]?' on':''}" data-ind="${d.name}">`+
       `<div class="ind-row-main"><div class="ind-row-name">${d.label}</div>`+
       `<div class="ind-row-desc">${d.desc||''}</div></div>`+
       `<span class="ind-row-badge">Added &#10003;</span>`+
-    `</div>`).join('') : `<div class="ind-empty">No indicators match "${indModalQ}"</div>`;
+    `</div>`).join('') : `<div class="ind-empty">No indicators match "${qEsc}"</div>`;
   list.querySelectorAll('.ind-row').forEach(el=>el.onclick=()=>{
     const name=el.dataset.ind;
     if(activeInd[name]) removeInd(name); else addInd(name);
