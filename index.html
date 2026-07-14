@@ -2682,6 +2682,46 @@ function qtLabelText(lvl,t,q){
   if(lvl===3){ const dn=['Mon','Tue','Wed','Thu','Fri'][q]||'Fri'; return q<=3?`${dn} · Q${q+1}`:`${dn} · sp`; }
   return q<=3?`W${q+1} · Q${q+1}`:`W5 · sp`;
 }
+// calcParams posisi: [levelCode:0=auto..4=monthly, N, fill:0|1, label:0|1].
+const LVL_OPT = ['auto','session','daily','weekly','monthly'];
+// Bangun segmen per (siklus,quarter) dari dataList kline utk N siklus terakhir.
+function qtBuildSegments(dataList, lvl, N){
+  if(!dataList || !dataList.length || lvl<=0) return [];
+  const segs = new Map();                        // key `${cycleStart}|${q}` → seg
+  for(const k of dataList){
+    const t = k.timestamp;
+    const q = qtQuarter(lvl, t);
+    if(q < 0) continue;                          // di luar siklus (weekend/jeda)
+    const cs = qtCycleStart(lvl, t);
+    const key = cs + '|' + q;
+    let s = segs.get(key);
+    if(!s){ s = {cycleStart:cs, startTs:t, endTs:t, hi:k.high, lo:k.low, level:lvl, q, text:qtLabelText(lvl, t, q)}; segs.set(key, s); }
+    else { s.endTs=t; if(k.high>s.hi)s.hi=k.high; if(k.low<s.lo)s.lo=k.low; }
+  }
+  // urut waktu, ambil N siklus terakhir.
+  const arr = [...segs.values()].sort((a,b)=> a.startTs-b.startTs);
+  const cycles = [...new Set(arr.map(s=>s.cycleStart))].sort((a,b)=>a-b);
+  const keep = new Set(cycles.slice(-N));
+  return arr.filter(s=> keep.has(s.cycleStart));
+}
+// State draw dibagi calc→draw (klinecharts panggil calc lalu draw pada indikator yg sama).
+function registerCustomIndicators(){
+  klinecharts.registerIndicator({
+    name: 'QT',
+    shortName: 'QT Fractal',
+    // calcParams: [levelCode, N, fill, label]
+    calcParams: [0, 4, 0, 1],
+    figures: [],
+    calc: (dataList, indicator) => {
+      const cp = indicator.calcParams || [0,4,0,1];
+      const lvl = qtLevel(tfSeconds(currentTF), LVL_OPT[cp[0]] || 'auto');
+      indicator.extendData = { segments: qtBuildSegments(dataList, lvl, cp[1]|0 || 4), fill: !!cp[2], label: cp[3]!==0, lvl };
+      return dataList.map(() => ({}));   // per-bar ringan → klinecharts anggap "punya data"
+    },
+    draw: () => false   // diisi Task 5
+  });
+}
+registerCustomIndicators();
 
 const chart = klinecharts.init('chart', {styles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
 new ResizeObserver(()=>{ chart.resize(); try{updatePriceTimer();}catch(e){} try{repositionNewsMarkers();}catch(e){} }).observe($('#chart'));
