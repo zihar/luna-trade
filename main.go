@@ -125,6 +125,11 @@ func main() {
 	mux := http.NewServeMux()
 	// Shell statik (index.html, assets/) publik; data di balik sesi (requireUser).
 	mux.Handle("/", noCache(http.FileServer(http.Dir("."))))
+	// Font statik jarang berubah → cache lama (bukan no-store) supaya tak
+	// re-download tiap reload. Prefix lebih panjang menang atas "/" di ServeMux.
+	// Catatan: nama file tak di-hash — kalau MENGGANTI isi font, pakai nama file
+	// baru (atau hard-refresh saat dev) agar klien tak pegang versi lama.
+	mux.Handle("/assets/fonts/", cacheLong(http.FileServer(http.Dir("."))))
 	// Endpoint auth publik (register/login/logout/me + Google OAuth).
 	registerAuth(mux)
 	registerGoogleOAuth(mux)
@@ -141,6 +146,15 @@ func main() {
 func noCache(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, must-revalidate")
+		h.ServeHTTP(w, r)
+	})
+}
+
+// cacheLong memberi Cache-Control panjang utk aset statik yang jarang berubah
+// (mis. font), menggantikan no-store dari catch-all "/".
+func cacheLong(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=2592000") // 30 hari
 		h.ServeHTTP(w, r)
 	})
 }
