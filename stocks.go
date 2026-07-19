@@ -5,7 +5,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -115,4 +118,74 @@ func convertYahoo(raw *yahooChartResp, count int) (*oandaCandles, error) {
 		out.Candles = out.Candles[len(out.Candles)-count:]
 	}
 	return out, nil
+}
+
+// StockSource = sumber candle saham (swappable). Kini: yahooSource. Kelak bisa
+// diganti stooqSource/twelveSource tanpa menyentuh candlesHandler.
+type StockSource interface {
+	Candles(sym, gran string, count int) (*oandaCandles, error)
+}
+
+var stockSrc StockSource = yahooSource{}
+
+type yahooSource struct{}
+
+func (yahooSource) Candles(sym, gran string, count int) (*oandaCandles, error) {
+	interval, rng := mapGran(gran)
+	u := "https://query1.finance.yahoo.com/v8/finance/chart/" + url.PathEscape(sym) +
+		"?interval=" + interval + "&range=" + rng
+	req, _ := http.NewRequest(http.MethodGet, u, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0") // endpoint v8 butuh UA; tanpa cookie/crumb
+	client := &http.Client{Timeout: 12 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("yahoo %s → HTTP %d", sym, resp.StatusCode)
+	}
+	var raw yahooChartResp
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	if raw.Chart.Error != nil {
+		return nil, fmt.Errorf("yahoo %s: %v", sym, raw.Chart.Error)
+	}
+	oc, err := convertYahoo(&raw, count)
+	if err != nil {
+		return nil, err
+	}
+	oc.Granularity = gran
+	return oc, nil
+}
+
+// handleStockCandles melayani /api/candles untuk simbol STOCK:*. Hasil di-cache
+// 5 menit (data EOD/delayed) → menekan hit ke Yahoo & menghindari rate-limit.
+func handleStockCandles(w http.ResponseWriter, inst, gran, countStr string) {
+	sym := strings.TrimPrefix(inst, "STOCK:")
+	count, _ := strconv.Atoi(countStr)
+	if count <= 0 {
+		count = 5000
+	}
+	key := "STOCK:" + sym + "|" + gran + "|" + strconv.Itoa(count)
+	loader := func() ([]byte, int, error) {
+		oc, err := stockSrc.Candles(sym, gran, count)
+		if err != nil {
+			return nil, 0, err
+		}
+		b, err := json.Marshal(oc)
+		if err != nil {
+			return nil, 0, err
+		}
+		return b, http.StatusOK, nil
+	}
+	body, status, err := candles.fetch(key, 5*time.Minute, loader)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write(body)
 }

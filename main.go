@@ -203,6 +203,9 @@ func candlesHandler(token string) http.HandlerFunc {
 		case "dxy":
 			handleDXYCandles(w, token, gran, p)
 			return
+		case "stock":
+			handleStockCandles(w, inst, gran, count)
+			return
 		}
 		target := host() + "/v3/instruments/" + url.PathEscape(inst) + "/candles?" + p.Encode()
 
