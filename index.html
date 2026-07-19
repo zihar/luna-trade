@@ -868,6 +868,42 @@
   .al-x:hover{ color:var(--red); }
   .al-empty{ padding:8px 11px; font-size:12px; color:var(--muted); }
 
+  /* Markets: seksi grup (accordion) + bintang favourite + show-all */
+  /* bintang absolut di gutter kiri → tak memakan lebar kolom simbol (panel padat) */
+  .wl-row{ position:relative; }
+  .wl-star{ position:absolute; left:0; top:0; bottom:0; margin:auto; width:13px; height:15px; padding:0; border:0;
+            background:none; cursor:pointer; font-size:12px; line-height:1; color:var(--muted);
+            opacity:0; transition:opacity .1s ease,color .1s ease; z-index:2; }
+  .wl-row:hover .wl-star{ opacity:.55; }
+  .wl-star:hover{ opacity:1 !important; color:var(--txt); }
+  .wl-star.fav{ opacity:1; color:var(--luna-glow); }
+  .wl-grp{ display:flex; align-items:center; gap:7px; padding:9px 12px 6px; cursor:pointer;
+           font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.07em;
+           color:var(--muted); user-select:none; }
+  .wl-grp:hover{ color:var(--txt); }
+  .wl-grp.fav{ color:var(--luna-glow); }
+  .wl-chev{ font-size:9px; width:10px; text-align:center; transition:transform .12s ease; }
+  .wl-grp.collapsed .wl-chev{ transform:rotate(-90deg); }
+  .wl-glbl{ flex:1; }
+  .wl-grp.fav .wl-glbl::before{ content:"\2605 "; }
+  .wl-grp.recent .wl-glbl::before{ content:"\1F550 "; }
+  .wl-cnt{ font-variant-numeric:tabular-nums; color:var(--muted); background:var(--inset);
+           border:1px solid var(--border); border-radius:999px; padding:1px 7px; font-size:9.5px; }
+  .wl-showall{ margin-left:2px; border:0; background:none; cursor:pointer; color:var(--accent);
+               font-family:var(--font-sans); font-size:10px; letter-spacing:0; text-transform:none; padding:2px 4px; }
+  .wl-showall:hover{ text-decoration:underline; }
+  .wl-grp-empty{ padding:4px 14px 10px; font-size:11px; color:var(--muted); }
+  .wl-sep{ height:1px; margin:5px 12px; background:var(--border); }
+  /* ipick: bintang favourite (absolut agar tak merusak grid 3-kolom) */
+  .ipick-row{ padding-right:28px; }
+  .ipk-star{ position:absolute; right:6px; top:50%; transform:translateY(-50%); width:20px; height:20px; padding:0;
+             border:0; background:none; cursor:pointer; font-size:13px; line-height:1; color:var(--muted);
+             opacity:0; transition:opacity .1s ease,color .1s ease; }
+  .ipick-row:hover .ipk-star{ opacity:.5; }
+  .ipk-star:hover{ opacity:1; color:var(--txt); }
+  .ipk-star.fav{ opacity:1; color:var(--luna-glow); }
+  @media (prefers-reduced-motion:reduce){ .wl-chev{ transition:none; } }
+
   /* News panel (shares grid-area:markets with #watchlist, radio toggle) */
   #newspanel{ grid-area:markets; overflow:auto; }
   .news-body{ display:flex; flex-direction:column; gap:10px; padding:10px; }
@@ -5332,57 +5368,135 @@ function maxSpreadPips(s){
   if(SYM_DECIMALS[s]!=null) return 200;                          // indices CFD → spread beberapa poin, longgar
   return 30;                            // FX major/minor & JPY (real biasanya 1–15, jadi aman)
 }
-// Watchlist di-render dua tahap: buildWatch() membuat node baris SEKALI, lalu
-// updateWatch() cuma menimpa textContent/class tiap tick. Ini mencegah kedip
-// (:hover/.on tak pernah lepas) & klik hilang (node tak diganti saat mouseup).
+// ---- Markets: favourites + open-frequency + curated "popular" ----
+// Kurasi "populer": subset yg tampil default per grup di panel (sisanya via "Show all").
+const POPULAR_SYMS = new Set([
+  'EUR_USD','GBP_USD','USD_JPY','AUD_USD','USD_CAD',
+  'XAU_USD','XAG_USD','WTICO_USD','BCO_USD',
+  'DXY','SPX500_USD','NAS100_USD','US30_USD','BTC_USD','ETH_USD',
+  'STOCK:BBCA.JK','STOCK:BBRI.JK','STOCK:BMRI.JK','STOCK:TLKM.JK','STOCK:ASII.JK','STOCK:GOTO.JK',
+  'STOCK:AAPL','STOCK:TSLA','STOCK:NVDA','STOCK:MSFT','STOCK:AMZN',
+  'STOCK:SPY','STOCK:QQQ',
+]);
+const MOST_OPENED_N = 5;
+// favourite instrumen (bintang) — pola sama dgn favorit TF (br_tfFav).
+function loadInstFav(){ try{ const a=JSON.parse(localStorage.getItem('br_instFav')); if(Array.isArray(a)) return a.filter(s=>WATCH_SYMS.includes(s)); }catch(e){} return []; }
+let instFav = loadInstFav();
+function saveInstFav(){ try{ localStorage.setItem('br_instFav', JSON.stringify(instFav)); }catch(e){} }
+function isInstFav(s){ return instFav.includes(s); }
+function toggleInstFav(s){ const i=instFav.indexOf(s); if(i>=0) instFav.splice(i,1); else instFav.push(s);
+  saveInstFav(); refreshMostOpened();   // fav & most-opened saling eksklusif → sinkron
+  buildWatch(); if(typeof ipickOpen!=='undefined' && ipickOpen) renderIpick($('#ipickQ')?$('#ipickQ').value:''); }
+// frekuensi buka per simbol (client-side, per-device) → seksi "Most opened".
+function loadInstFreq(){ try{ const o=JSON.parse(localStorage.getItem('br_instFreq')); if(o&&typeof o==='object') return o; }catch(e){} return {}; }
+let instFreq = loadInstFreq();
+function saveInstFreq(){ try{ localStorage.setItem('br_instFreq', JSON.stringify(instFreq)); }catch(e){} }
+function bumpInstFreq(s){ const e=instFreq[s]||{c:0,t:0}; e.c++; e.t=Date.now(); instFreq[s]=e;
+  const keys=Object.keys(instFreq);   // prune: simpan ~top-50 by count agar tak tumbuh tanpa batas
+  if(keys.length>60){ keys.sort((a,b)=>(instFreq[b].c-instFreq[a].c)||(instFreq[b].t-instFreq[a].t)); keys.slice(50).forEach(k=>delete instFreq[k]); }
+  saveInstFreq(); }
+let mostOpenedSnap = [];   // di-refresh saat load / panel dibuka / fav berubah (bukan tiap klik → anti layout-jump)
+function refreshMostOpened(){
+  mostOpenedSnap = Object.keys(instFreq)
+    .filter(s=>WATCH_SYMS.includes(s) && !isInstFav(s))
+    .sort((a,b)=>(instFreq[b].c-instFreq[a].c)||(instFreq[b].t-instFreq[a].t))
+    .slice(0, MOST_OPENED_N);
+}
+refreshMostOpened();
+// accordion (collapse) & "show all" per grup — persist.
+function wlLoadState(k){ try{ const o=JSON.parse(localStorage.getItem(k)); if(o&&typeof o==='object') return o; }catch(e){} return {}; }
+let wlCollapse = wlLoadState('br_wlCollapse');
+let wlShowAll  = wlLoadState('br_wlShowAll');
+function saveWLState(){ try{ localStorage.setItem('br_wlCollapse',JSON.stringify(wlCollapse)); localStorage.setItem('br_wlShowAll',JSON.stringify(wlShowAll)); }catch(e){} }
+
+// Watchlist di-render dua tahap: buildWatch() membangun struktur (grup/fav/most-opened)
+// & mengumpulkan node baris SEKALI, lalu updateWatch() cuma menimpa harga/class tiap tick.
+// Ini mencegah kedip (:hover/.on tak lepas) & klik hilang. buildWatch dipanggil ulang hanya
+// saat STRUKTUR berubah (fav/collapse/show-all); pilih instrumen biasa → updateWatch saja.
+function wlRowHTML(s){
+  return `<div class="wl-row" data-sym="${s}">`
+    +`<button class="wl-star${isInstFav(s)?' fav':''}" type="button" data-fav="${s}" title="${isInstFav(s)?'Remove from favourites':'Add to favourites'}" aria-label="Toggle favourite">★</button>`
+    +`<span class="wl-sym">${dispSym(s)}</span>`
+    +`<span class="wl-bid">—</span><span class="wl-ask">—</span>`
+    +`<span class="wl-spr">—</span><span class="wl-num wl-hi">—</span><span class="wl-num wl-lo">—</span></div>`;
+}
+function wlGrpHTML(key,label,count,opts){ opts=opts||{};
+  const cls='wl-grp'+(opts.cls?(' '+opts.cls):'')+(wlCollapse[key]?' collapsed':'');
+  let right=''; if(opts.showAll){ const g=opts.showAll.grp;
+    right=`<button class="wl-showall" type="button" data-showall="${g}">${wlShowAll[g]?'Show less':('Show all '+opts.showAll.total)}</button>`; }
+  return `<div class="${cls}" data-grp="${key}"><span class="wl-chev" aria-hidden="true">▾</span>`
+    +`<span class="wl-glbl">${label}</span><span class="wl-cnt">${count}</span>${right}</div>`;
+}
 function buildWatch(){
   const box=$('#wlRows'); if(!box) return;
-  box.innerHTML=`<div class="wl-row wl-hdr">
-    <span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
   wlNodes={};
-  WATCH_SYMS.forEach(s=>{
-    const row=document.createElement('div');
-    row.className='wl-row'; row.dataset.sym=s;
-    row.innerHTML=`<span class="wl-sym">${dispSym(s)}</span>`
-      +`<span class="wl-bid">—</span><span class="wl-ask">—</span>`
-      +`<span class="wl-spr">—</span><span class="wl-num wl-hi">—</span><span class="wl-num wl-lo">—</span>`;
-    box.appendChild(row);
-    wlNodes[s]={ row, bid:row.querySelector('.wl-bid'), ask:row.querySelector('.wl-ask'),
-                 spr:row.querySelector('.wl-spr'), hi:row.querySelector('.wl-hi'), lo:row.querySelector('.wl-lo') };
-  });
-  // satu listener klik terdelegasi (bertahan lintas tick) → tak perlu re-bind per baris
-  box.onclick=e=>{ const r=e.target.closest('.wl-row[data-sym]'); if(r) selectSymbol(r.dataset.sym); };
-  wlBuilt=true;
+  let html=`<div class="wl-row wl-hdr"><span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
+  // Favourites (selalu tampil; hint bila kosong)
+  html+=wlGrpHTML('@fav','Favourites',instFav.length,{cls:'fav'});
+  if(!wlCollapse['@fav']){
+    if(instFav.length) instFav.forEach(s=>{ if(WATCH_SYMS.includes(s)) html+=wlRowHTML(s); });
+    else html+=`<div class="wl-grp-empty">Tap ★ on any instrument to pin it here.</div>`;
+  }
+  // Most opened (sembunyi bila belum ada data)
+  if(mostOpenedSnap.length){
+    html+=wlGrpHTML('@recent','Most opened',mostOpenedSnap.length,{cls:'recent'});
+    if(!wlCollapse['@recent']) mostOpenedSnap.forEach(s=>html+=wlRowHTML(s));
+  }
+  html+=`<div class="wl-sep"></div>`;
+  // grup per IPK_GROUPS — default hanya populer, "Show all" → seluruh anggota
+  for(const g of IPK_GROUPS){
+    const all=WATCH_SYMS.filter(s=>ipkMeta(s).grp===g); if(!all.length) continue;
+    const pop=all.filter(s=>POPULAR_SYMS.has(s));
+    const base=(wlShowAll[g]||!pop.length)?all:pop;   // tanpa entri populer → tampilkan semua
+    const showAll=(pop.length && all.length>pop.length)?{grp:g,total:all.length}:null;
+    html+=wlGrpHTML(g,g,base.length,{showAll});
+    if(!wlCollapse[g]) base.forEach(s=>html+=wlRowHTML(s));
+  }
+  box.innerHTML=html;
+  // kumpulkan ref node (sym bisa muncul di >1 seksi → array)
+  box.querySelectorAll('.wl-row[data-sym]').forEach(row=>{ const s=row.dataset.sym;
+    (wlNodes[s]=wlNodes[s]||[]).push({ row, bid:row.querySelector('.wl-bid'), ask:row.querySelector('.wl-ask'),
+      spr:row.querySelector('.wl-spr'), hi:row.querySelector('.wl-hi'), lo:row.querySelector('.wl-lo') }); });
+  // satu listener terdelegasi: bintang > show-all > header grup > baris instrumen
+  box.onclick=e=>{
+    const fav=e.target.closest('.wl-star[data-fav]'); if(fav){ e.stopPropagation(); toggleInstFav(fav.dataset.fav); return; }
+    const sa=e.target.closest('.wl-showall[data-showall]'); if(sa){ e.stopPropagation(); const g=sa.dataset.showall; wlShowAll[g]=!wlShowAll[g]; saveWLState(); buildWatch(); return; }
+    const grp=e.target.closest('.wl-grp[data-grp]'); if(grp){ const k=grp.dataset.grp; wlCollapse[k]=!wlCollapse[k]; saveWLState(); buildWatch(); return; }
+    const r=e.target.closest('.wl-row[data-sym]'); if(r) selectSymbol(r.dataset.sym);
+  };
+  wlBuilt=true; wlKey=wlStructKey();
   updateWatch();
 }
 // util set teks hanya bila berubah (minim repaint)
 function setTxt(el,v){ if(el.textContent!==v) el.textContent=v; }
 function updateWatch(){
-  WATCH_SYMS.forEach(s=>{
-    const n=wlNodes[s]; if(!n) return;
-    n.row.classList.toggle('on', s===inst);
-    const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s), pip=pipOf(s);
-    if(!q && !lt){
-      setTxt(n.bid,'—'); setTxt(n.ask,'—'); setTxt(n.spr,'—'); setTxt(n.hi,'—'); setTxt(n.lo,'—');
-      n.row.removeAttribute('title'); return;
+  for(const s in wlNodes){
+    const nodes=wlNodes[s], q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s), pip=pipOf(s);
+    const has=!!(q||lt); let bid,ask,sprd,chg=q?q.chg:0,up=chg>=0;
+    if(has){
+      if(lt){ bid=lt.bid; ask=lt.ask; sprd=ask-bid; }                 // bid/ask realtime
+      else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
+      // clamp spread yg tak wajar (closeout broker metal/kripto) → indikatif, di-tengah-kan pada mid
+      const cap=maxSpreadPips(s)*pip;
+      if(sprd>cap){ const mid=(bid+ask)/2; sprd=cap; bid=mid-cap/2; ask=mid+cap/2; }
     }
-    let bid, ask, sprd;
-    if(lt){ bid=lt.bid; ask=lt.ask; sprd=ask-bid; }                 // bid/ask realtime
-    else { sprd=pip*1.6; bid=q.last-sprd/2; ask=q.last+sprd/2; }    // fallback sintetis dari candle harian
-    // clamp spread yg tak wajar (closeout broker metal/kripto) → indikatif, di-tengah-kan pada mid
-    const cap=maxSpreadPips(s)*pip;
-    if(sprd>cap){ const mid=(bid+ask)/2; sprd=cap; bid=mid-cap/2; ask=mid+cap/2; }
-    const chg=q?q.chg:0, up=chg>=0;
-    setTxt(n.bid,bid.toFixed(dec)); n.bid.classList.toggle('up',up); n.bid.classList.toggle('down',!up);
-    setTxt(n.ask,ask.toFixed(dec)); n.ask.classList.toggle('up',up); n.ask.classList.toggle('down',!up);
-    setTxt(n.spr,(sprd/pip).toFixed(1));
-    setTxt(n.hi, q&&q.hi!=null?q.hi.toFixed(dec):'—');
-    setTxt(n.lo, q&&q.lo!=null?q.lo.toFixed(dec):'—');
-    n.row.title=(chg>=0?'+':'')+chg.toFixed(2)+'% today';
-  });
+    nodes.forEach(n=>{
+      n.row.classList.toggle('on', s===inst);
+      if(!has){ setTxt(n.bid,'—'); setTxt(n.ask,'—'); setTxt(n.spr,'—'); setTxt(n.hi,'—'); setTxt(n.lo,'—'); n.row.removeAttribute('title'); return; }
+      setTxt(n.bid,bid.toFixed(dec)); n.bid.classList.toggle('up',up); n.bid.classList.toggle('down',!up);
+      setTxt(n.ask,ask.toFixed(dec)); n.ask.classList.toggle('up',up); n.ask.classList.toggle('down',!up);
+      setTxt(n.spr,(sprd/pip).toFixed(1));
+      setTxt(n.hi, q&&q.hi!=null?q.hi.toFixed(dec):'—');
+      setTxt(n.lo, q&&q.lo!=null?q.lo.toFixed(dec):'—');
+      n.row.title=(chg>=0?'+':'')+chg.toFixed(2)+'% today';
+    });
+  }
 }
-function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} applyTradeGating(); loadInit(true);
+// signature struktur: rebuild hanya bila berubah, else update harga in-place
+function wlStructKey(){ return instFav.join(',')+'|'+mostOpenedSnap.join(',')+'|'+JSON.stringify(wlCollapse)+'|'+JSON.stringify(wlShowAll); }
+let wlKey='';
+function renderWatch(){ if(!wlBuilt || wlKey!==wlStructKey()) buildWatch(); else updateWatch(); }
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); bumpInstFreq(s); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} applyTradeGating(); loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
@@ -5528,25 +5642,33 @@ let ipickOpen=false, ipickCursor=-1;
 function syncIpickTrigger(){ const s=($('#instrument')&&$('#instrument').value)||inst;
   const tp=$('#ipickTrgPair'), tt=$('#ipickTrgTick');
   if(tp) tp.innerHTML=ipkPair(s); if(tt) tt.textContent=dispSym(s); }
+function ipickRowHTML(s,idx){ const m=ipkMeta(s), on=s===inst?' on':'', cur=idx===ipickCursor?' cursor':'', fav=isInstFav(s);
+  return `<div class="ipick-row${on}${cur}" data-sym="${s}" role="option" aria-selected="${s===inst}">
+    <span class="ipick-pair">${ipkPair(s)}</span>
+    <span class="id"><div class="sym">${dispSym(s)}</div><div class="name">${m.name||s}</div></span>
+    <span class="px">${ipkPriceHTML(s)}</span>
+    <button class="ipk-star${fav?' fav':''}" type="button" data-fav="${s}" title="${fav?'Remove from favourites':'Add to favourites'}" aria-label="Toggle favourite">★</button></div>`; }
 function renderIpick(filter=''){
   const list=$('#ipickList'); if(!list) return;
   const f=(filter||'').trim().toLowerCase();
   const match=s=>{ const m=ipkMeta(s); return !f || dispSym(s).toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f) || (IPK_ALIAS[s]||[]).some(a=>a.toLowerCase().includes(f)); };
   let html='', any=false, idx=0; const flat=[];
+  // pseudo-grup Favourites di atas (bila ada & cocok filter) — state dibagi dgn panel Markets
+  const favItems=instFav.filter(s=>WATCH_SYMS.includes(s) && match(s));
+  if(favItems.length){ any=true;
+    html+=`<div class="ipick-eye"><span class="lbl">★ Favourites</span><span class="rule"></span><span class="cnt">${favItems.length}</span></div>`;
+    for(const s of favItems){ html+=ipickRowHTML(s,idx); flat.push(s); idx++; } }
   for(const g of IPK_GROUPS){
     const items=WATCH_SYMS.filter(s=>ipkMeta(s).grp===g && match(s));
     if(!items.length) continue; any=true;
     html+=`<div class="ipick-eye"><span class="lbl">${g}</span><span class="rule"></span><span class="cnt">${items.length}</span></div>`;
-    for(const s of items){ const m=ipkMeta(s), on=s===inst?' on':'', cur=idx===ipickCursor?' cursor':'';
-      html+=`<div class="ipick-row${on}${cur}" data-sym="${s}" role="option" aria-selected="${s===inst}">
-        <span class="ipick-pair">${ipkPair(s)}</span>
-        <span class="id"><div class="sym">${dispSym(s)}</div><div class="name">${m.name||s}</div></span>
-        <span class="px">${ipkPriceHTML(s)}</span></div>`;
-      flat.push(s); idx++; }
+    for(const s of items){ html+=ipickRowHTML(s,idx); flat.push(s); idx++; }
   }
   list.innerHTML = any ? html : `<div class="ipick-empty">No instruments match “${filter}”.</div>`;
   list._flat=flat;
-  list.querySelectorAll('.ipick-row').forEach(r=>r.onclick=()=>{ selectSymbol(r.dataset.sym); closeIpick(); });
+  list.querySelectorAll('.ipick-row').forEach(r=>r.onclick=e=>{ const st=e.target.closest('.ipk-star[data-fav]');
+    if(st){ e.stopPropagation(); toggleInstFav(st.dataset.fav); return; }   // bintang → toggle fav (re-render), tak menutup
+    selectSymbol(r.dataset.sym); closeIpick(); });
 }
 function updateIpickPrices(){ const list=$('#ipickList'); if(!list) return;
   list.querySelectorAll('.ipick-row').forEach(r=>{ const px=r.querySelector('.px'); if(px) px.innerHTML=ipkPriceHTML(r.dataset.sym); }); }
@@ -5907,6 +6029,7 @@ function setColumnVisible(visible){
 }
 function setMarketsHidden(hidden){
   $('#watchlist').classList.toggle('hidden',hidden);
+  if(!hidden){ refreshMostOpened(); if(wlBuilt) buildWatch(); }   // segarkan "Most opened" tiap panel dibuka
   setColumnVisible(!hidden);
   $('#toggleMarkets').classList.toggle('on',!hidden);
   setOrderDock(hidden);   // auto-float saat Markets disembunyikan, dock saat tampil
