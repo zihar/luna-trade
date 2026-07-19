@@ -847,7 +847,7 @@
            position:sticky; top:0; background:var(--panel); z-index:1; }
   .wl-hdr:hover{ background:var(--panel); }
   .wl-hdr > span{ font-family:inherit; }
-  .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); }
+  .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); padding-left:15px; }
   .wl-bid.up,.wl-ask.up{ color:var(--green); }
   .wl-bid.down,.wl-ask.down{ color:var(--red); }
   .wl-num{ color:var(--muted); }
@@ -871,12 +871,20 @@
   /* Markets: seksi grup (accordion) + bintang favourite + show-all */
   /* bintang absolut di gutter kiri → tak memakan lebar kolom simbol (panel padat) */
   .wl-row{ position:relative; }
-  .wl-star{ position:absolute; left:0; top:0; bottom:0; margin:auto; width:13px; height:15px; padding:0; border:0;
+  .wl-star{ position:absolute; left:6px; top:0; bottom:0; margin:auto; width:14px; height:16px; padding:0; border:0;
+            display:flex; align-items:center; justify-content:center;
             background:none; cursor:pointer; font-size:12px; line-height:1; color:var(--muted);
-            opacity:0; transition:opacity .1s ease,color .1s ease; z-index:2; }
-  .wl-row:hover .wl-star{ opacity:.55; }
-  .wl-star:hover{ opacity:1 !important; color:var(--txt); }
-  .wl-star.fav{ opacity:1; color:var(--luna-glow); }
+            opacity:0; transform:scale(.8); transform-origin:center;
+            transition:opacity .14s ease, color .14s ease, transform .14s cubic-bezier(.34,1.56,.64,1); z-index:2; }
+  .wl-row:hover .wl-star{ opacity:.5; transform:scale(1); }
+  .wl-star:hover{ opacity:1 !important; color:var(--txt); transform:scale(1.18); }
+  .wl-star.fav{ opacity:1; transform:scale(1); color:var(--luna-glow);
+                text-shadow:0 0 7px color-mix(in srgb, var(--luna-glow) 60%, transparent); }
+  .wl-star.fav:hover{ transform:scale(1.18); }
+  @media (prefers-reduced-motion: reduce){
+    .wl-star{ transition:opacity .1s linear, color .1s linear; transform:none; }
+    .wl-row:hover .wl-star, .wl-star:hover, .wl-star.fav, .wl-star.fav:hover{ transform:none; }
+  }
   .wl-grp{ display:flex; align-items:center; gap:7px; padding:9px 12px 6px; cursor:pointer;
            font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.07em;
            color:var(--muted); user-select:none; }
@@ -5432,7 +5440,7 @@ function wlGrpHTML(key,label,count,opts){ opts=opts||{};
 function buildWatch(){
   const box=$('#wlRows'); if(!box) return;
   wlNodes={};
-  let html=`<div class="wl-row wl-hdr"><span class="wl-sym">Instruments</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
+  let html=`<div class="wl-row wl-hdr"><span class="wl-sym">Symbol</span><span>Bid</span><span>Ask</span><span>Spread</span><span>Day&nbsp;Hi</span><span>Day&nbsp;Lo</span></div>`;
   // Favourites (selalu tampil; hint bila kosong)
   html+=wlGrpHTML('@fav','Favourites',instFav.length,{cls:'fav'});
   if(!wlCollapse['@fav']){
