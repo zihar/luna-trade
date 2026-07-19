@@ -26,9 +26,10 @@ echo "==> Build arm64 (Graviton)…"
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -mod=vendor -ldflags="-s -w" -o "$BIN" .
 echo "    binary: $(ls -lh "$BIN" | awk '{print $5}')"
 
-echo "==> Kirim binary + index.html + assets/ ke ${HOST} ..."
+echo "==> Kirim binary + index.html + assets/ + css/ ke ${HOST} ..."
 scp -o StrictHostKeyChecking=accept-new "$BIN" index.html "$HOST:/tmp/"
 scp -o StrictHostKeyChecking=accept-new -r assets "$HOST:/tmp/luna-assets"
+scp -o StrictHostKeyChecking=accept-new -r css "$HOST:/tmp/luna-css"
 
 echo "==> Pasang & restart service…"
 ssh "$HOST" 'bash -s' <<REMOTE
@@ -37,6 +38,8 @@ sudo mv /tmp/bar-replay-arm64 $REMOTE_DIR/bar-replay
 sudo mv /tmp/index.html $REMOTE_DIR/
 sudo rm -rf $REMOTE_DIR/assets
 sudo mv /tmp/luna-assets $REMOTE_DIR/assets
+sudo rm -rf $REMOTE_DIR/css
+sudo mv /tmp/luna-css $REMOTE_DIR/css
 sudo chmod +x $REMOTE_DIR/bar-replay
 sudo systemctl restart bar-replay
 sleep 1
