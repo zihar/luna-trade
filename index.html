@@ -1302,6 +1302,10 @@
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
   .orderpanel{ border-top:1px solid var(--border); padding:3px 8px 5px; }
+  .orderpanel.notrade{ position:relative; opacity:.55; pointer-events:none; }
+  .orderpanel.notrade::before{ content:'Chart only · not tradeable'; position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6;
+    font:600 11px var(--font-sans, sans-serif); letter-spacing:.03em; white-space:nowrap; pointer-events:none;
+    color:var(--muted, #8a94a6); background:var(--panel, #141822); border:1px solid var(--border); border-radius:999px; padding:3px 10px; }
   /* ── Type: UI pakai Sora (display), angka/readout pakai Chivo Mono (tabular) ── */
   .orderpanel, #orderForm{ font-family:var(--font-display); -webkit-font-smoothing:antialiased; }
   .orderpanel .op3-deal-px, .orderpanel .tl-in,
@@ -5366,7 +5370,7 @@ function updateWatch(){
   });
 }
 function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} loadInit(true);
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} applyTradeGating(); loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
@@ -5405,7 +5409,7 @@ const IPK_META = {
   WTICO_USD: {grp:'Energy',  name:'WTI Crude Oil',      base:'WTI'},
   BCO_USD:   {grp:'Energy',  name:'Brent Crude Oil',    base:'BRENT'},
   NATGAS_USD:{grp:'Energy',  name:'Natural Gas',        base:'NGAS'},
-  DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY'},
+  DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY', tradeable:false},
   SPX500_USD:{grp:'Indices', name:'S&P 500',            base:'SPX'},
   NAS100_USD:{grp:'Indices', name:'Nasdaq 100',         base:'NAS'},
   US30_USD:  {grp:'Indices', name:'Dow Jones 30',       base:'DJI'},
@@ -5426,6 +5430,10 @@ const IPK_META = {
 };
 function ipkMeta(s){ const m=IPK_META[s]; if(m) return m;
   const p=s.split('_'); return { grp:'Forex', name:s.replace('_',' / '), base:p[0], quote:p[1] }; }
+// Instrumen non-tradeable (saham, DXY): tiket order dinon-aktifkan (chart-only).
+// Panel positions/trades TETAP terlihat (lintas-instrumen).
+function isTradeable(s){ return ipkMeta(s).tradeable !== false; }
+function applyTradeGating(){ const op=$('#orderpanel'); if(op) op.classList.toggle('notrade', !isTradeable(inst)); }
 function ipkChip(ccy){ if(!ccy) return ''; const t=IPK_CCY[ccy]||ccy.slice(0,2); return `<span class="ipick-chip ipk-c-${ccy}">${t}</span>`; }
 function ipkPair(s){ const m=ipkMeta(s); return ipkChip(m.base)+ipkChip(m.quote); }
 function ipkPrice(s){ const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s);
@@ -6536,6 +6544,7 @@ makeResizer($('#rhTrades'), 'y','--trades-h', 'br_tradesH');
 if(localStorage.getItem('br_newsOpen')==='1') setNewsOpen(true);   // restore News state (radio dgn Markets)
 { const oh=localStorage.getItem('br_orderHidden'); const hideOrder=(oh===null?true:oh==='1');
   $('#orderpanel').style.display=hideOrder?'none':''; $('#toggleOrder').classList.toggle('on',!hideOrder); }
+applyTradeGating();
 const _coll=$('#bottompanel').classList.contains('collapsed');
 app.style.setProperty('--trades-h', _coll?'36px':savedTradesH()+'px');
 $('#toggleTrades').classList.toggle('on',!_coll);
