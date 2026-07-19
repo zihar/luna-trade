@@ -3142,6 +3142,7 @@ async function loadInit(latest){
       Promise.all([document.fonts.load("10px 'Inter Tight'"), document.fonts.load("bold 10px 'Inter Tight'")]),
       new Promise(r=>setTimeout(r,700)) ]); }catch(e){} }
   inst = $('#instrument').value;
+  applyTradeGating();
   const date = $('#date').value;
   if(!latest && !date){ setStatus('Pick a date first.',true); return; }
   localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
@@ -6544,7 +6545,6 @@ makeResizer($('#rhTrades'), 'y','--trades-h', 'br_tradesH');
 if(localStorage.getItem('br_newsOpen')==='1') setNewsOpen(true);   // restore News state (radio dgn Markets)
 { const oh=localStorage.getItem('br_orderHidden'); const hideOrder=(oh===null?true:oh==='1');
   $('#orderpanel').style.display=hideOrder?'none':''; $('#toggleOrder').classList.toggle('on',!hideOrder); }
-applyTradeGating();
 const _coll=$('#bottompanel').classList.contains('collapsed');
 app.style.setProperty('--trades-h', _coll?'36px':savedTradesH()+'px');
 $('#toggleTrades').classList.toggle('on',!_coll);
