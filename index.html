@@ -1504,6 +1504,11 @@
     <!-- Stocks (charting only, non-tradeable) -->
     <option>STOCK:BBCA.JK</option><option>STOCK:AAPL</option>
     <option>STOCK:TSLA</option><option>STOCK:NVDA</option><option>STOCK:AMZN</option><option>STOCK:MSFT</option><option>STOCK:META</option><option>STOCK:GOOGL</option><option>STOCK:AMD</option><option>STOCK:PLTR</option>
+    <!-- Indonesia (IDX) bluechip -->
+    <option>STOCK:BBRI.JK</option><option>STOCK:BMRI.JK</option><option>STOCK:BBNI.JK</option><option>STOCK:BRIS.JK</option><option>STOCK:TLKM.JK</option><option>STOCK:ISAT.JK</option><option>STOCK:EXCL.JK</option><option>STOCK:UNVR.JK</option>
+    <option>STOCK:ICBP.JK</option><option>STOCK:INDF.JK</option><option>STOCK:GGRM.JK</option><option>STOCK:HMSP.JK</option><option>STOCK:AMRT.JK</option><option>STOCK:CPIN.JK</option><option>STOCK:KLBF.JK</option><option>STOCK:ASII.JK</option>
+    <option>STOCK:UNTR.JK</option><option>STOCK:ADRO.JK</option><option>STOCK:PTBA.JK</option><option>STOCK:ANTM.JK</option><option>STOCK:INCO.JK</option><option>STOCK:MDKA.JK</option><option>STOCK:PGAS.JK</option><option>STOCK:MEDC.JK</option>
+    <option>STOCK:SMGR.JK</option><option>STOCK:INTP.JK</option><option>STOCK:JSMR.JK</option><option>STOCK:TOWR.JK</option><option>STOCK:GOTO.JK</option><option>STOCK:BRPT.JK</option><option>STOCK:TPIA.JK</option>
     <!-- ETF -->
     <option>STOCK:SPY</option><option>STOCK:QQQ</option>
   </select>
@@ -5432,7 +5437,38 @@ const IPK_META = {
   ETH_USD:{grp:'Crypto',  name:'Ether / US Dollar',        base:'ETH', quote:'USD'},
   LTC_USD:{grp:'Crypto',  name:'Litecoin / US Dollar',     base:'LTC', quote:'USD'},
   BCH_USD:{grp:'Crypto',  name:'Bitcoin Cash / US Dollar', base:'BCH', quote:'USD'},
-  'STOCK:BBCA.JK':{grp:'Stocks', name:'Bank Central Asia (IDX)', base:'BBCA', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BBCA.JK':{grp:'Stocks', name:'Bank Central Asia (IDX)',       base:'BBCA', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BBRI.JK':{grp:'Stocks', name:'Bank Rakyat Indonesia (IDX)',   base:'BBRI', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BMRI.JK':{grp:'Stocks', name:'Bank Mandiri (IDX)',            base:'BMRI', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BBNI.JK':{grp:'Stocks', name:'Bank Negara Indonesia (IDX)',   base:'BBNI', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BRIS.JK':{grp:'Stocks', name:'Bank Syariah Indonesia (IDX)',  base:'BRIS', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:TLKM.JK':{grp:'Stocks', name:'Telkom Indonesia (IDX)',        base:'TLKM', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:ISAT.JK':{grp:'Stocks', name:'Indosat Ooredoo Hutchison (IDX)',base:'ISAT',quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:EXCL.JK':{grp:'Stocks', name:'XLSMART Telecom (IDX)',         base:'EXCL', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:UNVR.JK':{grp:'Stocks', name:'Unilever Indonesia (IDX)',      base:'UNVR', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:ICBP.JK':{grp:'Stocks', name:'Indofood CBP (IDX)',            base:'ICBP', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:INDF.JK':{grp:'Stocks', name:'Indofood Sukses Makmur (IDX)',  base:'INDF', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:GGRM.JK':{grp:'Stocks', name:'Gudang Garam (IDX)',            base:'GGRM', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:HMSP.JK':{grp:'Stocks', name:'HM Sampoerna (IDX)',            base:'HMSP', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:AMRT.JK':{grp:'Stocks', name:'Alfamart / Sumber Alfaria (IDX)',base:'AMRT',quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:CPIN.JK':{grp:'Stocks', name:'Charoen Pokphand Indonesia (IDX)',base:'CPIN',quote:'IDR',decimals:0, tradeable:false},
+  'STOCK:KLBF.JK':{grp:'Stocks', name:'Kalbe Farma (IDX)',             base:'KLBF', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:ASII.JK':{grp:'Stocks', name:'Astra International (IDX)',     base:'ASII', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:UNTR.JK':{grp:'Stocks', name:'United Tractors (IDX)',         base:'UNTR', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:ADRO.JK':{grp:'Stocks', name:'Alamtri Resources / Adaro (IDX)',base:'ADRO',quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:PTBA.JK':{grp:'Stocks', name:'Bukit Asam (IDX)',              base:'PTBA', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:ANTM.JK':{grp:'Stocks', name:'Aneka Tambang / Antam (IDX)',   base:'ANTM', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:INCO.JK':{grp:'Stocks', name:'Vale Indonesia (IDX)',          base:'INCO', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:MDKA.JK':{grp:'Stocks', name:'Merdeka Copper Gold (IDX)',     base:'MDKA', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:PGAS.JK':{grp:'Stocks', name:'Perusahaan Gas Negara (IDX)',   base:'PGAS', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:MEDC.JK':{grp:'Stocks', name:'Medco Energi (IDX)',            base:'MEDC', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:SMGR.JK':{grp:'Stocks', name:'Semen Indonesia (IDX)',         base:'SMGR', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:INTP.JK':{grp:'Stocks', name:'Indocement (IDX)',              base:'INTP', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:JSMR.JK':{grp:'Stocks', name:'Jasa Marga (IDX)',              base:'JSMR', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:TOWR.JK':{grp:'Stocks', name:'Sarana Menara Nusantara (IDX)', base:'TOWR', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:GOTO.JK':{grp:'Stocks', name:'GoTo Gojek Tokopedia (IDX)',    base:'GOTO', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:BRPT.JK':{grp:'Stocks', name:'Barito Pacific (IDX)',          base:'BRPT', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:TPIA.JK':{grp:'Stocks', name:'Chandra Asri Pacific (IDX)',    base:'TPIA', quote:'IDR', decimals:0, tradeable:false},
   'STOCK:AAPL':   {grp:'Stocks', name:'Apple Inc. (NASDAQ)',     base:'AAPL', quote:'USD', decimals:2, tradeable:false},
   'STOCK:TSLA':   {grp:'Stocks', name:'Tesla, Inc.',             base:'TSLA', quote:'USD', decimals:2, tradeable:false},
   'STOCK:NVDA':   {grp:'Stocks', name:'NVIDIA Corporation',      base:'NVDA', quote:'USD', decimals:2, tradeable:false},
