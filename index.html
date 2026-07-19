@@ -2342,6 +2342,16 @@ klinecharts.registerOverlay({
       const bl = va==='top' ? 'bottom' : va==='bottom' ? 'top' : 'middle';
       figs.push({type:'text',attrs:{x:px,y:ty,text:String(t),align:ha,baseline:bl},
         styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
+    // Saat MENGGAMBAR: handle default disembunyikan (HIDDEN_POINT), jadi titik-BERGERAK (belum diklik)
+    // tak berbuletan. Di sini kita render sendiri buletan utk titik yg SUDAH DIKLIK (currentStep-1 titik
+    // pertama) → buletan baru muncul saat diklik (klik 1 & klik 2). Setelah objek jadi, handle default
+    // (draggable) yg dipakai (lihat onDrawEnd restore) → createPointFigures ini tak menambah apa-apa lagi.
+    if(overlay && overlay.isDrawing && overlay.isDrawing()){
+      const nClicked=(overlay.currentStep|0)-1;
+      for(let i=0;i<nClicked && i<C.length;i++){ const p=C[i]; if(!p) continue;
+        figs.push({type:'circle', attrs:{x:p.x, y:p.y, r:OVERLAY_POINT.radius},
+          styles:{style:'stroke_fill', color:OVERLAY_POINT.color, borderColor:OVERLAY_POINT.borderColor, borderSize:OVERLAY_POINT.borderSize}}); }
+    }
     return figs;
   },
   // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
