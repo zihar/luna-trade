@@ -285,15 +285,10 @@
   .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
-  /* [magnet] buletan preview: penanda titik yg akan mendarat di OHLC terdekat saat menggambar */
+  /* reticle titik cursor 'dot' (juga penanda snap Magnet): dot kecil solid, minimalis */
   .mag-dot{ position:absolute; z-index:7; pointer-events:none; display:none;
-    width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%;
-    border:1.5px solid var(--mag); background:transparent;
-    box-shadow:0 0 0 1px rgba(0,0,0,.45), 0 0 5px var(--mag-glow); }
-  /* pin pusat: penanda pixel pasti — tengah reticle tetap kosong agar titik target terlihat */
-  .mag-dot::after{ content:''; position:absolute; left:50%; top:50%;
-    width:2px; height:2px; margin:-1px 0 0 -1px; border-radius:50%;
-    background:var(--mag); box-shadow:0 0 0 .5px rgba(0,0,0,.4); }
+    width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
+    background:var(--mag); box-shadow:0 0 0 1px rgba(0,0,0,.4); }
   /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
   .axis-time{ position:absolute; z-index:6; pointer-events:none; display:none;
     transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
@@ -2681,6 +2676,12 @@ klinecharts.registerOverlay({
 const AXIS_FONT = "'Inter Tight',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
 const chTextStyle = bg => ({ backgroundColor:bg, color:'#fff', size:10, family:AXIS_FONT, weight:'bold',
   borderRadius:4, paddingLeft:6, paddingRight:6, paddingTop:3, paddingBottom:3 });
+// buletan handle titik overlay (drag/draw): isi putih bersih + border tipis gelap. Dipakai di dark/light
+// styles & utk RESTORE setelah menggambar — selama menggambar handle di-transparankan (HIDDEN_POINT) supaya
+// tak ada buletan di kursor sebelum klik (lihat createDraw/onDrawEnd).
+const OVERLAY_POINT = { color:'#ffffff', borderColor:'rgba(0,0,0,0.35)', borderSize:1.5, radius:3.5,
+  activeColor:'#ffffff', activeBorderColor:'rgba(0,0,0,0.5)', activeBorderSize:2, activeRadius:5 };
+const HIDDEN_POINT = { color:'transparent', borderColor:'transparent' };
 const darkStyles = {
   grid:{ horizontal:{color:'#1f1f24'}, vertical:{color:'#1f1f24'} },
   candle:{
@@ -2698,9 +2699,7 @@ const darkStyles = {
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
   overlay:{ text:{color:'#fff', backgroundColor:'rgba(27,27,31,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag/draw (handle bawaan): isi putih bersih + border tipis gelap (definisi tepi di atas candle apa pun); membesar & border menebal saat hover/drag (ala TradingView/Figma)
-    point:{ color:'#ffffff', borderColor:'rgba(0,0,0,0.35)', borderSize:1.5, radius:3.5,
-            activeColor:'#ffffff', activeBorderColor:'rgba(0,0,0,0.5)', activeBorderSize:2, activeRadius:5 } },
+    point: OVERLAY_POINT },
 };
 const lightStyles = {
   grid:{ horizontal:{color:'#eceff3'}, vertical:{color:'#eceff3'} },
@@ -2719,9 +2718,7 @@ const lightStyles = {
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag/draw (handle bawaan): isi putih bersih + border tipis gelap (definisi tepi di atas candle apa pun); membesar & border menebal saat hover/drag (ala TradingView/Figma)
-    point:{ color:'#ffffff', borderColor:'rgba(0,0,0,0.35)', borderSize:1.5, radius:3.5,
-            activeColor:'#ffffff', activeBorderColor:'rgba(0,0,0,0.5)', activeBorderSize:2, activeRadius:5 } },
+    point: OVERLAY_POINT },
 };
 // ===================== QT Fractal (Modul C) — util waktu NY (DST-aware) =====================
 // Anchor Quarterly Theory selalu America/New_York, independen dari timezone tampilan user.
@@ -4410,6 +4407,8 @@ function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     applyXDateFlag(o);   // buang tanggal sumbu X utk draw non-waktu (built-in klinecharts set flag ini true)
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
+    // kembalikan handle titik yg disembunyikan saat menggambar → buletan hover/drag normal lagi (muncul saat objek di-hover/pilih)
+    try{ if(o) chart.overrideOverlay({id:o.id, styles:{point:OVERLAY_POINT}}); }catch(_){}
     // Tempelkan klik presisi ke titik final by-index (klik & titik urut sama), lalu JARING
     // PENGAMAN: klinecharts kadang menaruh titik di area future TANPA anchor (timestamp &
     // dataIndex null) → tergambar ke tepi kiri chart (x=0) = "kelempar". Titik anchorless
@@ -4494,7 +4493,11 @@ function createDraw(name,btn,extra,instant){
         inProgressId=null; disarmIcons();
         try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // spt jalur restore
         selectedId=id; scheduleSaveDraws();                          // pilih + persist + catat history utk undo
-      } else { inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed'); }
+      } else { inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed');
+        // sembunyikan buletan handle titik SELAMA menggambar (titik-bergerak di kursor + titik yg sudah
+        // ditaruh) — dikembalikan di onDrawEnd. Kursor jadi bersih (crosshair saja) sesuai preferensi.
+        try{ chart.overrideOverlay({id, styles:{point:HIDDEN_POINT}}); }catch(_){}
+      }
     }
     else setStatus('Failed to activate '+name,true);
   }catch(e){ setStatus('Drawing error: '+e.message,true); }
@@ -4623,7 +4626,7 @@ let lastPtr={x:innerWidth/2,y:innerHeight/2};
 const magDot=document.createElement('div'); magDot.className='mag-dot'; $('#chart').appendChild(magDot);
 function hideMagDot(){ magDot.style.display='none'; }
 function updateMagDot(ev){
-  if(!inProgressId){ hideMagDot(); return; }   // hanya saat sedang menggambar (magnet on/off sama saja)
+  if(!inProgressId || cursorMode!=='dot'){ hideMagDot(); return; }   // reticle titik HANYA di cursor 'dot' (cross → cuma garis; arrow → bersih). Magnet tetap men-snap posisinya.
   const r=$('#chart').getBoundingClientRect();
   const px=ev.clientX-r.left, py=ev.clientY-r.top;
   const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
