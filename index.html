@@ -4323,7 +4323,7 @@ function spRenderStats(){
   // equity curve dari balanceAfter (kronologis)
   const cv=$('#equityCurve'); if(cv){ const ctx=cv.getContext('2d'), dpr=window.devicePixelRatio||1, w=cv.clientWidth||300, h=cv.clientHeight||96;
     cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
-    if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px ui-monospace'; ctx.fillText('Belum ada trade selesai.',8,h/2); }
+    if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px '+getCSS('--font-num'); ctx.fillText('Belum ada trade selesai.',8,h/2); }
     else { const start=recs[0].balanceAfter-(recs[0].pnlCcy||0), pts=[start,...recs.map(r=>r.balanceAfter)];
       const mn=Math.min(...pts), mx=Math.max(...pts), rng=(mx-mn)||1, X=i=>2+i/(pts.length-1||1)*(w-4), Y=v=>h-5-(v-mn)/rng*(h-10);
       ctx.strokeStyle=getCSS('--border'); ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(0,Y(start)); ctx.lineTo(w,Y(start)); ctx.stroke(); ctx.setLineDash([]);
@@ -5117,7 +5117,7 @@ function drawEquity(){
   cv.width=w*dpr; cv.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
   const recs=journal.filter(t=>t.balanceAfter!=null);
-  if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px ui-monospace';
+  if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px '+getCSS('--font-num');
     ctx.fillText('Belum ada trade selesai (mode $).',8,h/2); return; }
   const start=recs[0].balanceAfter-(recs[0].pnlCcy||0);
   const pts=[start,...recs.map(r=>r.balanceAfter)];
