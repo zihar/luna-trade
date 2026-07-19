@@ -1,0 +1,66 @@
+  /* panel bawah: Trade Manual & Statistik (collapsible) */
+  .bottompanel{background:var(--panel);border-top:1px solid var(--border);max-height:38vh;overflow-y:auto}
+  .bottompanel.collapsed .bottomcontent{display:none}
+  .bottomhead{display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid var(--border)}
+  .bottomhead .rlabel{font-size:11px;color:var(--muted)}
+  .bottomcontent{display:block;padding:0}
+  /* tabs Positions/Pending/Closed/Statistik (ala TradeLocker) */
+  .tp-tabs{display:flex;gap:2px}
+  .tp-tabs button{background:transparent;border:0;border-radius:0;color:var(--muted);font-size:12px;
+    padding:6px 12px;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px}
+  .tp-tabs button:hover{color:var(--txt)}
+  .tp-tabs button.on{color:var(--txt);border-bottom-color:var(--accent)}
+  .tp-tabs button b{font-size:10px;color:var(--muted);background:var(--inset);border-radius:9px;padding:0 6px;font-weight:600}
+  .tp-tabs button.on b{color:var(--accent)}
+  .tp-pane{display:block}
+  .tp-pane[hidden]{display:none}
+  #paneStats{padding:11px 12px}
+  .tp-tablewrap{overflow:auto;max-height:100%}
+  .tp-table{width:100%;border-collapse:collapse;font-size:12px}
+  .tp-table thead th{position:sticky;top:0;background:var(--panel);z-index:1;
+    font-size:11px;font-weight:600;color:var(--hdr);letter-spacing:.44px;text-transform:capitalize;
+    text-align:left;padding:9px 10px;white-space:nowrap}
+  .tp-table tbody td{padding:9px 10px;color:var(--txt);white-space:nowrap;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line)}
+  .tp-table tbody tr:last-child td{border-bottom:none}
+  .tp-table tbody tr:hover{background:var(--btn-hover)}
+  .tp-table .t-side-buy{color:var(--green);font-weight:600}
+  .tp-table .t-side-sell{color:var(--red);font-weight:600}
+  .tp-table .t-side-pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.03em;line-height:1.5}
+  .tp-table .t-side-buy .t-side-pill{color:var(--green);background:var(--tint-buy)}
+  .tp-table .t-side-sell .t-side-pill{color:var(--red);background:var(--tint-sell)}
+  .tp-table .t-pos{color:var(--green)} .tp-table .t-neg{color:var(--red)}
+  .tp-table .t-act button{font-size:11px;padding:3px 9px;margin-right:5px}
+  .tp-empty{padding:30px 12px;color:var(--muted);font-size:12px;text-align:center}
+  .tp-empty-ic,.tp-empty-t,.tp-empty-h{text-align:center}
+  .tp-empty-ic{font-size:20px;line-height:1;color:var(--luna-glow);opacity:.6;margin-bottom:9px;
+    filter:drop-shadow(0 0 7px rgba(174,185,232,.35))}
+  .tp-empty-t{color:var(--txt);font-weight:600;font-size:12.5px;opacity:.82}
+  .tp-empty-h{margin-top:4px;color:var(--muted);font-size:11px;max-width:340px;margin-left:auto;margin-right:auto}
+  .bp-section{display:flex;flex-direction:column;gap:8px;min-width:0;padding:11px 12px}
+  .bp-title{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .bp-trade{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+  .fld{display:flex;flex-direction:column;gap:3px}
+  .fld label{font-size:10px;color:var(--muted)}
+  .fld input{width:92px}
+  .bp-trade button.buy,.bp-trade button.sell{padding:7px 14px}
+  .bp-stats .stats{display:grid;grid-template-columns:repeat(4,minmax(82px,1fr));gap:7px}
+  .bp-journal{flex:1;min-width:300px}
+  .bp-journal .journal-wrap{max-height:26vh}
+  /* context menu klik-kanan di chart */
+  .ctxmenu{position:fixed;z-index:1000;background:var(--panel);border:1px solid var(--border);
+           border-radius:7px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.45);min-width:160px}
+  .ctxitem{padding:7px 12px;border-radius:5px;cursor:pointer;font-size:13px;color:var(--txt);
+           display:flex;align-items:center;gap:8px}
+  .ctxitem:hover{background:var(--btn-hover)}
+  .ctxitem.disabled{color:var(--muted);opacity:.45;cursor:default;pointer-events:none}
+  .ctxsep{height:1px;background:var(--border);margin:4px 6px}
+  /* editor teks inline di chart */
+  /* WYSIWYG: chrome minimal — transparan, tanpa kotak; hanya ring aksen tipis + caret.
+     font/ukuran/warna/align di-set inline oleh openOverlayTextEditor agar = teks canvas. */
+  .text-editor,.text-editor:focus,.text-editor:focus-visible{position:fixed;z-index:1100;background:transparent;color:var(--txt);
+    border:0;padding:0;margin:0;caret-color:var(--accent);outline:none;border-radius:2px;
+    box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+    min-width:24px;min-height:16px;resize:none;overflow:hidden;white-space:pre;
+    text-shadow:0 1px 2px rgba(0,0,0,.45)}
+  .text-editor::placeholder{ color:var(--muted); opacity:1; text-shadow:none; }
+

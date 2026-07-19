@@ -1,0 +1,98 @@
+  /* ===== Bar Replay: floating pill (ala TradingView) + watermark crescent Luna ===== */
+  /* Pill playback melayang di tengah-bawah panel chart utama; hanya tampil saat replay aktif. */
+  .replaypill{
+    position:absolute; left:50%; bottom:52px; z-index:40;
+    transform:translateX(-50%) translateY(10px);
+    display:none; align-items:center; gap:1px;
+    padding:5px; border-radius:13px;
+    background:var(--panel); border:1px solid var(--border);
+    box-shadow:0 12px 36px rgba(0,0,0,.5), inset 0 0 0 1px rgba(174,185,232,.05);
+    opacity:0; pointer-events:none;
+    transition:opacity .22s ease, transform .26s cubic-bezier(.2,.75,.3,1);
+  }
+  .replaypill.on{ display:inline-flex; opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
+  .replaypill button{
+    height:32px; min-width:32px; padding:0 8px; border:0; border-radius:9px;
+    background:transparent; color:var(--txt); cursor:pointer; line-height:0;
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    transition:background .12s ease, color .12s ease, transform .08s ease;
+  }
+  .replaypill button:hover{ background:var(--btn-hover); }
+  .replaypill button:active{ transform:scale(.94); }
+  .replaypill button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .replaypill svg{ width:17px; height:17px; display:block; }
+  /* "Select bar" — pakai identitas Luna (--luna-glow), bukan biru fungsional */
+  .rp-select{ padding:0 11px 0 9px !important; font-family:var(--font-display);
+              font-weight:600; font-size:12.5px; letter-spacing:.01em; color:var(--luna-glow) !important; line-height:1 !important; }
+  .rp-select svg{ stroke:currentColor; }
+  .rp-select:hover{ background:rgba(174,185,232,.12) !important; }
+  .rp-select.armed{ background:rgba(174,185,232,.20) !important;
+                    box-shadow:inset 0 0 0 1px rgba(174,185,232,.5); }
+  /* Play = satu aksen dominan (Chanel: boldness di satu tempat) */
+  .rp-play{ background:var(--accent) !important; color:#fff !important; min-width:38px !important; }
+  .rp-play:hover{ background:var(--accent) !important; filter:brightness(1.1); }
+  .rp-play svg{ fill:currentColor; }
+  .rp-step svg{ fill:currentColor; }
+  .rp-speed{ font-family:var(--font-num); font-weight:700; font-size:12px; color:var(--muted); min-width:36px !important; line-height:1 !important; }
+  .rp-speed:hover{ color:var(--txt); }
+  /* menu pilih speed (ala TradingView) — muncul di atas pill saat klik #rpSpeed */
+  .rp-speed-menu{ display:none; position:fixed; z-index:120; min-width:236px; padding:6px;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .rp-speed-menu.open{ display:block; }
+  .rp-speed-menu .rpm-hd{ color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:4px 8px 6px; }
+  .rp-speed-menu .rpm-row{ display:flex; align-items:center; gap:14px; padding:7px 8px; border-radius:6px; cursor:pointer; }
+  .rp-speed-menu .rpm-row:hover{ background:var(--btn-hover); }
+  .rp-speed-menu .rpm-row.on{ background:var(--btn); }
+  .rp-speed-menu .rpm-x{ font-family:var(--font-num); font-weight:700; font-size:13px; min-width:40px; color:var(--txt); }
+  .rp-speed-menu .rpm-d{ font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .rp-tf{ align-self:center; font-family:var(--font-num); font-weight:700; font-size:11px;
+          letter-spacing:.04em; color:var(--muted); padding:0 9px; white-space:nowrap; }
+  .rp-div{ width:1px; height:20px; background:var(--border); margin:0 4px; flex:0 0 auto; }
+  .rp-close{ color:var(--muted); }
+  .rp-close:hover{ color:var(--red) !important; background:rgba(255,111,111,.13) !important; }
+
+  /* Watermark samar: user aware sedang di mode replay. Non-interaktif, di belakang candle-interaksi. */
+  .replay-watermark{
+    position:absolute; inset:0; z-index:3;
+    display:none; align-items:center; justify-content:center; gap:min(3.2vw,42px);
+    pointer-events:none; user-select:none;
+  }
+  .cpanel-pri.replay-on .replay-watermark{ display:flex; }
+  .replay-watermark .wm-moon{
+    width:clamp(56px,8.5vw,116px); height:auto; color:var(--luna-glow);
+    opacity:.12; filter:drop-shadow(0 0 26px rgba(174,185,232,.28));
+  }
+  .replay-watermark .wm-text{
+    font-family:var(--font-display); font-weight:600; letter-spacing:.05em;
+    font-size:clamp(40px,7.4vw,96px); color:var(--luna-glow); opacity:.09; line-height:1;
+  }
+  @media (prefers-reduced-motion:reduce){
+    .replaypill{ transition:none; }
+    .replaypill button{ transition:none; }
+    .replaypill button:active{ transform:none; }
+  }
+
+  /* ===== Pick-mode "cut cursor": garis pemisah + sisi kanan (masa depan) dipudarkan ===== */
+  /* Aktif saat memilih bar mulai replay — tak mengubah data, murni lapisan visual. --pcx = x garis. */
+  .pick-cut{ position:absolute; inset:0; z-index:35; pointer-events:none;
+             opacity:0; transition:opacity .15s ease; }
+  .cpanel-pri.picking .pick-cut{ opacity:1; }
+  .pick-cut .pc-veil{ position:absolute; top:0; bottom:0; left:var(--pcx,100%); right:0;
+                      background:rgba(6,7,10,.55); }
+  body.light .pick-cut .pc-veil{ background:rgba(255,255,255,.6); }
+  .pick-cut .pc-line{ position:absolute; top:0; bottom:0; left:var(--pcx,100%);
+                      width:2px; margin-left:-1px; background:var(--accent);
+                      box-shadow:0 0 10px rgba(74,113,255,.65); }
+  .pick-cut .pc-scissors{ position:absolute; left:50%; top:54%; transform:translate(-50%,-50%);
+                          width:26px; height:26px; border-radius:50%; background:var(--panel);
+                          border:1px solid var(--accent); color:var(--accent);
+                          display:flex; align-items:center; justify-content:center;
+                          box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  .pick-cut .pc-scissors svg{ width:15px; height:15px; }
+  .pick-cut .pc-date{ position:absolute; bottom:24px; left:var(--pcx,100%); transform:translateX(-50%);
+                      background:var(--accent); color:#fff; font-family:var(--font-num); font-weight:700;
+                      font-size:11px; letter-spacing:.02em; padding:3px 9px; border-radius:6px;
+                      white-space:nowrap; box-shadow:0 2px 10px rgba(0,0,0,.4); }
+  @media (prefers-reduced-motion:reduce){ .pick-cut{ transition:none; } }
+
