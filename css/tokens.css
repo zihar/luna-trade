@@ -1,0 +1,37 @@
+  @font-face{font-family:'Inter Tight';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/inter-tight-400.woff2) format('woff2');}
+  @font-face{font-family:'Inter Tight';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/inter-tight-500.woff2) format('woff2');}
+  @font-face{font-family:'Inter Tight';font-style:normal;font-weight:600;font-display:swap;src:url(/assets/fonts/inter-tight-600.woff2) format('woff2');}
+  @font-face{font-family:'Inter Tight';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/inter-tight-700.woff2) format('woff2');}
+  @font-face{font-family:'Sora';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/sora-500.woff2) format('woff2');}
+  @font-face{font-family:'Sora';font-style:normal;font-weight:600;font-display:swap;src:url(/assets/fonts/sora-600.woff2) format('woff2');}
+  @font-face{font-family:'Sora';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/sora-700.woff2) format('woff2');}
+  @font-face{font-family:'Chivo Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/chivo-mono-400.woff2) format('woff2');}
+  @font-face{font-family:'Chivo Mono';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/chivo-mono-500.woff2) format('woff2');}
+  @font-face{font-family:'Chivo Mono';font-style:normal;font-weight:600;font-display:swap;src:url(/assets/fonts/chivo-mono-600.woff2) format('woff2');}
+  @font-face{font-family:'Chivo Mono';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/chivo-mono-700.woff2) format('woff2');}
+  :root{
+    --bg:#0e0f14; --panel:#1b1b1f; --panel-2:#000; --border:#434346; --txt:#fff; --muted:#89898b;
+    --hdr:#a3a3aa; --luna-glow:#aeb9e8;   /* hdr: label tabel sedikit lebih terang · luna-glow: aksen brand bulan */
+    --green:#54c88c; --red:#ff6f6f; --accent:#4a71ff;
+    --mag:#4a71ff; --mag-glow:rgba(74,113,255,.5);  /* reticle magnet: biru accent (warna tetap), hanya bentuk yg dirampingkan */
+    --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#1b2f2a; --tint-sell:#3d1a1e;
+    --inset:#0e0e11; --btn:#1b1b1f; --btn-hover:#26262b; --btn-border-hover:#3a3a40; --line:#26262b;
+  }
+  body.light{
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fff; --border:#d6dbe2; --txt:#1e242e; --muted:#697280;
+    --hdr:#5a6273; --luna-glow:#5b6cc4;
+    --green:#1a9d6e; --red:#d8504e; --accent:#3a5fe0;
+    --mag:#3a5fe0; --mag-glow:rgba(58,95,224,.4);  /* biru accent (warna tetap) */
+    --buy:#54c88c; --sell:#ff6f6f; --tint-buy:#e3f3ec; --tint-sell:#fbe9e9;
+    --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:12px/1.45 var(--font-sans);
+       background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;
+           background:var(--panel);border-bottom:1px solid var(--border)}
+  input,select{background:var(--inset);border:1px solid var(--border);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:13px}
+  button{background:var(--btn);border:1px solid var(--border);color:var(--txt);border-radius:6px;
+         padding:6px 11px;cursor:pointer;font-size:13px}
+  button:hover{border-color:var(--btn-border-hover);background:var(--btn-hover)}
+  button:disabled{opacity:.4;cursor:not-allowed}

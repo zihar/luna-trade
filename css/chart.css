@@ -1,0 +1,84 @@
+  /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
+  .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
+  .ind-leg{ position:absolute; left:12px; pointer-events:none;
+    font:600 11.5px/1.25 var(--font-sans); white-space:nowrap; }
+  .ind-leg-head{ display:inline-flex; align-items:center; gap:6px; pointer-events:auto;
+    padding:1px 4px; margin-left:-4px; border-radius:6px; transition:background .12s ease; }
+  .ind-leg-head:hover{ background:color-mix(in srgb, var(--panel) 78%, transparent); }
+  .ind-leg-name{ color:var(--txt); }
+  .ind-leg-params{ color:var(--muted); font-weight:500; }
+  .ind-leg.hidden .ind-leg-name, .ind-leg.hidden .ind-leg-params{ opacity:.45; }
+  .ind-leg-vals{ display:inline-flex; gap:8px; color:var(--muted); font-weight:500; }
+  .ind-leg-btns{ display:inline-flex; align-items:center; gap:1px; }
+  .ind-leg-btn{ display:none; align-items:center; justify-content:center; background:transparent;
+    border:0; color:var(--muted); cursor:pointer; line-height:1; padding:2px; border-radius:4px; }
+  .ind-leg-head:hover .ind-leg-btn{ display:inline-flex; }
+  .ind-leg.hidden .leg-eye{ display:inline-flex; }   /* mata-tertutup tetap tampak sbg penanda saat hidden */
+  .ind-leg-btn svg{ width:13px; height:13px; display:block; }
+  .ind-leg-btn:hover{ color:var(--txt); background:var(--btn-hover); }
+  .ind-leg-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .zoomhint{font-size:11px;color:var(--muted);margin-left:auto}
+  #chart{flex:1;min-height:0;position:relative}
+  /* watermark identitas Luna — pojok kanan-atas, sangat samar, tak ganggu candle */
+  .chart-wm{ position:absolute; top:8px; right:13px; z-index:2; pointer-events:none; user-select:none;
+    display:flex; align-items:center; gap:6px; opacity:.06; }
+  .chart-wm .wm-glyph{ width:15px; height:15px; display:block; color:var(--luna-glow); }
+  .chart-wm .wm-t{ font:600 12px/1 var(--font-num); letter-spacing:.09em; color:var(--txt); white-space:nowrap; }
+  body.light .chart-wm{ opacity:.1; }
+  /* legend kiri-atas (ala TradingView): baris info instrumen (klik→picker). OHLC = legend candle native. */
+  .chart-legend{ position:absolute; top:6px; left:12px; z-index:6; pointer-events:none; user-select:none; }
+  .cl-inst{ pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; gap:7px;
+    margin-left:-5px; padding:2px 6px 2px 5px; border:0; background:transparent; border-radius:7px;
+    color:var(--txt); font-family:var(--font-sans); line-height:1; transition:background .12s ease; }
+  .cl-inst:hover{ background:var(--btn-hover); }
+  .cl-inst:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .cl-inst .cl-name{ font-size:13px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; }
+  .cl-inst .cl-tf{ font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap;
+    padding-left:8px; position:relative; }
+  .cl-inst .cl-tf::before{ content:'·'; position:absolute; left:1px; }
+  .cl-inst .cl-chev{ width:12px; height:12px; color:var(--muted); flex:0 0 auto; opacity:0; transition:opacity .12s ease; }
+  .cl-inst:hover .cl-chev, .cl-inst:focus-visible .cl-chev{ opacity:1; }
+  @media (prefers-reduced-motion: reduce){ .cl-inst, .cl-inst .cl-chev{ transition:none; } }
+  /* countdown candle berikutnya — pill di sumbu kanan, sejajar garis harga terakhir */
+  .price-timer{ position:absolute; right:1px; z-index:5; pointer-events:none; display:none;
+    background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
+    padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
+  /* reticle titik cursor 'dot' (juga penanda snap Magnet): dot kecil solid, minimalis */
+  .mag-dot{ position:absolute; z-index:7; pointer-events:none; display:none;
+    width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
+    background:var(--mag); box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+  /* label waktu di sumbu-X saat hover area future (candle belum terbentuk) */
+  .axis-time{ position:absolute; z-index:6; pointer-events:none; display:none;
+    transform:translateX(-50%); background:var(--accent); color:#fff; font:600 10px/1 var(--mono);
+    white-space:nowrap; padding:3px 6px; border-radius:4px; }
+  .sidebar{width:300px;background:var(--panel);border-left:1px solid var(--border);
+           display:flex;flex-direction:column;overflow-y:auto}
+  .panel{padding:12px;border-bottom:1px solid var(--border)}
+  .panel h3{margin:0 0 9px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .row{display:flex;gap:6px;align-items:center;margin-bottom:7px}
+  .row label{width:74px;color:var(--muted);font-size:12px}
+  .row input,.row select{flex:1;width:100%}
+  .btns{display:flex;gap:5px}
+  .btns button{flex:1;padding:8px 0}
+  .clock{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+  .price{font-variant-numeric:tabular-nums}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .stat{background:var(--inset);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
+  .stat .k{font-size:10px;color:var(--muted);text-transform:uppercase}
+  .stat .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th,td{text-align:right;padding:4px 5px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:500;position:sticky;top:0;background:var(--panel)}
+  td:first-child,th:first-child{text-align:left}
+  .journal-wrap{max-height:200px;overflow-y:auto}
+  .kbd{display:inline-block;background:var(--inset);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted)}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .chartrow{flex:1;display:flex;min-height:0}
+  .drawtools{width:50px;background:var(--panel);border-right:1px solid var(--border);
+             display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0}
+  .drawtools .spacer{flex:1}
+  .dtool{width:32px;height:32px;display:flex;align-items:center;justify-content:center;padding:0;color:var(--muted)}
+  .dtool:hover{color:var(--txt)}
+  .dtool.armed{background:rgba(74,113,255,.16);border-color:transparent;color:var(--accent);border-radius:9px}
+  .dtool svg{width:18px;height:18px}

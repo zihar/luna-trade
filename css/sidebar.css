@@ -1,0 +1,121 @@
+  /* sizing readout (Fase 1a) */
+  .sizing{ flex-basis:100%; display:flex; gap:18px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:2px; }
+  .sizing b{ font-family:var(--mono); color:var(--accent); }
+  .sizing .neg{ color:var(--red); } .sizing .pos{ color:var(--green); }
+
+  /* bar metrik akun (Fase 1b) */
+  .acctbar{ display:flex; gap:16px; align-items:center; }
+  .acctbar .m{ display:flex; flex-direction:column; line-height:1.15; }
+  .acctbar .m i{ color:var(--muted); font-style:normal; font-size:9px; text-transform:uppercase; letter-spacing:.05em; }
+  .acctbar .m b{ font-family:var(--mono); font-size:13px; }
+  .acctbar .pos{ color:var(--green); } .acctbar .neg{ color:var(--red); }
+  .acctbar #resetBtn,.acctbar #closeAllBtn{ font-size:11px; padding:5px 11px; }
+  .acctbar #resetBtn{ color:var(--muted); }
+
+  /* order lanjutan (Fase 1c) */
+  .adv-row{ flex-basis:100%; display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-top:2px; }
+  .seg-mini{ display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; height:30px; }
+  .seg-mini button{ border:0; border-radius:0; background:var(--btn); color:var(--muted); padding:0 11px; font-size:11px; font-weight:600; }
+  .seg-mini button.on{ background:var(--accent); color:#fff; }
+  .chk{ display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); height:30px; }
+  .chk input{ width:auto; }
+
+  /* equity curve (Fase 1b) */
+  .equitywrap{ margin-top:8px; }
+  .equitywrap .t{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;
+                  margin-bottom:3px; display:flex; align-items:center; gap:7px; }
+  .equitywrap .t::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
+  #equityCurve{ width:100%; height:96px; display:block; background:var(--inset);
+                border:1px solid var(--border); border-radius:6px; }
+
+  /* watchlist (Markets) — gaya tabel TradeLocker */
+  .watchlist{ width:400px; background:var(--panel); border-left:1px solid var(--border);
+              display:flex; flex-direction:column; overflow:hidden; min-height:0; flex:none; }
+  .watchlist.hidden{ display:none; }
+  /* daftar instrumen = bagian yg scroll; order panel docked tetap kebagian ruang di bawah */
+  #wlRows{ flex:1 1 0; min-height:64px; overflow-y:auto; }
+  .wl-head{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+            padding:9px 11px 6px; display:flex; align-items:center; gap:7px; }
+  .wl-head::before{ content:""; width:3px; height:11px; border-radius:2px; background:var(--accent); }
+  .nmk-toggle{ display:inline-flex; align-items:center; gap:4px; font-size:10px;
+    text-transform:none; letter-spacing:0; color:var(--muted); cursor:pointer; margin-right:8px; }
+  .nmk-toggle input{ accent-color:var(--luna-glow); cursor:pointer; margin:0; }
+  .wl-live{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--muted); opacity:.45; }
+  .wl-live.on{ background:var(--green); opacity:1; box-shadow:0 0 5px var(--green); }
+  .wl-row{ display:grid; grid-template-columns:minmax(56px,1fr) 62px 62px 40px 58px 58px; gap:6px; align-items:center;
+           padding:0 12px; height:38px; cursor:pointer; font-size:12px; overflow:hidden;
+           border-left:2px solid transparent; }
+  .wl-row:hover{ background:var(--btn-hover); }
+  .wl-row.on{ background:rgba(74,113,255,.16); border-left-color:var(--accent); }
+  .wl-row > span{ font-family:var(--mono); text-align:right; font-variant-numeric:tabular-nums;
+                  white-space:nowrap; overflow:hidden; text-overflow:clip; }
+  .wl-hdr{ color:var(--hdr); font-size:11px; font-weight:600; letter-spacing:.44px; text-transform:capitalize;
+           cursor:default; height:auto; padding:10px 12px 8px; border-left-color:transparent;
+           position:sticky; top:0; background:var(--panel); z-index:1; }
+  .wl-hdr:hover{ background:var(--panel); }
+  .wl-hdr > span{ font-family:inherit; }
+  .wl-sym{ font-weight:600; text-align:left !important; font-family:inherit !important; color:var(--txt); padding-left:15px; }
+  .wl-bid.up,.wl-ask.up{ color:var(--green); }
+  .wl-bid.down,.wl-ask.down{ color:var(--red); }
+  .wl-num{ color:var(--muted); }
+  .wl-spr{ text-align:right; font-size:11px; color:var(--muted); }
+  .wl-chg{ font-family:var(--mono); font-size:10px; width:54px; text-align:right; color:var(--muted); }
+  .wl-chg.up{ color:var(--green); } .wl-chg.down{ color:var(--red); }
+  .wl-alert{ margin-top:4px; border-top:1px solid var(--border); padding-bottom:8px; }
+  #alertsPane .al-add{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+                        border-radius:6px;background:var(--btn);border:1px solid var(--border);
+                        color:var(--txt);font-size:16px;line-height:1;cursor:pointer }
+  #alertsPane .al-add:hover{ background:var(--btn-hover) }
+  .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
+  .al-item:hover{ background:var(--btn-hover); }
+  .al-main{ font-weight:600; color:var(--txt); font-size:13px; }
+  .al-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .al-st{ color:var(--green); } .al-st.trig{ color:var(--muted); }
+  .al-x{ position:absolute; right:6px; top:8px; background:none; border:0; color:var(--muted); cursor:pointer; }
+  .al-x:hover{ color:var(--red); }
+  .al-empty{ padding:8px 11px; font-size:12px; color:var(--muted); }
+
+  /* Markets: seksi grup (accordion) + bintang favourite + show-all */
+  /* bintang absolut di gutter kiri → tak memakan lebar kolom simbol (panel padat) */
+  .wl-row{ position:relative; }
+  .wl-star{ position:absolute; left:6px; top:0; bottom:0; margin:auto; width:14px; height:16px; padding:0; border:0;
+            display:flex; align-items:center; justify-content:center;
+            background:none; cursor:pointer; font-size:12px; line-height:1; color:var(--muted);
+            opacity:0; transform:scale(.8); transform-origin:center;
+            transition:opacity .14s ease, color .14s ease, transform .14s cubic-bezier(.34,1.56,.64,1); z-index:2; }
+  .wl-row:hover .wl-star{ opacity:.5; transform:scale(1); }
+  .wl-star:hover{ opacity:1 !important; color:var(--txt); transform:scale(1.18); }
+  .wl-star.fav{ opacity:1; transform:scale(1); color:var(--luna-glow);
+                text-shadow:0 0 7px color-mix(in srgb, var(--luna-glow) 60%, transparent); }
+  .wl-star.fav:hover{ transform:scale(1.18); }
+  @media (prefers-reduced-motion: reduce){
+    .wl-star{ transition:opacity .1s linear, color .1s linear; transform:none; }
+    .wl-row:hover .wl-star, .wl-star:hover, .wl-star.fav, .wl-star.fav:hover{ transform:none; }
+  }
+  .wl-grp{ display:flex; align-items:center; gap:7px; padding:9px 12px 6px; cursor:pointer;
+           font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.07em;
+           color:var(--muted); user-select:none; }
+  .wl-grp:hover{ color:var(--txt); }
+  .wl-grp.fav{ color:var(--luna-glow); }
+  .wl-chev{ font-size:9px; width:10px; text-align:center; transition:transform .12s ease; }
+  .wl-grp.collapsed .wl-chev{ transform:rotate(-90deg); }
+  .wl-glbl{ flex:1; }
+  .wl-grp.fav .wl-glbl::before{ content:"\2605 "; }
+  .wl-grp.recent .wl-glbl::before{ content:"\1F550 "; }
+  .wl-cnt{ font-variant-numeric:tabular-nums; color:var(--muted); background:var(--inset);
+           border:1px solid var(--border); border-radius:999px; padding:1px 7px; font-size:9.5px; }
+  .wl-showall{ margin-left:2px; border:0; background:none; cursor:pointer; color:var(--accent);
+               font-family:var(--font-sans); font-size:10px; letter-spacing:0; text-transform:none; padding:2px 4px; }
+  .wl-showall:hover{ text-decoration:underline; }
+  .wl-grp-empty{ padding:4px 14px 10px; font-size:11px; color:var(--muted); }
+  .wl-sep{ height:1px; margin:5px 12px; background:var(--border); }
+  /* ipick: bintang favourite (absolut agar tak merusak grid 3-kolom) */
+  .ipick-row{ padding-right:28px; }
+  .ipk-star{ position:absolute; right:6px; top:50%; transform:translateY(-50%); width:20px; height:20px; padding:0;
+             border:0; background:none; cursor:pointer; font-size:13px; line-height:1; color:var(--muted);
+             opacity:0; transition:opacity .1s ease,color .1s ease; }
+  .ipick-row:hover .ipk-star{ opacity:.5; }
+  .ipk-star:hover{ opacity:1; color:var(--txt); }
+  .ipk-star.fav{ opacity:1; color:var(--luna-glow); }
+  @media (prefers-reduced-motion:reduce){ .wl-chev{ transition:none; } }
+

@@ -1,0 +1,57 @@
+  /* rail berkategori + flyout ala TradingView */
+  .dt-cat{position:relative}
+  .dt-cat.armed{background:rgba(74,113,255,.16);color:var(--accent);border-radius:9px}
+  #dtFlyout{position:fixed;z-index:1100;display:none;flex-direction:column;min-width:180px;padding:4px;
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
+  #dtFlyout.show{display:flex}
+  .dt-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;cursor:pointer;color:var(--txt);font-size:13px}
+  .dt-item:hover{background:rgba(74,113,255,.12)}
+  .dt-item svg{width:17px;height:17px;flex:0 0 auto;color:var(--muted)}
+  .dt-item.active,.dt-item.active svg{color:var(--accent)}
+  .dt-item .dt-sc{margin-left:auto;padding-left:18px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .dt-item.active .dt-sc{color:var(--accent)}
+  .dt-item .dt-nm{flex:1;min-width:0}                 /* nama tool mengisi ruang → hotkey+bintang rata kanan */
+  /* ikon rail dibungkus agar caret bisa jadi sibling tanpa tertimpa saat innerHTML ikon diganti */
+  .dt-ico{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+  /* tombol tetap FULL 32px; caret = tab tipis MENEMPEL di kanan tombol (ala TradingView).
+     ::before = slot bayangan kiri selebar caret → ikon tetap center di rail & sejajar tombol lain. */
+  .dt-catrow{display:flex;align-items:center;width:100%;height:32px}
+  .dt-catrow::before{content:"";flex:0 0 9px}
+  .dt-catrow .dt-cat{flex:0 0 32px;width:32px;height:32px}
+  .dt-caret{flex:0 0 9px;height:32px;display:flex;align-items:center;justify-content:center;
+            font-size:8px;line-height:1;color:var(--muted);opacity:0;transition:opacity .12s;cursor:pointer;
+            border-left:1px solid var(--border);border-radius:0 5px 5px 0}
+  .dt-catrow:hover .dt-caret{opacity:1}
+  .dt-caret:hover{color:var(--txt);background:rgba(255,255,255,.06)}
+  /* header grup + bintang favorite di flyout (ala TradingView) */
+  .dt-fly-title{font-size:11px;letter-spacing:.06em;color:var(--muted);padding:6px 10px 4px;text-transform:uppercase}
+  .dt-fav{margin-left:8px;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;flex:0 0 auto}
+  .dt-fav.on{color:var(--accent)}
+  .dt-fav:hover{color:var(--txt)}
+  /* Favorites drawing bar: pill horizontal melayang di atas chart, bisa digeser via grip */
+  .favbar{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:40;display:none;
+          align-items:center;gap:1px;padding:4px 6px;border-radius:13px;background:var(--panel);
+          border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .favbar.show{display:inline-flex}
+  .favbar-grip{width:14px;height:20px;margin-right:3px;flex:0 0 auto;cursor:grab;color:var(--muted);opacity:.6;
+               background:radial-gradient(currentColor 1px,transparent 1.4px) 0 0/5px 6px}
+  .favbar.dragging{cursor:grabbing}
+  .favbar.dragging .favbar-grip{cursor:grabbing}
+  .favbar-btn{width:32px;height:32px}
+  body.eraser-on #chart{cursor:crosshair}
+  a{color:var(--accent)}
+  .speed{display:flex;gap:6px;align-items:center;margin-top:7px}
+  .speed input{flex:1}
+  .replaybar{display:none;align-items:center;gap:10px;padding:6px 12px;background:var(--panel);border-top:1px solid var(--border)}   /* disembunyikan: auto-load saat buka + shortcut ←/→/Space tetap jalan */
+  .replaybar.collapsed{padding:3px 12px}
+  .replaybar.collapsed .rcontent{display:none}
+  .rcontent{display:flex;align-items:center;gap:10px;flex:1;flex-wrap:nowrap;overflow-x:auto}
+  .replaybar select{height:28px;padding:2px 6px;border-radius:6px;background:var(--btn);border:1px solid var(--border);color:var(--txt);font-size:12px;cursor:pointer}
+  .rsep{width:1px;height:18px;background:var(--border)}
+  .rlabel{color:var(--muted);font-size:11px}
+  .datefield{position:relative;display:inline-flex}
+  .datedisplay{padding:5px 12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .datefield input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
+  .replaybar .clock{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+  .replaybar .price{font-variant-numeric:tabular-nums}
+  .replaybar button{padding:5px 12px}

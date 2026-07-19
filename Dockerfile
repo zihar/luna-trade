@@ -23,6 +23,7 @@ WORKDIR /app
 # Binary + aset statis (FileServer serve dari working dir "/app").
 COPY --from=build /bar-replay /app/bar-replay
 COPY index.html /app/index.html
+COPY css /app/css
 COPY assets /app/assets
 
 # Token & kredensial basic-auth disuntik saat run (-e ...), jangan di-bake ke image.

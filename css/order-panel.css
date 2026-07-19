@@ -1,0 +1,317 @@
+  /* ===================== popup setting objek gambar & chart (TradingView-like) ===================== */
+  /* "Change interval" dialog — konfirmasi ganti TF via keyboard (ala TradingView), tema Luna */
+  .ivl-overlay{ position:fixed; inset:0; z-index:1500; display:none; align-items:center; justify-content:center; }
+  .ivl-overlay.show{ display:flex; }
+  .ivl-card{ background:var(--panel); border:1px solid var(--border); border-radius:16px;
+             box-shadow:var(--shadow); padding:22px 22px 18px; width:300px; }
+  .ivl-head{ display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:16px; }
+  .ivl-title{ font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--txt); letter-spacing:.01em; }
+  .ivl-info{ width:15px; height:15px; color:var(--muted); cursor:help; flex:none; }
+  .ivl-input{ width:100%; box-sizing:border-box; text-align:center; font-family:var(--font-num);
+              font-size:26px; font-weight:400; color:var(--txt); background:var(--inset);
+              border:1.5px solid var(--border); border-radius:11px; padding:12px 10px; outline:none;
+              transition:border-color .12s ease, box-shadow .12s ease; }
+  .ivl-input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
+  .ivl-input.invalid{ border-color:var(--red); }
+  .ivl-input.invalid:focus{ box-shadow:0 0 0 3px rgba(255,111,111,.25); }
+  .ivl-sub{ text-align:center; font-family:var(--font-display); font-size:12px; color:var(--muted);
+            margin-top:10px; min-height:15px; }
+  .ivl-sub.invalid{ color:var(--red); }
+  @media (prefers-reduced-motion: reduce){ .ivl-input{ transition:none; } }
+  .objpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
+           border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:184px; }
+  .objpop.show{ display:block; }
+  /* pegangan drag untuk popup config tanpa header (objpop/fibpop/chartSet/pos-confirm) */
+  .pp-grip{ display:flex; align-items:center; justify-content:center; height:14px; margin:-2px 0 8px;
+            border-bottom:1px solid var(--border); cursor:grab; user-select:none; touch-action:none; }
+  .pp-grip::before{ content:'\2059\2059\2059'; color:var(--muted); font-size:11px; letter-spacing:3px; line-height:1; }
+  .objpop.dragging, .fibpop.dragging{ cursor:grabbing; }
+  .pp-grip:active{ cursor:grabbing; }
+  /* popup Kelola posisi (edit SL/TP dari klik garis) */
+  /* panel Edit Open Position (ala TradeLocker) — reuse grid .tl-* */
+  .pos-edit2{ width:322px; max-width:calc(100vw - 24px); padding:14px; }
+  .pos-edit2 .pe-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; cursor:move; touch-action:none; }
+  .pos-edit2 .pe-head button{ cursor:pointer; }   /* tombol ✕ tetap klik, bukan geser */
+  .pos-edit2 .pe-pen{ color:var(--muted); font-size:13px; }
+  .pos-edit2 .pe-title{ font-size:12.5px; font-weight:700; flex:1; }
+  .pos-edit2 .pe-dir{ font-size:10px; font-weight:700; padding:3px 9px; border-radius:6px; letter-spacing:.05em; }
+  .pos-edit2 .pe-dir.sell{ color:var(--red); background:rgba(255,111,111,.14); }
+  .pos-edit2 .pe-dir.buy{ color:var(--green); background:rgba(84,200,140,.14); }
+  .pos-edit2 .pe-inst{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--inset);
+    border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:12px; margin-bottom:11px; }
+  .pos-edit2 .pe-inst-l{ display:flex; align-items:center; gap:7px; }
+  .pos-edit2 .pe-inst-r{ font-family:var(--mono); color:var(--muted); }
+  .pos-edit2 .pe-inst-r .t-pos{ color:var(--green); } .pos-edit2 .pe-inst-r .t-neg{ color:var(--red); }
+  .pos-edit2 .tl-in{ text-align:left; }
+  /* sel readout (Ticks & P&L·Balance): kotak field yg sama, tapi tak menyala & tak terlihat editable */
+  .pos-edit2 .tl-cell.ro{ cursor:default; }
+  .pos-edit2 .tl-cell.ro:focus-within{ border-color:var(--border); box-shadow:none; }
+  .pos-edit2 .tl-cell.ro .tl-in{ cursor:default; color:var(--muted); }
+  .pos-edit2 .tl-cell.ro.neg .tl-in{ color:var(--red); }
+  .pos-edit2 .tl-cell.ro.pos .tl-in{ color:var(--green); }
+  .pos-edit2 .pe-act{ display:flex; gap:8px; margin-top:12px; }
+  .pos-edit2 .pe-act button{ flex:1; height:40px; font-size:13px; font-weight:600; border-radius:9px; }
+  .pos-edit2 #peConfirm{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pos-edit2 #peConfirm:hover{ filter:brightness(1.08); }
+  /* ===== posisi on-chart: pill P&L + label SL/TP (layer DOM di atas kanvas) ===== */
+  #posLayer{ position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:12; }
+  .pos-node{ position:absolute; left:8px; transform:translateY(-50%); display:flex; align-items:center; gap:5px;
+    font-family:var(--mono); font-size:11px; font-weight:700; line-height:1; white-space:nowrap; pointer-events:none; }
+  .pos-node > *{ pointer-events:auto; }
+  /* pill entry: panah arah + $ P&L berjalan + tombol tutup */
+  .pos-pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 4px 3px 7px; border-radius:5px;
+    background:var(--panel-2); border:1px solid; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.45); }
+  .pos-pill.up{ border-color:#089981; } .pos-pill.up .pos-arrow{ color:#089981; }
+  .pos-pill.down{ border-color:#f23645; } .pos-pill.down .pos-arrow{ color:#f23645; }
+  .pos-pill .pos-arrow{ font-size:10px; }
+  .pos-pill .pos-pnl{ color:var(--txt); }
+  /* label SL/TP (collapsed = teks; expanded = detail $/%) */
+  .pos-tag{ display:inline-flex; align-items:center; gap:5px; padding:3px 6px; border-radius:4px;
+    background:var(--panel-2); border:1px solid; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.45); }
+  .pos-tag .grip{ color:var(--muted); font-size:9px; letter-spacing:-1.5px; cursor:grab; }
+  .pos-node.sl .pos-tag{ border-color:#f23645; color:#f23645; }
+  .pos-node.tp .pos-tag{ border-color:#089981; color:#089981; }
+  .pos-node.sl .pos-tag, .pos-node.tp .pos-tag{ cursor:ns-resize; user-select:none; }
+  .pos-node .pos-tag.drag{ box-shadow:0 0 0 1px currentColor inset; }
+  /* tombol X (tutup posisi / hapus level) */
+  .pos-x{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0;
+    border:1px solid var(--border); border-radius:4px; background:var(--inset); color:var(--muted);
+    font-size:12px; line-height:1; cursor:pointer; }
+  .pos-x:hover{ color:var(--txt); background:var(--btn-hover); }
+  .pos-x:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  /* chip + SL / + TP (saat expand & level belum ada) */
+  .pos-add{ padding:3px 7px; font-size:10px; font-weight:600; border-radius:4px; border:1px dashed var(--border);
+    background:var(--panel-2); color:var(--muted); cursor:pointer; }
+  .pos-add.sl:hover{ color:#f23645; border-color:#f23645; }
+  .pos-add.tp:hover{ color:#089981; border-color:#089981; }
+  .pos-add:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  /* konfirmasi tutup posisi */
+  .pos-confirm{ min-width:160px; padding:10px 11px; font-size:12px; }
+  .pos-confirm .pc-msg{ margin-bottom:9px; color:var(--txt); }
+  .pos-confirm .pc-act{ display:flex; gap:6px; }
+  .pos-confirm .pc-act button{ flex:1; font-size:11px; padding:6px 0; }
+  .pos-confirm .pc-yes{ background:var(--red); border-color:var(--red); color:#fff; }
+  @media (prefers-reduced-motion: reduce){ .pos-pill, .pos-tag{ box-shadow:none; } }
+  .objpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 5px; }
+  .objpop .pp-row{ display:flex; align-items:center; gap:6px; margin-bottom:9px; flex-wrap:wrap; }
+  .sw{ width:18px; height:18px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0;
+       box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); transition:transform .12s, box-shadow .12s; }
+  .sw:hover{ transform:scale(1.14); }
+  .sw.on{ border-color:var(--txt); box-shadow:inset 0 0 0 1px rgba(0,0,0,.3), 0 0 0 2px var(--panel), 0 0 0 3px var(--luna-glow); }
+  .pp-chip{ padding:4px 10px; font-size:11px; color:var(--muted); background:var(--btn); border:1px solid var(--border); border-radius:6px; cursor:pointer; transition:background .12s, border-color .12s, color .12s; }
+  .pp-chip:hover{ color:var(--txt); border-color:var(--btn-border-hover); background:var(--btn-hover); }
+  .pp-chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pp-chip.on:hover{ color:#fff; filter:brightness(1.06); }
+  .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:10px; margin-top:3px; }
+  .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
+  .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; padding:2px; transition:border-color .12s; }
+  .pp-color:hover{ border-color:var(--btn-border-hover); }
+  .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }
+  .pp-slider input[type=range]{ flex:1; min-width:0; }
+  .pp-slider .pp-sval{ flex:0 0 auto; color:var(--muted); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+  /* editor level Fibonacci */
+  .fibpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
+           border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
+  .fp-color:hover,.fp-x:hover{ border-color:var(--btn-border-hover); }
+  .fibpop.show{ display:block; }
+  .fibpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 7px; }
+  .fp-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .fp-row input[type=number]{ flex:1; width:100%; }
+  .fp-color{ flex:0 0 auto; width:28px; height:26px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; }
+  .fp-x{ width:26px; padding:5px 0; font-size:12px; color:var(--muted); }
+  .fp-bg{ display:flex; align-items:center; gap:7px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; font-size:11px; }
+  .fp-bg label{ display:flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
+  .fp-bg input[type=range]{ flex:1; min-width:0; }
+  .fp-bg #fpBgVal{ flex:0 0 auto; color:var(--muted); width:32px; text-align:right; }
+  .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
+  /* editor parameter indikator (numpang chrome .objpop) */
+  .ind-editor{ width:200px; }
+  .ind-editor .ie-title{ color:var(--txt); font-weight:600; font-size:12px; text-transform:none; letter-spacing:0; }
+  .ind-editor .ie-listrow{ display:flex; gap:6px; align-items:center; }
+  .ind-editor .ie-num{ flex:1; min-width:0; }
+  .ind-editor .ie-x{ flex:0 0 auto; width:24px; padding:4px 0; font-size:14px; line-height:1; color:var(--muted); background:transparent; border:0; cursor:pointer; }
+  .ind-editor .ie-x:disabled{ opacity:.3; cursor:default; }
+  .ind-editor .ie-add{ flex:1; font-size:11px; padding:6px 0; color:var(--accent); }
+  .fp-act button{ flex:1; font-size:11px; padding:6px 0; }
+
+  /* order panel ringkas (docked di Markets / mengambang di atas chart) */
+  .orderpanel{ border-top:1px solid var(--border); padding:3px 8px 5px; }
+  .orderpanel.notrade{ position:relative; opacity:.55; pointer-events:none; }
+  .orderpanel.notrade::before{ content:'Chart only · not tradeable'; position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6;
+    font:600 11px var(--font-sans, sans-serif); letter-spacing:.03em; white-space:nowrap; pointer-events:none;
+    color:var(--muted, #8a94a6); background:var(--panel, #141822); border:1px solid var(--border); border-radius:999px; padding:3px 10px; }
+  /* ── Type: UI pakai Sora (display), angka/readout pakai Chivo Mono (tabular) ── */
+  .orderpanel, #orderForm{ font-family:var(--font-display); -webkit-font-smoothing:antialiased; }
+  .orderpanel .op3-deal-px, .orderpanel .tl-in,
+  .orderpanel .op2-step-val input, .orderpanel .op3-stage-step .v, .orderpanel .op3-stage-out,
+  .orderpanel .op3-exec-num, .orderpanel .op3-margin b, .orderpanel .op3-riskpct, .orderpanel input[type=number]{
+    font-family:var(--font-num); font-feature-settings:"tnum" 1; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  /* docked: jangan diciutkan oleh daftar Markets; scroll internal saat expand agar SL/TP & exec terjangkau */
+  .orderpanel[data-dock="docked"]{ flex:0 0 auto; max-height:64%; overflow-y:auto; }
+  .orderpanel[data-dock="floating"]{ cursor:move; }   /* seluruh area (incl. tepi atas) = drag handle; kontrol di-skip via JS */
+  .orderpanel .bp-title{ margin-bottom:8px; }
+  /* order panel — ticket modern minimalis ala TradeLocker */
+  .op2{ display:flex; flex-direction:column; gap:5px; }
+  .op2-sym{ font-size:12.5px; font-weight:600; letter-spacing:.01em; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  /* header simple: 1 baris — flag·sym·MARKET · ··· · RISK·SL·TP · chev·X (compact) */
+  .op-shead{ display:flex; align-items:center; gap:5px; cursor:move; touch-action:none; }
+  /* jarak kecil: pisahkan MARKET dari identitas & window control (⌄✕) dari grup chip */
+  .op-shead #opTypePill{ margin-left:3px; }
+  .op-shead #op2Expand{ margin-left:5px; }
+  .op-ehead{ display:flex; align-items:center; gap:6px; cursor:move; touch-action:none; }
+  .op-chev{ width:22px; height:22px; padding:0; font-size:10px; line-height:1; color:var(--muted);
+    background:var(--inset); border:1px solid var(--border); border-radius:6px; flex:0 0 auto; cursor:pointer; }
+  .op-chev:hover{ color:var(--txt); background:var(--btn-hover); }
+  .op-chev-blue{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .op-chev-blue:hover{ background:var(--accent); filter:brightness(1.08); }
+  /* segmented Market/Pending + Sell/Buy */
+  .op3-seg,.op3-dir{ display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:3px;
+    background:var(--inset); border-radius:8px; }
+  .op3-seg button,.op3-dir button{ height:27px; border:1px solid transparent; border-radius:6px;
+    background:transparent; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.03em; }
+  .op3-seg button:hover,.op3-dir button:hover{ color:var(--txt); }
+  .op3-seg button.on{ background:var(--btn); color:var(--txt); border-color:var(--border); }
+  .op3-dir button.dir-sell.on{ color:var(--red); border-color:var(--red); background:rgba(255,111,111,.12); }
+  .op3-dir button.dir-buy.on{ color:var(--green); border-color:var(--green); background:rgba(84,200,140,.12); }
+  /* ===== SL/TP grid ala TradeLocker ===== */
+  .op-hidden{ display:none; }
+  .tl-sltp{ display:flex; flex-direction:column; gap:6px; }
+  /* baris header: Trail | Stop Loss[✓] | Take Profit[✓] */
+  .tl-head{ display:grid; grid-template-columns:auto 1fr 1fr; gap:6px; }
+  .tl-trail{ height:30px; padding:0 9px; border-radius:6px; background:var(--inset); border:1px solid var(--border);
+    color:var(--muted); font-size:10px; font-weight:600; }
+  .tl-trail.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tl-toggle{ display:flex; align-items:center; justify-content:space-between; gap:6px; height:30px; padding:0 9px;
+    border-radius:6px; background:var(--inset); border:1px solid var(--border); color:var(--muted);
+    font-size:11px; font-weight:600; cursor:pointer; }
+  .tl-toggle.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tl-toggle input{ accent-color:#fff; }
+  /* grid 3 kolom: SL | label | TP — tiap sel = field editable (Price/Ticks/P&L·Balance) */
+  .tl-grid{ display:grid; grid-template-columns:1fr auto 1fr; column-gap:7px; row-gap:5px; align-items:stretch; }
+  /* field modern: kotak membulat bg inset, border tipis → MENYALA saat fokus (ring near-white + halo luna) */
+  .tl-cell{ min-width:0; background:var(--inset); border:1px solid var(--border); border-radius:8px;
+    transition:border-color .12s ease, box-shadow .12s ease; }
+  .tl-cell:focus-within{ border-color:#eef1f7; box-shadow:0 0 0 1px #eef1f7, 0 0 13px rgba(174,185,232,.5); }
+  /* P&L/Balance dipisah sedikit → ritme 2 grup ala referensi */
+  .tl-grid .grp-solo{ margin-top:4px; }
+  /* input di dalam field */
+  .tl-in{ width:100%; border:0; background:transparent; outline:none; color:var(--accent);
+    font-weight:700; font-size:14px; padding:9px 11px; letter-spacing:-.01em; }
+  .tl-in::placeholder{ color:var(--muted); opacity:.65; }
+  .tl-in::-webkit-outer-spin-button,.tl-in::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .tl-in[type=number]{ -moz-appearance:textfield; appearance:textfield; }
+  .tl-cell:focus-within .tl-in:focus{ color:var(--txt); }   /* nilai yg sedang diedit → putih */
+  /* baris P&L $ & Balance % dalam satu field */
+  .tl-cell.grp-solo{ display:flex; flex-direction:column; }
+  .tl-kv{ display:flex; align-items:center; justify-content:space-between; gap:6px; padding:5px 11px; }
+  .tl-kv + .tl-kv{ border-top:1px solid var(--line); }
+  .tl-kv .tl-in{ padding:0; font-size:12px; }
+  .tl-kv i{ font-style:normal; font-size:9px; color:var(--muted); flex:0 0 auto; }
+  .tl-cell.neg .tl-in{ color:var(--red); } .tl-cell.pos .tl-in{ color:var(--green); }
+  .tl-cell.neg:focus-within .tl-in:focus, .tl-cell.pos:focus-within .tl-in:focus{ color:var(--txt); }
+  /* kolom label tengah */
+  .tl-lbl{ display:flex; align-items:center; justify-content:center; padding:0 10px; font-size:10px; color:var(--muted); white-space:nowrap; }
+  .tl-lbl.two{ flex-direction:column; gap:12px; justify-content:center; }
+  /* kolom dinonaktifkan */
+  .tl-sltp .off{ opacity:.4; }
+  .op3-pend{ }
+  /* margin */
+  .op3-margin{ font-size:10px; color:var(--muted); text-align:right; }
+  .op3-margin b{ color:var(--txt); font-weight:700; }
+  .op3-margin .muted{ color:var(--muted); }
+  /* size row */
+  .op3-size{ display:flex; align-items:stretch; gap:8px; }
+  .op3-risk{ display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted);
+    background:var(--inset); border:1px solid var(--border); border-radius:7px; padding:0 8px; white-space:nowrap; }
+  .op3-riskpct{ width:26px; border:0; background:transparent; padding:0; height:auto; text-align:right; font-size:10px; color:var(--txt); }
+  .op2-step{ display:flex; flex:1; align-items:stretch; border:1px solid var(--border); border-radius:7px; overflow:hidden; }
+  .op2-step button{ width:32px; padding:0; font-size:15px; font-weight:400; line-height:1; border:0; border-radius:0;
+    background:var(--btn); color:var(--muted); }
+  .op2-step button:hover{ background:var(--btn-hover); color:var(--txt); }
+  .op2-step-val{ display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:2px 2px; min-width:52px; }
+  .op2-step-val input{ width:100%; border:0; background:transparent; text-align:center;
+    font-size:13px; font-weight:700; padding:0; height:auto; color:var(--txt); }
+  .op2-step-val span{ font-size:8px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; }
+  /* execute button */
+  .op3-exec{ height:35px; border:0; border-radius:8px; font-size:12.5px; font-weight:700; letter-spacing:.06em; color:#15151a; cursor:pointer; }
+  .op3-exec.dir-sell{ background:var(--red); } .op3-exec.dir-buy{ background:var(--green); }
+  .op3-exec:hover{ filter:brightness(1.08); }
+  /* ===== dua mode: simple (compact) ↔ expand ===== */
+  .op-simple{ display:flex; flex-direction:column; gap:6px; }
+  .op-expand{ display:none; flex-direction:column; gap:6px; }
+  /* header flush ke tepi atas + jadi drag-handle penuh */
+  .op-shead, .op-ehead{ padding-top:2px; }
+  .op2.expanded .op-simple{ display:none; }
+  .op2.expanded .op-expand{ display:flex; }
+  /* slot "flag" order panel & popup edit: pakai ulang dual-chip picker (versi 18px kompak) */
+  .op2-flag, .pe-flag{ display:inline-flex; align-items:center; line-height:1; margin-right:1px; vertical-align:middle; }
+  .op2-flag .ipick-chip, .pe-flag .ipick-chip{ width:18px; height:18px; border-radius:5px; font-size:8px; }
+  .op2-flag .ipick-chip+.ipick-chip, .pe-flag .ipick-chip+.ipick-chip{ margin-left:-6px; }
+  .op2-flag .ipick-chip:first-child, .pe-flag .ipick-chip:first-child{ position:relative; z-index:2;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 2px var(--panel), 0 1px 2px rgba(0,0,0,.4); }
+  /* header satu baris simple: pill Market/Pending + chip RISK/SL/TP (netral, ala TradeLocker) */
+  .op3-pill{ height:22px; padding:0 9px; border-radius:12px; background:var(--inset);
+    border:1px solid var(--border); color:var(--txt); font-size:9px; font-weight:600; letter-spacing:.12em; flex:0 0 auto; }
+  .op3-pill:hover{ border-color:var(--btn-border-hover); }
+  .op3-chip{ height:22px; padding:0 7px; border-radius:6px; background:var(--inset);
+    border:1px solid var(--border); color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.1em; flex:0 0 auto; }
+  .op3-chip:hover{ color:var(--txt); border-color:var(--btn-border-hover); }
+  /* aktif = halus & netral; border-color WAJIB di-set utk override global `button.on` (biru) */
+  /* chip aktif: warna jelas per fungsi (SL merah, TP hijau, RISK accent) */
+  #chipSL.on{ color:var(--red); border-color:var(--red); background:rgba(255,111,111,.14); }
+  #chipTP.on{ color:var(--green); border-color:var(--green); background:rgba(84,200,140,.14); }
+  #chipRisk.on{ color:var(--accent); border-color:var(--accent); background:rgba(74,113,255,.14); }
+  /* editor "stage" simple: baris per chip aktif */
+  .op3-stage{ display:flex; flex-direction:column; gap:5px; }
+  .op3-stage:not(:has(> .op3-stage-row:not([hidden]))){ display:none; }   /* tak ada baris aktif → tak makan ruang */
+  .op3-stage-row{ display:flex; align-items:center; gap:8px; }
+  .op3-stage-row[hidden]{ display:none; }
+  .op3-stage-lbl{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; min-width:62px; }
+  .op3-stage-lbl.sl{ color:var(--red); } .op3-stage-lbl.tp{ color:var(--green); } .op3-stage-lbl.risk{ color:var(--accent); }
+  .op3-stage-step{ display:flex; align-items:center; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:var(--inset); }
+  .op3-stage-step button{ width:23px; height:21px; padding:0; border:0; border-radius:0; background:transparent; color:var(--muted); font-size:14px; line-height:1; }
+  .op3-stage-step button:hover{ color:var(--txt); background:var(--btn-hover); }
+  .op3-stage-step .v{ min-width:40px; text-align:center; font-size:11px; font-weight:700; color:var(--txt); }
+  .op3-stage-out{ margin-left:auto; font-size:10px; color:var(--muted); }
+  .op3-stage-out.pos{ color:var(--green); } .op3-stage-out.neg{ color:var(--red); }
+  /* mode simple: Init. Margin jadi garis pembatas section + pegangan geser panel */
+  .op3-margin-c{ display:flex; align-items:center; gap:9px; text-align:center; cursor:move; touch-action:none; }
+  .op3-margin-c::before, .op3-margin-c::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .op3-margin-c:hover::before, .op3-margin-c:hover::after{ background:var(--border); }
+  .op3-margin-c .mtxt{ flex:0 0 auto; }
+  /* Advanced (expand) — sembunyikan field jarang dipakai supaya panel tak memanjang */
+  .op3-adv{ border-top:1px solid var(--line); padding-top:8px; }
+  .op3-adv>summary{ cursor:pointer; font-size:9.5px; font-weight:600; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.05em; list-style:none; padding:2px 0; }
+  .op3-adv>summary::-webkit-details-marker{ display:none; }
+  .op3-adv>summary::before{ content:"⌄"; display:inline-block; margin-right:6px; transition:transform .15s; }
+  .op3-adv[open]>summary::before{ transform:rotate(180deg); }
+  .op3-adv>*+*{ margin-top:9px; }
+  /* baris transaksi: [SELL bid] [stepper] [BUY ask] */
+  .op3-deal{ display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:stretch; }
+  .op3-deal-btn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0;
+    min-height:36px; border:0; border-radius:8px; cursor:pointer; padding:3px 4px; }
+  .op3-deal-btn.dir-sell{ background:var(--sell); color:#3d0c0c; }
+  .op3-deal-btn.dir-buy{ background:var(--buy); color:#06291b; }
+  .op3-deal-btn:hover{ filter:brightness(1.07); }
+  .op3-deal-px{ font-size:15px; font-weight:700; line-height:1.1; letter-spacing:-.02em; }
+  .op3-deal-lbl{ font-size:8px; font-weight:700; letter-spacing:.2em; opacity:.8; }
+  .op3-deal-mid{ display:flex; align-items:stretch; min-width:96px; }
+  .op3-deal-mid .op2-step{ flex:1; }
+  /* mode satu-arah (SL/TP/Risk ON): stepper kiri + satu tombol eksekusi */
+  .op3-deal-one{ display:grid; grid-template-columns:minmax(96px,118px) 1fr; gap:8px; align-items:stretch; }
+  .op3-deal-one .op3-exec{ height:auto; min-height:38px; font-size:13px; }
+  /* toggle arah (pill seperti Market/Pending) — warna ikut arah */
+  .dir-pill.dir-sell{ color:var(--red); border-color:rgba(255,111,111,.55); }
+  .dir-pill.dir-buy{ color:var(--green); border-color:rgba(84,200,140,.55); }
+  /* [hidden] harus menang atas display:grid/flex author di atas */
+  .op3-deal[hidden], .op3-deal-one[hidden], .op3-pill[hidden]{ display:none; }
+  /* expand: slot stepper di baris size */
+  .op3-size-stepslot{ display:flex; flex:1; align-items:stretch; }
+  .op3-size-stepslot .op2-step{ flex:1; }
+  .orderpanel .fld input{ width:100%; }
+  .orderpanel .sizing{ flex-direction:column; gap:3px; margin-top:2px; }
+  .orderpanel[data-dock="floating"]{ position:fixed; top:90px; left:70px; width:408px; z-index:1100; max-height:calc(100vh - 120px); overflow:auto;
+    background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow); border-radius:8px; }
+  .wl-x{ padding:1px 6px; font-size:11px; background:transparent; border-color:transparent; color:var(--muted); border-radius:5px; }
+  .wl-x:hover{ color:var(--txt); background:var(--btn-hover); }

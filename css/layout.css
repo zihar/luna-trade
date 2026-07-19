@@ -1,0 +1,116 @@
+  /* toast feedback (alert/pending) */
+  /* --tc = warna aksen per tipe; satu variabel menggerakkan border kiri, ikon, & drain bar */
+  .toast{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:2000;
+          display:flex; align-items:center; gap:9px; max-width:min(440px,90vw);
+          background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--tc,var(--accent)); color:var(--txt);
+          padding:9px 10px 10px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px;
+          overflow:hidden; opacity:0; transition:opacity .25s, top .25s; pointer-events:none; }
+  .toast.show{ opacity:1; top:18px; }
+  .toast .toast-ic{ flex:none; width:16px; height:16px; color:var(--tc,var(--accent)); }
+  .toast .toast-msg{ flex:1; min-width:0; }
+  /* kontainer pointer-events:none supaya tak memblok toolbar di belakang; hanya close yang interaktif */
+  .toast .toast-close{ flex:none; pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+          width:20px; height:20px; margin:-2px -2px -2px 2px; padding:0; border:0; border-radius:6px; background:transparent;
+          color:var(--muted); transition:color .15s, background .15s; }
+  .toast .toast-close:hover{ color:var(--txt); background:rgba(255,255,255,.07); }
+  .toast .toast-close:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .toast .toast-close svg{ width:13px; height:13px; }
+  /* drain bar: penuh → habis selama durasi = penanda sisa waktu sebelum auto-hilang */
+  .toast .toast-bar{ position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--tc,var(--accent));
+          opacity:.85; transform-origin:left center; transform:scaleX(1); }
+  .toast.t-success{ --tc:var(--green); }
+  .toast.t-error{ --tc:var(--red); }
+  .toast.t-warn{ --tc:#e3b341; }
+  .toast.t-info{ --tc:var(--accent); }
+  @media (prefers-reduced-motion: reduce){ .toast .toast-bar{ display:none; } }
+  /* hormati preferensi kurangi-gerak: matikan animasi/transisi non-esensial */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  }
+
+  /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
+  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:5px;
+    background:var(--panel); border:1px solid var(--border); color:var(--txt); font-size:12px; font-weight:500;
+    padding:3px 9px; border-radius:6px; cursor:pointer; white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.28); transform:translate(-50%,-100%);
+    transition:border-color .12s ease, background .12s ease; }
+  .addtext-btn.show{ display:inline-flex; }
+  .addtext-btn:hover{ background:var(--btn-hover); border-color:var(--accent); }
+  .addtext-btn .pl{ font-weight:700; font-size:13px; line-height:1; color:var(--accent); }
+
+  /* ===================== layout 5-zona (TradeLocker) ===================== */
+  .app{ flex:1; min-height:0; position:relative; display:grid;
+        grid-template-columns:56px 1fr var(--markets-w,300px);
+        grid-template-rows:1fr var(--trades-h,210px);
+        grid-template-areas:"rail center markets" "rail trades trades"; }
+
+  /* pembatas yang bisa digeser (resize Markets & Trades) */
+  .rh{ position:absolute; z-index:60; background:transparent; transition:background .12s; }
+  .rh:hover,.rh.drag{ background:var(--accent); }
+  .rh-markets{ top:0; bottom:var(--trades-h,210px); width:7px;
+               right:calc(var(--markets-w,300px) - 3px); cursor:col-resize; }
+  .rh-markets.hidden{ display:none; }
+  .rh-trades{ left:56px; right:0; height:7px;
+              bottom:calc(var(--trades-h,210px) - 3px); cursor:row-resize; }
+  #rail{ grid-area:rail; background:var(--panel); border-right:1px solid var(--border);
+         display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0; }
+  /* panel Alerts — slide-in overlay dari kanan (tak reflow grid); dibuka dari tombol di rail KIRI */
+  #alertsPane{ position:absolute; top:0; bottom:var(--trades-h,210px); right:0;
+               width:300px; z-index:65; background:var(--panel);
+               border-left:1px solid var(--border); display:flex; flex-direction:column;
+               transform:translateX(100%); transition:transform .18s ease;
+               box-shadow:-18px 0 36px rgba(0,0,0,.30); }
+  #alertsPane.open{ transform:translateX(0); }
+  #alertsPane .ap-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px;
+     font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.05em; color:var(--txt);
+     border-bottom:1px solid var(--line); }
+  #alertsPane .ap-body{ flex:1; overflow:auto; padding:6px 6px 10px; }
+  @media (prefers-reduced-motion:reduce){ #alertsPane{ transition:none; } }
+  .center{ grid-area:center; min-width:0; min-height:0; display:flex; flex-direction:column;
+           position:relative; background:var(--bg); }
+  #watchlist{ grid-area:markets; width:auto; flex:initial; }
+  #bottompanel{ grid-area:trades; max-height:none; overflow:auto; }
+  .center #chart{ flex:1; min-height:0; }
+  /* ===== multi-chart grid ===== */
+  #chartgrid{ flex:1; min-height:0; min-width:0; display:grid; gap:1px; background:var(--border); }
+  #chartgrid.lay-1{ grid-template-columns:1fr; grid-template-rows:1fr; }
+  #chartgrid.lay-2{ grid-template-columns:1fr 1fr; grid-template-rows:1fr; }
+  #chartgrid.lay-4{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+  .cpanel{ display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--bg); position:relative; }
+  .cpanel.active{ box-shadow: inset 0 0 0 1px var(--accent); }
+  .cpanel > #chart, .cpanel .cp-chart{ flex:1; min-height:0; min-width:0; }
+  .cpanel-hd{ display:flex; align-items:center; gap:6px; padding:3px 7px; border-bottom:1px solid var(--border);
+              background:var(--panel); font-size:11px; cursor:default; }
+  .cp-sym{ font-size:11px; padding:2px 5px; background:var(--panel-2); color:var(--txt);
+           border:1px solid var(--border); border-radius:5px; }
+  .cp-tfwrap{ position:relative; display:inline-flex; align-items:center; gap:2px; }
+  .cp-tfs{ display:inline-flex; gap:2px; }
+  .cp-tf{ font-size:10px; padding:1px 5px; background:transparent; border:1px solid transparent;
+          color:var(--muted); border-radius:4px; cursor:pointer; }
+  .cp-tf:hover{ color:var(--txt); }
+  .cp-tf.on{ color:var(--accent); background:rgba(74,113,255,.16); }
+  .cp-more{ font-size:9px; padding:1px 3px; }
+  .cp-tf-menu{ top:20px; width:132px; }
+  .cp-tf-menu .tf-row{ height:26px; font-size:11px; }
+  .cp-last{ margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .cp-act{ margin-left:6px; font-size:13px; line-height:1; padding:2px 5px; background:transparent;
+           border:1px solid var(--border); border-radius:5px; color:var(--muted); cursor:pointer; }
+  .cp-act:hover{ color:var(--accent); border-color:var(--accent); }
+  #layoutbtns{ display:inline-flex; gap:3px; }
+  #layoutbtns button{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:22px;
+                      padding:0; background:transparent; border:1px solid var(--border); border-radius:5px;
+                      color:var(--muted); cursor:pointer; }
+  #layoutbtns button:hover{ color:var(--txt); }
+  #layoutbtns button.on{ color:#fff; background:var(--accent); border-color:var(--accent); }
+  #layoutbtns button svg{ width:14px; height:14px; }
+  .railbtn{ width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+            padding:0; font-size:15px; color:var(--muted); background:transparent; border-color:transparent; border-radius:9px; }
+  .railbtn svg{ width:19px; height:19px; }
+  .railbtn:hover{ color:var(--txt); background:var(--btn-hover); }
+  .railbtn.on{ color:var(--accent); background:rgba(74,113,255,.14); }
+  .raildiv{ width:22px; height:1px; background:var(--border); margin:3px 0; }
+  .railspacer{ flex:1; }
+  #rail .drawtools{ width:auto; background:transparent; border:0; padding:0; gap:4px; }
+  .demo-badge{ font-size:8px; letter-spacing:.08em; color:var(--muted);
+               border:1px solid var(--border); border-radius:4px; padding:2px 4px; }
+
