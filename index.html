@@ -5481,6 +5481,33 @@ const IPK_META = {
   'STOCK:SPY':    {grp:'ETF',    name:'SPDR S&P 500 ETF',        base:'SPY',  quote:'USD', decimals:2, tradeable:false},
   'STOCK:QQQ':    {grp:'ETF',    name:'Invesco QQQ Trust',       base:'QQQ',  quote:'USD', decimals:2, tradeable:false},
 };
+// Alias pencarian: ticker umum (TradingView/broker lain) → kode instrumen OANDA.
+// Hanya memengaruhi filter di picker (lihat match() renderIpick), tak mengubah label/data.
+// Forex & saham sudah kecari via kode simbol/dispSym + nama, jadi tak perlu entri di sini.
+const IPK_ALIAS = {
+  // Energy
+  WTICO_USD:['USOIL','OIL','CRUDE','WTI','CL'],
+  BCO_USD:['UKOIL','BRENT','BRENTOIL'],
+  NATGAS_USD:['NATGAS','NGAS','GAS','NG'],
+  // Indices
+  SPX500_USD:['SPX','US500','SP500','ES'],
+  NAS100_USD:['NAS100','US100','NDX','USTEC','NASDAQ'],
+  US30_USD:['US30','DOW','DJIA','DJI','WALLSTREET'],
+  US2000_USD:['US2000','RUSSELL','RUT'],
+  DE30_EUR:['GER40','GER30','DE40','DAX','GERMANY40'],
+  UK100_GBP:['UK100','FTSE','FTSE100'],
+  FR40_EUR:['FRA40','FR40','CAC','CAC40'],
+  EU50_EUR:['EU50','STOXX50','ESTX50','SX5E','EUSTX50'],
+  JP225_USD:['JP225','JPN225','NIKKEI','NKY','NI225'],
+  AU200_AUD:['AU200','AUS200','ASX200','ASX'],
+  HK33_HKD:['HK50','HK33','HSI','HANGSENG'],
+  DXY:['DXY','USDOLLAR','USDINDEX','DOLLARINDEX','DX'],
+  // Metals
+  XAU_USD:['GOLD'], XAG_USD:['SILVER'],
+  // Crypto (nama penuh; ticker XXXUSD sudah cocok via kode simbol)
+  BTC_USD:['BITCOIN'], ETH_USD:['ETHEREUM','ETHER'],
+  LTC_USD:['LITECOIN'], BCH_USD:['BITCOINCASH'],
+};
 function ipkMeta(s){ const m=IPK_META[s]; if(m) return m;
   const p=s.split('_'); return { grp:'Forex', name:s.replace('_',' / '), base:p[0], quote:p[1] }; }
 // Instrumen non-tradeable (saham, DXY): tiket order dinon-aktifkan (chart-only).
@@ -5504,7 +5531,7 @@ function syncIpickTrigger(){ const s=($('#instrument')&&$('#instrument').value)|
 function renderIpick(filter=''){
   const list=$('#ipickList'); if(!list) return;
   const f=(filter||'').trim().toLowerCase();
-  const match=s=>{ const m=ipkMeta(s); return !f || dispSym(s).toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f); };
+  const match=s=>{ const m=ipkMeta(s); return !f || dispSym(s).toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f) || (IPK_ALIAS[s]||[]).some(a=>a.toLowerCase().includes(f)); };
   let html='', any=false, idx=0; const flat=[];
   for(const g of IPK_GROUPS){
     const items=WATCH_SYMS.filter(s=>ipkMeta(s).grp===g && match(s));
