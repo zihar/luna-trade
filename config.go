@@ -84,9 +84,11 @@ func loadConfig() Config {
 		c.StreamInstruments = []string{
 			// Forex
 			"EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "USD_CAD", "AUD_USD", "NZD_USD",
-			"GBP_JPY", "EUR_JPY",
+			"GBP_JPY", "EUR_JPY", "EUR_GBP", "AUD_JPY", "EUR_AUD", "GBP_AUD",
 			// Metals
 			"XAU_USD", "XAG_USD",
+			// Energy (CFD)
+			"WTICO_USD", "BCO_USD", "NATGAS_USD",
 			// Indices (CFD)
 			"SPX500_USD", "NAS100_USD", "US30_USD", "US2000_USD", "DE30_EUR",
 			"UK100_GBP", "FR40_EUR", "EU50_EUR", "JP225_USD", "AU200_AUD", "HK33_HKD",

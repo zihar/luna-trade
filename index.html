@@ -1485,9 +1485,11 @@
     <option>EUR_USD</option><option>GBP_USD</option><option>USD_JPY</option>
     <option>USD_CHF</option><option>USD_CAD</option><option>AUD_USD</option><option>NZD_USD</option>
     <!-- Forex cross -->
-    <option>GBP_JPY</option><option>EUR_JPY</option>
+    <option>GBP_JPY</option><option>EUR_JPY</option><option>EUR_GBP</option><option>AUD_JPY</option><option>EUR_AUD</option><option>GBP_AUD</option>
     <!-- Metals -->
     <option>XAU_USD</option><option>XAG_USD</option>
+    <!-- Energy -->
+    <option>WTICO_USD</option><option>BCO_USD</option><option>NATGAS_USD</option>
     <!-- Indices -->
     <option>DXY</option>
     <option>SPX500_USD</option><option>NAS100_USD</option><option>US30_USD</option><option>US2000_USD</option>
@@ -3090,7 +3092,8 @@ function guessPip(){
   const s=$('#instrument').value;
   // tabel di dalam fungsi: guessPip dipanggil saat init sebelum const global lain siap → hindari TDZ
   const PIP={ SPX500_USD:1, NAS100_USD:1, US30_USD:1, DE30_EUR:1, UK100_GBP:1, FR40_EUR:1, EU50_EUR:1,
-    JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:0.01, ETH_USD:0.1, LTC_USD:0.1, BCH_USD:0.1 };
+    JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:0.01, ETH_USD:0.1, LTC_USD:0.1, BCH_USD:0.1,
+    WTICO_USD:0.01, BCO_USD:0.01, NATGAS_USD:0.01 };
   $('#pipSize').value = PIP[s]!=null ? PIP[s]
     : s.includes('BTC')?1 : s.includes('DXY')?0.01 : s.includes('JPY')?0.01 : s.includes('XAU')?0.1 : s.includes('XAG')?0.001 : 0.0001;
   lotsManual=false;   // saran lot otomatis menyesuaikan instrumen baru
@@ -3552,7 +3555,11 @@ const INSTRUMENT = {
   NZD_USD:{pip:0.0001,quote:'USD'}, USD_CHF:{pip:0.0001,quote:'CHF'},
   USD_CAD:{pip:0.0001,quote:'CAD'}, USD_JPY:{pip:0.01,quote:'JPY'},
   GBP_JPY:{pip:0.01,quote:'JPY'},   EUR_JPY:{pip:0.01,quote:'JPY'},
+  EUR_GBP:{pip:0.0001,quote:'GBP'}, AUD_JPY:{pip:0.01,quote:'JPY'},
+  EUR_AUD:{pip:0.0001,quote:'AUD'}, GBP_AUD:{pip:0.0001,quote:'AUD'},
   XAU_USD:{pip:0.1,quote:'USD'},    XAG_USD:{pip:0.001,quote:'USD'},
+  // Energy (CFD) — WTI/Brent/NatGas, pipLocation -2 (OANDA)
+  WTICO_USD:{pip:0.01,quote:'USD'}, BCO_USD:{pip:0.01,quote:'USD'}, NATGAS_USD:{pip:0.01,quote:'USD'},
   // Indices (CFD). quote non-USD (EUR/GBP/AUD/HKD) → konversi P&L masih approx (lihat quoteToUsd).
   DXY:{pip:0.01,quote:'USD'},
   SPX500_USD:{pip:1,quote:'USD'}, NAS100_USD:{pip:1,quote:'USD'}, US30_USD:{pip:1,quote:'USD'},
@@ -4218,7 +4225,7 @@ function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(s
 function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
 
 // formatter sadar-instrumen (posisi server bisa beda pair dari chart aktif)
-function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('DXY')?3 : i.includes('JPY')?3 : (i.includes('XAU')||i.includes('XAG'))?3 : 5; }
+function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('DXY')?3 : i.includes('JPY')?3 : (i.includes('XAU')||i.includes('XAG'))?3 : (i.includes('WTICO')||i.includes('BCO')||i.includes('NATGAS'))?3 : 5; }
 function fmtFor(i,v){ return v==null||isNaN(v)?'—':(+v).toFixed(decimalsFor(i)); }
 function unitsPerFor(i){ return i.includes('BTC')?1 : (i.includes('XAU')||i.includes('XAG'))?100 : 100000; }
 function lotLabelFor(i,u){ if(i.includes('BTC')) return u.toFixed(4)+' BTC'; if(i.includes('XAU')||i.includes('XAG')) return (u/100).toFixed(2)+' lot'; return (u/100000).toFixed(2)+' lot'; }
@@ -5249,6 +5256,7 @@ const WATCH_SYMS = [...document.querySelectorAll('#instrument option')].map(o=>o
 const SYM_DECIMALS = {
   SPX500_USD:1, NAS100_USD:1, US30_USD:1, DE30_EUR:1, UK100_GBP:1, FR40_EUR:1, EU50_EUR:1,
   JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:3, ETH_USD:2, LTC_USD:2, BCH_USD:2,
+  WTICO_USD:3, BCO_USD:3, NATGAS_USD:3,
 };
 function symDecimals(s){ if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
   return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
@@ -5368,12 +5376,14 @@ const IPK_CCY = {
   // mata uang (pair 2-chip)
   EUR:'EU', USD:'US', GBP:'GB', JPY:'JP', AUD:'AU', CAD:'CA', NZD:'NZ', CHF:'CH', HKD:'HK',
   XAU:'Au', XAG:'Ag',
+  // energy (chip tunggal) — kode singkat khas komoditasnya
+  WTI:'WTI', BRENT:'BR', NGAS:'NG',
   // crypto (chip base)
   BTC:'₿', ETH:'Ξ', LTC:'Ł', BCH:'BC',
   // indeks (chip tunggal) — kode singkat khas indeksnya
   DXY:'$', SPX:'SP', NAS:'NQ', DJI:'DJ', RUT:'RU', DAX:'DE', FTSE:'UK', CAC:'FR', STOXX:'SX', NKY:'NK', ASX:'AS', HSI:'HK',
 };
-const IPK_GROUPS = ['Forex','Metals','Indices','Crypto'];
+const IPK_GROUPS = ['Forex','Metals','Energy','Indices','Crypto'];
 const IPK_META = {
   EUR_USD:{grp:'Forex',   name:'Euro / US Dollar',                  base:'EUR', quote:'USD'},
   GBP_USD:{grp:'Forex',   name:'British Pound / US Dollar',         base:'GBP', quote:'USD'},
@@ -5384,8 +5394,15 @@ const IPK_META = {
   NZD_USD:{grp:'Forex',   name:'New Zealand Dollar / US Dollar',    base:'NZD', quote:'USD'},
   GBP_JPY:{grp:'Forex',   name:'British Pound / Japanese Yen',      base:'GBP', quote:'JPY'},
   EUR_JPY:{grp:'Forex',   name:'Euro / Japanese Yen',              base:'EUR', quote:'JPY'},
+  EUR_GBP:{grp:'Forex',   name:'Euro / British Pound',              base:'EUR', quote:'GBP'},
+  AUD_JPY:{grp:'Forex',   name:'Australian Dollar / Japanese Yen',  base:'AUD', quote:'JPY'},
+  EUR_AUD:{grp:'Forex',   name:'Euro / Australian Dollar',          base:'EUR', quote:'AUD'},
+  GBP_AUD:{grp:'Forex',   name:'British Pound / Australian Dollar', base:'GBP', quote:'AUD'},
   XAU_USD:{grp:'Metals',  name:'Gold / US Dollar',                  base:'XAU', quote:'USD'},
   XAG_USD:{grp:'Metals',  name:'Silver / US Dollar',                base:'XAG', quote:'USD'},
+  WTICO_USD: {grp:'Energy',  name:'WTI Crude Oil',      base:'WTI'},
+  BCO_USD:   {grp:'Energy',  name:'Brent Crude Oil',    base:'BRENT'},
+  NATGAS_USD:{grp:'Energy',  name:'Natural Gas',        base:'NGAS'},
   DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY'},
   SPX500_USD:{grp:'Indices', name:'S&P 500',            base:'SPX'},
   NAS100_USD:{grp:'Indices', name:'Nasdaq 100',         base:'NAS'},
