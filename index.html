@@ -1,11 +1,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Luna Trade — Manual Forex Backtester (OANDA)</title>
+<title>Luna Trade — Forex Charting, Replay &amp; Paper Trading</title>
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+<!-- SEO -->
+<meta name="description" content="Professional-grade charting with live prices, drawing tools, bar replay, and economic news — all in one calm workspace.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<!-- Open Graph — preview kartu saat link dibagikan. Saat domain produksi final: pakai URL absolut + tambah <meta property="og:url">. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Luna Trade">
+<meta property="og:title" content="Luna Trade — Forex Charting, Replay & Paper Trading">
+<meta property="og:description" content="Professional-grade charting with live prices, drawing tools, bar replay, and economic news — all in one calm workspace.">
+<meta property="og:image" content="/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Luna Trade — forex charting workspace">
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Luna Trade — Forex Charting, Replay & Paper Trading">
+<meta name="twitter:description" content="Professional-grade charting with live prices, drawing tools, bar replay, and economic news — all in one calm workspace.">
+<meta name="twitter:image" content="/assets/og-image.png">
 <!-- Font self-hosted (assets/fonts) — Modern Distinct: Sora (display) · Inter Tight (UI) · Chivo Mono (angka). Tak bergantung Google Fonts CDN. -->
 <style>
   @font-face{font-family:'Inter Tight';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/inter-tight-400.woff2) format('woff2');}
@@ -36,7 +55,7 @@
     --inset:#eef1f5; --btn:#eef1f5; --btn-hover:#e1e6ed; --btn-border-hover:#c2cad4; --line:#e7eaef;
   }
   *{box-sizing:border-box}
-  body{margin:0;font:12px/1.45 'Inter Tight',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  body{margin:0;font:12px/1.45 var(--font-sans);
        background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column;overflow:hidden}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;
            background:var(--panel);border-bottom:1px solid var(--border)}
@@ -217,7 +236,7 @@
   .ind-modal-box{ width:min(560px,92vw); max-height:min(70vh,560px); display:flex; flex-direction:column;
     background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
   .ind-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px 8px; }
-  .ind-modal-title{ font:700 14px/1 'Inter Tight',sans-serif; color:var(--txt); }
+  .ind-modal-title{ font:700 14px/1 var(--font-sans); color:var(--txt); }
   .ind-modal-x{ background:transparent; border:0; color:var(--muted); font-size:20px; cursor:pointer;
     line-height:1; padding:2px 6px; border-radius:6px; }
   .ind-modal-x:hover{ color:var(--txt); background:var(--btn-hover); }
@@ -234,7 +253,7 @@
   .ind-row{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; }
   .ind-row:hover{ background:var(--btn-hover); }
   .ind-row-main{ flex:1; min-width:0; }
-  .ind-row-name{ font:600 13px/1.2 'Inter Tight',sans-serif; color:var(--txt); }
+  .ind-row-name{ font:600 13px/1.2 var(--font-sans); color:var(--txt); }
   .ind-row.on .ind-row-name{ color:var(--accent); }
   .ind-row-desc{ font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ind-row-badge{ font-size:11px; color:var(--accent); opacity:0; }
@@ -243,7 +262,7 @@
   /* legend on-chart per-indikator (ala TradingView) — overlay HTML di dalam #chart */
   .ind-legends{ position:absolute; inset:0; z-index:6; pointer-events:none; }
   .ind-leg{ position:absolute; left:12px; pointer-events:none;
-    font:600 11.5px/1.25 'Inter Tight',sans-serif; white-space:nowrap; }
+    font:600 11.5px/1.25 var(--font-sans); white-space:nowrap; }
   .ind-leg-head{ display:inline-flex; align-items:center; gap:6px; pointer-events:auto;
     padding:1px 4px; margin-left:-4px; border-radius:6px; transition:background .12s ease; }
   .ind-leg-head:hover{ background:color-mix(in srgb, var(--panel) 78%, transparent); }
@@ -271,7 +290,7 @@
   .chart-legend{ position:absolute; top:6px; left:12px; z-index:6; pointer-events:none; user-select:none; }
   .cl-inst{ pointer-events:auto; cursor:pointer; display:inline-flex; align-items:center; gap:7px;
     margin-left:-5px; padding:2px 6px 2px 5px; border:0; background:transparent; border-radius:7px;
-    color:var(--txt); font-family:'Inter Tight',sans-serif; line-height:1; transition:background .12s ease; }
+    color:var(--txt); font-family:var(--font-sans); line-height:1; transition:background .12s ease; }
   .cl-inst:hover{ background:var(--btn-hover); }
   .cl-inst:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
   .cl-inst .cl-name{ font-size:13px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; }
@@ -449,11 +468,12 @@
 
   /* ===================== polish pass ===================== */
   :root{ color-scheme:dark;
-         /* Modern Distinct: angka pakai Chivo Mono (monospace, tabular figures) */
-         --mono:'Chivo Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
          /* type: Sora (display/brand) + Inter Tight (UI/label) + Chivo Mono (angka/instrumen) */
          --font-display:'Sora','Inter Tight',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         --font-sans:'Inter Tight',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         /* angka pakai Chivo Mono (monospace, tabular figures) */
          --font-num:'Chivo Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+         --mono:var(--font-num);   /* alias lama → satu sumber kebenaran */
          --shadow:0 10px 30px rgba(0,0,0,.5); --ring:rgba(59,130,246,.35); }
   body.light{ color-scheme:light; --shadow:0 8px 22px rgba(22,33,55,.12); --ring:rgba(37,99,235,.28); }
 
@@ -546,7 +566,7 @@
   .ipick-box:focus-within{ border-color:#eef1f7; box-shadow:0 0 0 1px #eef1f7, 0 0 13px rgba(174,185,232,.5); }
   body.light .ipick-box:focus-within{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 0 13px rgba(90,108,196,.4); }
   .ipick-box svg{ width:14px; height:14px; color:var(--muted); flex:none; }
-  .ipick-box input{ flex:1; min-width:0; border:0; background:transparent; outline:none; color:var(--txt); font:13px 'Inter Tight',sans-serif; }
+  .ipick-box input{ flex:1; min-width:0; border:0; background:transparent; outline:none; color:var(--txt); font:13px var(--font-sans); }
   .ipick-box input::placeholder{ color:var(--muted); }
   .ipick-kbd{ font-family:var(--font-num); font-size:10px; color:var(--muted); border:1px solid var(--border);
     border-radius:5px; padding:2px 5px; background:var(--btn); }
@@ -858,8 +878,8 @@
      Impact di-warnai via --imp (High=red, Medium=amber); bias via --bi (bull/bear/neutral).
      Angka pakai --mono + tabular-nums. Semua token → ikut tema light/dark. */
   .cal-bias{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:0 2px 10px; border-bottom:1px solid var(--border); }
-  .cal-sym{ font:600 13px 'Sora','Inter Tight',sans-serif; letter-spacing:.01em; color:var(--txt); }
-  .cal-dir{ margin-left:auto; font:700 11px 'Sora',sans-serif; letter-spacing:.05em; white-space:nowrap;
+  .cal-sym{ font:600 13px var(--font-display); letter-spacing:.01em; color:var(--txt); }
+  .cal-dir{ margin-left:auto; font:700 11px var(--font-display); letter-spacing:.05em; white-space:nowrap;
             padding:2px 9px; border-radius:20px; border:1px solid var(--border); color:var(--muted); }
   .cal-bias.bullish .cal-dir{ color:var(--green); border-color:color-mix(in srgb,var(--green) 45%,transparent); background:color-mix(in srgb,var(--green) 12%,transparent); }
   .cal-bias.bearish .cal-dir{ color:var(--red);   border-color:color-mix(in srgb,var(--red) 45%,transparent);   background:color-mix(in srgb,var(--red) 12%,transparent); }
@@ -870,14 +890,14 @@
              background:radial-gradient(120% 140% at 100% 0, color-mix(in srgb,var(--imp) 15%,transparent), transparent 62%), var(--panel-2); }
   .cal-hero.imp-high{ --imp:var(--red); } .cal-hero.imp-med{ --imp:#e0a63a; }
   .cal-hero::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--imp); }
-  .cal-hero-eyebrow{ font:600 10px 'Sora',sans-serif; letter-spacing:.15em; text-transform:uppercase; color:var(--luna-glow); }
-  .cal-hero-name{ font:600 13px 'Sora','Inter Tight',sans-serif; letter-spacing:-.005em; color:var(--txt); margin:3px 0 6px; }
-  .cal-cd{ font:600 30px/1 'Sora',sans-serif; letter-spacing:.02em; color:var(--txt); font-variant-numeric:tabular-nums; }
+  .cal-hero-eyebrow{ font:600 10px var(--font-display); letter-spacing:.15em; text-transform:uppercase; color:var(--luna-glow); }
+  .cal-hero-name{ font:600 13px var(--font-display); letter-spacing:-.005em; color:var(--txt); margin:3px 0 6px; }
+  .cal-cd{ font:600 30px/1 var(--font-display); letter-spacing:.02em; color:var(--txt); font-variant-numeric:tabular-nums; }
   .cal-hero-meta{ display:flex; align-items:center; gap:8px; margin-top:9px; font:11px var(--mono,monospace); color:var(--muted); }
 
   .cal-daygroup{ display:flex; flex-direction:column; }
   .cal-dayhead{ display:flex; align-items:center; gap:9px; margin:4px 0 -2px;
-                font:600 10px 'Sora',sans-serif; letter-spacing:.13em; text-transform:uppercase; color:var(--hdr); }
+                font:600 10px var(--font-display); letter-spacing:.13em; text-transform:uppercase; color:var(--hdr); }
   .cal-dayhead::after{ content:""; flex:1; height:1px; background:var(--border); }
   .cal-daydate{ color:var(--muted); letter-spacing:.03em; }
 
@@ -894,29 +914,29 @@
 
   .cal2-top{ display:flex; align-items:center; gap:7px; }
   .cal-time{ font:600 12px var(--mono,monospace); color:var(--txt); font-variant-numeric:tabular-nums; }
-  .cal-cur{ font:600 10px 'Sora',sans-serif; letter-spacing:.04em; color:var(--muted); }
+  .cal-cur{ font:600 10px var(--font-display); letter-spacing:.04em; color:var(--muted); }
   .cal-imp{ display:inline-flex; gap:1.5px; align-items:flex-end; height:9px; margin-left:auto; }
   .cal-imp i{ width:2.5px; border-radius:1px; background:var(--imp); }
   .cal-imp i:nth-child(1){ height:4px; } .cal-imp i:nth-child(2){ height:6.5px; } .cal-imp i:nth-child(3){ height:9px; }
-  .cal-implbl{ font:600 10px 'Sora',sans-serif; letter-spacing:.02em; color:var(--imp); }
-  .cal2-name{ font:600 13px/1.3 'Sora','Inter Tight',sans-serif; letter-spacing:-.005em; color:var(--txt); margin:3px 0 6px; }
+  .cal-implbl{ font:600 10px var(--font-display); letter-spacing:.02em; color:var(--imp); }
+  .cal2-name{ font:600 13px/1.3 var(--font-display); letter-spacing:-.005em; color:var(--txt); margin:3px 0 6px; }
 
   .cal-fpa{ display:flex; flex-wrap:wrap; gap:4px 14px; font:11px var(--mono,monospace); }
   .cal-fpa > span{ display:inline-flex; gap:5px; align-items:baseline; }
   .cal-fpa i{ font-style:normal; font-size:10px; letter-spacing:.03em; color:var(--muted); }
   .cal-fpa b{ font-weight:600; color:var(--txt); font-variant-numeric:tabular-nums; }
 
-  .cal-surprise{ --bi:var(--muted); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:7px; font:600 11px 'Sora','Inter Tight',sans-serif; }
+  .cal-surprise{ --bi:var(--muted); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:7px; font:600 11px var(--font-display); }
   .cal-surprise.bullish{ --bi:var(--green); } .cal-surprise.bearish{ --bi:var(--red); }
   .cal-delta{ color:var(--bi); white-space:nowrap; }
   .cal-biastag{ color:var(--bi); white-space:nowrap; padding:1px 8px; border-radius:20px;
                 border:1px solid color-mix(in srgb,var(--bi) 42%,transparent); background:color-mix(in srgb,var(--bi) 12%,transparent); }
-  .cal-pre{ font:400 11px/1.4 'Sora','Inter Tight',sans-serif; color:var(--muted); margin-top:6px;
+  .cal-pre{ font:500 11px/1.4 var(--font-display); color:var(--muted); margin-top:6px;
             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
   /* News panel tabs (Calendar | News) — segmented di .wl-head */
   .news-tabs{ display:inline-flex; background:var(--inset); border:1px solid var(--border); border-radius:7px; padding:2px; gap:2px; }
-  .news-tab{ font:600 11px 'Sora','Inter Tight',sans-serif; letter-spacing:.02em; color:var(--muted);
+  .news-tab{ font:600 11px var(--font-display); letter-spacing:.02em; color:var(--muted);
              background:none; border:0; padding:3px 11px; border-radius:5px; cursor:pointer; text-transform:none; }
   .news-tab:hover{ color:var(--txt); background:var(--btn-hover); }
   .news-tab.on{ color:var(--txt); background:var(--panel); }
@@ -928,13 +948,13 @@
   .hl-item:hover{ background:color-mix(in srgb, var(--luna-glow) 7%, transparent); border-left-color:var(--luna-glow); }
   .hl-item:focus-visible{ outline:2px solid var(--ring); outline-offset:-2px; }
   .hl-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:3px; }
-  .hl-src{ font:600 11px 'Sora','Inter Tight',sans-serif; color:var(--hdr); letter-spacing:.01em;
+  .hl-src{ font:600 11px var(--font-display); color:var(--hdr); letter-spacing:.01em;
            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .hl-item:hover .hl-src{ color:var(--luna-glow); }
   .hl-time{ font:11px var(--font-num,monospace); color:var(--muted); white-space:nowrap; }
-  .hl-title{ font:400 13px/1.35 'Inter Tight',sans-serif; color:var(--txt);
+  .hl-title{ font:400 13px/1.35 var(--font-sans); color:var(--txt);
              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .hl-more{ font:600 11px 'Sora','Inter Tight',sans-serif; color:var(--luna-glow); margin-top:4px;
+  .hl-more{ font:600 11px var(--font-display); color:var(--luna-glow); margin-top:4px;
             opacity:0; transition:opacity .15s; }
   .hl-item:hover .hl-more, .hl-item:focus-visible .hl-more{ opacity:1; }
   @media (prefers-reduced-motion: reduce){ .hl-more{ transition:none; } }
@@ -947,16 +967,16 @@
             opacity:0; transform:translateX(12px); transition:opacity .25s, transform .25s; }
   .nc-card.in{ opacity:1; transform:none; }
   .nc-top{ display:flex; align-items:center; gap:6px; margin-bottom:3px;
-           font:600 11px 'Sora','Inter Tight',sans-serif; }
+           font:600 11px var(--font-display); }
   .nc-badge{ color:var(--luna-glow); white-space:nowrap; }
   .nc-src{ color:var(--hdr); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .nc-time{ color:var(--muted); font:11px var(--font-num,monospace); margin-left:auto; white-space:nowrap; }
   .nc-x{ background:none; border:0; color:var(--muted); cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
   .nc-x:hover{ color:var(--txt); } .nc-x:focus-visible{ outline:2px solid var(--ring); outline-offset:1px; }
-  .nc-title{ font:400 13px/1.35 'Sora','Inter Tight',sans-serif; letter-spacing:-.005em; color:var(--txt); text-decoration:none;
+  .nc-title{ font:500 13px/1.35 var(--font-display); letter-spacing:-.005em; color:var(--txt); text-decoration:none;
              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .nc-title:hover{ color:var(--luna-glow); }
-  .nc-more{ font:600 11px 'Sora','Inter Tight',sans-serif; color:var(--luna-glow); margin-top:4px;
+  .nc-more{ font:600 11px var(--font-display); color:var(--luna-glow); margin-top:4px;
             display:inline-block; text-decoration:none; }
   @media (prefers-reduced-motion: reduce){ .nc-card{ transition:none; transform:none; } }
   /* Varian kartu event high-impact (aksen amber, judul non-link) */
@@ -964,11 +984,11 @@
   .nc-evt .nc-badge{ color:#e0a63a; }
   .nc-evt .nc-title{ -webkit-line-clamp:3; }
   .nc-evrow{ margin-top:6px; }
-  .nc-bias{ font:600 11px 'Sora','Inter Tight',sans-serif; padding:2px 8px; border-radius:20px; }
+  .nc-bias{ font:600 11px var(--font-display); padding:2px 8px; border-radius:20px; }
   .nc-bias.up{ color:var(--green); background:rgba(46,204,113,.14); }
   .nc-bias.down{ color:var(--red); background:rgba(255,111,111,.14); }
   /* Daftar event saat >1 rilis di waktu sama (coalesced) */
-  .nc-evlist{ margin-top:5px; font:400 12px/1.4 'Sora','Inter Tight',sans-serif; color:var(--txt);
+  .nc-evlist{ margin-top:5px; font:500 12px/1.4 var(--font-display); color:var(--txt);
               display:flex; flex-direction:column; gap:3px; }
   .nc-evline{ display:flex; align-items:center; gap:6px; }
   .nc-evline .nc-evn{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
@@ -992,7 +1012,7 @@
   .nmk.impact-high .nmk-sev{ color:var(--red); } .nmk.impact-medium .nmk-sev{ color:#e0a63a; }
   .nmk-count{ position:absolute; top:-7px; left:-7px; min-width:16px; height:16px; padding:0 3px; border-radius:8px;
         background:var(--luna-glow); color:#0b0e14; border:1.5px solid var(--bg);
-        font:700 9px 'Sora','Inter Tight',sans-serif; display:grid; place-items:center; line-height:1; }
+        font:700 9px var(--font-display); display:grid; place-items:center; line-height:1; }
   .nmk.is-next{ box-shadow:0 0 0 2px var(--bg), 0 0 10px 2px rgba(174,185,232,.85); }
   .nmk.is-next::after{ content:""; position:absolute; inset:-4px; border-radius:50%;
         border:1.5px solid var(--luna-glow); animation:nmkPulse 2.4s ease-in-out infinite; }
@@ -1007,7 +1027,7 @@
   .nmk-pop .np-body{ padding:13px 15px; }
   .nmk-pop .np-hd{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
   .nmk-pop .np-fl{ font-size:15px; line-height:1; }
-  .nmk-pop .np-nm{ font:600 14px 'Sora','Inter Tight',sans-serif; flex:1; }
+  .nmk-pop .np-nm{ font:600 14px var(--font-display); flex:1; }
   .nmk-pop .np-chip{ font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px;
      border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
   .nmk-pop .np-chip.impact-high{ color:var(--red); background:rgba(255,111,111,.13); border:1px solid rgba(255,111,111,.4); }
@@ -1020,7 +1040,7 @@
   /* Popup multi-event (≥2 rilis di waktu sama): header ringkas + daftar kartu scrollable, bar impact kiri */
   .nmk-pop.np-multi{ width:264px; }
   .nmk-pop .np-mhd{ display:flex; align-items:baseline; gap:8px; padding:11px 15px 9px; border-bottom:1px solid var(--border); }
-  .nmk-pop .np-mc{ font:600 13px 'Sora','Inter Tight',sans-serif; color:var(--txt); }
+  .nmk-pop .np-mc{ font:600 13px var(--font-display); color:var(--txt); }
   .nmk-pop .np-mt{ margin-left:auto; color:var(--muted); font:11px var(--mono,monospace); }
   .nmk-pop .np-scroll{ max-height:min(54vh,340px); overflow-y:auto; }
   .nmk-pop .np-evt{ padding:11px 15px; border-left:3px solid transparent; }
@@ -2840,7 +2860,7 @@ function registerCustomIndicators(){
       const ed = indicator.extendData; if(!ed || !ed.segments || !ed.segments.length) return false;
       const NEUTRAL = '#8892a6';                       // warna netral PR-1 (warna fase AMD → PR-2)
       ctx.save();
-      ctx.font = '10px -apple-system,system-ui,sans-serif';
+      ctx.font = '10px '+AXIS_FONT;
       for(const s of ed.segments){
         // xAxis.convertToPixel butuh dataIndex (bukan timestamp) di klinecharts 9.8.10 →
         // konversi via tsToFracIndex (gap-aware, sudah dipakai trendline/overlay lain).
