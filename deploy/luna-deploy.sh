@@ -34,10 +34,14 @@ git reset --hard "origin/$BRANCH"
 install -m 0755 /tmp/luna.new "$RUNTIME/bar-replay"
 rm -f /tmp/luna.new
 
-# Sync aset web (yang selama ini di-scp manual): index.html + assets/.
+# Sync aset web (yang selama ini di-scp manual): index.html + assets/ + css/.
+# css/ = modul CSS hasil pemecahan index.html monolitik (Fase 1) — WAJIB ikut,
+# kalau tidak index.html mereferensikan /css/*.css yang 404 → halaman tanpa styling.
 install -m 0644 "$REPO/index.html" "$RUNTIME/index.html"
 rm -rf "$RUNTIME/assets"
 cp -r "$REPO/assets" "$RUNTIME/assets"
+rm -rf "$RUNTIME/css"
+cp -r "$REPO/css" "$RUNTIME/css"
 
 # Sync unit bar-replay kalau berubah (mis. ExecStart/hardening baru) → daemon-reload.
 if ! cmp -s "$REPO/deploy/bar-replay.service" /etc/systemd/system/bar-replay.service; then
