@@ -40,6 +40,22 @@ func TestMapGran(t *testing.T) {
 	}
 }
 
+func TestIsNonTradeable(t *testing.T) {
+	cases := map[string]bool{
+		"STOCK:AAPL":    true,
+		"STOCK:BBCA.JK": true,
+		"DXY":           true,
+		"USD_DXY":       true,
+		"EUR_USD":       false,
+		"XAU_USD":       false,
+	}
+	for inst, want := range cases {
+		if got := isNonTradeable(inst); got != want {
+			t.Errorf("isNonTradeable(%q) = %v, want %v", inst, got, want)
+		}
+	}
+}
+
 func TestConvertYahoo_AdjustedSkipNull(t *testing.T) {
 	b, err := os.ReadFile("testdata/yahoo_bbca.json")
 	if err != nil {

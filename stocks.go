@@ -14,6 +14,12 @@ import (
 	"time"
 )
 
+// isNonTradeable: instrumen chart-only (saham & DXY sintetis) yang tak boleh
+// dieksekusi sebagai order. Dipakai handlePaperOrder (defense-in-depth).
+func isNonTradeable(inst string) bool {
+	return inst == "DXY" || inst == "USD_DXY" || strings.HasPrefix(inst, "STOCK:")
+}
+
 // resolveSource memilih sumber candle berdasar simbol instrumen.
 func resolveSource(inst string) string {
 	if inst == "DXY" || inst == "USD_DXY" {
