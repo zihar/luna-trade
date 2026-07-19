@@ -2349,6 +2349,24 @@ klinecharts.registerOverlay({
         styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
     return figs;
   },
+  // Preview PRESISI: saat menggambar, klinecharts men-snap titik in-progress ke pusat bar
+  // (integer dataIndex + timestamp) sehingga garis PREVIEW beda dari titik FINAL yg kita commit
+  // sbg dataIndex PECAHAN → garis "loncat" ±½ bar saat klik ke-2. Nilai balik onDrawing DIABAIKAN
+  // klinecharts (beda dari onPressedMoving yg di-gate), jadi titik in-progress ditulis ulang
+  // LANGSUNG di sini: dataIndex pecahan TANPA timestamp (spy render tak re-snap), identik dgn
+  // jalur commit di onDrawEnd → preview == final (nol geser) utk horizontal/vertikal/diagonal.
+  // Magnet hanya menyetel VALUE (harga) ke OHLC; X tetap ikut kursor supaya preview & commit
+  // konsisten (commit trendline juga pakai fidx kursor). e.x/e.y = container-relative (spt onPressedMoving).
+  onDrawing:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!o.points.length) return false;
+    const m=o.points.length-1;                        // titik yg sedang ditarik = indeks terakhir
+    for(let k=0;k<m;k++){ const pc=pendingClicks[k];  // titik yg sudah diklik → re-anchor ke fidx presisi
+      if(pc && isFinite(pc.fidx) && pc.value!=null) o.points[k]={dataIndex:pc.fidx, value:pc.value}; }
+    const fa=fracAnchorFromPx(e.x); let v=pxToValue(e.y);
+    if(magnetOn && v!=null){ const xa=xAnchorFromPx(e.x);   // magnet: value → OHLC terdekat, X tetap kursor
+      if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, e.x, e.y); if(s) v=s.value; } }
+    if(fa && v!=null) o.points[m]={dataIndex:fa.dataIndex, value:v};
+    return false;
+  },
   // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
   // ke indeks integer. Dengan return true di onPressedMoving, default itu dilewati dan kita tulis
   // dataIndex PECAHAN sendiri (endpoint) / translasi semua titik (badan garis). e.x/e.y klinecharts
