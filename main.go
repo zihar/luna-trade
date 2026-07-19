@@ -198,8 +198,9 @@ func candlesHandler(token string) http.HandlerFunc {
 			p.Set("alignmentTimezone", "America/New_York")
 			p.Set("dailyAlignment", "18")
 		}
-		// DXY tidak ada di OANDA → dihitung sintetis dari 6 komponen (dxy.go).
-		if inst == "DXY" || inst == "USD_DXY" {
+		// Sumber non-OANDA diintersep di sini (lihat stocks.go: resolveSource).
+		switch resolveSource(inst) {
+		case "dxy":
 			handleDXYCandles(w, token, gran, p)
 			return
 		}
