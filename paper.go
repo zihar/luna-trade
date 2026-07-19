@@ -244,6 +244,10 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if isNonTradeable(string(req.Instrument)) {
+		writeErr(w, http.StatusBadRequest, "instrument is chart-only and not tradeable")
+		return
+	}
 	if req.Type != Market {
 		writeErr(w, http.StatusBadRequest, "paper saat ini hanya mendukung market order")
 		return

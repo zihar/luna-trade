@@ -1302,6 +1302,10 @@
 
   /* order panel ringkas (docked di Markets / mengambang di atas chart) */
   .orderpanel{ border-top:1px solid var(--border); padding:3px 8px 5px; }
+  .orderpanel.notrade{ position:relative; opacity:.55; pointer-events:none; }
+  .orderpanel.notrade::before{ content:'Chart only · not tradeable'; position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6;
+    font:600 11px var(--font-sans, sans-serif); letter-spacing:.03em; white-space:nowrap; pointer-events:none;
+    color:var(--muted, #8a94a6); background:var(--panel, #141822); border:1px solid var(--border); border-radius:999px; padding:3px 10px; }
   /* ── Type: UI pakai Sora (display), angka/readout pakai Chivo Mono (tabular) ── */
   .orderpanel, #orderForm{ font-family:var(--font-display); -webkit-font-smoothing:antialiased; }
   .orderpanel .op3-deal-px, .orderpanel .tl-in,
@@ -1497,6 +1501,8 @@
     <option>JP225_USD</option><option>AU200_AUD</option><option>HK33_HKD</option>
     <!-- Crypto -->
     <option>BTC_USD</option><option>ETH_USD</option><option>LTC_USD</option><option>BCH_USD</option>
+    <!-- Stocks (charting only, non-tradeable) -->
+    <option>STOCK:BBCA.JK</option><option>STOCK:AAPL</option>
   </select>
   <div class="ipick" id="ipick">
     <button type="button" class="ipick-trg" id="ipickTrg" aria-haspopup="listbox" aria-expanded="false" aria-label="Switch instrument">
@@ -3136,6 +3142,7 @@ async function loadInit(latest){
       Promise.all([document.fonts.load("10px 'Inter Tight'"), document.fonts.load("bold 10px 'Inter Tight'")]),
       new Promise(r=>setTimeout(r,700)) ]); }catch(e){} }
   inst = $('#instrument').value;
+  applyTradeGating();
   const date = $('#date').value;
   if(!latest && !date){ setStatus('Pick a date first.',true); return; }
   localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
@@ -5258,7 +5265,7 @@ const SYM_DECIMALS = {
   JP225_USD:1, AU200_AUD:1, HK33_HKD:1, US2000_USD:3, ETH_USD:2, LTC_USD:2, BCH_USD:2,
   WTICO_USD:3, BCO_USD:3, NATGAS_USD:3,
 };
-function symDecimals(s){ if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
+function symDecimals(s){ const im=IPK_META[s]; if(im&&im.decimals!=null) return im.decimals; if(SYM_DECIMALS[s]!=null) return SYM_DECIMALS[s];
   return s.includes('BTC')?1 : s.includes('DXY')?3 : s.includes('JPY')?3 : (s.includes('XAU')||s.includes('XAG'))?3 : 5; }
 // toast feedback ringan (alert berbunyi / pending tereksekusi) — terlihat tanpa mengandalkan setStatus
 let toastTimer=null;
@@ -5364,7 +5371,7 @@ function updateWatch(){
   });
 }
 function renderWatch(){ if(!wlBuilt) buildWatch(); else updateWatch(); }
-function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} loadInit(true);
+function selectSymbol(s){ if(s===inst) return; track('symbol',{sym:s}); $('#instrument').value=s; inst=s; guessPip(); renderWatch(); syncIpickTrigger(); updateChartWM(); renderHeaderPrice(); try{drawPaperLines();}catch(e){} applyTradeGating(); loadInit(true);
   if(typeof refreshNewsData==='function') refreshNewsData();   // instrumen berubah → sync bias card + marker (walau panel tertutup)
 }
 
@@ -5383,7 +5390,7 @@ const IPK_CCY = {
   // indeks (chip tunggal) — kode singkat khas indeksnya
   DXY:'$', SPX:'SP', NAS:'NQ', DJI:'DJ', RUT:'RU', DAX:'DE', FTSE:'UK', CAC:'FR', STOXX:'SX', NKY:'NK', ASX:'AS', HSI:'HK',
 };
-const IPK_GROUPS = ['Forex','Metals','Energy','Indices','Crypto'];
+const IPK_GROUPS = ['Forex','Metals','Energy','Indices','Crypto','Stocks'];
 const IPK_META = {
   EUR_USD:{grp:'Forex',   name:'Euro / US Dollar',                  base:'EUR', quote:'USD'},
   GBP_USD:{grp:'Forex',   name:'British Pound / US Dollar',         base:'GBP', quote:'USD'},
@@ -5403,7 +5410,7 @@ const IPK_META = {
   WTICO_USD: {grp:'Energy',  name:'WTI Crude Oil',      base:'WTI'},
   BCO_USD:   {grp:'Energy',  name:'Brent Crude Oil',    base:'BRENT'},
   NATGAS_USD:{grp:'Energy',  name:'Natural Gas',        base:'NGAS'},
-  DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY'},
+  DXY:       {grp:'Indices', name:'US Dollar Index',    base:'DXY', tradeable:false},
   SPX500_USD:{grp:'Indices', name:'S&P 500',            base:'SPX'},
   NAS100_USD:{grp:'Indices', name:'Nasdaq 100',         base:'NAS'},
   US30_USD:  {grp:'Indices', name:'Dow Jones 30',       base:'DJI'},
@@ -5419,9 +5426,15 @@ const IPK_META = {
   ETH_USD:{grp:'Crypto',  name:'Ether / US Dollar',        base:'ETH', quote:'USD'},
   LTC_USD:{grp:'Crypto',  name:'Litecoin / US Dollar',     base:'LTC', quote:'USD'},
   BCH_USD:{grp:'Crypto',  name:'Bitcoin Cash / US Dollar', base:'BCH', quote:'USD'},
+  'STOCK:BBCA.JK':{grp:'Stocks', name:'Bank Central Asia (IDX)', base:'BBCA', quote:'IDR', decimals:0, tradeable:false},
+  'STOCK:AAPL':   {grp:'Stocks', name:'Apple Inc. (NASDAQ)',     base:'AAPL', quote:'USD', decimals:2, tradeable:false},
 };
 function ipkMeta(s){ const m=IPK_META[s]; if(m) return m;
   const p=s.split('_'); return { grp:'Forex', name:s.replace('_',' / '), base:p[0], quote:p[1] }; }
+// Instrumen non-tradeable (saham, DXY): tiket order dinon-aktifkan (chart-only).
+// Panel positions/trades TETAP terlihat (lintas-instrumen).
+function isTradeable(s){ return ipkMeta(s).tradeable !== false; }
+function applyTradeGating(){ const op=$('#orderpanel'); if(op) op.classList.toggle('notrade', !isTradeable(inst)); }
 function ipkChip(ccy){ if(!ccy) return ''; const t=IPK_CCY[ccy]||ccy.slice(0,2); return `<span class="ipick-chip ipk-c-${ccy}">${t}</span>`; }
 function ipkPair(s){ const m=ipkMeta(s); return ipkChip(m.base)+ipkChip(m.quote); }
 function ipkPrice(s){ const q=quoteCache[s], lt=liveTicks[s], dec=symDecimals(s);
