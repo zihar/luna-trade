@@ -1503,6 +1503,9 @@
     <option>BTC_USD</option><option>ETH_USD</option><option>LTC_USD</option><option>BCH_USD</option>
     <!-- Stocks (charting only, non-tradeable) -->
     <option>STOCK:BBCA.JK</option><option>STOCK:AAPL</option>
+    <option>STOCK:TSLA</option><option>STOCK:NVDA</option><option>STOCK:AMZN</option><option>STOCK:MSFT</option><option>STOCK:META</option><option>STOCK:GOOGL</option><option>STOCK:AMD</option><option>STOCK:PLTR</option>
+    <!-- ETF -->
+    <option>STOCK:SPY</option><option>STOCK:QQQ</option>
   </select>
   <div class="ipick" id="ipick">
     <button type="button" class="ipick-trg" id="ipickTrg" aria-haspopup="listbox" aria-expanded="false" aria-label="Switch instrument">
@@ -5390,7 +5393,7 @@ const IPK_CCY = {
   // indeks (chip tunggal) — kode singkat khas indeksnya
   DXY:'$', SPX:'SP', NAS:'NQ', DJI:'DJ', RUT:'RU', DAX:'DE', FTSE:'UK', CAC:'FR', STOXX:'SX', NKY:'NK', ASX:'AS', HSI:'HK',
 };
-const IPK_GROUPS = ['Forex','Metals','Energy','Indices','Crypto','Stocks'];
+const IPK_GROUPS = ['Forex','Metals','Energy','Indices','Crypto','Stocks','ETF'];
 const IPK_META = {
   EUR_USD:{grp:'Forex',   name:'Euro / US Dollar',                  base:'EUR', quote:'USD'},
   GBP_USD:{grp:'Forex',   name:'British Pound / US Dollar',         base:'GBP', quote:'USD'},
@@ -5428,6 +5431,16 @@ const IPK_META = {
   BCH_USD:{grp:'Crypto',  name:'Bitcoin Cash / US Dollar', base:'BCH', quote:'USD'},
   'STOCK:BBCA.JK':{grp:'Stocks', name:'Bank Central Asia (IDX)', base:'BBCA', quote:'IDR', decimals:0, tradeable:false},
   'STOCK:AAPL':   {grp:'Stocks', name:'Apple Inc. (NASDAQ)',     base:'AAPL', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:TSLA':   {grp:'Stocks', name:'Tesla, Inc.',             base:'TSLA', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:NVDA':   {grp:'Stocks', name:'NVIDIA Corporation',      base:'NVDA', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:AMZN':   {grp:'Stocks', name:'Amazon.com, Inc.',        base:'AMZN', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:MSFT':   {grp:'Stocks', name:'Microsoft Corporation',   base:'MSFT', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:META':   {grp:'Stocks', name:'Meta Platforms, Inc.',    base:'META', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:GOOGL':  {grp:'Stocks', name:'Alphabet Inc. (Class A)', base:'GOOGL',quote:'USD', decimals:2, tradeable:false},
+  'STOCK:AMD':    {grp:'Stocks', name:'Advanced Micro Devices',  base:'AMD',  quote:'USD', decimals:2, tradeable:false},
+  'STOCK:PLTR':   {grp:'Stocks', name:'Palantir Technologies',   base:'PLTR', quote:'USD', decimals:2, tradeable:false},
+  'STOCK:SPY':    {grp:'ETF',    name:'SPDR S&P 500 ETF',        base:'SPY',  quote:'USD', decimals:2, tradeable:false},
+  'STOCK:QQQ':    {grp:'ETF',    name:'Invesco QQQ Trust',       base:'QQQ',  quote:'USD', decimals:2, tradeable:false},
 };
 function ipkMeta(s){ const m=IPK_META[s]; if(m) return m;
   const p=s.split('_'); return { grp:'Forex', name:s.replace('_',' / '), base:p[0], quote:p[1] }; }
