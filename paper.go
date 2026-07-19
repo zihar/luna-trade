@@ -28,6 +28,9 @@ var instrumentSpec = map[string]instSpec{
 	"EUR_USD": {0.0001, "USD"}, "GBP_USD": {0.0001, "USD"}, "AUD_USD": {0.0001, "USD"},
 	"USD_CAD": {0.0001, "CAD"}, "USD_JPY": {0.01, "JPY"},
 	"GBP_JPY": {0.01, "JPY"}, "EUR_JPY": {0.01, "JPY"},
+	"EUR_GBP": {0.0001, "GBP"}, "AUD_JPY": {0.01, "JPY"},
+	"EUR_AUD": {0.0001, "AUD"}, "GBP_AUD": {0.0001, "AUD"},
+	"WTICO_USD": {0.01, "USD"}, "BCO_USD": {0.01, "USD"}, "NATGAS_USD": {0.01, "USD"},
 	"XAU_USD": {0.1, "USD"}, "BTC_USD": {1, "USD"},
 }
 
