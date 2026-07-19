@@ -3067,10 +3067,13 @@ document.addEventListener('click',(e)=>{
 });
 // highlightTF dipanggil di banyak tempat saat currentTF berubah → rebuild bar (agar TF non-favorit aktif ikut tampil/hilang) & refresh menu bila terbuka.
 function highlightTF(){ rebuildTFBar(); if(tfMenu.classList.contains('open')) buildTFMenu(); updateChartWM(); }
+// dispSym: nama simbol untuk TAMPILAN — buang namespace 'STOCK:' & suffix bursa ('.JK'),
+// serta pemisah '_' (format OANDA). Data & routing tetap pakai simbol lengkap.
+function dispSym(s){ return String(s).replace(/^STOCK:/,'').replace(/\.[A-Z]+$/,'').replace('_',''); }
 // watermark kanvas: crescent + "SIMBOL · TF" (ikut instrumen & timeframe aktif)
 function updateChartWM(){ try{ updateChartLegend(); }catch(e){}   // legend kiri-atas ikut ganti instrumen/TF
   if(!chartWmEl) return; const t=chartWmEl.querySelector('.wm-t');
-  if(t) t.textContent = inst.replace('_','') + ' · ' + (TF_LABEL[currentTF]||currentTF); }
+  if(t) t.textContent = dispSym(inst) + ' · ' + (TF_LABEL[currentTF]||currentTF); }
 rebuildTFBar();
 
 // ===================== load awal =====================
@@ -3340,7 +3343,7 @@ function renderHeaderPrice(){
   baEl.textContent=bid.toFixed(dec)+' / '+ask.toFixed(dec);
 }
 function renderOrderPanel(){
-  document.querySelectorAll('.j-sym').forEach(s=>s.textContent=inst.replace('_',''));
+  document.querySelectorAll('.j-sym').forEach(s=>s.textContent=dispSym(inst));
   const flagHtml = ipkPair(inst);   // dual-chip identik picker (pengganti emoji generik)
   document.querySelectorAll('.j-flag').forEach(f=>f.innerHTML=flagHtml);
   const lu=$('#lotUnit'); if(lu) lu.textContent=lotUnitName();
@@ -4034,7 +4037,7 @@ function renderPosEdit(skipPriceInputs){
   const dec=decimalsFor(editPos.instrument), pip=pipOf(editPos.instrument), bal=+$('#balance').value||0, isSell=editPos.dir==='short';
   $$('#peDir').textContent=isSell?'SELL':'BUY'; $$('#peDir').className='pe-dir '+(isSell?'sell':'buy');
   $$('#peFlag').innerHTML = ipkPair(editPos.instrument);   // dual-chip identik picker
-  $$('#peSym').textContent=editPos.instrument.replace('_','');
+  $$('#peSym').textContent=dispSym(editPos.instrument);
   const mkt=+editPos.price, mktCls=(isSell? mkt<=editPos.entry : mkt>=editPos.entry)?'t-pos':'t-neg';
   $$('#peInstR').innerHTML=`${lotLabelFor(editPos.instrument,editPos.units)} / ${(+editPos.entry).toFixed(dec)} → <span class="${mktCls}">${mkt.toFixed(dec)}</span>`;
   $$('#peSLon').checked=editPos.slOn; $$('#peTPon').checked=editPos.tpOn;
@@ -4261,7 +4264,7 @@ const ServerPaperBroker = {
         body:JSON.stringify(body)});
       const d=await r.json().catch(()=>({}));
       if(!r.ok){ toast(d.error||'Order failed','error'); }
-      else { clearDraftLines(); toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+inst.replace('_','')+' @ '+fmtFor(inst,d.entry),'success'); await spSync(); }
+      else { clearDraftLines(); toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+dispSym(inst)+' @ '+fmtFor(inst,d.entry),'success'); await spSync(); }
     }catch(e){ toast('Could not connect to the server','error'); }
     if(btn) btn.disabled=false;
   },
@@ -4299,7 +4302,7 @@ function spRenderTrades(){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','SL / TP','Margin','Profit & Loss','Actions']);
     if(!SP.positions.length){ body.innerHTML=emptyRow(8,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
     body.innerHTML=SP.positions.map(p=>`<tr>
-      <td><b>${p.instrument.replace('_','')}</b></td>
+      <td><b>${dispSym(p.instrument)}</b></td>
       <td class="${sideCls(p.dir)}">${sideTxt(p.dir)}</td>
       <td>${lotLabelFor(p.instrument,p.units)}</td>
       <td>${fmtFor(p.instrument,p.entry)} / ${fmtFor(p.instrument,p.price)}</td>
@@ -4314,7 +4317,7 @@ function spRenderTrades(){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry','Exit','Profit & Loss','Closed (NY)']);
     if(!SP.closed.length){ body.innerHTML=emptyRow(7,'No closed positions','Trades you close will show up here.'); return; }
     body.innerHTML=SP.closed.map(t=>`<tr>
-      <td><b>${t.instrument.replace('_','')}</b></td>
+      <td><b>${dispSym(t.instrument)}</b></td>
       <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}</td>
       <td>${lotLabelFor(t.instrument,t.units)}</td>
       <td>${fmtFor(t.instrument,t.entry)}</td>
@@ -5188,7 +5191,7 @@ function renderTrades(){
   if(isStats){ try{renderStats();}catch(e){} return; }
 
   const head=$('#tpHead'), body=$('#tpBody');
-  const sym=inst.replace('_','');
+  const sym=dispSym(inst);
   const cur=currentCandle();
   if(activeTradeTab==='positions'){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Stop Loss','Take Profit','Margin','Profit & Loss','Actions']);
@@ -5335,7 +5338,7 @@ function buildWatch(){
   WATCH_SYMS.forEach(s=>{
     const row=document.createElement('div');
     row.className='wl-row'; row.dataset.sym=s;
-    row.innerHTML=`<span class="wl-sym">${s.replace('_','')}</span>`
+    row.innerHTML=`<span class="wl-sym">${dispSym(s)}</span>`
       +`<span class="wl-bid">—</span><span class="wl-ask">—</span>`
       +`<span class="wl-spr">—</span><span class="wl-num wl-hi">—</span><span class="wl-num wl-lo">—</span>`;
     box.appendChild(row);
@@ -5461,11 +5464,11 @@ function ipkPriceHTML(s){ const p=ipkPrice(s);
 let ipickOpen=false, ipickCursor=-1;
 function syncIpickTrigger(){ const s=($('#instrument')&&$('#instrument').value)||inst;
   const tp=$('#ipickTrgPair'), tt=$('#ipickTrgTick');
-  if(tp) tp.innerHTML=ipkPair(s); if(tt) tt.textContent=s.replace('_',''); }
+  if(tp) tp.innerHTML=ipkPair(s); if(tt) tt.textContent=dispSym(s); }
 function renderIpick(filter=''){
   const list=$('#ipickList'); if(!list) return;
   const f=(filter||'').trim().toLowerCase();
-  const match=s=>{ const m=ipkMeta(s); return !f || s.replace('_','').toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f); };
+  const match=s=>{ const m=ipkMeta(s); return !f || dispSym(s).toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f) || (m.grp||'').toLowerCase().includes(f); };
   let html='', any=false, idx=0; const flat=[];
   for(const g of IPK_GROUPS){
     const items=WATCH_SYMS.filter(s=>ipkMeta(s).grp===g && match(s));
@@ -5474,7 +5477,7 @@ function renderIpick(filter=''){
     for(const s of items){ const m=ipkMeta(s), on=s===inst?' on':'', cur=idx===ipickCursor?' cursor':'';
       html+=`<div class="ipick-row${on}${cur}" data-sym="${s}" role="option" aria-selected="${s===inst}">
         <span class="ipick-pair">${ipkPair(s)}</span>
-        <span class="id"><div class="sym">${s.replace('_','')}</div><div class="name">${m.name||s}</div></span>
+        <span class="id"><div class="sym">${dispSym(s)}</div><div class="name">${m.name||s}</div></span>
         <span class="px">${ipkPriceHTML(s)}</span></div>`;
       flat.push(s); idx++; }
   }
@@ -5712,8 +5715,8 @@ function drawAlertLines(){
 function renderAlertList(){
   const el=$('#alertList'); if(!el) return;
   el.innerHTML = alerts.length
-    ? alerts.map((a,i)=>`<div class="al-item"><div class="al-main">${a.sym.replace('_','')} Crossing ${a.price}</div>`
-        +`<div class="al-sub">${a.sym.replace('_','')} · <span class="al-st${a.triggeredAt?' trig':''}">${a.triggeredAt?'Triggered':'Active'}</span></div>`
+    ? alerts.map((a,i)=>`<div class="al-item"><div class="al-main">${dispSym(a.sym)} Crossing ${a.price}</div>`
+        +`<div class="al-sub">${dispSym(a.sym)} · <span class="al-st${a.triggeredAt?' trig':''}">${a.triggeredAt?'Triggered':'Active'}</span></div>`
         +`<button class="al-x" data-i="${i}" title="Delete">✕</button></div>`).join('')
     : '<div class="al-empty">No alerts yet. Click + to add.</div>';
   el.querySelectorAll('.al-x').forEach(b=>b.onclick=()=>removeAlert(+b.dataset.i));
@@ -5731,7 +5734,7 @@ async function createServerAlert(price){
 }
 // dialog "Create alert on <INST>" — dipicu tombol + panel Alerts
 function openAlertDialog(){
-  $('#amInst').textContent=inst.replace('_','');
+  $('#amInst').textContent=dispSym(inst);
   const m=liveMid?liveMid():null, cur=currentCandle();
   $('#amPrice').value=(m!=null?m:(cur?cur.close:'')) || '';
   $('#alertModal').classList.add('open'); setTimeout(()=>$('#amPrice').focus(),0);
