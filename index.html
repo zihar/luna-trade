@@ -2543,7 +2543,7 @@ function posFigures(dir){
     // pill ala TV: teks putih + background berwarna + sudut membulat
     const pill=(x,y,text,bg,align,baseline)=>{ if(showH) F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
       styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}}); };
-    const handle=(x,y)=>{ if(showH) F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'rgba(24,32,48,0.92)',borderColor:'#4a8bff',borderSize:1.5,borderRadius:3}}); };
+    const handle=(x,y)=>{ if(showH) F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'#ffffff',borderColor:'rgba(0,0,0,0.35)',borderSize:1.5,borderRadius:3}}); };
 
     const entry=pts[0].value, yE=C[0].y;
     const haveTP = pts.length>1 && pts[1] && pts[1].value!=null && coordinates.length>1;
@@ -2698,9 +2698,9 @@ const darkStyles = {
   yAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
   crosshair:{ horizontal:{ text:chTextStyle('#4a71ff') }, vertical:{ text:chTextStyle('#4a71ff') } },
   overlay:{ text:{color:'#fff', backgroundColor:'rgba(27,27,31,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag/draw (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
-    point:{ color:'rgba(0,0,0,0)', borderColor:'#4a71ff', borderSize:1.5, radius:3,
-            activeColor:'rgba(0,0,0,0)', activeBorderColor:'#4a71ff', activeBorderSize:1.5, activeRadius:4 } },
+    // buletan drag/draw (handle bawaan): isi putih bersih + border tipis gelap (definisi tepi di atas candle apa pun); membesar & border menebal saat hover/drag (ala TradingView/Figma)
+    point:{ color:'#ffffff', borderColor:'rgba(0,0,0,0.35)', borderSize:1.5, radius:3.5,
+            activeColor:'#ffffff', activeBorderColor:'rgba(0,0,0,0.5)', activeBorderSize:2, activeRadius:5 } },
 };
 const lightStyles = {
   grid:{ horizontal:{color:'#eceff3'}, vertical:{color:'#eceff3'} },
@@ -2719,9 +2719,9 @@ const lightStyles = {
   yAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
   crosshair:{ horizontal:{ text:chTextStyle('#3a5fe0') }, vertical:{ text:chTextStyle('#3a5fe0') } },
   overlay:{ text:{color:'#1e242e', backgroundColor:'rgba(200,208,220,0.92)', borderColor:'rgba(0,0,0,0)'},
-    // buletan drag/draw (handle bawaan): kecil + tengah transparan (cincin), ala TradingView
-    point:{ color:'rgba(0,0,0,0)', borderColor:'#3a5fe0', borderSize:1.5, radius:3,
-            activeColor:'rgba(0,0,0,0)', activeBorderColor:'#3a5fe0', activeBorderSize:1.5, activeRadius:4 } },
+    // buletan drag/draw (handle bawaan): isi putih bersih + border tipis gelap (definisi tepi di atas candle apa pun); membesar & border menebal saat hover/drag (ala TradingView/Figma)
+    point:{ color:'#ffffff', borderColor:'rgba(0,0,0,0.35)', borderSize:1.5, radius:3.5,
+            activeColor:'#ffffff', activeBorderColor:'rgba(0,0,0,0.5)', activeBorderSize:2, activeRadius:5 } },
 };
 // ===================== QT Fractal (Modul C) — util waktu NY (DST-aware) =====================
 // Anchor Quarterly Theory selalu America/New_York, independen dari timezone tampilan user.
