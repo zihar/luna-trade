@@ -1921,7 +1921,7 @@ let drawIds = [];        // overlay drawing
 const extending = {};
 
 // ===================== util =====================
-function priceDecimals(){ return inst.includes('BTC')?1 : inst.includes('DXY')?3 : inst.includes('JPY')?3 : (inst.includes('XAU')||inst.includes('XAG'))?3 : 5; }
+function priceDecimals(){ return symDecimals(inst); }   // sumber tunggal presisi (baca IPK_META: stocks, indeks, dst)
 function fmt(p){ return p==null||isNaN(p)?'—':(+p).toFixed(priceDecimals()); }
 function nyTime(ms){
   try{
@@ -4279,7 +4279,7 @@ function spStartPolling(){ if(SP.timer) return; spSync(); SP.timer=setInterval(s
 function spStopPolling(){ if(SP.timer){ clearInterval(SP.timer); SP.timer=null; } }
 
 // formatter sadar-instrumen (posisi server bisa beda pair dari chart aktif)
-function decimalsFor(i){ return i.includes('BTC')?1 : i.includes('DXY')?3 : i.includes('JPY')?3 : (i.includes('XAU')||i.includes('XAG'))?3 : (i.includes('WTICO')||i.includes('BCO')||i.includes('NATGAS'))?3 : 5; }
+function decimalsFor(i){ return symDecimals(i); }   // delegasi ke sumber tunggal (baca IPK_META)
 function fmtFor(i,v){ return v==null||isNaN(v)?'—':(+v).toFixed(decimalsFor(i)); }
 function unitsPerFor(i){ return i.includes('BTC')?1 : (i.includes('XAU')||i.includes('XAG'))?100 : 100000; }
 function lotLabelFor(i,u){ if(i.includes('BTC')) return u.toFixed(4)+' BTC'; if(i.includes('XAU')||i.includes('XAG')) return (u/100).toFixed(2)+' lot'; return (u/100000).toFixed(2)+' lot'; }
