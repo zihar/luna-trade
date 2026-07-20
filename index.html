@@ -809,6 +809,9 @@ function expandBox(o){
   try{ chart.overrideOverlay({id:o.id, points:pts, extendData:ext}); }catch(e){}
 }
 
+// Undangan "+ Add text" (ala TradingView) hanya muncul saat objek SUDAH JADI & sedang
+// di-hover atau terpilih — bukan saat digambar. Dipakai rect & trendline saat teks kosong.
+function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && (overlay.id===hoverId || overlay.id===selectedId); }
 // ===================== custom overlay: rectangle/zona =====================
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
@@ -822,12 +825,15 @@ klinecharts.registerOverlay({
     const rl=lsLine(st);
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
-    const t=overlay&&overlay.extendData;                       // teks opsional → posisi via textAlign/textValign
-    if(t){ const ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=String(t).split('\n'), lh=15;
+    const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');    // teks opsional → posisi via textAlign/textValign
+    if(t!==''){ const ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=t.split('\n'), lh=15;
       const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
       const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
       lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
         styles:{color:drawTextColor,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
+    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → undangan "+ Add text" menyatu di tengah kotak (ala TradingView)
+      figs.push({type:'text',attrs:{x:x+w/2,y:y+h/2,text:'+ Add text',align:'center',baseline:'middle'},
+        styles:{color:drawTextMuted,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     return figs;
   }
 });
@@ -929,14 +935,17 @@ klinecharts.registerOverlay({
     const a=C[0], b=C[1];
     const st=dstyle(overlay);
     const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))}];
-    const t=overlay&&overlay.extendData;
-    if(t){ const ha=st.textAlign||'center', va=st.textValign||'top', off=4;
+    const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');
+    if(t!==''){ const ha=st.textAlign||'center', va=st.textValign||'top', off=4;
       const px = ha==='left' ? a.x : ha==='right' ? b.x : (a.x+b.x)/2;
       const py = ha==='left' ? a.y : ha==='right' ? b.y : (a.y+b.y)/2;
       const ty = va==='top' ? py-off : va==='bottom' ? py+off : py;
       const bl = va==='top' ? 'bottom' : va==='bottom' ? 'top' : 'middle';
-      figs.push({type:'text',attrs:{x:px,y:ty,text:String(t),align:ha,baseline:bl},
+      figs.push({type:'text',attrs:{x:px,y:ty,text:t,align:ha,baseline:bl},
         styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
+    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → "Add text" muted di titik-tengah garis
+      figs.push({type:'text',attrs:{x:(a.x+b.x)/2,y:(a.y+b.y)/2-4,text:'Add text',align:'center',baseline:'bottom'},
+        styles:{color:drawTextMuted,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     // Selama MENGGAMBAR tak ada buletan handle sama sekali (default disembunyikan via HIDDEN_POINT).
     // Buletan hanya muncul saat objek yg SUDAH JADI di-hover/pilih (handle default dikembalikan di onDrawEnd).
     return figs;
@@ -3025,6 +3034,8 @@ function posRerender(o){ try{
   if(!o||o.id===inProgressId||!o.points) return;
   if((o.name==='longPosition'||o.name==='shortPosition')&&o.points.length>=6) chart.overrideOverlay({id:o.id,points:o.points});
   else if(o.name==='fib3'&&o.points.length>=2) chart.overrideOverlay({id:o.id,points:o.points});  // toggle penanda harga Y saat aktif
+  // rect/trendline kosong: paksa redraw saat hover/select → undangan "+ Add text" muncul/hilang seketika
+  else if((o.name==='rect'||o.name==='trendline')&&o.points.length>=2&&!(o.extendData&&String(o.extendData).trim())) chart.overrideOverlay({id:o.id,points:o.points});
 }catch(_){} }
 function delHooks(){ return {
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
@@ -3068,7 +3079,11 @@ function delHooks(){ return {
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
     if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
     inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
-  onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; } selectedId=e.overlay.id; return false; },
+  onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
+    const o=e.overlay; selectedId=o&&o.id;
+    // objek bisa-teks yg masih KOSONG → klik = tambah teks (buka modal tab Text), ala TradingView "+ Add text"
+    if(o && ADDTEXT_CLICK.has(o.name) && !(o.extendData&&String(o.extendData).trim())) openDrawModal(o,'text');
+    return false; },
   onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
   onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;   // objek bisa-teks → modal ke tab Text, sisanya tab Style
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
@@ -3561,8 +3576,9 @@ _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetO
 // urutan tombol bawah (atas→bawah): magnet, hide, trash
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
-// Catatan: tombol melayang "+ Add text" dihapus — affordance kini menyatu di objek
-// (double-click objek → modal Style/Text tab Text). Lihat openDrawModal.
+// Catatan: tombol melayang "+ Add text" (DOM) diganti undangan yang MENYATU di canvas —
+// placeholder muted di dalam rect/trendline saat kosong & di-hover/pilih (lihat showAddTextHint
+// + createPointFigures). Klik objek kosong → openDrawModal(o,'text') (lihat onClick overlay).
 
 // ===================== stats & journal =====================
 function renderStats(){
@@ -5412,6 +5428,7 @@ makeDraggable(objPop, '.pp-grip');
 // objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
 const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline']);
 const DM_ALIGN_OBJS=new Set(['text','rect','trendline']);   // callout selalu kiri-atas → tanpa chip align
+const ADDTEXT_CLICK=new Set(['rect','trendline','callout']);   // klik saat kosong → langsung tambah teks (undangan "+ Add text" di canvas)
 // judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
 const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();
 // ikon tipe objek utk header modal (SVG dari daftar tool → header memberi tahu objek apa yg diedit)
@@ -5422,8 +5439,9 @@ function dmEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp
 const drawModal=document.createElement('div'); drawModal.className='dmodal-scrim';
 drawModal.innerHTML='<div class="dmodal" role="dialog" aria-modal="true"></div>';
 document.body.appendChild(drawModal);
-let dmTarget=null;
-drawModal.addEventListener('mousedown',e=>{ if(e.target===drawModal) closeDrawModal(); });   // klik scrim = tutup
+let dmTarget=null, dmOpenedAt=0;
+// klik scrim = tutup; abaikan sesaat setelah buka agar klik ke-2 (double-click "+ Add text") tak langsung menutup
+drawModal.addEventListener('mousedown',e=>{ if(e.target===drawModal && (Date.now()-dmOpenedAt)>350) closeDrawModal(); });
 function closeDrawModal(){
   if(!drawModal.classList.contains('show')) return;
   const o=dmTarget; dmTarget=null;
@@ -5483,7 +5501,7 @@ function openDrawModal(o, tab){
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
   panel.querySelector('.dm-close').onclick=closeDrawModal;
   panel.querySelector('.dm-x').onclick=closeDrawModal;
-  dmTarget=o;
+  dmTarget=o; dmOpenedAt=Date.now();
   drawModal.classList.add('show');
   // tinggi konsisten antar-tab: samakan min-height tiap pane ke pane tertinggi
   // (di-set per-pane, bukan body, agar tak terpengaruh padding body saat box-sizing:border-box)
