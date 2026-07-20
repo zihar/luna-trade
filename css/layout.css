@@ -28,16 +28,6 @@
     *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
   }
 
-  /* tombol "+ Add text" pada trendline/rect (muncul saat terpilih & di-hover) */
-  .addtext-btn{ position:fixed; z-index:1200; display:none; align-items:center; gap:5px;
-    background:var(--panel); border:1px solid var(--border); color:var(--txt); font-size:12px; font-weight:500;
-    padding:3px 9px; border-radius:6px; cursor:pointer; white-space:nowrap;
-    box-shadow:0 2px 8px rgba(0,0,0,.28); transform:translate(-50%,-100%);
-    transition:border-color .12s ease, background .12s ease; }
-  .addtext-btn.show{ display:inline-flex; }
-  .addtext-btn:hover{ background:var(--btn-hover); border-color:var(--accent); }
-  .addtext-btn .pl{ font-weight:700; font-size:13px; line-height:1; color:var(--accent); }
-
   /* ===================== layout 5-zona (TradeLocker) ===================== */
   .app{ flex:1; min-height:0; position:relative; display:grid;
         grid-template-columns:56px 1fr var(--markets-w,300px);

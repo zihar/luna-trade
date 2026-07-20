@@ -104,6 +104,39 @@
   .pp-chip.on:hover{ color:#fff; filter:brightness(1.06); }
   .pp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:10px; margin-top:3px; }
   .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
+  /* ===== modal Style/Text objek gambar (ala TradingView): dialog di tengah, live-apply ===== */
+  .dmodal-scrim{ position:fixed; inset:0; z-index:1400; display:none; align-items:center; justify-content:center;
+    background:rgba(4,6,12,.5); backdrop-filter:blur(2px); }
+  .dmodal-scrim.show{ display:flex; }
+  .dmodal{ background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
+    width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 48px); display:flex; flex-direction:column;
+    overflow:hidden; animation:dmPop .14s ease; }
+  @keyframes dmPop{ from{ opacity:0; transform:translateY(6px) scale(.98); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .dmodal{ animation:none; } }
+  .dm-head{ display:flex; align-items:center; gap:8px; padding:11px 12px 9px; border-bottom:1px solid var(--border); }
+  .dm-title{ font-size:13px; font-weight:600; color:var(--txt); flex:1; }
+  .dm-x{ flex:0 0 auto; width:24px; height:24px; border:0; border-radius:6px; background:transparent; color:var(--muted);
+    font-size:15px; line-height:1; cursor:pointer; transition:background .12s, color .12s; }
+  .dm-x:hover{ background:var(--btn-hover); color:var(--txt); }
+  .dm-tabs{ display:flex; gap:2px; padding:0 12px; border-bottom:1px solid var(--border); }
+  .dm-tab{ background:transparent; border:0; border-bottom:2px solid transparent; color:var(--muted); font-size:12px;
+    padding:8px 10px; cursor:pointer; transition:color .12s; }
+  .dm-tab:hover{ color:var(--txt); }
+  .dm-tab.on{ color:var(--txt); border-bottom-color:var(--accent); }
+  .dm-body{ padding:12px; overflow:auto; }
+  .dm-pane[hidden]{ display:none; }
+  .dm-ta{ width:100%; box-sizing:border-box; min-height:76px; resize:vertical; background:var(--btn); color:var(--txt);
+    border:1px solid var(--border); border-radius:8px; padding:8px 9px; font-size:13px; font-family:inherit; line-height:1.4;
+    margin-bottom:11px; transition:border-color .12s, box-shadow .12s; }
+  .dm-ta::placeholder{ color:var(--muted); }
+  .dm-ta:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
+  .dm-foot{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-top:1px solid var(--border); }
+  .dm-del{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:12px; padding:6px 11px;
+    border-radius:7px; cursor:pointer; transition:color .12s, border-color .12s; }
+  .dm-del:hover{ color:var(--red); border-color:var(--red); }
+  .dm-close{ margin-left:auto; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:12px;
+    font-weight:600; padding:6px 16px; border-radius:7px; cursor:pointer; transition:filter .12s; }
+  .dm-close:hover{ filter:brightness(1.06); }
   .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; padding:2px; transition:border-color .12s; }
   .pp-color:hover{ border-color:var(--btn-border-hover); }
   .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }

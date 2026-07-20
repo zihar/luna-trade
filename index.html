@@ -1185,7 +1185,7 @@ function posFigures(dir){
 klinecharts.registerOverlay({name:'longPosition', totalStep:2, needDefaultPointFigure:true, performEventPressedMove:posPressedMove, createPointFigures:posFigures('long')});
 klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointFigure:true, performEventPressedMove:posPressedMove, createPointFigures:posFigures('short')});
 
-// custom overlay: Text bebas — 1 klik taruh titik, lalu editor inline (lihat editTextOverlay)
+// custom overlay: Text bebas — 1 klik taruh titik, lalu modal Style/Text tab Text (lihat applyTextInput)
 let drawTextColor='#e8edf2';   // diperbarui oleh applyTheme agar kontras di light/dark
 let drawTextMuted='#89898b';   // warna placeholder (callout kosong) — ikut tema (= --muted)
 let editingTextId=null;        // id overlay teks yg sedang diedit → jangan dirender (cegah dobel dgn editor)
@@ -3070,13 +3070,12 @@ function delHooks(){ return {
     inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
   onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; } selectedId=e.overlay.id; return false; },
   onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
-  onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;
-    if(n==='text'||n==='callout'){ hideAddTextNow(); editTextOverlay(o); }  // teks/callout: klik 2x → edit teks (style via klik-kanan)
-    else if(DRAW_DEFAULT[n]!==undefined){ hideAddTextNow(); showObjPopup(o, lastPtr.x, lastPtr.y); } }catch(_){} return false; },
+  onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;   // objek bisa-teks → modal ke tab Text, sisanya tab Style
+    if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
-  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; try{hideAddTextNow();}catch(_){} posRerender(e.overlay); return false; },
+  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
-  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; try{scheduleHideAddText();}catch(_){} posRerender(e.overlay); } return false; },
+  onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); return false; },
 };}
 // Instant-drop ala TradingView: shortcut H/V → garis langsung terpasang di posisi cursor
@@ -3277,86 +3276,10 @@ function updateMagDot(ev){
 $('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
 $('#chart').addEventListener('mouseleave',hideMagDot);
 
-// Text: editor inline di chart. Dipakai saat baru dibuat & saat double-click teks lama.
-let textEditorEl=null;
-function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor saat tool Text dipakai
-function editTextOverlay(o){ if(!o) return;
-  if(o.name==='text') openOverlayTextEditor(o,true);            // 'text': kosong = hapus
-  else if(o.name==='callout') openOverlayTextEditor(o,false); } // 'callout': kosong = tetap (default "Text")
-function editShapeText(o){ if(o && (o.name==='rect'||o.name==='trendline')) openOverlayTextEditor(o,false); } // bentuk tetap walau teks kosong
-// lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
-function overlayTextAnchor(o){
-  const rect=$('#chart').getBoundingClientRect();
-  const toPx=p=>{ let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
-  const pts=o.points||[];
-  if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
-  // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
-  if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
-  if(o.name==='callout' && pts.length>=2){ const b=toPx(pts[1]); if(b) return {x:rect.left+b.x, y:rect.top+b.y}; }   // pusat kotak teks (titik ke-2), bukan jangkar penunjuk
-  const p=pts[0]; if(!p) return null; const px=toPx(p);
-  return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
-}
-function openOverlayTextEditor(o, removeIfEmpty){
-  if(!o) return;
-  const a=overlayTextAnchor(o); if(!a) return;
-  const x=a.x, y=a.y;
-
-  if(textEditorEl){ try{textEditorEl.remove();}catch(e){} textEditorEl=null; }
-  const ta=document.createElement('textarea');
-  ta.className='text-editor'; ta.value=o.extendData||''; ta.rows=1;
-  ta.placeholder='Add text'; ta.wrap='off';   // wrap off → auto-size lebar ikut baris terpanjang
-  // WYSIWYG: editor pakai font/ukuran/warna/align PERSIS seperti figure canvas yang di-render
-  // (lihat createPointFigures tiap overlay) → tak ada "loncatan" gaya saat commit.
-  const st=dstyle(o), name=o.name;
-  const mir = name==='text'     ? { size:(st.size||13), color:(st.color||drawTextColor), lh:16, align:(st.textAlign||'left') }
-            : name==='callout'  ? { size:12, color:drawTextColor, lh:15, align:'left' }
-            : name==='rect'     ? { size:12, color:drawTextColor, lh:15, align:(st.textAlign||'center') }
-            : name==='trendline'? { size:10, color:drawTextColor, lh:14, align:(st.textAlign||'center') }
-            :                     { size:13, color:drawTextColor, lh:16, align:'left' };
-  ta.style.fontFamily=AXIS_FONT;
-  ta.style.fontSize=mir.size+'px';
-  ta.style.lineHeight=mir.lh+'px';
-  ta.style.color=mir.color;
-  ta.style.textAlign=mir.align;
-  // posisi in-place: samakan titik jangkar teks canvas ↔ pojok/tengah editor
-  if(name==='text'){                         // baseline 'top' di titik klik → pojok kiri-atas editor di situ
-    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-2)+'px'; ta.style.transform='none';
-  } else if(name==='callout'){               // teks rata kiri-atas di dalam kotak (pusat kotak = anchor)
-    const t=(o.extendData||'')||'Add text', lines=String(t).split('\n'), lh=15, pad=6;
-    const cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
-    ta.style.left=Math.round(x-cw/2+pad)+'px'; ta.style.top=Math.round(y-ch/2+pad)+'px'; ta.style.transform='none';
-  } else {                                   // rect/trendline: teks di tengah anchor
-    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y)+'px'; ta.style.transform='translate(-50%,-50%)';
-  }
-  document.body.appendChild(ta); textEditorEl=ta;
-  // sembunyikan teks overlay aslinya selagi editor terbuka → tidak dobel
-  editingTextId=o.id; try{chart.overrideOverlay({id:o.id,points:o.points});}catch(e){}
-  ta.focus(); ta.select();
-
-  let done=false;
-  const close=(save)=>{
-    if(done) return; done=true;
-    try{ta.remove();}catch(e){} if(textEditorEl===ta) textEditorEl=null;
-    editingTextId=null;   // tampilkan kembali teks overlay (commit di bawah akan me-render ulang)
-    const fresh=(o.extendData==null||o.extendData==='');
-    if(save){
-      const v=ta.value;
-      if(v.trim()===''){ if(removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} } else { try{chart.overrideOverlay({id:o.id,extendData:''});}catch(e){} } }
-      else { try{chart.overrideOverlay({id:o.id,extendData:v});}catch(e){} }
-      scheduleSaveDraws();
-    }else if(fresh && removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru (khusus Text)
-    else { try{ const ov=chart.getOverlayById(o.id); if(ov) chart.overrideOverlay({id:o.id,points:ov.points}); }catch(e){} }  // batal edit: tampilkan lagi teks lama
-  };
-  const grow=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px';
-    if(ta.value===''){ ta.style.width='64px'; }                              // ruang utk placeholder "Add text"
-    else { ta.style.width='0px'; ta.style.width=(ta.scrollWidth+2)+'px'; } };  // ring memeluk baris terpanjang
-  ta.addEventListener('input',grow); grow();
-  ta.addEventListener('keydown',ev=>{
-    ev.stopPropagation();                              // Enter = baris baru (perilaku textarea default)
-    if(ev.key==='Escape'){ ev.preventDefault(); close(false); }
-  });
-  ta.addEventListener('blur',()=>close(true));         // simpan saat klik ke tempat lain
-}
+// Text/Callout: entri teks lewat modal Style/Text (tab Text). Dipanggil saat objek baru
+// dibuat (onDrawEnd) → langsung buka tab Text; edit objek lama via double-click (lihat onDoubleClick).
+// openDrawModal di-hoist (function declaration), aman dipanggil dari sini walau didefinisikan belakang.
+function applyTextInput(o){ if(o && (o.name==='text'||o.name==='callout')) openDrawModal(o,'text'); }
 
 const DEFAULT_POS_RR = 3;  // klik tool → klik 1x di chart → posisi 1:3, lalu bisa di-adjust
 // risk default = rata-rata range candle (ATR sederhana) TF aktif → ukuran selalu proporsional TF
@@ -3638,34 +3561,8 @@ _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetO
 // urutan tombol bawah (atas→bawah): magnet, hide, trash
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
-// ===================== "+ Add text" pada trendline & rect (ala TradingView) =====================
-// Garis dipilih (klik) → hover garisnya → tombol "+ Add text" muncul DI ATAS kursor (tak menutupi garis).
-const addTextBtn=document.createElement('div'); addTextBtn.className='addtext-btn'; document.body.appendChild(addTextBtn);
-let overAddBtn=false, addBtnTarget=null, addHideTimer=null;
-function showAddText(id){
-  addBtnTarget=id; const o=chart.getOverlayById(id); if(!o) return;
-  addTextBtn.innerHTML = o.extendData ? 'Edit text' : '<span class="pl">+</span> Add text';
-  const a=overlayTextAnchor(o); if(!a){ hideAddTextNow(); return; }   // nempel persis di tengah garis
-  addTextBtn.style.left=Math.round(a.x)+'px'; addTextBtn.style.top=Math.round(a.y-8)+'px';
-  addTextBtn.classList.add('show');
-}
-function hideAddTextNow(){ clearTimeout(addHideTimer); addTextBtn.classList.remove('show'); }
-function scheduleHideAddText(){ clearTimeout(addHideTimer); addHideTimer=setTimeout(()=>{ if(!overAddBtn) addTextBtn.classList.remove('show'); },200); }
-addTextBtn.addEventListener('mouseenter',()=>{ overAddBtn=true; clearTimeout(addHideTimer); });
-addTextBtn.addEventListener('mouseleave',()=>{ overAddBtn=false; scheduleHideAddText(); });
-addTextBtn.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); });
-addTextBtn.addEventListener('click',e=>{ e.stopPropagation();
-  const o=addBtnTarget&&chart.getOverlayById(addBtnTarget);
-  if(o) openOverlayTextEditor(o,false);   // editor muncul in-place di lokasi teks
-  hideAddTextNow();
-});
-$('#chart').addEventListener('mousemove',e=>{
-  // jangan munculkan "+ Add text" selama objek masih DIGAMBAR (inProgressId): tunggu draw selesai
-  // dulu, baru saat di-hover tombolnya muncul (ala TradingView).
-  const can = hoverId && hoverId!==inProgressId && hoverId===selectedId && (hoverName==='trendline'||hoverName==='rect');
-  if(can) showAddText(hoverId);
-  else if(!overAddBtn) scheduleHideAddText();
-});
+// Catatan: tombol melayang "+ Add text" dihapus — affordance kini menyatu di objek
+// (double-click objek → modal Style/Text tab Text). Lihat openDrawModal.
 
 // ===================== stats & journal =====================
 function renderStats(){
@@ -5508,39 +5405,85 @@ $('#rpExit').onclick=exitReplay;
 // pulihkan speed tersimpan
 try{ const sv=localStorage.getItem('br_speed'); if(sv && $('#speed') && RP_SPEEDS.includes(+sv)) $('#speed').value=sv; }catch(e){}
 
-// ===================== popup setting objek gambar (double-click / klik-kanan) =====================
+// ===================== setting objek gambar: modal Style/Text (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
-const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);
+const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);   // dipakai popup posisi (showPosPopup)
 makeDraggable(objPop, '.pp-grip');
-function markOn(sel,el){ objPop.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); }
-function showObjPopup(o, cx, cy){
+// objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
+const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline']);
+const DM_ALIGN_OBJS=new Set(['text','rect','trendline']);   // callout selalu kiri-atas → tanpa chip align
+// judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
+const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();
+function dmEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// modal terpusat: satu instance, isi dibangun ulang per objek
+const drawModal=document.createElement('div'); drawModal.className='dmodal-scrim';
+drawModal.innerHTML='<div class="dmodal" role="dialog" aria-modal="true"></div>';
+document.body.appendChild(drawModal);
+let dmTarget=null;
+drawModal.addEventListener('mousedown',e=>{ if(e.target===drawModal) closeDrawModal(); });   // klik scrim = tutup
+function closeDrawModal(){
+  if(!drawModal.classList.contains('show')) return;
+  const o=dmTarget; dmTarget=null;
+  drawModal.classList.remove('show');
+  // 'text' kosong = tak bermakna → hapus objeknya (mirror perilaku editor lama)
+  if(o){ try{ const ov=chart.getOverlayById(o.id);
+    if(ov && o.name==='text' && (ov.extendData==null||String(ov.extendData).trim()==='')) chart.removeOverlay(o.id); }catch(e){} }
+  scheduleSaveDraws();
+}
+// dispatcher: posisi long/short pakai popup zona sendiri, sisanya modal Style/Text
+function openObjSettings(o, cx, cy, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
   if(o.name==='longPosition'||o.name==='shortPosition'){ showPosPopup(o, cx, cy); return; }
-  const st=dstyle(o), hasText=(o.name==='trendline'||o.name==='rect'||o.name==='text');
+  openDrawModal(o, tab);
+}
+function openDrawModal(o, tab){
+  if(!o||DRAW_DEFAULT[o.name]===undefined) return;
+  const name=o.name, st=dstyle(o), isFib=(name==='fib3');
+  const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
+  const active=(tab==='text'&&hasText)?'text':'style';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  const talign=st.textAlign||(DRAW_DEFAULT[o.name]&&DRAW_DEFAULT[o.name].textAlign)||'center';
-  const tvalign=st.textValign||(DRAW_DEFAULT[o.name]&&DRAW_DEFAULT[o.name].textValign)||'middle';
-  const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
-  const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
-  const isFib=(o.name==='fib3');   // warna fib diatur per-level via ⚙ Level → picker generik tak berguna, disembunyikan
-  objPop.innerHTML=GRIP+(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
+  const stylePane=`<div class="dm-pane" data-pane="style">`
+    +(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
-    +(hasText?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
-    +`<div class="pp-act">${isFib?'<button id="ppFib">⚙ Level &amp; Color</button>':''}${hasText?'<button id="ppText">✎ Text</button>':''}<button id="ppDel">🗑 Delete</button></div>`;
-  objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
-  objPop.style.top =Math.min(cy,window.innerHeight-(hasText?300:220))+'px';
-  objPop.classList.add('show');
-  objPop.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); markOn('[data-col]',b); });
-  objPop.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); markOn('[data-w]',b); });
-  objPop.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); markOn('[data-st]',b); });
-  objPop.querySelectorAll('[data-ha]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textAlign:b.dataset.ha}); markOn('[data-ha]',b); });
-  objPop.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); markOn('[data-va]',b); });
-  const tb=objPop.querySelector('#ppText'); if(tb) tb.onclick=()=>{ hideObjPopup(); openOverlayTextEditor(o,false); };
-  const fb=objPop.querySelector('#ppFib'); if(fb) fb.onclick=()=>{ const x=objPop.offsetLeft, y=objPop.offsetTop; hideObjPopup(); showFibPop(x,y); };
-  objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
+    +(isFib?`<div class="pp-row" style="margin-top:2px"><button class="pp-chip" id="dmFib">⚙ Level &amp; Color</button></div>`:'')
+    +`</div>`;
+  let textPane='';
+  if(hasText){
+    const talign=st.textAlign||(DRAW_DEFAULT[name]&&DRAW_DEFAULT[name].textAlign)||'center';
+    const tvalign=st.textValign||(DRAW_DEFAULT[name]&&DRAW_DEFAULT[name].textValign)||'middle';
+    const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
+    const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
+    textPane=`<div class="dm-pane" data-pane="text"><textarea class="dm-ta" placeholder="Add text">${dmEsc(o.extendData)}</textarea>`
+      +(hasAlign?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
+      +`</div>`;
+  }
+  const panel=drawModal.querySelector('.dmodal');
+  panel.innerHTML=`<div class="dm-head"><span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
+    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}</div>`
+    +`<div class="dm-body">${stylePane}${textPane}</div>`
+    +`<div class="dm-foot"><button class="dm-del">🗑 Delete</button><button class="dm-close">Close</button></div>`;
+  const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
+  const dmSwitch=(t)=>{ panel.querySelectorAll('.dm-tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+    panel.querySelectorAll('.dm-pane').forEach(p=>{ p.hidden=(p.dataset.pane!==t); }); };
+  panel.querySelectorAll('.dm-tab').forEach(b=>b.onclick=()=>dmSwitch(b.dataset.tab));
+  panel.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); mark('[data-col]',b); });
+  panel.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); mark('[data-w]',b); });
+  panel.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); mark('[data-st]',b); });
+  panel.querySelectorAll('[data-ha]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textAlign:b.dataset.ha}); mark('[data-ha]',b); });
+  panel.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); mark('[data-va]',b); });
+  const ta=panel.querySelector('.dm-ta');
+  if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
+  const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(Math.round(window.innerWidth/2-90), 90); };
+  panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
+  panel.querySelector('.dm-close').onclick=closeDrawModal;
+  panel.querySelector('.dm-x').onclick=closeDrawModal;
+  dmTarget=o;
+  drawModal.classList.add('show');
+  dmSwitch(active);
+  if(active==='text'&&ta){ ta.focus(); const L=ta.value.length; try{ta.setSelectionRange(L,L);}catch(e){} }
 }
 // popup khusus Long/Short Position: warna & transparansi zona Profit & Stop terpisah (per objek)
 function showPosPopup(o, cx, cy){
@@ -5589,7 +5532,7 @@ function showFibPop(cx,cy){
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
 
 // ===================== setting chart (⚙ rail): candle, background, grid =====================
 // bg & grid disimpan PER-TEMA (light/dark) supaya setting global tetap berfungsi di kedua tema
@@ -6002,7 +5945,7 @@ function removeMenuItems(){
 function openRemoveMenu(x,y){ showCtx(x,y,removeMenuItems()); }
 $('#chart').addEventListener('contextmenu',e=>{
   e.preventDefault();
-  if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); showObjPopup(o, e.clientX, e.clientY); return; } }
+  if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
   const rect=$('#chart').getBoundingClientRect();
   const yIn=e.clientY-rect.top;
   const price=pxToValue(yIn);

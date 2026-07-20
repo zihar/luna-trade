@@ -55,12 +55,3 @@
   .ctxitem.disabled{color:var(--muted);opacity:.45;cursor:default;pointer-events:none}
   .ctxsep{height:1px;background:var(--border);margin:4px 6px}
   /* editor teks inline di chart */
-  /* WYSIWYG: chrome minimal — transparan, tanpa kotak; hanya ring aksen tipis + caret.
-     font/ukuran/warna/align di-set inline oleh openOverlayTextEditor agar = teks canvas. */
-  .text-editor,.text-editor:focus,.text-editor:focus-visible{position:fixed;z-index:1100;background:transparent;color:var(--txt);
-    border:0;padding:0;margin:0;caret-color:var(--accent);outline:none;border-radius:2px;
-    box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
-    min-width:24px;min-height:16px;resize:none;overflow:hidden;white-space:pre;
-    text-shadow:0 1px 2px rgba(0,0,0,.45)}
-  .text-editor::placeholder{ color:var(--muted); opacity:1; text-shadow:none; }
-
