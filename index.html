@@ -192,7 +192,7 @@
     <div class="orderpanel" id="orderpanel" data-dock="docked"></div>
   </div>
   <div id="alertsPane" role="region" aria-label="Alerts">
-    <div class="ap-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button></div>
+    <div class="ap-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button><button class="ap-x" id="alertsClose" title="Close">✕</button></div>
     <div class="ap-body"><div id="alertList"></div></div>
   </div>
   <div class="alert-modal" id="alertModal" role="dialog" aria-modal="true">
@@ -4530,6 +4530,7 @@ function setAlertsPane(open){
 }
 function toggleAlertsPane(){ setAlertsPane(!$('#alertsPane').classList.contains('open')); }
 $('#railAlerts').onclick=toggleAlertsPane;
+$('#alertsClose').onclick=()=>setAlertsPane(false);   // tombol ✕ di header panel
 try{ if(localStorage.getItem('br_alertsPane')==='1') setAlertsPane(true); }catch(e){}
 $('#amClose').onclick=closeAlertDialog; $('#amCancel').onclick=closeAlertDialog;
 $('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!(p>0)){ setStatus('Enter a valid price.',true); return; }

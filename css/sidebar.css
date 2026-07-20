@@ -66,6 +66,11 @@
                         border-radius:6px;background:var(--btn);border:1px solid var(--border);
                         color:var(--txt);font-size:16px;line-height:1;cursor:pointer }
   #alertsPane .al-add:hover{ background:var(--btn-hover) }
+  /* tombol close panel Alerts: ghost (samar) di sebelah +, terang saat hover */
+  #alertsPane .ap-x{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+                      border-radius:6px;background:transparent;border:1px solid transparent;
+                      color:var(--muted);font-size:13px;line-height:1;cursor:pointer }
+  #alertsPane .ap-x:hover{ background:var(--btn-hover);color:var(--txt) }
   .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
   .al-item:hover{ background:var(--btn-hover); }
   .al-main{ font-weight:600; color:var(--txt); font-size:13px; }
