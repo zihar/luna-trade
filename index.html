@@ -811,7 +811,7 @@ function expandBox(o){
 
 // Undangan "+ Add text" (ala TradingView) hanya muncul saat objek SUDAH JADI & sedang
 // di-hover atau terpilih — bukan saat digambar. Dipakai rect & trendline saat teks kosong.
-function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && (overlay.id===hoverId || overlay.id===selectedId); }
+function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && overlay.id!==editingTextId && (overlay.id===hoverId || overlay.id===selectedId); }
 // apakah kursor terakhir berada di atas area undangan "+ Add text" objek (utk membedakan klik
 // "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label.
 function overPlaceholder(o){ try{ const a=overlayTextAnchor(o); if(!a) return false;
