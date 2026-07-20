@@ -106,24 +106,30 @@
   .pp-act button{ flex:1; font-size:11px; padding:6px 0; }
   /* ===== modal Style/Text objek gambar (ala TradingView): dialog di tengah, live-apply ===== */
   .dmodal-scrim{ position:fixed; inset:0; z-index:1400; display:none; align-items:center; justify-content:center;
-    background:rgba(4,6,12,.5); backdrop-filter:blur(2px); }
+    background:rgba(4,6,12,.55); backdrop-filter:blur(3px); }
   .dmodal-scrim.show{ display:flex; }
-  .dmodal{ background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
-    width:300px; max-width:calc(100vw - 24px); max-height:calc(100vh - 48px); display:flex; flex-direction:column;
-    overflow:hidden; animation:dmPop .14s ease; }
-  @keyframes dmPop{ from{ opacity:0; transform:translateY(6px) scale(.98); } to{ opacity:1; transform:none; } }
+  .dmodal{ position:relative; background:var(--panel); border:1px solid var(--border); border-radius:13px;
+    box-shadow:var(--shadow), 0 0 0 1px rgba(255,255,255,.02) inset;
+    width:304px; max-width:calc(100vw - 24px); max-height:calc(100vh - 48px); display:flex; flex-direction:column;
+    overflow:hidden; animation:dmPop .15s cubic-bezier(.2,.7,.3,1); }
+  /* signature: garis aksen tipis dua-warna brand (accent → luna-glow) di tepi atas */
+  .dmodal::before{ content:''; position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg, var(--accent), var(--luna-glow)); opacity:.9; }
+  @keyframes dmPop{ from{ opacity:0; transform:translateY(7px) scale(.985); } to{ opacity:1; transform:none; } }
   @media (prefers-reduced-motion: reduce){ .dmodal{ animation:none; } }
-  .dm-head{ display:flex; align-items:center; gap:8px; padding:11px 12px 9px; border-bottom:1px solid var(--border); }
-  .dm-title{ font-size:13px; font-weight:600; color:var(--txt); flex:1; }
-  .dm-x{ flex:0 0 auto; width:24px; height:24px; border:0; border-radius:6px; background:transparent; color:var(--muted);
-    font-size:15px; line-height:1; cursor:pointer; transition:background .12s, color .12s; }
+  .dm-head{ display:flex; align-items:center; gap:9px; padding:13px 14px 12px 16px; border-bottom:1px solid var(--border); }
+  .dm-ico{ flex:0 0 auto; display:inline-flex; color:var(--muted); }
+  .dm-ico svg{ width:15px; height:15px; display:block; }
+  .dm-title{ font-size:13.5px; font-weight:600; color:var(--txt); flex:1; letter-spacing:.01em; }
+  .dm-x{ flex:0 0 auto; width:24px; height:24px; border:0; border-radius:7px; background:transparent; color:var(--muted);
+    font-size:14px; line-height:1; cursor:pointer; transition:background .12s, color .12s; }
   .dm-x:hover{ background:var(--btn-hover); color:var(--txt); }
-  .dm-tabs{ display:flex; gap:2px; padding:0 12px; border-bottom:1px solid var(--border); }
+  .dm-tabs{ display:flex; gap:4px; padding:0 16px; border-bottom:1px solid var(--border); }
   .dm-tab{ background:transparent; border:0; border-bottom:2px solid transparent; color:var(--muted); font-size:12px;
-    padding:8px 10px; cursor:pointer; transition:color .12s; }
+    font-weight:500; padding:10px 4px; margin-bottom:-1px; cursor:pointer; transition:color .12s, border-color .12s; }
   .dm-tab:hover{ color:var(--txt); }
-  .dm-tab.on{ color:var(--txt); border-bottom-color:var(--accent); }
-  .dm-body{ padding:15px 16px 17px; overflow:auto; }
+  .dm-tab.on{ color:var(--txt); background:transparent; border-bottom-color:var(--accent); }  /* override global button.on (controls.css) */
+  .dm-body{ padding:16px 16px 18px; overflow:auto; }
   .dm-pane[hidden]{ display:none; }
   /* ritme spasi khusus modal (lebih lega dari popup floating .objpop) */
   .dm-body .pp-lbl{ color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; margin:0 0 9px; }
@@ -136,13 +142,14 @@
     margin-bottom:16px; transition:border-color .12s, box-shadow .12s; }
   .dm-ta::placeholder{ color:var(--muted); }
   .dm-ta:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
-  .dm-foot{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-top:1px solid var(--border); }
-  .dm-del{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:12px; padding:6px 11px;
-    border-radius:7px; cursor:pointer; transition:color .12s, border-color .12s; }
+  .dm-foot{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
+  .dm-del{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--border);
+    color:var(--muted); font-size:12px; padding:6px 12px; border-radius:8px; cursor:pointer; transition:color .12s, border-color .12s; }
+  .dm-del svg{ width:13px; height:13px; }
   .dm-del:hover{ color:var(--red); border-color:var(--red); }
   .dm-close{ margin-left:auto; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:12px;
-    font-weight:600; padding:6px 16px; border-radius:7px; cursor:pointer; transition:filter .12s; }
-  .dm-close:hover{ filter:brightness(1.06); }
+    font-weight:600; padding:6px 18px; border-radius:8px; cursor:pointer; transition:filter .12s; }
+  .dm-close:hover{ filter:brightness(1.07); }
   .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; padding:2px; transition:border-color .12s; }
   .pp-color:hover{ border-color:var(--btn-border-hover); }
   .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }

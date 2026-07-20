@@ -5414,6 +5414,9 @@ const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline']);
 const DM_ALIGN_OBJS=new Set(['text','rect','trendline']);   // callout selalu kiri-atas → tanpa chip align
 // judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
 const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();
+// ikon tipe objek utk header modal (SVG dari daftar tool → header memberi tahu objek apa yg diedit)
+const OBJ_ICON=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ if(t.svg) m[t.name]=t.svg; })); }catch(e){} return m; })();
+// TRASH_SVG sudah didefinisikan di rail drawing (dipakai ulang utk tombol Delete modal)
 function dmEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 // modal terpusat: satu instance, isi dibangun ulang per objek
 const drawModal=document.createElement('div'); drawModal.className='dmodal-scrim';
@@ -5461,10 +5464,10 @@ function openDrawModal(o, tab){
       +`</div>`;
   }
   const panel=drawModal.querySelector('.dmodal');
-  panel.innerHTML=`<div class="dm-head"><span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
+  panel.innerHTML=`<div class="dm-head">${OBJ_ICON[name]?`<span class="dm-ico">${OBJ_ICON[name]}</span>`:''}<span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
     +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}</div>`
     +`<div class="dm-body">${stylePane}${textPane}</div>`
-    +`<div class="dm-foot"><button class="dm-del">🗑 Delete</button><button class="dm-close">Close</button></div>`;
+    +`<div class="dm-foot"><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
   const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
   const dmSwitch=(t)=>{ panel.querySelectorAll('.dm-tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
     panel.querySelectorAll('.dm-pane').forEach(p=>{ p.hidden=(p.dataset.pane!==t); }); };
@@ -5482,6 +5485,11 @@ function openDrawModal(o, tab){
   panel.querySelector('.dm-x').onclick=closeDrawModal;
   dmTarget=o;
   drawModal.classList.add('show');
+  // tinggi konsisten antar-tab: samakan min-height tiap pane ke pane tertinggi
+  // (di-set per-pane, bukan body, agar tak terpengaruh padding body saat box-sizing:border-box)
+  try{ const panes=[...panel.querySelectorAll('.dm-pane')]; let maxH=0;
+    panes.forEach(p=>{ const h0=p.hidden; p.hidden=false; p.style.minHeight=''; maxH=Math.max(maxH,p.offsetHeight); p.hidden=h0; });
+    if(maxH) panes.forEach(p=>{ p.style.minHeight=maxH+'px'; }); }catch(e){}
   dmSwitch(active);
   if(active==='text'&&ta){ ta.focus(); const L=ta.value.length; try{ta.setSelectionRange(L,L);}catch(e){} }
 }
