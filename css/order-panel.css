@@ -123,11 +123,17 @@
     padding:8px 10px; cursor:pointer; transition:color .12s; }
   .dm-tab:hover{ color:var(--txt); }
   .dm-tab.on{ color:var(--txt); border-bottom-color:var(--accent); }
-  .dm-body{ padding:12px; overflow:auto; }
+  .dm-body{ padding:15px 16px 17px; overflow:auto; }
   .dm-pane[hidden]{ display:none; }
+  /* ritme spasi khusus modal (lebih lega dari popup floating .objpop) */
+  .dm-body .pp-lbl{ color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; margin:0 0 9px; }
+  .dm-body .pp-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
+  .dm-body .pp-row:last-child{ margin-bottom:0; }
+  .dm-body .sw{ width:20px; height:20px; }
+  .dm-body .pp-chip{ padding:5px 12px; }
   .dm-ta{ width:100%; box-sizing:border-box; min-height:76px; resize:vertical; background:var(--btn); color:var(--txt);
-    border:1px solid var(--border); border-radius:8px; padding:8px 9px; font-size:13px; font-family:inherit; line-height:1.4;
-    margin-bottom:11px; transition:border-color .12s, box-shadow .12s; }
+    border:1px solid var(--border); border-radius:8px; padding:9px 10px; font-size:13px; font-family:inherit; line-height:1.45;
+    margin-bottom:16px; transition:border-color .12s, box-shadow .12s; }
   .dm-ta::placeholder{ color:var(--muted); }
   .dm-ta:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
   .dm-foot{ display:flex; align-items:center; gap:8px; padding:10px 12px; border-top:1px solid var(--border); }
