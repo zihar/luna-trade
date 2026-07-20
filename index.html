@@ -812,6 +812,10 @@ function expandBox(o){
 // Undangan "+ Add text" (ala TradingView) hanya muncul saat objek SUDAH JADI & sedang
 // di-hover atau terpilih — bukan saat digambar. Dipakai rect & trendline saat teks kosong.
 function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && (overlay.id===hoverId || overlay.id===selectedId); }
+// apakah kursor terakhir berada di atas area undangan "+ Add text" objek (utk membedakan klik
+// "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label.
+function overPlaceholder(o){ try{ const a=overlayTextAnchor(o); if(!a) return false;
+  return Math.abs(lastPtr.x-a.x)<=55 && Math.abs(lastPtr.y-a.y)<=16; }catch(e){ return false; } }
 // ===================== custom overlay: rectangle/zona =====================
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
@@ -943,8 +947,8 @@ klinecharts.registerOverlay({
       const bl = va==='top' ? 'bottom' : va==='bottom' ? 'top' : 'middle';
       figs.push({type:'text',attrs:{x:px,y:ty,text:t,align:ha,baseline:bl},
         styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
-    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → "Add text" muted di titik-tengah garis
-      figs.push({type:'text',attrs:{x:(a.x+b.x)/2,y:(a.y+b.y)/2-4,text:'Add text',align:'center',baseline:'bottom'},
+    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → "Add text" muted DI GARIS (bisa diklik utk input inline)
+      figs.push({type:'text',attrs:{x:(a.x+b.x)/2,y:(a.y+b.y)/2,text:'Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     // Selama MENGGAMBAR tak ada buletan handle sama sekali (default disembunyikan via HIDDEN_POINT).
     // Buletan hanya muncul saat objek yg SUDAH JADI di-hover/pilih (handle default dikembalikan di onDrawEnd).
@@ -3014,7 +3018,7 @@ function updateOpenTradeBox(){
 }
 
 // ===================== drawing tools (ikon, ala TV) =====================
-let selectedId=null, hoverId=null, hoverName=null, inProgressId=null;
+let selectedId=null, hoverId=null, hoverName=null, inProgressId=null, addTextTimer=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
 // Lepas seleksi objek gambar yang sudah jadi (Esc). selectedId=null saja TAK cukup: klinecharts
 // menyimpan state seleksi di OverlayStore._clickInstanceInfo (inilah yang menggambar handle). Bersihkan
@@ -3081,11 +3085,15 @@ function delHooks(){ return {
     inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
   onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
     const o=e.overlay; selectedId=o&&o.id;
-    // objek bisa-teks yg masih KOSONG → klik = tambah teks (buka modal tab Text), ala TradingView "+ Add text"
-    if(o && ADDTEXT_CLICK.has(o.name) && !(o.extendData&&String(o.extendData).trim())) openDrawModal(o,'text');
+    // klik pada undangan "+ Add text" objek KOSONG → editor INLINE (bukan modal). Timer 220ms:
+    // double-click (buka modal) akan membatalkannya lewat clearTimeout di onDoubleClick.
+    if(o && ADDTEXT_CLICK.has(o.name) && !(o.extendData&&String(o.extendData).trim()) && overPlaceholder(o)){
+      clearTimeout(addTextTimer);
+      addTextTimer=setTimeout(()=>{ const c=chart.getOverlayById(o.id); if(c && !(c.extendData&&String(c.extendData).trim())) openOverlayTextEditor(c,false); }, 220);
+    }
     return false; },
   onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
-  onDoubleClick:(e)=>{ try{ const o=e.overlay, n=o&&o.name;   // objek bisa-teks → modal ke tab Text, sisanya tab Style
+  onDoubleClick:(e)=>{ clearTimeout(addTextTimer); try{ const o=e.overlay, n=o&&o.name;   // batalkan editor inline → double-click = modal
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); return false; },
@@ -3291,10 +3299,87 @@ function updateMagDot(ev){
 $('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
 $('#chart').addEventListener('mouseleave',hideMagDot);
 
-// Text/Callout: entri teks lewat modal Style/Text (tab Text). Dipanggil saat objek baru
-// dibuat (onDrawEnd) → langsung buka tab Text; edit objek lama via double-click (lihat onDoubleClick).
-// openDrawModal di-hoist (function declaration), aman dipanggil dari sini walau didefinisikan belakang.
-function applyTextInput(o){ if(o && (o.name==='text'||o.name==='callout')) openDrawModal(o,'text'); }
+// Text: editor inline di chart (input teks LANGSUNG di canvas, TANPA modal). Dipakai saat objek
+// text/callout baru dibuat (onDrawEnd → applyTextInput) & saat klik undangan "+ Add text" pd rect/
+// trendline/callout kosong (lihat onClick overlay). Modal Style/Text hanya via double-click / klik-kanan.
+let textEditorEl=null;
+function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor inline saat tool Text/Callout dipakai
+function editTextOverlay(o){ if(!o) return;
+  if(o.name==='text') openOverlayTextEditor(o,true);            // 'text': kosong = hapus
+  else if(o.name==='callout') openOverlayTextEditor(o,false); } // 'callout': kosong = tetap (default "Text")
+// lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
+function overlayTextAnchor(o){
+  const rect=$('#chart').getBoundingClientRect();
+  const toPx=p=>{ let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){} if(Array.isArray(px)) px=px[0]; return px; };
+  const pts=o.points||[];
+  if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
+  if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  if(o.name==='callout' && pts.length>=2){ const b=toPx(pts[1]); if(b) return {x:rect.left+b.x, y:rect.top+b.y}; }   // pusat kotak teks (titik ke-2), bukan jangkar penunjuk
+  const p=pts[0]; if(!p) return null; const px=toPx(p);
+  return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
+}
+function openOverlayTextEditor(o, removeIfEmpty){
+  if(!o) return;
+  const a=overlayTextAnchor(o); if(!a) return;
+  const x=a.x, y=a.y;
+
+  if(textEditorEl){ try{textEditorEl.remove();}catch(e){} textEditorEl=null; }
+  const ta=document.createElement('textarea');
+  ta.className='text-editor'; ta.value=o.extendData||''; ta.rows=1;
+  ta.placeholder='Add text'; ta.wrap='off';   // wrap off → auto-size lebar ikut baris terpanjang
+  // WYSIWYG: editor pakai font/ukuran/warna/align PERSIS seperti figure canvas yang di-render
+  // (lihat createPointFigures tiap overlay) → tak ada "loncatan" gaya saat commit.
+  const st=dstyle(o), name=o.name;
+  const mir = name==='text'     ? { size:(st.size||13), color:(st.color||drawTextColor), lh:16, align:(st.textAlign||'left') }
+            : name==='callout'  ? { size:12, color:drawTextColor, lh:15, align:'left' }
+            : name==='rect'     ? { size:12, color:drawTextColor, lh:15, align:(st.textAlign||'center') }
+            : name==='trendline'? { size:10, color:drawTextColor, lh:14, align:(st.textAlign||'center') }
+            :                     { size:13, color:drawTextColor, lh:16, align:'left' };
+  ta.style.fontFamily=AXIS_FONT;
+  ta.style.fontSize=mir.size+'px';
+  ta.style.lineHeight=mir.lh+'px';
+  ta.style.color=mir.color;
+  ta.style.textAlign=mir.align;
+  // posisi in-place: samakan titik jangkar teks canvas ↔ pojok/tengah editor
+  if(name==='text'){                         // baseline 'top' di titik klik → pojok kiri-atas editor di situ
+    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-2)+'px'; ta.style.transform='none';
+  } else if(name==='callout'){               // teks rata kiri-atas di dalam kotak (pusat kotak = anchor)
+    const t=(o.extendData||'')||'Add text', lines=String(t).split('\n'), lh=15, pad=6;
+    const cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
+    ta.style.left=Math.round(x-cw/2+pad)+'px'; ta.style.top=Math.round(y-ch/2+pad)+'px'; ta.style.transform='none';
+  } else {                                   // rect/trendline: teks di tengah anchor
+    ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y)+'px'; ta.style.transform='translate(-50%,-50%)';
+  }
+  document.body.appendChild(ta); textEditorEl=ta;
+  // sembunyikan teks overlay aslinya selagi editor terbuka → tidak dobel
+  editingTextId=o.id; try{chart.overrideOverlay({id:o.id,points:o.points});}catch(e){}
+  ta.focus(); ta.select();
+
+  let done=false;
+  const close=(save)=>{
+    if(done) return; done=true;
+    try{ta.remove();}catch(e){} if(textEditorEl===ta) textEditorEl=null;
+    editingTextId=null;   // tampilkan kembali teks overlay (commit di bawah akan me-render ulang)
+    const fresh=(o.extendData==null||o.extendData==='');
+    if(save){
+      const v=ta.value;
+      if(v.trim()===''){ if(removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} } else { try{chart.overrideOverlay({id:o.id,extendData:''});}catch(e){} } }
+      else { try{chart.overrideOverlay({id:o.id,extendData:v});}catch(e){} }
+      scheduleSaveDraws();
+    }else if(fresh && removeIfEmpty){ try{chart.removeOverlay(o.id);}catch(e){} }  // batal saat baru (khusus Text)
+    else { try{ const ov=chart.getOverlayById(o.id); if(ov) chart.overrideOverlay({id:o.id,points:ov.points}); }catch(e){} }  // batal edit: tampilkan lagi teks lama
+  };
+  const grow=()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px';
+    if(ta.value===''){ ta.style.width='64px'; }                              // ruang utk placeholder "Add text"
+    else { ta.style.width='0px'; ta.style.width=(ta.scrollWidth+2)+'px'; } };  // ring memeluk baris terpanjang
+  ta.addEventListener('input',grow); grow();
+  ta.addEventListener('keydown',ev=>{
+    ev.stopPropagation();                              // Enter = baris baru (perilaku textarea default)
+    if(ev.key==='Escape'){ ev.preventDefault(); close(false); }
+  });
+  ta.addEventListener('blur',()=>close(true));         // simpan saat klik ke tempat lain
+}
 
 const DEFAULT_POS_RR = 3;  // klik tool → klik 1x di chart → posisi 1:3, lalu bisa di-adjust
 // risk default = rata-rata range candle (ATR sederhana) TF aktif → ukuran selalu proporsional TF
@@ -3576,9 +3661,10 @@ _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetO
 // urutan tombol bawah (atas→bawah): magnet, hide, trash
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
-// Catatan: tombol melayang "+ Add text" (DOM) diganti undangan yang MENYATU di canvas —
-// placeholder muted di dalam rect/trendline saat kosong & di-hover/pilih (lihat showAddTextHint
-// + createPointFigures). Klik objek kosong → openDrawModal(o,'text') (lihat onClick overlay).
+// Catatan: undangan "+ Add text" MENYATU di canvas — placeholder muted di dalam rect/trendline
+// saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Klik pada area
+// placeholder → editor teks INLINE (openOverlayTextEditor), BUKAN modal (lihat onClick overlay).
+// Modal Style/Text hanya via double-click / klik-kanan (onDoubleClick / contextmenu).
 
 // ===================== stats & journal =====================
 function renderStats(){
@@ -5439,9 +5525,8 @@ function dmEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp
 const drawModal=document.createElement('div'); drawModal.className='dmodal-scrim';
 drawModal.innerHTML='<div class="dmodal" role="dialog" aria-modal="true"></div>';
 document.body.appendChild(drawModal);
-let dmTarget=null, dmOpenedAt=0;
-// klik scrim = tutup; abaikan sesaat setelah buka agar klik ke-2 (double-click "+ Add text") tak langsung menutup
-drawModal.addEventListener('mousedown',e=>{ if(e.target===drawModal && (Date.now()-dmOpenedAt)>350) closeDrawModal(); });
+let dmTarget=null;
+drawModal.addEventListener('mousedown',e=>{ if(e.target===drawModal) closeDrawModal(); });   // klik scrim = tutup
 function closeDrawModal(){
   if(!drawModal.classList.contains('show')) return;
   const o=dmTarget; dmTarget=null;
@@ -5501,7 +5586,7 @@ function openDrawModal(o, tab){
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
   panel.querySelector('.dm-close').onclick=closeDrawModal;
   panel.querySelector('.dm-x').onclick=closeDrawModal;
-  dmTarget=o; dmOpenedAt=Date.now();
+  dmTarget=o;
   drawModal.classList.add('show');
   // tinggi konsisten antar-tab: samakan min-height tiap pane ke pane tertinggi
   // (di-set per-pane, bukan body, agar tak terpengaruh padding body saat box-sizing:border-box)
