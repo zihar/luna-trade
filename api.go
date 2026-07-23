@@ -237,7 +237,10 @@ func handlePrices(w http.ResponseWriter, r *http.Request) {
 			}
 			fl.Flush()
 		case <-keepalive.C:
-			if _, err := io.WriteString(w, ":ka\n\n"); err != nil {
+			// event bernama (bukan komentar :ka) agar client bisa mendeteksi
+			// koneksi hidup lewat addEventListener('ping') — independen dari tick
+			// harga (mis. saat market tutup). Tak masuk onmessage → tak jadi tick.
+			if _, err := io.WriteString(w, "event: ping\ndata: 1\n\n"); err != nil {
 				return
 			}
 			fl.Flush()
