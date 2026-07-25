@@ -3240,9 +3240,9 @@ function buildDrawsFromArray(arr){
     if(d.points.some(pt=>pt.vt==null)) return;   // lewati gambar rusak lama (titik anchorless → far-left)
     const pts=d.points.map(pt=>{
       if(pt.vt==null) return {value:pt.value};
-      if(d.name==='trendline'){ const fi=tsToFracIndex(pt.vt);   // trendline: SELALU dataIndex pecahan (presisi)
+      if(subBar(d.name)){ const fi=tsToFracIndex(pt.vt);   // tool sub-bar: SELALU dataIndex pecahan (presisi)
         return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
-      return (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // overlay lain: future → dataIndex
+      return (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // BAR_ANCHOR: future → dataIndex
         : {timestamp:pt.vt, value:pt.value};
     });
     const base={name:d.name, points:pts};
