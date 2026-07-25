@@ -696,10 +696,15 @@ async function refineMagnetPoints(id){
     for(const p of pts){
       if(p.value==null) continue;
       const t=tsOf(p); if(t==null) continue;   // titik ber-dataIndex pecahan ikut terlayani (fidxToTs)
-      // titik FUTURE (di kanan candle terakhir): tak ada candle nyata utk di-magnet. Tanpa gate
-      // ini, barRangeContaining tak punya batas atas → utk ts apa pun setelah candle terakhir ia
-      // balik ke rentang bar TERAKHIR, lalu magnet keras menarik value titik ke OHLC bar itu diam2.
-      const arrC=tfData[cur]; if(t>=arrC[arrC.length-1].timestamp+DUR[cur]) continue;
+      // titik FUTURE (di kanan candle TERUNGKAP terakhir): tak ada candle nyata utk di-magnet.
+      // Tanpa gate ini, barRangeContaining tak punya batas atas → utk ts apa pun setelah candle
+      // terakhir ia balik ke rentang bar TERAKHIR, lalu magnet keras menarik value titik ke OHLC
+      // bar itu diam2. Sumber batas WAJIB revealed(cur), bukan tfData[cur]: di mode Bar Replay
+      // tfData memuat bar setelah kursor T yang belum terungkap (revealed memotongnya), tapi
+      // menggambar tetap aktif di area itu — pakai tfData akan membocorkan OHLC candle yang
+      // belum bisa dilihat pengguna ke titik yg dijatuhkan di area "kosong" kanan kursor replay.
+      const arrC=revealed(cur); if(!arrC.length) continue;
+      if(t>=arrC[arrC.length-1].timestamp+DUR[cur]) continue;
       const rng=barRangeContaining(cur,t); if(!rng) continue;
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
       let best=null,bd=Infinity;
