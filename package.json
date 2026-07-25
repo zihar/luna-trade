@@ -1,0 +1,15 @@
+{
+  "name": "luna-trade-e2e",
+  "private": true,
+  "description": "E2E test UI untuk luna-trade (Playwright). Backend Go tak tersentuh — ini devDependency saja.",
+  "scripts": {
+    "test": "playwright test",
+    "test:drawing": "playwright test tests/drawing",
+    "test:smoke": "playwright test tests/smoke",
+    "test:integration": "playwright test --project=integration",
+    "gallery": "node tests/build-gallery.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
