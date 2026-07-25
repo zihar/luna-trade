@@ -30,7 +30,7 @@ press-drag saat objek belum jadi), bukan drag SETELAH objek jadi.** Menggeser ti
 objek yang sudah selesai digambar (mis. memilih `rect` yang sudah ada lalu menarik salah
 satu titiknya) masih presisi sub-bar **hanya untuk `trendline`** —
 `onPressedMoveStart`/`onPressedMoving`/`onPressedMoveEnd` yang menulis ulang titik
-dengan presisi cuma terdaftar di registrasi `trendline` (`index.html:945-995`). 19 tool
+dengan presisi cuma terdaftar di registrasi `trendline` (`index.html:945-995`). 20 tool
 lain kemungkinan besar masih snap-per-bar saat titik yang sudah jadi di-drag ulang, dan
 ini **tak teruji**, bukan sekadar belum diperbaiki — `tests/drawing/30-interaction.spec.js`
 (describe "drag") hanya menjalankan kedua test dragnya (drag satu titik, drag badan) atas
@@ -41,6 +41,17 @@ jalur menggambar). Catatan implementasi untuk siapa pun yang mengerjakan follow-
 `onPressedMoveEnd` yang ADA SEKARANG memanggil `scheduleSaveDraws()` setelah
 `refineMagnetPoints`; kalau lapis presisi drag ini diperluas ke tool lain nanti, panggilan
 itu wajib dibawa juga, kalau tidak perubahan hasil drag tak akan tersimpan.
+
+**Urutan wajib untuk PR follow-up: tulis dulu test drag untuk tool non-`trendline`,
+baru implementasi.** Rencana Task 4 yang menutup celah ini (lihat
+`docs/superpowers/plans/2026-07-25-drawing-subbar-anchor.md`) memakai gerbang "kerjakan
+hanya bila blok test tertentu merah" — tapi gerbang itu hanya bisa mengamati blok
+press-drag SAAT MENGGAMBAR (`20-parity.spec.js:106`), yang memang sudah punya test.
+Drag-setelah-jadi untuk tool selain `trendline` tak punya test SAMA SEKALI di
+`30-interaction.spec.js`, jadi tak ada blok merah yang bisa dipakai gerbang itu
+mendeteksi kapan fitur ini perlu dikerjakan — sebuah gerbang yang menunggu test hijau
+tak akan pernah menyala untuk celah yang testnya belum ditulis. Tanpa menuliskan test
+drag itu lebih dulu (merah), follow-up berikutnya mewarisi titik buta yang sama persis.
 
 **Gejala terukur.** Klik di sebuah pixel, objek mendarat **3–4px** di sampingnya
 (= ½ `barSpace`; pada fixture `barSpace` = 8px). Berlaku untuk `rayLine`, `straightLine`,
@@ -154,7 +165,7 @@ Bukan sekadar "tak error" — ini yang diperiksa dan benar:
 - **Drag (`trendline` saja — lihat kualifikasi di Temuan 1)** — geser satu titik: titik itu
   mendarat tepat di kursor (≤1px) dan titik lain tak bergeming. Geser badan: semua titik
   bergeser sama besar (≤1.5px). Kedua test ini (`tests/drawing/30-interaction.spec.js`,
-  describe "drag") hanya dijalankan atas `trendline`; 19 tool lain **tak teruji** untuk drag
+  describe "drag") hanya dijalankan atas `trendline`; 20 tool lain **tak teruji** untuk drag
   setelah objek jadi dan kemungkinan besar masih snap-per-bar di jalur itu.
 - **Hapus** — tiga jalur (tombol Delete, eraser-klik, trash di modal) semuanya bersih.
 - **Undo/redo** — Ctrl+Z membuang, Ctrl+Y mengembalikan.

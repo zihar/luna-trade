@@ -455,7 +455,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 Dua hal berbeda memakai jalur yang sama di sini:
 1. **Press-drag saat menggambar** — titik terakhir ditaruh lewat tekan-geser-lepas alih-alih klik (`20-parity.spec.js:106`, mode `'drag'`). Diuji untuk semua tool multi-titik.
-2. **Drag setelah objek jadi** — menggeser satu titik atau badan objek. `30-interaction.spec.js:15` hanya mengujinya untuk `trendline`, jadi 19 tool lain **tak teruji** dan kemungkinan besar snap per-bar. Task ini menutup keduanya sekaligus.
+2. **Drag setelah objek jadi** — menggeser satu titik atau badan objek. `30-interaction.spec.js:15` hanya mengujinya untuk `trendline`, jadi 20 tool lain **tak teruji** dan kemungkinan besar snap per-bar. Task ini menutup keduanya sekaligus.
 
 **Files:**
 - Modify: `index.html:977-1000` (pindahkan `onPressedMoveStart` / `onPressedMoving` dari registrasi `trendline`)

@@ -76,7 +76,7 @@ Lapis 7 ditambahkan setelah spec awal disetujui, saat membaca suite lebih teliti
 tekan-geser-lepas untuk semua tool multi-titik; jalur itu lewat `onPressedMoving`, yang sama
 seperti `onDrawing` hanya terdaftar di `trendline` — jadi memindahkan `onDrawing` saja belum
 memenuhi kriteria terima. Sekaligus ia menutup celah kedua: `30-interaction.spec.js:15` hanya
-menguji drag-setelah-jadi untuk `trendline`, sehingga 19 tool lain tak teruji dan kemungkinan
+menguji drag-setelah-jadi untuk `trendline`, sehingga 20 tool lain tak teruji dan kemungkinan
 besar masih snap per-bar. Apakah lapis ini benar-benar perlu ditentukan oleh pengukuran, bukan
 tebakan — spike yang menjawabnya.
 

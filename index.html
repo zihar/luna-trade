@@ -696,6 +696,10 @@ async function refineMagnetPoints(id){
     for(const p of pts){
       if(p.value==null) continue;
       const t=tsOf(p); if(t==null) continue;   // titik ber-dataIndex pecahan ikut terlayani (fidxToTs)
+      // titik FUTURE (di kanan candle terakhir): tak ada candle nyata utk di-magnet. Tanpa gate
+      // ini, barRangeContaining tak punya batas atas → utk ts apa pun setelah candle terakhir ia
+      // balik ke rentang bar TERAKHIR, lalu magnet keras menarik value titik ke OHLC bar itu diam2.
+      const arrC=tfData[cur]; if(t>=arrC[arrC.length-1].timestamp+DUR[cur]) continue;
       const rng=barRangeContaining(cur,t); if(!rng) continue;
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
       let best=null,bd=Infinity;
@@ -3085,9 +3089,15 @@ function delHooks(){ return {
       // cepat (klik nyasar/tertelan bikin titik jatuh di Y yg jauh) tetap tertangkap lewat titik ini.
       const pxOf=(p)=>{ if(!p) return null; let c=chart.convertToPixel(p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c||null; };
       let refine = pendingClicks.length===o.points.length;
+      // Y dilewati HANYA utk titik yg memang sudah dihomogenkan overlay ke value titik terakhir
+      // (lihat komentar di atas) — dideteksi dari BENTUK (value titik k ≈ value titik terakhir),
+      // bukan dari nama tool, supaya tak melawan tujuan generik BAR_ANCHOR/subBar. Titik lain yg
+      // TIDAK dihomogenkan (value-nya masih beda dari titik terakhir) tetap dicek Y spt sebelum
+      // Temuan #penyempitan ini — jaring desync klik-cepat tak lagi bolong utk titik non-terakhir.
       if(refine){ const tolX=1.5*barSpacePx(), lastIdx=o.points.length-1;
         for(let k=0;k<o.points.length;k++){ const a=pxOf(toPt(pendingClicks[k])), b=pxOf(o.points[k]);
-          if(!a||!b||Math.abs(a.x-b.x)>tolX||(k===lastIdx&&Math.abs(a.y-b.y)>6)){ refine=false; break; } } }
+          if(!a||!b||Math.abs(a.x-b.x)>tolX||
+             ((k===lastIdx || Math.abs(o.points[k].value-o.points[lastIdx].value)>1e-9) && Math.abs(a.y-b.y)>6)){ refine=false; break; } } }
       if(refine){ for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]); }
       // Tool sub-bar: pindahkan anchor ke dataIndex PECAHAN (bukan timestamp) supaya bentuk &
       // handle dirender presisi di titik klik. Fraksi presisi diambil dari fidx klik
@@ -3163,11 +3173,15 @@ function instantDropPoint(name){
   const px=lastPtr.x-r.left, py=lastPtr.y-r.top;
   if(px<0||py<0||px>r.width||py>r.height) return null;
   const v=pxToValue(py); if(v==null) return null;
-  // anchor X (timestamp in-range / dataIndex future) WAJIB utk kedua garis: walau x tak
-  // relevan visual utk horizontal, serializeDraws melewati titik tanpa `vt` → tanpa anchor X
-  // garis tak ter-persist & tak masuk history undo (sama spt garis yg digambar manual: klik
-  // memberi timestamp dari posisi-x). vertical: snap ke bar spt onDrawEnd (x memang relevan).
-  const xa=xAnchorFromPx(px); if(!xa) return null;
+  // anchor X WAJIB ada utk kedua garis: walau x tak relevan visual utk horizontal,
+  // serializeDraws melewati titik tanpa `vt` → tanpa anchor X garis tak ter-persist & tak
+  // masuk history undo (sama spt garis yg digambar manual: klik memberi anchor dari posisi-x).
+  // Bentuk anchor ikut kebijakan subBar() yg sama dgn onDrawEnd: horizontalStraightLine
+  // (sub-bar) → dataIndex PECAHAN via fracAnchorFromPx, supaya jalur instant-drop (dropped=true,
+  // onDrawEnd/subBar() tak pernah jalan) mendarat presisi juga, bukan snap ke pusat bar spt
+  // sebelumnya. verticalStraightLine (BAR_ANCHOR) tetap xAnchorFromPx lalu snap ke bar di bawah
+  // (x memang relevan → wajib align ke candle yg diklik).
+  const xa = subBar(name) ? fracAnchorFromPx(px) : xAnchorFromPx(px); if(!xa) return null;
   const np=Object.assign({value:v}, xa);
   if(name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
   return np;
