@@ -1,7 +1,15 @@
 # Temuan ronde pertama E2E drawing
 
 Tanggal: 2026-07-25 · Suite: `npm test` (163 test, project `hermetic`)
-Hasil: **112 lolos · 51 gagal** — semua kegagalan adalah temuan, bukan harness yang rusak.
+Hasil ronde pertama: **112 lolos · 51 gagal** — semua kegagalan adalah temuan, bukan harness
+yang rusak.
+
+**Update 2026-07-25 (setelah perbaikan anchor sub-bar, Temuan 1):** suite naik jadi
+**168 test · 157 lolos · 11 gagal**. Sisa merah seluruhnya masuk tiga kelompok yang memang
+dibiarkan merah dengan sengaja — Temuan 2 (klik cepat, jumlah lolos berfluktuasi antar-run),
+Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`), Temuan 4 (instant-drop `lastPtr`
+basi) — plus 2 test `@integration` yang butuh server Go asli di `:8765` (tak tersedia di
+lingkungan ini, di luar jalur hermetik). Tak ada regresi di luar itu.
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -9,7 +17,13 @@ memang diharapkan; melonggarkan toleransi supaya hijau justru menyembunyikan mas
 
 ---
 
-## Temuan 1 — Menggambar tak mengikuti kursor: 20 dari 24 tool meleset ½ bar
+## Temuan 1 — Menggambar tak mengikuti kursor: 20 dari 24 tool meleset ½ bar — SELESAI
+
+**Status:** diperbaiki 2026-07-25, lihat
+`docs/superpowers/specs/2026-07-25-drawing-subbar-anchor-design.md`.
+Presisi sub-bar kini default untuk semua tool; snap per-bar disisakan sebagai daftar
+pengecualian eksplisit `BAR_ANCHOR` (`index.html`) untuk `verticalStraightLine` dan
+`long/shortPosition`.
 
 **Gejala terukur.** Klik di sebuah pixel, objek mendarat **3–4px** di sampingnya
 (= ½ `barSpace`; pada fixture `barSpace` = 8px). Berlaku untuk `rayLine`, `straightLine`,
