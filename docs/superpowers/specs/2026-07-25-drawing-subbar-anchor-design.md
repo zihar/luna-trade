@@ -47,7 +47,7 @@ Pengecualian dan alasannya (keduanya sudah tertulis di kode sebelum pekerjaan in
 - `longPosition` / `shortPosition` — entry harus mendarat di center candle terpilih
   (`index.html:3408-3412`)
 
-## Komponen: enam lapis
+## Komponen: tujuh lapis
 
 | # | Lapis | Lokasi | Perubahan |
 |---|---|---|---|
@@ -57,6 +57,7 @@ Pengecualian dan alasannya (keduanya sudah tertulis di kode sebelum pekerjaan in
 | 4 | Reticle titik (`updateMagDot`) | `index.html:3290` | idem |
 | 5 | Restore dari localStorage | `index.html:3194` | idem |
 | 6 | `refineMagnetPoints` | `index.html:689` | gate `p.timestamp!=null` → `tsOf(p)`; hanya tulis ulang `value` |
+| 7 | Jalur drag (`onPressedMoveStart` / `onPressedMoving` / `onPressedMoveEnd`) | `index.html:977-1001` | **pindahkan** ke `delHooks()` dengan guard `subBar`, sejalan dengan lapis 2 |
 
 Lapis 2 adalah kunci ekonomisnya. `delHooks()` dikirim per-instance lewat `createOverlay`,
 dan hook lain di objek yang sama (`onDrawStart`, `onDrawEnd`, `onClick`, …) terbukti
@@ -69,6 +70,15 @@ no-op. Tanpa lapis 6, 13 tool kehilangan penyempurnaan harga presisi-M5 saat mag
 TF besar. Perbaikannya justru menyederhanakan fungsi itu dan sejalan dengan kebijakan magnet
 yang sudah tertulis di `index.html:970` ("magnet hanya menyetel VALUE; X tetap ikut kursor"),
 sekaligus menutup follow-up yang menggantung di `index.html:685-687`.
+
+Lapis 7 ditambahkan setelah spec awal disetujui, saat membaca suite lebih teliti. Dua alasan.
+`20-parity.spec.js:106` punya blok describe "press-drag" yang menaruh titik terakhir lewat
+tekan-geser-lepas untuk semua tool multi-titik; jalur itu lewat `onPressedMoving`, yang sama
+seperti `onDrawing` hanya terdaftar di `trendline` — jadi memindahkan `onDrawing` saja belum
+memenuhi kriteria terima. Sekaligus ia menutup celah kedua: `30-interaction.spec.js:15` hanya
+menguji drag-setelah-jadi untuk `trendline`, sehingga 19 tool lain tak teruji dan kemungkinan
+besar masih snap per-bar. Apakah lapis ini benar-benar perlu ditentukan oleh pengukuran, bukan
+tebakan — spike yang menjawabnya.
 
 ## Aliran data setelah perubahan
 
@@ -94,8 +104,10 @@ yang baru beralih otomatis tercakup saat ganti TF.
 - Temuan 2 (klik cepat menelan klik), 3 (`simpleAnnotation`/`simpleTag` tak terjangkau),
   4 (instant-drop pakai `lastPtr` basi), 5 (dua sumber kebenaran nama `arrow`) — PR terpisah,
   sesuai CLAUDE.md aturan 1.
-- **Tak ada file test yang diubah.** `TOOL_SPEC` sudah menyatakan `anchor: 'subbar'` untuk
-  ke-20 tool, jadi test yang merah hari ini adalah spesifikasi yang benar.
+- **Tak ada ekspektasi test yang diubah.** `TOOL_SPEC` sudah menyatakan `anchor: 'subbar'` untuk
+  ke-20 tool, jadi test yang merah hari ini adalah spesifikasi yang benar. Satu file test
+  **ditambah** (`tests/drawing/70-reticle.spec.js`): reticle preview belum teruji sama sekali
+  padahal lapis 4 membuatnya load-bearing. Menambah cakupan bukan melonggarkan ekspektasi.
 
 ## Risiko
 
@@ -117,7 +129,10 @@ yang baru beralih otomatis tercakup saat ganti TF.
 
 ## Verifikasi
 
-`npm test` (hermetik, 163 test). Baseline hari ini 112 lolos / 51 gagal.
+`npm test` (hermetik). Baseline terverifikasi di branch ini setelah #119 merge: **113 lolos**,
+dengan kegagalan terkumpul di `20-parity.spec.js` (34), `40-modal-text.spec.js` (2, Temuan 3),
+dan `50-rail.spec.js` (1, Temuan 4). Dua test `@integration` gagal karena butuh server Go asli
+di `:8765` — bukan bagian dari jalur hermetik.
 
 Kriteria terima:
 
@@ -132,7 +147,8 @@ Kriteria terima:
 
 ## Rencana PR
 
-- **PR-0 — spike, tak di-merge.** Pasang `onDrawing` generik hanya untuk `rayLine`, ukur Δ.
+- **PR-0 — spike, tak di-merge.** Pasang `onDrawing` generik hanya untuk `rayLine`, ukur Δ di
+  tiga mode (klik normal, press-drag, klik cepat).
   Menjawab risiko 1 dan 2 sekaligus. Hasilnya menentukan bentuk PR-1.
 - **PR-1 — mekanisme generik + lapis 6.** Bila spike gagal, PR-1 mengecil jadi 11 overlay
   custom dan **PR-2** menangani 9 built-in lewat registrasi ulang.
