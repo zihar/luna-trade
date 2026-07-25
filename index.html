@@ -3068,19 +3068,23 @@ function delHooks(){ return {
       const rect=$('#chart').getBoundingClientRect();
       const toPt=(pc)=>{ const np = pc.timestamp!=null?{timestamp:pc.timestamp,value:pc.value}:{dataIndex:pc.dataIndex,value:pc.value};
         if(o.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp); return np; };
-      // Refine ke presisi sub-bar HANYA bila klik ↔ titik klinecharts SELARAS di sumbu X: jumlah
-      // sama & tiap titik berdekatan secara pixel pada X. Saat klik cepat, pendingClicks bisa
-      // desync (klik ekstra dianggap noise / push ter-skip) → pemetaan by-index memasang klik yg
-      // salah & kotak "mengecil". Bila desync, pakai titik klinecharts apa adanya (ukuran benar,
-      // x snap-ke-bar). Y SENGAJA tak dicek: beberapa overlay built-in (mis. horizontalRayLine)
-      // menghomogenkan VALUE titik ke-0 mengikuti kursor titik terakhir saat menggambar
-      // (klinecharts performEventMoveForDrawing) — itu justru VALUE yg mau kita timpa balik ke
-      // klik asli, jadi ikut mensyaratkan Y sudah dekat di sini malah menolak koreksi yg dicari.
+      // Refine ke presisi sub-bar HANYA bila klik ↔ titik klinecharts SELARAS: jumlah sama &
+      // tiap titik berdekatan secara pixel di X. Saat klik cepat, pendingClicks bisa desync (klik
+      // ekstra dianggap noise / push ter-skip) → pemetaan by-index memasang klik yg salah &
+      // kotak "mengecil". Bila desync, pakai titik klinecharts apa adanya (ukuran benar, x snap-ke-bar).
+      // Y HANYA dicek di titik TERAKHIR, bukan semua titik: beberapa overlay built-in (mis.
+      // horizontalRayLine) menghomogenkan VALUE titik #0 mengikuti performPoint selama menggambar
+      // (klinecharts performEventMoveForDrawing) — itu justru value yg mau kita timpa balik ke
+      // klik asli, jadi mensyaratkan Y titik #0 sudah dekat malah menolak koreksi yg dicari.
+      // Titik TERAKHIR aman dicek di kedua sumbu karena ia SENDIRI adalah performPoint (klinecharts
+      // menyalin value performPoint ke titik lain, bukan sebaliknya) → pendingClicks[last].value
+      // tetap ≈ o.points[last].value walau utk tool ber-invariant sekalipun. Sinyal desync klik
+      // cepat (klik nyasar/tertelan bikin titik jatuh di Y yg jauh) tetap tertangkap lewat titik ini.
       const pxOf=(p)=>{ if(!p) return null; let c=chart.convertToPixel(p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:p.dataIndex,value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return c||null; };
       let refine = pendingClicks.length===o.points.length;
-      if(refine){ const tolX=1.5*barSpacePx();
+      if(refine){ const tolX=1.5*barSpacePx(), lastIdx=o.points.length-1;
         for(let k=0;k<o.points.length;k++){ const a=pxOf(toPt(pendingClicks[k])), b=pxOf(o.points[k]);
-          if(!a||!b||Math.abs(a.x-b.x)>tolX){ refine=false; break; } } }
+          if(!a||!b||Math.abs(a.x-b.x)>tolX||(k===lastIdx&&Math.abs(a.y-b.y)>6)){ refine=false; break; } } }
       if(refine){ for(let k=0;k<o.points.length;k++) o.points[k]=toPt(pendingClicks[k]); }
       // Tool sub-bar: pindahkan anchor ke dataIndex PECAHAN (bukan timestamp) supaya bentuk &
       // handle dirender presisi di titik klik. Fraksi presisi diambil dari fidx klik
@@ -3112,7 +3116,16 @@ function delHooks(){ return {
       if(afterOverride && afterOverride.points && afterOverride.points.length===intendedValues.length){
         const drifted=afterOverride.points.some((p,i)=>{ const v=intendedValues[i];
           return p&&p.value!=null&&v!=null&&Math.abs(p.value-v)>1e-9; });
-        if(drifted && intendedValues[0]!=null){ const lvl=intendedValues[0];
+        // Timpa ulang HANYA bila drift-nya memang pola HOMOGENISASI klinecharts (semua titik
+        // berakhir di value yg SAMA satu sama lain) — itu tanda tangan performEventPressedMove
+        // (lihat komentar di atas), bukan sekadar value yg berbeda dari niat kita krn sebab lain
+        // yg tak kita kenali. Tanpa syarat ini, collapse bisa salah tembak diam-diam (ketutup
+        // catch(_){} di luar) pada overlay lain di masa depan yg juga mengubah value saat override
+        // tapi TIDAK dgn cara menyeragamkan semua titik.
+        const homogenized = afterOverride.points.length>1 &&
+          afterOverride.points.every(p=>p&&p.value!=null) &&
+          afterOverride.points.every(p=>Math.abs(p.value-afterOverride.points[0].value)<1e-9);
+        if(drifted && homogenized && intendedValues[0]!=null){ const lvl=intendedValues[0];
           chart.overrideOverlay({id:o.id, points:afterOverride.points.map(p=>p?Object.assign({}, p, {value:lvl}):p)}); }
       }
     } }catch(_){}
@@ -3315,8 +3328,8 @@ function updateMagDot(ev){
   const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
   // Reticle WAJIB memakai anchor yg IDENTIK dgn titik yg akan di-commit, lalu dirender lewat
   // convertToPixel yg SAMA dgn mesin render → dijamin mendarat tepat di posisi titik sebenarnya.
-  // (Kursor mentah meleset: convertToPixel(timestamp) meny-snap ke bar utk tool non-trendline,
-  // sedang trendline beranchor dataIndex pecahan/presisi. Menyatukan jalur magnet ON/OFF.)
+  // (Kursor mentah meleset: convertToPixel(timestamp) meny-snap ke bar utk tool BAR_ANCHOR,
+  // sedang tool sub-bar beranchor dataIndex pecahan/presisi. Menyatukan jalur magnet ON/OFF.)
   let anchor=null;
   if(magnetOn){
     const xa=xAnchorFromPx(px);
@@ -3324,8 +3337,10 @@ function updateMagDot(ev){
   }
   if(!anchor){
     const o=chart.getOverlayById(inProgressId), name=o&&o.name;
-    if(subBar(name)){ const fa=fracAnchorFromPx(px); if(fa) anchor={dataIndex:fa.dataIndex, value:v}; }   // presisi sub-bar (fidx)
-    else { const xa=xAnchorFromPx(px); if(xa) anchor=Object.assign({value:v}, xa); }                      // BAR_ANCHOR: timestamp (ikut snap render)
+    // name falsy (overlay tak ketemu) → jatuh ke cabang BAR_ANCHOR (perilaku lama): subBar(undefined)
+    // sendiri bernilai true (bukan anggota BAR_ANCHOR), jadi name dicek eksplisit lebih dulu.
+    if(name && subBar(name)){ const fa=fracAnchorFromPx(px); if(fa) anchor={dataIndex:fa.dataIndex, value:v}; }   // presisi sub-bar (fidx)
+    else { const xa=xAnchorFromPx(px); if(xa) anchor=Object.assign({value:v}, xa); }                             // BAR_ANCHOR: timestamp (ikut snap render)
   }
   if(!anchor){ hideMagDot(); return; }
   const key = anchor.timestamp!=null ? {timestamp:anchor.timestamp, value:anchor.value} : {dataIndex:anchor.dataIndex, value:anchor.value};
