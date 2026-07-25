@@ -682,9 +682,8 @@ async function buildReplayPartial(tf){
 }
 const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1,
   priceLine:1, callout:1, simpleAnnotation:1, simpleTag:1}; // box & penanda axis & teks: dilewati
-// CATATAN: titik trendline kini beranchor dataIndex (tanpa timestamp) → refine M5 di bawah
-// (yang butuh p.timestamp) menjadi no-op untuk trendline. Magnet saat MENGGAMBAR tetap bekerja
-// (snap nilai OHLC via pendingClicks). Penyempurnaan X presisi-M5 untuk trendline = follow-up.
+// Berlaku untuk titik ber-timestamp MAUPUN ber-dataIndex pecahan (lewat tsOf). Yang
+// disempurnakan hanya VALUE; anchor X tak disentuh supaya presisi sub-bar tak hilang.
 async function refineMagnetPoints(id){
   try{
     const o=chart.getOverlayById(id); if(!o||MAGNET_REFINE_SKIP[o.name]) return;
@@ -695,15 +694,19 @@ async function refineMagnetPoints(id){
     const pts=(o.points||[]).map(p=>Object.assign({},p));
     let changed=false;
     for(const p of pts){
-      if(p.timestamp==null||p.value==null) continue;
-      const rng=barRangeContaining(cur,p.timestamp); if(!rng) continue;
+      if(p.value==null) continue;
+      const t=tsOf(p); if(t==null) continue;   // titik ber-dataIndex pecahan ikut terlayani (fidxToTs)
+      const rng=barRangeContaining(cur,t); if(!rng) continue;
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
       let best=null,bd=Infinity;
       for(const c of m5){ if(c.timestamp>=rng.open && c.timestamp<rng.end){
-        for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={timestamp:c.timestamp,value:v};} }
+        for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={value:v};} }
       }}
       // magnet "keras": semua titik digeser ke nilai OHLC M5 sebenarnya (tanpa gate jarak).
-      if(best && (best.timestamp!==p.timestamp || best.value!==p.value)){ p.timestamp=best.timestamp; p.value=best.value; changed=true; }
+      // HANYA value yang disempurnakan — anchor X dibiarkan apa adanya, sesuai kebijakan magnet:
+      // "magnet hanya menyetel VALUE; X tetap ikut kursor". Menulis p.timestamp di sini akan
+      // MENGHAPUS presisi sub-bar titik ber-dataIndex (render meng-snap timestamp ke pusat bar).
+      if(best && best.value!==p.value){ p.value=best.value; changed=true; }
     }
     if(changed){ try{chart.overrideOverlay({id, points:pts});}catch(e){} }
   }catch(e){}
