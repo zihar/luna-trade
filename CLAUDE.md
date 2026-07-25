@@ -43,7 +43,13 @@ di atas.
 
 ## Verifikasi
 
-- Frontend tanpa unit test — verifikasi manual via browser. Server lokal:
+- **E2E UI (Playwright)** — `npm test` (hermetik: stub semua `/api` + fixture candle, tak
+  butuh `.env`/OANDA/binary Go). Drawing tergarap penuh atas `TOOL_SPEC`; menambah tool
+  drawing = satu baris tabel di `tests/helpers/spec.js`. Baca `tests/README.md` sebelum
+  menambah test — ada 4 jebakan canvas yang sudah ditangani helper (jeda klik ~400ms,
+  sumbu harga di dalam `#chart`, titik overlay tak selalu di atas bentuknya, jumlah titik
+  mengembang setelah objek jadi). Temuan yang masih merah: `docs/e2e-drawing-findings.md`.
+- Sisanya verifikasi manual via browser. Server lokal:
   `PORT=8765 ./luna-trade` (butuh `.env`: `OANDA_TOKEN`, dll). Serve dari disk (no-cache),
   jadi edit `index.html` langsung tampil saat reload.
 - Chart butuh login OANDA untuk memuat candle; tanpa login, verifikasi terbatas ke

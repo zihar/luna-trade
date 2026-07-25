@@ -26,3 +26,9 @@ ROADMAP.md
 
 # Artefak Playwright MCP (screenshot/trace sesi browser)
 .playwright-mcp/
+
+# E2E test (Playwright) — toolchain & artefak, bukan sumber
+node_modules/
+test-results/
+playwright-report/
+report/
