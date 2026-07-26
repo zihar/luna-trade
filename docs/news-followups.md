@@ -1,7 +1,7 @@
 # News feature — follow-up backlog
 
 Item lanjutan dari fitur News (Fase 1 kalender+bias & Fase 2 marker on-chart, di-merge PR #21).
-Status per 2026-07-10.
+Status per 2026-07-19 (di-cross-check ke kode).
 
 ## Status ringkas
 
@@ -10,9 +10,11 @@ Status per 2026-07-10.
 | Bias arah currency non-USD | ✅ SELESAI — PR #35 |
 | Dedupe startup double-fetch | ✅ SELESAI — PR #36 |
 | Perluas `fiatCodes` (SEK/NOK) | ⏸️ SKIP — tak perlu (semua FX Luna major) |
-| Cache stale-while-revalidate | 🔸 DEFER — benefit kecil |
-| Headline feed + notif on-chart | 🔲 BELUM — fitur besar, butuh pilih provider (lihat bawah) |
-| Fallback BLS · push notif · AI summary | 🔲 DEFERRED — spec sendiri |
+| Cache stale-while-revalidate | ✅ SELESAI — PR #78 (`newscache.go`, dulu ditandai DEFER) |
+| Headline feed + tab News + notif on-chart | ✅ SELESAI — PR #70/#71/#72 (provider: Finnhub) |
+| Push notif event high-impact | ✅ SELESAI — PR #79/#80/#82/#83/#84 |
+| Fallback BLS | 🔲 BELUM — spec sendiri (0 hit di kode) |
+| AI summary/digest | 🔲 BELUM — spec sendiri (yg ada: bias rule-based) |
 
 ## Selesai
 
