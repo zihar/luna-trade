@@ -9,10 +9,16 @@ yang rusak.
 di `:8765`, tak tersedia di lingkungan ini, di luar jalur hermetik).
 
 **Update 2026-07-26 (setelah penawar klik-tertelan / Temuan 2):** **166 test hermetik ·
-163 lolos · 3 gagal**. Sisa merah seluruhnya dua kelompok yang masih sengaja dibiarkan —
-Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`, 2 test) dan Temuan 4 (instant-drop
-`lastPtr` basi, 1 test). Tak ada regresi di luar itu, dan suite kini deterministik: kelompok
-klik cepat tak lagi bergantung beban mesin (lihat catatan flaky di Temuan 2).
+163 lolos · 3 gagal**. Suite juga jadi deterministik: kelompok klik cepat tak lagi bergantung
+beban mesin (lihat catatan flaky di Temuan 2).
+
+**Update 2026-07-26 (setelah gerbang `ptrOverChart` / Temuan 4):** **166 test hermetik ·
+164 lolos · 2 gagal**. Sisa merah tinggal **satu** kelompok yang masih sengaja dibiarkan:
+Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`, 2 test). Tak ada regresi di luar itu.
+
+Yang masih terbuka setelah semua update di atas: **Temuan 3**, **Temuan 5** (kebersihan kode,
+testnya hijau), dan follow-up terbesar — **drag setelah objek jadi** yang masih presisi hanya
+untuk `trendline` dan belum punya test untuk 20 tool lain (lihat kualifikasi di Temuan 1).
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -175,16 +181,37 @@ Test: `tests/drawing/40-modal-text.spec.js` (describe "keterjangkauan objek")
 
 ---
 
-## Temuan 4 — Instant-drop memakai posisi kursor basi
+## Temuan 4 — Instant-drop memakai posisi kursor basi — SELESAI
 
-`Alt+H` / `Alt+V` menjatuhkan garis di posisi kursor tanpa klik. Niat yang tertulis di kode
-(index.html:3131-3137): bila kursor **di luar** chart, `instantDropPoint` mengembalikan null
-→ jatuh ke mode gambar biasa. Tapi `lastPtr` hanya di-update oleh `mousemove` pada `#chart`
-(index.html:3299), jadi ia **tak pernah** berisi koordinat di luar chart.
+**Status:** diperbaiki 2026-07-26 lewat flag `ptrOverChart` di `index.html`.
+
+`Alt+H` / `Alt+V` menjatuhkan garis di posisi kursor tanpa klik. Niat yang tertulis di kode:
+bila kursor **di luar** chart, `instantDropPoint` mengembalikan null → jatuh ke mode gambar
+biasa. Tapi `lastPtr` hanya di-update oleh `mousemove` pada `#chart`, jadi ia **tak pernah**
+berisi koordinat di luar chart — cek rect di dalam `instantDropPoint` tak pernah bisa gugur.
 
 Akibatnya: menekan `Alt+H` sambil kursor berada di watchlist/header/panel tetap menjatuhkan
 garis di posisi terakhir di dalam chart — tanpa diminta, di tempat yang tak dilihat user.
 Fallback yang sudah ditulis itu efektif jadi kode mati.
+
+**Fix.** Flag `ptrOverChart` (di-set `mousemove`/`mouseenter` pada `#chart`, di-clear
+`mouseleave`) jadi gerbang pertama `instantDropPoint`. Cek rect dipertahankan sebagai lapis
+kedua untuk kasus lain (chart menyusut setelah posisi terakhir tercatat).
+
+**Kenapa flag terpisah, bukan `lastPtr` yang dilacak di level document.** Tujuh pemakai
+`lastPtr` yang lain (popup setting objek & mini-confirm, panel edit posisi, jaring pengaman
+anchor di `onDrawEnd` dan di jalur posisi paper, hit-test badge alert, `overPlaceholder`)
+semuanya berjalan saat pointer memang di atas chart dan membutuhkan koordinat yang valid **di
+dalam** chart. Melacak `lastPtr` sampai ke luar chart akan membuat dua jaring pengaman anchor
+itu menerima koordinat di luar area plot — tepat kelas bug yang mereka cegah ("garis kelempar
+ke tepi"). Basi-nya `lastPtr` itu justru desain; yang kurang hanyalah cara mengetahui pointer
+sudah keluar.
+
+**Konsekuensi kecil yang diterima:** kalau pointer sudah diam di atas chart sejak sebelum
+halaman selesai memuat (belum ada `mousemove`/`mouseenter` sama sekali), `Alt+H` kini jatuh ke
+mode gambar biasa — butuh satu klik. Sebelumnya ia menjatuhkan garis di **default** `lastPtr`
+(tengah viewport), yaitu posisi yang juga bukan tempat yang user tunjuk. Jadi ini lebih dekat
+ke niat, bukan mundur.
 
 Test: `tests/drawing/50-rail.spec.js`
 
