@@ -67,6 +67,51 @@ test.describe('favorites', () => {
     assertNoPageErrors(page);
   });
 
+  test('shape Arrow yang difavoritkan meng-arm SHAPE, bukan mode kursor', async ({ page }) => {
+    // Temuan 5: `arrow` ada dua kali di DRAW_GROUPS (grup Cursor "Arrow (no crosshair)" & grup
+    // Shapes "Arrow"). Selama favorite disimpan sebagai nama telanjang, resolusinya lewat
+    // toolByName ("yang pertama menang") selalu memberi varian CURSOR — tombol favorites-nya
+    // bertooltip "Cursor: Arrow (no crosshair)" dan kliknya mengubah mode kursor, bukan meng-arm
+    // shape. Terukur sebelum fix: cursorMode cross→arrow, crosshair mati, inProgressId tetap null.
+    await gotoApp(page);
+    await openFlyout(page, 'shapes');
+    const item = page.locator('#dtFlyout .dt-item', { has: page.locator('.dt-nm', { hasText: /^Arrow$/ }) });
+    await item.locator('.dt-fav').click();
+    await page.keyboard.press('Escape');
+
+    const btn = page.locator('#favBar .favbar-btn').first();
+    await expect(btn, 'tooltip harus varian Shapes, bukan Cursor').toHaveAttribute('title', /Shapes/);
+    await expect(btn).not.toHaveAttribute('title', /no crosshair/);
+
+    const before = await page.evaluate(() => cursorMode);
+    await btn.click();
+    await page.waitForFunction(() => inProgressId != null, null, { timeout: 3000 });
+    expect(await page.evaluate(() => chart.getOverlayById(inProgressId).name), 'overlay yang ter-arm').toBe('arrow');
+    expect(await page.evaluate(() => cursorMode), 'mode kursor tak boleh ikut berubah').toBe(before);
+    assertNoPageErrors(page);
+  });
+
+  test('favorite lama (nama telanjang di localStorage) dimigrasi ke kunci ber-grup', async ({ page }) => {
+    // Data lama menyimpan nama telanjang. Migrasinya tak ambigu justru karena bintang HANYA ada di
+    // grup non-cursor: `arrow` yang tersimpan pasti berasal dari shape Arrow.
+    await page.addInitScript(() => {
+      try { localStorage.setItem('br_fav_tools', JSON.stringify(['arrow', 'circle'])); } catch (_) {}
+    });
+    await gotoApp(page);
+
+    expect(await page.evaluate(() => favTools), 'favTools sudah berkualifikasi grup').toEqual(['shapes:arrow', 'shapes:circle']);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('br_fav_tools'))), 'tersimpan kembali dalam bentuk baru').toEqual([
+      'shapes:arrow',
+      'shapes:circle',
+    ]);
+
+    // …dan tombol pertama benar-benar meng-arm shape arrow.
+    await page.locator('#favBar .favbar-btn').first().click();
+    await page.waitForFunction(() => inProgressId != null, null, { timeout: 3000 });
+    expect(await page.evaluate(() => chart.getOverlayById(inProgressId).name)).toBe('arrow');
+    assertNoPageErrors(page);
+  });
+
   test('favorites bar bisa digeser lewat grip & posisinya tersimpan', async ({ page }) => {
     await gotoApp(page);
     await openFlyout(page, 'shapes');
