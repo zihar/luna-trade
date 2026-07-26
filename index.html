@@ -802,6 +802,10 @@ function writeBox(pts,Lxa,Rxa,T,B){
   const xa=[Lxa,mxa,Rxa,Rxa,Rxa,mxa,Lxa,Lxa], vy=[T,T,T,mV,B,B,B,mV];
   for(let i=0;i<8;i++) pts[i]=Object.assign({value:vy[i]}, xa[i]);
 }
+// Tool berbentuk kotak: 2 titik saat digambar → mekar jadi 8 handle, dan setiap drag handle harus
+// menulis ulang SISI (bukan satu titik lepas) supaya kotaknya tetap kotak. Dipakai expandBox dan
+// lapis drag presisi di delHooks() — satu daftar, bukan dua yang bisa melenceng.
+const BOX_TOOLS={rect:1, fib3:1};
 // dipanggil saat salah satu handle di-drag → recompute jadi kotak rapi (tetap axis-aligned)
 function boxPressedMove(t){
   const pts=t.points, k=t.performPointIndex, pp=t.performPoint;
@@ -817,7 +821,7 @@ function boxPressedMove(t){
 }
 // setelah 2 klik (2 titik) → mekarkan jadi 8 titik handle
 function expandBox(o){
-  if(!o || (o.name!=='rect' && o.name!=='fib3')) return;
+  if(!o || !BOX_TOOLS[o.name]) return;
   if(!o.points || o.points.length>=8) return;
   const p0=o.points[0], p1=o.points[1];
   if(!p0||!p1||p0.value==null||p1.value==null) return;
@@ -951,8 +955,9 @@ function arrowMarkFigures(dir){ // dir: -1 = up (tip di atas), +1 = down (tip di
 klinecharts.registerOverlay({ name:'arrowMarkUp',   totalStep:2, needDefaultPointFigure:true, createPointFigures:arrowMarkFigures(-1) });
 klinecharts.registerOverlay({ name:'arrowMarkDown', totalStep:2, needDefaultPointFigure:true, createPointFigures:arrowMarkFigures(+1) });
 
-// state drag trendline presisi (intercept onPressedMoving; klinecharts default meng-snap ke bar)
-let tlDrag=null;
+// state drag presisi (intercept onPressedMoving di delHooks; klinecharts default meng-snap ke bar).
+// Berlaku untuk SEMUA tool sub-bar, bukan cuma trendline — karena itu namanya bukan tlDrag lagi.
+let dragBase=null;
 // custom overlay: Trendline (2 titik) dengan teks opsional — klik 2× utk edit
 klinecharts.registerOverlay({
   name:'trendline', totalStep:3, needDefaultPointFigure:true,
@@ -977,33 +982,6 @@ klinecharts.registerOverlay({
     // Buletan hanya muncul saat objek yg SUDAH JADI di-hover/pilih (handle default dikembalikan di onDrawEnd).
     return figs;
   },
-  // Drag PRESISI: klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap
-  // ke indeks integer. Dengan return true di onPressedMoving, default itu dilewati dan kita tulis
-  // dataIndex PECAHAN sendiri (endpoint) / translasi semua titik (badan garis). e.x/e.y klinecharts
-  // = clientX-target.left (container-relative) → sama ruang dgn fracAnchorFromPx/pxToValue (OX=OY=0).
-  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o) tlDrag={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
-  onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points) return false;
-    const OX=0, OY=0;
-    const xa=fracAnchorFromPx(e.x-OX), v=pxToValue(e.y-OY);
-    if(!xa || v==null) return false;
-    const pts=o.points.map(p=>Object.assign({},p));
-    const key=e.figureKey||'';
-    if(key.indexOf('overlay_figure_point_')===0){       // seret SATU ujung
-      const i=e.figureIndex; if(pts[i]) pts[i]={dataIndex:xa.dataIndex, value:v};
-    } else {                                            // seret BADAN garis → translasi semua titik
-      if(!tlDrag) return false;
-      const sx=fracAnchorFromPx(tlDrag.x-OX), sv=pxToValue(tlDrag.y-OY);
-      if(!sx || sv==null) return false;
-      const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
-      for(let i=0;i<pts.length;i++){ const sp=tlDrag.pts[i]; if(!sp) continue;
-        const bi=(sp.dataIndex!=null)?sp.dataIndex:fidxOf(sp);
-        pts[i]={dataIndex: bi+dIdx, value: (sp.value!=null?sp.value:v)+dV}; }
-    }
-    try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(_){}
-    return true;                                        // lewati snap bawaan klinecharts
-  },
-  onPressedMoveEnd:(e)=>{ tlDrag=null; try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
-    try{scheduleSaveDraws();}catch(_){} return false; }
 });
 
 // garis horizontal/vertikal: override bawaan klinecharts agar penanda harga (axis Y) &
@@ -3117,6 +3095,54 @@ function delHooks(){ return {
     if(fa && v!=null) o.points[m]={dataIndex:fa.dataIndex, value:v};
     return false;
   },
+  // Drag PRESISI untuk tool sub-bar — pasangan onDrawing di atas, untuk objek yang SUDAH jadi
+  // (dan untuk titik terakhir yang ditaruh lewat tekan-geser-lepas saat menggambar).
+  // klinecharts default mengubah kursor→titik via _coordinateToPoint yg meng-snap ke indeks
+  // INTEGER; dengan `return true` di onPressedMoving, default itu dilewati dan kita tulis
+  // dataIndex PECAHAN sendiri (satu ujung) / translasi semua titik (badan objek). e.x/e.y
+  // klinecharts = clientX-target.left (container-relative) → sama ruang dgn
+  // fracAnchorFromPx/pxToValue (OX=OY=0).
+  //
+  // Sampai 2026-07-26 hook ini hanya terdaftar di registrasi `trendline`, jadi 18 tool lain
+  // meleset ½ barSpace saat titiknya digeser dan 15 tool saat badannya digeser — terukur di
+  // tests/drawing/31-drag-precision.spec.js (Temuan 6), sama besar di fixture maupun server asli.
+  //
+  // Guard subBar(): tool BAR_ANCHOR dilewati dengan sengaja. verticalStraightLine memang harus
+  // snap ke bar, dan long/shortPosition punya jalur pressed-move sendiri (panel posisi + handle
+  // SL/TP) yang tak boleh ditimpa.
+  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o&&subBar(o.name)) dragBase={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
+  onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
+    const OX=0, OY=0;
+    const xa=fracAnchorFromPx(e.x-OX), v=pxToValue(e.y-OY);
+    if(!xa || v==null) return false;
+    const pts=o.points.map(p=>Object.assign({},p));
+    const key=e.figureKey||'';
+    if(key.indexOf('overlay_figure_point_')===0){       // seret SATU ujung
+      const i=e.figureIndex;
+      if(BOX_TOOLS[o.name]){
+        // rect/fib3 mendaftarkan performEventPressedMove (boxPressedMove) yg menulis ulang 8 titik
+        // supaya kotaknya tetap kotak — dan `return true` di bawah melewati jalur klinecharts yg
+        // biasanya memanggilnya. Jadi panggil sendiri, dengan performPoint PRESISI (dataIndex
+        // pecahan) yang justru inti perbaikan ini; writeBox/keyOf sudah menerima anchor pecahan.
+        // Tanpa ini, menarik satu handle menulis satu titik lepas → kotaknya rusak (terukur:
+        // titik mendarat 202px dari kursor), bukan cuma kurang presisi.
+        boxPressedMove({points:pts, performPointIndex:i, performPoint:{dataIndex:xa.dataIndex, value:v}});
+      } else if(pts[i]) pts[i]={dataIndex:xa.dataIndex, value:v};
+    } else {                                            // seret BADAN objek → translasi semua titik
+      if(!dragBase) return false;
+      const sx=fracAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
+      if(!sx || sv==null) return false;
+      const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
+      for(let i=0;i<pts.length;i++){ const sp=dragBase.pts[i]; if(!sp) continue;
+        const bi=(sp.dataIndex!=null)?sp.dataIndex:fidxOf(sp);
+        pts[i]={dataIndex: bi+dIdx, value: (sp.value!=null?sp.value:v)+dV}; }
+    }
+    try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(_){}
+    return true;                                        // lewati snap bawaan klinecharts
+  },
+  // scheduleSaveDraws() WAJIB ikut: tanpa itu hasil drag tak tersimpan & tak masuk history undo.
+  onPressedMoveEnd:(e)=>{ dragBase=null; try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
+    try{scheduleSaveDraws();}catch(_){} return false; },
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     applyXDateFlag(o);   // buang tanggal sumbu X utk draw non-waktu (built-in klinecharts set flag ini true)

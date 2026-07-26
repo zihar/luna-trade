@@ -22,9 +22,10 @@ Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`, 2 test). Tak ada regres
 merah dan itulah isi Temuan 6 (implementasinya belum dikerjakan — urutan wajib "test dulu, baru
 fix"). Dua merah sisanya tetap Temuan 3.
 
-Yang masih terbuka setelah semua update di atas: **Temuan 6** (implementasi lapis presisi drag),
-**Temuan 3** (keterjangkauan `simpleAnnotation`/`simpleTag`), dan **Temuan 5** (kebersihan kode,
-testnya hijau).
+**Update 2026-07-27 (lapis presisi drag / Temuan 6 SELESAI):** **204 test hermetik · 202 lolos ·
+2 gagal**. Sisa merah tinggal **Temuan 3** (`simpleAnnotation`/`simpleTag` tak bisa di-hover).
+
+Yang masih terbuka: **Temuan 3** dan **Temuan 5** (kebersihan kode, testnya hijau).
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -225,7 +226,35 @@ Test: `tests/drawing/50-rail.spec.js`
 
 ---
 
-## Temuan 6 — Drag SETELAH objek jadi masih snap per-bar (18 tool titik · 15 tool badan)
+## Temuan 6 — Drag SETELAH objek jadi masih snap per-bar (18 tool titik · 15 tool badan) — SELESAI
+
+**Status:** diperbaiki 2026-07-27. `onPressedMoveStart`/`onPressedMoving`/`onPressedMoveEnd`
+dipindah dari registrasi `trendline` ke `delHooks()` dengan guard `subBar()` (sejalan dengan
+`onDrawing`), `tlDrag` → `dragBase`, dan `scheduleSaveDraws()` ikut dibawa supaya hasil drag
+tersimpan. Spec drag: **38/38 hijau**; suite penuh **204 test · 202 lolos · 2 gagal** (sisa =
+Temuan 3).
+
+**Satu hal yang tak terduga dan penting.** Memindahkan hook saja belum cukup untuk `rect` &
+`fib3`: keduanya mendaftarkan `performEventPressedMove: boxPressedMove` yang menulis ulang 8
+titik supaya kotaknya tetap kotak — dan `return true` di `onPressedMoving` (yang memang perlu,
+untuk melewati snap bawaan) **ikut melewati pemanggilan hook itu**. Akibatnya menarik satu handle
+menulis satu titik lepas → kotaknya rusak, titik mendarat **202px** dari kursor: lebih buruk dari
+bug yang sedang diperbaiki. Fixnya memanggil `boxPressedMove` sendiri dari dalam
+`onPressedMoving`, dengan `performPoint` presisi (`dataIndex` pecahan) — `writeBox`/`keyOf`
+memang sudah menerima anchor pecahan. Pelajaran umumnya: overlay yang punya
+`performEventPressedMove` sendiri tak boleh sekadar dilewati; ia harus disuapi titik presisi.
+
+Selain itu, satu kegagalan awal ternyata **testnya yang salah**: `31-drag-precision` mula-mula
+menyeret titik TERAKHIR, dan pada `rect`/`fib3` titik terakhir adalah handle **tengah-sisi** yang
+secara desain hanya menggeser satu sumbu (terukur Δy 151px — perilaku benar, bukan cacat). Spec
+sekarang menyeret **sudut** bbox (`cornerIndex`).
+
+**Verifikasi di server lokal + akun sungguhan:** blok badan turun dari 15 merah (pra-fix) jadi 6,
+dan keenamnya **tak reproducible** — test yang sama lolos saat dijalankan sebagai subset kecil,
+dan yang gagal selalu assertion boolean (objek gagal di-grab), bukan presisi pixel. Ini masuk
+kategori noise mode live yang sudah didokumentasikan di `tests/README.md`; gerbang tetap hermetik.
+
+### Isi temuan aslinya (sebelum perbaikan)
 
 Ini celah yang sebelumnya cuma "diduga & tak teruji" di kualifikasi Temuan 1. Sekarang terukur,
 oleh `tests/drawing/31-drag-precision.spec.js` (38 test: 20 drag-titik + 17 drag-badan + 1
