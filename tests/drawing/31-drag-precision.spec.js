@@ -56,6 +56,26 @@ async function halfBarOffX(page, wantX, sp) {
   return c + Math.round((wantX - c) / sp) * sp + sp / 2;
 }
 
+/**
+ * Titik yang layak diseret untuk menilai presisi DUA sumbu: sebuah SUDUT bounding box.
+ *
+ * Objek yang mengembang jadi 8 titik (`rect`, `fib3`) menaruh handle **tengah-sisi** di antara
+ * sudut-sudutnya — terukur lewat probe: indeks 1 & 5 tengah-sisi horizontal, 3 & 7 tengah-sisi
+ * vertikal, sisanya sudut. Handle tengah-sisi memang HANYA menggeser satu sumbu (menarik handle
+ * kiri-tengah menggeser tepi kiri, bukan tinggi kotak), jadi menuntutnya mendarat di kursor pada
+ * kedua sumbu akan menuduh perilaku yang benar: sempat terukur Δy 151px di situ, dan itu bukan
+ * cacat. Untuk tool 1-2 titik, ujung-ujungnya sendiri sudah jadi sudut bbox.
+ */
+function cornerIndex(pts) {
+  const P = pts.filter(Boolean);
+  const xs = P.map((p) => p.x), ys = P.map((p) => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const isCorner = (p) =>
+    (Math.abs(p.x - minX) < 1 || Math.abs(p.x - maxX) < 1) && (Math.abs(p.y - minY) < 1 || Math.abs(p.y - maxY) < 1);
+  for (let i = pts.length - 1; i >= 0; i--) if (pts[i] && isCorner(pts[i])) return i;   // dari belakang: ujung terakhir dulu
+  return pts.length - 1;
+}
+
 /** Pilih objek dulu: handle titik hanya muncul saat objek di-hover/terpilih. */
 async function selectObject(page, obj, rect) {
   const spot = await hoverableSpot(page, obj, rect);
@@ -114,9 +134,7 @@ test.describe('drag setelah objek jadi — titik', () => {
       const before = await toPixels(page, obj.points);
       await selectObject(page, obj, rect);
 
-      // Seret titik TERAKHIR: onPressedMoving hanya menulis ulang titik yang sedang diseret.
-      const i = before.length - 1;
-      const from = before[i];
+      const from = before[cornerIndex(before)];
       const sp = await barSpace(page);
       const to = { x: await halfBarOffX(page, from.x + 84, sp), y: from.y + 52 };
       await drag(page, rect, from, to);

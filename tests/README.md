@@ -57,6 +57,14 @@ Dua hal yang wajib diketahui sebelum memakainya:
   kegagalan palsu: pernah terukur 35 dari 38 merah dengan 2 worker, sementara test yang sama
   dijalankan sendiri **lolos**, dan 29 merah dengan 1 worker. Yang berubah lingkungan, bukan
   aplikasinya.
+- **Bahkan dengan 1 worker, run yang panjang masih menghasilkan merah yang tak reproducible.**
+  Terukur pada `31-drag-precision.spec.js` setelah Temuan 6 diperbaiki: hermetik 38/38 hijau,
+  live 22/38 dalam satu run penuh — tapi test yang sama (`circle`, `ellipse`, `arrow`) **lolos**
+  saat dijalankan sebagai subset kecil. Yang gagal selalu assertion **boolean** (`selectedId`
+  setelah klik, atau "badan diseret tapi tak ada titik yang pindah") — yaitu objek gagal
+  di-grab — **bukan** assertion presisi pixel. Jadi kalau mode live merah, periksa dulu apakah
+  yang gagal boolean-nya: itu tanda interaksi tak nyangkut di lingkungan live, bukan temuan.
+  Verifikasi ulang dengan subset kecil sebelum menyimpulkan apa pun.
 - **Bukan gerbang.** Hasilnya tak deterministik (data pasar bergerak, forming bar hanya saat
   pasar buka). Jalur hermetik tetap satu-satunya yang boleh dipakai untuk menilai merah/hijau.
 
