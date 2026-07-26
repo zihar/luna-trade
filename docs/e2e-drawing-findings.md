@@ -16,9 +16,15 @@ beban mesin (lihat catatan flaky di Temuan 2).
 164 lolos · 2 gagal**. Sisa merah tinggal **satu** kelompok yang masih sengaja dibiarkan:
 Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`, 2 test). Tak ada regresi di luar itu.
 
-Yang masih terbuka setelah semua update di atas: **Temuan 3**, **Temuan 5** (kebersihan kode,
-testnya hijau), dan follow-up terbesar — **drag setelah objek jadi** yang masih presisi hanya
-untuk `trendline` dan belum punya test untuk 20 tool lain (lihat kualifikasi di Temuan 1).
+**Update 2026-07-26 (spec drag ditambahkan / Temuan 6):** suite jadi **204 test hermetik ·
+169 lolos · 35 gagal** (terukur, bukan hitungan di atas kertas). Tambahan 38 test
+(`31-drag-precision.spec.js`) menutup titik buta drag-setelah-jadi; **33** di antaranya sengaja
+merah dan itulah isi Temuan 6 (implementasinya belum dikerjakan — urutan wajib "test dulu, baru
+fix"). Dua merah sisanya tetap Temuan 3.
+
+Yang masih terbuka setelah semua update di atas: **Temuan 6** (implementasi lapis presisi drag),
+**Temuan 3** (keterjangkauan `simpleAnnotation`/`simpleTag`), dan **Temuan 5** (kebersihan kode,
+testnya hijau).
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -35,7 +41,9 @@ pengecualian eksplisit `BAR_ANCHOR` (`index.html`) untuk `verticalStraightLine` 
 `long/shortPosition`.
 
 **Kualifikasi penting — cakupan "SELESAI" di atas hanya untuk jalur MENGGAMBAR (klik/
-press-drag saat objek belum jadi), bukan drag SETELAH objek jadi.** Menggeser titik/badan
+press-drag saat objek belum jadi), bukan drag SETELAH objek jadi.** Celah itu kini **sudah
+teruji dan terukur** — lihat **Temuan 6**; paragraf di bawah adalah dugaan aslinya, yang
+ternyata benar. Menggeser titik/badan
 objek yang sudah selesai digambar (mis. memilih `rect` yang sudah ada lalu menarik salah
 satu titiknya) masih presisi sub-bar **hanya untuk `trendline`** —
 `onPressedMoveStart`/`onPressedMoving`/`onPressedMoveEnd` yang menulis ulang titik
@@ -214,6 +222,51 @@ mode gambar biasa — butuh satu klik. Sebelumnya ia menjatuhkan garis di **defa
 ke niat, bukan mundur.
 
 Test: `tests/drawing/50-rail.spec.js`
+
+---
+
+## Temuan 6 — Drag SETELAH objek jadi masih snap per-bar (18 tool titik · 15 tool badan)
+
+Ini celah yang sebelumnya cuma "diduga & tak teruji" di kualifikasi Temuan 1. Sekarang terukur,
+oleh `tests/drawing/31-drag-precision.spec.js` (38 test: 20 drag-titik + 17 drag-badan + 1
+penjaga cakupan).
+
+**Angka (2026-07-26).** Hermetik dan server lokal + akun sungguhan memberi hasil **identik**:
+
+| Blok | Lolos | Gagal |
+|---|---|---|
+| drag titik (20 tool) | 2 (`trendline`, `verticalStraightLine`) | **18** |
+| drag badan (17 tool) | 2 (idem) | **15** |
+
+`trendline` lolos karena ia satu-satunya yang punya lapis presisi drag
+(`onPressedMoveStart`/`Moving`/`End` di registrasinya). `verticalStraightLine` lolos karena
+snap-per-bar-nya memang disengaja (`BAR_ANCHOR`), jadi toleransinya ½ bar + 1.
+
+**Besar kesalahannya deterministik: tepat ½ `barSpace`** (4px pada `barSpace` 8px) untuk drag
+titik, dan sebesar pembulatan-per-bar untuk drag badan (terukur 6px pada satu kasus). Angka itu
+tak muncul dengan sendirinya — target drag **sengaja** ditaruh di tengah antara dua pusat bar
+(`halfBarOffX` untuk titik, Δ "sejumlah bar bulat + ½ bar" untuk badan). Tanpa itu besar
+kesalahan tergantung keberuntungan: versi pertama spec ini memakai target apa adanya dan
+mengukur Δ 2px, dan blok badannya memberi **set kegagalan yang beda antara fixture & server
+nyata** semata karena titik grab-nya berbeda — bukan karena aplikasinya berbeda. Pelajarannya:
+untuk menguji snap, target uji harus ditaruh di titik paling tak menguntungkan bagi snap.
+
+**Yang TIDAK diuji, beserta alasannya** (konstanta `DRAG_SKIP`/`BODY_SKIP` di spec, dijaga satu
+test agar tak diam-diam bertambah):
+- `simpleAnnotation`, `simpleTag` — Temuan 3: tak bisa di-hover sama sekali → tak bisa di-drag.
+- `longPosition`, `shortPosition` — drag-nya jalur sendiri (handle SL/TP + panel posisi).
+- `arrowMarkUp`, `arrowMarkDown`, `text` — tak punya badan terpisah dari handle titiknya (terukur
+  lewat probe: tak ada satu pun pixel hoverable ≥14px dari titik), jadi drag badan == drag titik
+  dan sudah tercakup blok titik.
+
+**Rencana perbaikannya sudah tertulis** sebagai Task 4 di
+`docs/superpowers/plans/2026-07-25-drawing-subbar-anchor.md`: pindahkan
+`onPressedMoveStart`/`onPressedMoving`/`onPressedMoveEnd` dari registrasi `trendline` ke
+`delHooks()` dengan guard `subBar()`. Wajib dibawa serta: panggilan `scheduleSaveDraws()` di
+`onPressedMoveEnd` — tanpa itu hasil drag tak tersimpan.
+
+Test: `tests/drawing/31-drag-precision.spec.js` · verifikasi live: `--project=live` +
+`LUNA_LIVE=1` (lihat `tests/README.md`, wajib `--workers=1`)
 
 ---
 

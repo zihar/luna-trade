@@ -38,10 +38,32 @@ npm run test:integration
 Gunanya satu: menjaga stub tak melenceng dari respons server sungguhan. Kalau bentuk
 respons berubah di backend, suite hermetik bisa tetap hijau sementara aplikasi nyata rusak.
 
+### Mode `live` (opsional) — spec UI yang sama, tapi ke server & akun sungguhan
+
+```bash
+PORT=8765 ./luna-trade                                        # butuh .env
+LUNA_LIVE=1 npx playwright test tests/drawing/31-drag-precision.spec.js \
+  --project=live --workers=1
+```
+
+`LUNA_LIVE=1` membuat `gotoApp` **melewati semua stub** dan login lebih dulu lewat
+`POST /api/auth/login` (kredensial dari `LUNA_TEST_EMAIL`/`LUNA_TEST_PASSWORD`, default akun
+test lokal), jadi chart memuat candle OANDA nyata. Gunanya satu: memastikan sebuah temuan bukan
+artefak fixture (`barSpace` fixture 8px, 500 bar tetap, harga sintetis).
+
+Dua hal yang wajib diketahui sebelum memakainya:
+
+- **Pakai `--workers=1`.** Beberapa worker terhadap satu server + data nyata menghasilkan
+  kegagalan palsu: pernah terukur 35 dari 38 merah dengan 2 worker, sementara test yang sama
+  dijalankan sendiri **lolos**, dan 29 merah dengan 1 worker. Yang berubah lingkungan, bukan
+  aplikasinya.
+- **Bukan gerbang.** Hasilnya tak deterministik (data pasar bergerak, forming bar hanya saat
+  pasar buka). Jalur hermetik tetap satu-satunya yang boleh dipakai untuk menilai merah/hijau.
+
 ## Susunan
 
 ```
-playwright.config.js      project "hermetic" (default) + "integration" (@integration)
+playwright.config.js      project "hermetic" (default) + "integration" (@integration) + "live"
 tests/
   static-server.js        server statis ~40 baris (modul http bawaan Node)
   fixtures/
@@ -56,7 +78,8 @@ tests/
     draw.js               armTool, drawTool, measureParity, dragPoint, diffShots
     gallery.js            tulis kartu galeri
   drawing/                00 harness · 10 timing klik · 20 presisi · 30 interaksi
-                          40 modal/teks · 50 rail · 60 magnet/TF
+                          31 presisi drag · 40 modal/teks · 50 rail · 60 magnet/TF
+                          70 reticle
   smoke/areas.spec.js     1 test tipis per area non-drawing
   integration/            @integration (butuh server Go)
   build-gallery.js        globalTeardown → report/gallery.html
