@@ -3718,10 +3718,39 @@ function lastToolOf(g){ const saved=localStorage.getItem('br_lasttool_'+g.key); 
 function closeFlyout(){ _fly.classList.remove('show'); _flyOpenKey=null; }
 // ---- favorites: bintang di flyout → bar melayang di atas chart (Image #3, ala TradingView) ----
 let favBar=null;                                                   // elemen bar; dibuat saat init rail
-let favTools=[]; try{ favTools=JSON.parse(localStorage.getItem('br_fav_tools')||'[]')||[]; }catch(_){ favTools=[]; }
 function groupOfTool(n){ for(const g of DRAW_GROUPS){ if(g.tools.some(t=>t.name===n)) return g; } return null; }
-function isFav(n){ return favTools.includes(n); }
-function toggleFav(n){ const i=favTools.indexOf(n); if(i>=0) favTools.splice(i,1); else favTools.push(n);
+// Favorite disimpan sebagai "<groupKey>:<toolName>", bukan nama telanjang (Temuan 5 E2E).
+// Sebabnya: `arrow` ada DUA KALI di DRAW_GROUPS — grup Cursor ("Arrow (no crosshair)", mode kursor)
+// dan grup Shapes ("Arrow", overlay). Nama telanjang harus di-resolve lewat toolByName/groupOfTool
+// yang "yang pertama menang" → selalu dapat varian CURSOR. Akibat terukurnya: mem-favorite shape
+// Arrow menghasilkan tombol favorites bertooltip "Cursor: Arrow (no crosshair)" yang KLIKNYA
+// mengubah mode kursor, bukan meng-arm shape — jadi shape Arrow praktis tak bisa difavoritkan.
+// Kunci ber-grup membuat maksudnya eksplisit dan tahan terhadap tabrakan nama berikutnya.
+const favKey=(g,t)=>g.key+':'+t.name;
+/** Kunci favorite → {g,t}; null bila tool/grupnya sudah tak ada (mis. tool ditarik). */
+function resolveFav(key){
+  const i=String(key).indexOf(':');
+  if(i<0){                                        // data lama (nama telanjang) → lihat migrasi di bawah
+    const g=favGroupOf(key), t=g&&g.tools.find(x=>x.name===key); return (g&&t)?{g,t}:null; }
+  const gk=key.slice(0,i), nm=key.slice(i+1);
+  const g=DRAW_GROUPS.find(x=>x.key===gk), t=g&&g.tools.find(x=>x.name===nm);
+  return (g&&t)?{g,t}:null;
+}
+// Grup yang bisa difavoritkan saja: bintang HANYA dirender untuk grup non-cursor (lihat openFlyout),
+// jadi favorite tak pernah bisa berarti mode kursor. Itu sekaligus yang membuat migrasi data lama
+// TAK ambigu: nama telanjang `arrow` yang tersimpan pasti berasal dari shape Arrow, satu-satunya
+// Arrow yang punya bintang.
+function favGroupOf(n){ for(const g of DRAW_GROUPS){ if(!g.cursor && g.tools.some(t=>t.name===n)) return g; } return null; }
+let favTools=[]; try{ favTools=JSON.parse(localStorage.getItem('br_fav_tools')||'[]')||[]; }catch(_){ favTools=[]; }
+(function migrateFavKeys(){                       // sekali jalan: nama telanjang → berkualifikasi grup
+  let changed=false;
+  favTools=favTools.map(k=>{ if(String(k).indexOf(':')>=0) return k;
+    const r=resolveFav(k); if(!r) return k;       // tak terpetakan (tool ditarik) → dibuang di filter bawah
+    changed=true; return favKey(r.g,r.t); }).filter(k=>resolveFav(k));
+  if(changed){ try{localStorage.setItem('br_fav_tools',JSON.stringify(favTools));}catch(_){} }
+})();
+function isFav(g,t){ return favTools.includes(favKey(g,t)); }
+function toggleFav(g,t){ const k=favKey(g,t), i=favTools.indexOf(k); if(i>=0) favTools.splice(i,1); else favTools.push(k);
   try{localStorage.setItem('br_fav_tools',JSON.stringify(favTools));}catch(_){} buildFavBar(); }
 // ---- keyboard shortcut drawing ala TradingView (Alt+huruf; Mac ⌥) ----
 const IS_MAC=/Mac|iPhone|iPad|iPod/.test((navigator.platform||'')+' '+(navigator.userAgent||''));
@@ -3746,10 +3775,10 @@ function openFlyout(g, catBtn){
     it.innerHTML=t.svg+'<span class="dt-nm">'+t.title+'</span>'+(t.sc?'<span class="dt-sc">'+scLabel(t.sc)+'</span>':'');
     it.onclick=(ev)=>{ ev.stopPropagation(); pickTool(g, t, catBtn); };
     if(!g.cursor){                                                 // bintang favorite (overlay saja, bukan cursor)
-      const star=document.createElement('span'); star.className='dt-fav'+(isFav(t.name)?' on':'');
+      const star=document.createElement('span'); star.className='dt-fav'+(isFav(g,t)?' on':'');
       star.setAttribute('role','button'); star.setAttribute('aria-label','Favorite'); star.title='Toggle favorite';
-      star.textContent=isFav(t.name)?'★':'☆';
-      star.onclick=(ev)=>{ ev.stopPropagation(); toggleFav(t.name); const on=isFav(t.name); star.classList.toggle('on',on); star.textContent=on?'★':'☆'; };
+      star.textContent=isFav(g,t)?'★':'☆';
+      star.onclick=(ev)=>{ ev.stopPropagation(); toggleFav(g,t); const on=isFav(g,t); star.classList.toggle('on',on); star.textContent=on?'★':'☆'; };
       it.appendChild(star);
     }
     _fly.appendChild(it); });
@@ -3784,11 +3813,12 @@ if(_cpri) _cpri.appendChild(favBar);
 function buildFavBar(){
   if(!favBar) return;
   favBar.innerHTML='<span class="favbar-grip" aria-hidden="true"></span>';
-  favTools.forEach(name=>{ const t=toolByName(name), g=groupOfTool(name); if(!t||!g) return;
+  favTools.forEach(key=>{ const r=resolveFav(key); if(!r) return;    // kunci ber-grup → tool yang BENAR (Temuan 5)
+    const {g,t}=r;
     const b=document.createElement('button'); b.className='dtool favbar-btn'; b.title=catTitle(g,t); b.innerHTML=t.svg;
     b.onclick=(e)=>{ e.stopPropagation(); const catBtn=_dt.querySelector('.dt-cat[data-cat="'+g.key+'"]'); if(catBtn) pickTool(g,t,catBtn); };
     favBar.appendChild(b); });
-  favBar.classList.toggle('show', favTools.some(n=>toolByName(n)));   // tampil hanya bila ada favorite valid
+  favBar.classList.toggle('show', favTools.some(k=>resolveFav(k)));   // tampil hanya bila ada favorite valid
 }
 // restore posisi tersimpan (relatif ke .cpanel-pri); default dock atas-tengah via CSS transform
 (function(){ try{ const p=JSON.parse(localStorage.getItem('br_favBarPos')||'null');

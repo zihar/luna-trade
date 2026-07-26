@@ -35,8 +35,13 @@ assertion-nya, sehingga `horizontalRayLine` (Y klik ke-2-nya memang diabaikan) m
 3 kartu merah di suite yang hijau. Sekarang keduanya memakai satu predikat (`withinTol`) →
 galeri **50 kartu · 0 gagal**.
 
-Yang masih terbuka: **Temuan 5** (kebersihan kode: dua sumber kebenaran untuk nama `arrow`;
-testnya hijau karena ia menegaskan perilaku yang ada).
+**Update 2026-07-27 (Temuan 5 SELESAI):** **201 test hermetik · 201 lolos · 0 gagal** (galeri 50
+kartu, 0 gagal). Favorite kini disimpan berkualifikasi grup (`shapes:arrow`), jadi shape Arrow bisa
+difavoritkan dan tak lagi berubah jadi tombol mode kursor; +2 test (perilaku & migrasi data lama).
+**Seluruh temuan ronde pertama (1–6) tertutup.**
+
+Tak ada temuan ronde pertama yang masih terbuka. Backlog terpisah (bukan temuan): gap tool
+drawing vs TradingView — `docs/drawing-tools-gap-plan.md`.
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -339,6 +344,36 @@ Test: `tests/drawing/31-drag-precision.spec.js` · verifikasi live: `--project=l
 `LUNA_LIVE=1` (lihat `tests/README.md`, wajib `--workers=1`)
 
 ---
+
+## Temuan 5 — dua sumber kebenaran untuk nama `arrow` — SELESAI
+
+**Status:** diperbaiki 2026-07-27. Favorite kini disimpan sebagai **`"<groupKey>:<toolName>"`**
+(mis. `shapes:arrow`), bukan nama telanjang, dengan migrasi sekali-jalan untuk data lama di
+`br_fav_tools`.
+
+**Koreksi bobot temuan.** Catatan ronde pertama menyebut ini "kelas kebersihan kode, bukan
+kerusakan" karena "kedua jalur pemakaian sendiri tetap berfungsi". Itu **meremehkan**: yang salah
+bukan cuma tooltip. Probe di harness (jeda 2026-07-27) mengukur bahwa mem-favorite **shape Arrow**
+menghasilkan tombol favorites bertooltip `Cursor: Arrow (no crosshair)` yang **kliknya mengubah
+mode kursor** (`cursorMode` cross→arrow, crosshair mati) dan **tak** meng-arm overlay
+(`inProgressId` tetap null). Praktisnya: **shape Arrow tak bisa difavoritkan** — favoritnya diam-diam
+jadi tombol ganti mode kursor. Jadi ini bug fungsional kecil, bukan kosmetik.
+
+**Kenapa flyout rail sendiri aman:** ia memanggil `pickTool(g, t, …)` dengan objek grup & tool
+langsung dari iterasi, tanpa lookup nama. Yang bocor hanya jalur favorites, karena `buildFavBar()`
+me-resolve nama lewat `toolByName`/`groupOfTool` ("yang pertama menang" → varian Cursor).
+
+**Kenapa migrasinya tak ambigu:** bintang favorite **hanya** dirender untuk grup non-cursor
+(`if(!g.cursor)` di `openFlyout`), jadi mode kursor tak pernah bisa difavoritkan — nama telanjang
+`arrow` yang tersimpan pasti berasal dari shape Arrow, satu-satunya Arrow yang punya bintang.
+Migrasi memetakan nama lama ke grup non-cursor pertama yang memuatnya, lalu menulis ulang
+`br_fav_tools`; entri yang tak terpetakan lagi (mis. tool yang ditarik) dibuang.
+
+Test: `50-rail.spec.js` describe "favorites" — dua test baru (shape Arrow meng-arm shape & tak
+mengubah mode kursor; nama telanjang lama dimigrasi ke kunci ber-grup). Keduanya **diverifikasi
+tidak hampa**: dengan resolusi lama dikembalikan, keduanya merah.
+
+### Isi temuan aslinya
 
 ## Temuan 5 (kecil) — dua sumber kebenaran untuk nama `arrow`
 
