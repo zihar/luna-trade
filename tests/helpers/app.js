@@ -73,17 +73,42 @@ function harnessInit() {
   } catch (_) {}
 }
 
+// Mode LIVE (opt-in, `LUNA_LIVE=1`): jalankan spec yang sama terhadap server Go asli + akun
+// sungguhan, bukan stub. Gunanya satu hal yang tak bisa dijawab suite hermetik: memastikan sebuah
+// temuan bukan artefak fixture (mis. `barSpace` fixture = 8px, jumlah bar tetap, harga sintetis).
+// Bukan pengganti jalur hermetik — di sini data bergerak, jadi hasilnya tak deterministik.
+//
+// Pakai: PORT=8765 ./luna-trade  lalu
+//        LUNA_LIVE=1 npx playwright test <spec> --project=live
+// Kredensial dari LUNA_TEST_EMAIL / LUNA_TEST_PASSWORD (default = akun test lokal).
+const LIVE = !!process.env.LUNA_LIVE;
+
+/** Login lewat API supaya cookie sesi sudah ada sebelum halaman dibuka (context yg sama). */
+async function loginLive(page) {
+  const email = process.env.LUNA_TEST_EMAIL || 'test@luna.local';
+  const password = process.env.LUNA_TEST_PASSWORD || 'LunaTest123!';
+  const res = await page.request.post('/api/auth/login', { data: { email, password } });
+  expect(
+    res.ok(),
+    `LUNA_LIVE: login sebagai ${email} gagal (${res.status()}) — pastikan "PORT=8765 ./luna-trade" jalan & akun test ada`
+  ).toBe(true);
+}
+
 /**
  * Pasang stub + init script, buka halaman, tunggu chart benar-benar siap.
- * Mengembalikan { state } — state server palsu (lihat fixtures/api.js).
+ * Mengembalikan { state } — state server palsu (lihat fixtures/api.js); null di mode LIVE.
  */
 async function gotoApp(page, opts = {}) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.__e2eErrors = errors;
 
+  // harnessInit tetap dipasang di mode LIVE: stub EventSource menahan badai reconnect SSE dan
+  // stub Notification menahan prompt OS. Keduanya tak menyentuh /api/candles, jadi candle yang
+  // dipakai chart tetap data OANDA sungguhan lewat token di .env.
   await page.addInitScript(harnessInit);
-  const state = await installStubs(page);
+  const state = LIVE ? null : await installStubs(page);
+  if (LIVE) await loginLive(page);
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 

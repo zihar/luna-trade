@@ -47,6 +47,15 @@ module.exports = defineConfig({
       testMatch: /integration\/.*\.spec\.js/,
       use: { ...devices['Desktop Chrome'], baseURL: process.env.LUNA_URL || 'http://localhost:8765' },
     },
+    // live — spec UI yang SAMA seperti hermetic, tapi terhadap server Go asli + akun sungguhan
+    // (tanpa stub /api). Opt-in penuh: butuh `LUNA_LIVE=1` supaya gotoApp melewati stub & login
+    // dulu, plus server jalan di :8765. Dipakai untuk memastikan sebuah temuan bukan artefak
+    // fixture; hasilnya TAK deterministik (data pasar bergerak), jadi bukan gerbang CI.
+    {
+      name: 'live',
+      testIgnore: /integration\//,
+      use: { ...devices['Desktop Chrome'], baseURL: process.env.LUNA_URL || 'http://localhost:8765' },
+    },
   ],
 
   webServer: {
