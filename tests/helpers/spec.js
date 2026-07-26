@@ -60,8 +60,18 @@ const TOOL_SPEC = [
   // ---- Text ----
   { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: 'modal', autoEditor: true, settings: 'modal', persist: true, sc: 'X' },
   { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: 'modal+inline', autoEditor: true, settings: 'modal', persist: true },
-  { name: 'simpleAnnotation', group: 'text', groupTitle: 'Text', title: 'Annotation', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: null, persist: true, builtin: true },
-  { name: 'simpleTag', group: 'text', groupTitle: 'Text', title: 'Tag', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: null, persist: true, builtin: true },
+  // simpleAnnotation ("Annotation") & simpleTag ("Tag") DITARIK dari rail 2026-07-27 (Temuan 3),
+  // jadi keduanya keluar dari tabel ini — bukan karena testnya rewel, tapi karena tool-nya tak ada
+  // lagi di UI. Keduanya overlay bawaan klinecharts yang menandai semua figure-nya
+  // `ignoreEvent:true` → sekali tergambar tak bisa di-hover/dipilih/di-drag/dihapus lewat klik.
+  // Tak diperbaiki karena redundan (simpleTag ≈ priceLine, simpleAnnotation ≈ callout/arrowMark).
+  // Penjaga agar tak diam-diam kembali: tests/drawing/50-rail.spec.js describe "tool yang ditarik".
+];
+// Nama tool yang sengaja DITARIK dari UI. Dipakai penjaga di 50-rail.spec.js — ditaruh di sini
+// supaya satu file tetap jadi sumber kebenaran soal "tool apa yang ada & tak ada".
+const RETIRED_TOOLS = [
+  { name: 'simpleAnnotation', title: 'Annotation', why: 'figure ber-ignoreEvent → tak bisa dijangkau; redundan dgn callout/arrowMark' },
+  { name: 'simpleTag', title: 'Tag', why: 'figure ber-ignoreEvent → tak bisa dijangkau; redundan dgn priceLine' },
 ];
 
 // Mode cursor (bukan overlay — mengubah crosshair global, index.html:3509).
@@ -91,4 +101,4 @@ const inGroup = (g) => TOOL_SPEC.filter((t) => t.group === g);
 const withShortcut = () => TOOL_SPEC.filter((t) => t.sc);
 const multiPoint = () => TOOL_SPEC.filter((t) => t.clicks > 1);
 
-module.exports = { TOOL_SPEC, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, axisOf, byName, inGroup, withShortcut, multiPoint };
+module.exports = { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, axisOf, byName, inGroup, withShortcut, multiPoint };

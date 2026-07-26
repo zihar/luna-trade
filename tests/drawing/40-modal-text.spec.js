@@ -4,7 +4,9 @@
 //   settings 'modal'    → double-click membuka modal; tab awal = Text untuk objek bisa-teks
 //                         (DM_TEXT_OBJS), Style untuk sisanya
 //   settings 'pospopup' → long/shortPosition dialihkan ke popup posisi (index.html:5573)
-//   settings null       → simpleAnnotation/simpleTag memang tak punya panel setting
+//   settings null       → tak punya panel setting (sejak simpleAnnotation/simpleTag ditarik dari
+//                         rail — Temuan 3 — tak ada lagi tool berkategori ini; kolomnya disimpan
+//                         karena tool baru bisa masuk kategori itu lagi)
 //   text 'modal+inline' → objek kosong menawarkan "+ Add text"; klik → editor inline
 
 const { test, expect } = require('@playwright/test');

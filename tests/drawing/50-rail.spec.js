@@ -5,7 +5,7 @@ const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect } = require('../helpers/chart');
 const { openFlyout, overlays, setCursor, clickAt, CLICK_GAP_MS } = require('../helpers/draw');
-const { TOOL_SPEC, CURSOR_MODES, withShortcut } = require('../helpers/spec');
+const { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, withShortcut } = require('../helpers/spec');
 
 const GROUPS = [...new Set(TOOL_SPEC.map((t) => t.group))];
 
@@ -165,6 +165,27 @@ test.describe('mode cursor', () => {
     await setCursor(page, 'dot');
     expect(await page.evaluate(() => inProgressId)).toBeNull();
     expect(await overlays(page), 'overlay setengah jadi harus dibuang').toHaveLength(0);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('tool yang ditarik', () => {
+  // Temuan 3: simpleAnnotation & simpleTag ditarik dari rail karena semua figure-nya ber-
+  // `ignoreEvent` (tak bisa di-hover/dipilih/di-drag/dihapus lewat klik) dan keduanya redundan
+  // dengan tool yang sudah bekerja. Test ini menjaga agar tak diam-diam kembali: menghidupkannya
+  // lagi WAJIB lewat pendaftaran ulang sendiri tanpa ignoreEvent, bukan dengan menambahkan
+  // entri rail-nya kembali.
+  test('tak muncul di rail mana pun (nama & label)', async ({ page }) => {
+    await gotoApp(page);
+    const names = await page.evaluate(() => DRAW_GROUPS.flatMap((g) => g.tools.map((t) => t.name)));
+    const titles = await page.evaluate(() => DRAW_GROUPS.flatMap((g) => g.tools.map((t) => t.title)));
+    for (const r of RETIRED_TOOLS) {
+      expect(names, `${r.name} sudah ditarik (${r.why})`).not.toContain(r.name);
+      expect(titles, `label "${r.title}" sudah ditarik`).not.toContain(r.title);
+    }
+    // …dan tak ikut di-persist, supaya objek lama di localStorage berhenti dimuat sendiri.
+    const persisted = await page.evaluate(() => Object.keys(PERSIST_DRAW));
+    for (const r of RETIRED_TOOLS) expect(persisted, `${r.name} tak boleh ada di PERSIST_DRAW`).not.toContain(r.name);
     assertNoPageErrors(page);
   });
 });

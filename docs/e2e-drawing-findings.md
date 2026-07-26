@@ -23,9 +23,20 @@ merah dan itulah isi Temuan 6 (implementasinya belum dikerjakan — urutan wajib
 fix"). Dua merah sisanya tetap Temuan 3.
 
 **Update 2026-07-27 (lapis presisi drag / Temuan 6 SELESAI):** **204 test hermetik · 202 lolos ·
-2 gagal**. Sisa merah tinggal **Temuan 3** (`simpleAnnotation`/`simpleTag` tak bisa di-hover).
+2 gagal**. Sisa merah tinggal Temuan 3.
 
-Yang masih terbuka: **Temuan 3** dan **Temuan 5** (kebersihan kode, testnya hijau).
+**Update 2026-07-27 (Temuan 3 ditutup dengan menarik 2 tool):** **199 test hermetik · 199 lolos ·
+0 gagal** — suite hijau seluruhnya untuk pertama kalinya sejak ronde pertama (112/163). Jumlah
+test turun karena test milik `simpleAnnotation`/`simpleTag` ikut hilang bersama tool-nya, dan naik
+satu karena penjaga baru "tool yang ditarik" di `50-rail.spec.js`.
+
+Sekaligus dibetulkan: **status kartu galeri** dulu memakai aturan sumbu yang beda tipis dari
+assertion-nya, sehingga `horizontalRayLine` (Y klik ke-2-nya memang diabaikan) muncul sebagai
+3 kartu merah di suite yang hijau. Sekarang keduanya memakai satu predikat (`withinTol`) →
+galeri **50 kartu · 0 gagal**.
+
+Yang masih terbuka: **Temuan 5** (kebersihan kode: dua sumber kebenaran untuk nama `arrow`;
+testnya hijau karena ia menegaskan perilaku yang ada).
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -176,7 +187,37 @@ Test: `tests/drawing/10-click-timing.spec.js`, `20-parity.spec.js` (describe "kl
 
 ---
 
-## Temuan 3 — `simpleAnnotation` & `simpleTag` tak bisa dijangkau setelah tergambar
+## Temuan 3 — `simpleAnnotation` & `simpleTag` tak bisa dijangkau setelah tergambar — SELESAI (ditarik)
+
+**Status:** diselesaikan 2026-07-27 dengan **menarik kedua tool dari rail**, bukan memperbaikinya.
+
+**Akar masalahnya di upstream.** Keduanya overlay **bawaan klinecharts** — di bundle 9.8.10,
+definisi keduanya menandai **setiap figure**-nya `ignoreEvent: true` (`simpleAnnotation`: garis
+tegak + kepala panah + teks, ketiganya; `simpleTag`: garis horizontalnya, plus label sumbu Y lewat
+`createYAxisFigures`), dan tak menyetel `needDefaultPointFigure`. `ignoreEvent` berarti figure itu
+dilewati saat hit-test, jadi rantainya: hit-test tak pernah kena → `onMouseEnter` tak jalan →
+`hoverId` tetap null → tak bisa dipilih, di-drag, dihapus lewat klik/Delete, atau dibuka
+setting-nya. Kombinasi "semua figure `ignoreEvent`" + "tanpa handle default" menandakan keduanya
+dirancang sebagai **anotasi programatik** (dipasang oleh kode), bukan objek yang digambar &
+disunting pengguna — jadi memakainya sebagai tool gambar memang salah tempat.
+
+**Kenapa ditarik, bukan diperbaiki.** Memperbaikinya bisa: daftarkan ulang sendiri tanpa
+`ignoreEvent` (presedennya ada — garis horizontal/vertikal sudah kita override), lalu masuk
+`DRAW_DEFAULT` agar modal Style hidup, dan `simpleAnnotation` juga perlu ikut jalur editor teks
+inline (tanpa cara mengisi teks, ia tak berguna). Itu satu PR sedang — untuk dua tool yang
+**redundan dengan tool yang sudah bekerja penuh**: `simpleTag` ≈ `priceLine` (garis + penanda harga
+di sumbu Y), `simpleAnnotation` ≈ `callout` / `arrowMarkUp-Down` (teks berpointer & penanda di bar).
+Jadi tak ada fungsi yang benar-benar hilang.
+
+**Cakupan perubahan.** Entri rail dihapus (`DRAW_GROUPS`), keluar dari `PERSIST_DRAW` — dan itu
+sekaligus **jalur migrasinya**: `buildDrawsFromArray` memfilter lewat daftar itu, jadi objek lama
+yang masih tersimpan di localStorage pengguna berhenti dimuat tanpa kode migrasi. Keluar juga dari
+`MAGNET_REFINE_SKIP` dan dari `TOOL_SPEC` (tool-nya tak ada lagi di UI, jadi 2 test "keterjangkauan
+objek" yang merah ikut hilang bersama tool-nya). Alasan lengkapnya ditulis di tempat entri rail-nya
+dihapus, dan penjaga di `tests/drawing/50-rail.spec.js` (describe "tool yang ditarik") memastikan
+keduanya tak diam-diam kembali: menghidupkannya lagi wajib lewat pendaftaran ulang sendiri.
+
+### Isi temuan aslinya
 
 Kedua objek **tak bisa di-hover di titik mana pun** — sudah diprobe di titik-titiknya,
 midpoint, pusat & tepi bounding box, dan beberapa offset vertikal. Konsekuensinya: tak bisa

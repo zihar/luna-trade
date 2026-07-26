@@ -681,7 +681,7 @@ async function buildReplayPartial(tf){
   return {timestamp:open, open:o, high:h, low:l, close:c};
 }
 const MAGNET_REFINE_SKIP={rect:1, fib3:1, verticalStraightLine:1, horizontalStraightLine:1,
-  priceLine:1, callout:1, simpleAnnotation:1, simpleTag:1}; // box & penanda axis & teks: dilewati
+  priceLine:1, callout:1}; // box & penanda axis & teks: dilewati
 // Berlaku untuk titik ber-timestamp MAUPUN ber-dataIndex pecahan (lewat tsOf). Yang
 // disempurnakan hanya VALUE; anchor X tak disentuh supaya presisi sub-bar tak hilang.
 async function refineMagnetPoints(id){
@@ -3316,7 +3316,10 @@ let suppressDrawSave=false, drawSaveTimer=null;
 const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
   horizontalStraightLine:1,verticalStraightLine:1,
   straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
-  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,arrowMarkDown:1,callout:1,simpleAnnotation:1,simpleTag:1};
+  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,arrowMarkDown:1,callout:1};
+// simpleAnnotation & simpleTag sengaja TIDAK di sini (ditarik dari rail, lihat DRAW_GROUPS):
+// buildDrawsFromArray memfilter lewat daftar ini, jadi objek lama yang masih tersimpan di
+// localStorage pengguna otomatis berhenti dimuat — tak perlu migrasi.
 function drawsKey(){ return 'br_draws_'+inst; }
 function serializeDraws(){
   const out=[];
@@ -3672,8 +3675,18 @@ const DRAW_GROUPS=[
   {key:'text', title:'Text', tools:[
     {name:'text', sc:'X', title:'Text', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
     {name:'callout', title:'Callout', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 16l-2 4 6-4"/></svg>'},
-    {name:'simpleAnnotation', title:'Annotation', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v9"/><circle cx="12" cy="16" r="2"/></svg>'},
-    {name:'simpleTag', title:'Tag', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h14l4-4-4-4H3z"/></svg>'},
+    // simpleAnnotation ("Annotation") & simpleTag ("Tag") DITARIK dari rail 2026-07-27 (Temuan 3
+    // E2E). Keduanya overlay BAWAAN klinecharts yang menandai semua figure-nya `ignoreEvent:true`
+    // dan tak punya handle default → hit-test tak pernah kena → sekali tergambar objeknya tak bisa
+    // di-hover, dipilih, di-drag, dihapus lewat klik/Delete, atau dibuka setting-nya; satu-satunya
+    // jalan keluar Undo atau trash (hapus semua). Itu desain upstream untuk anotasi PROGRAMATIK,
+    // bukan objek yang digambar & disunting user, jadi memakainya sebagai tool gambar salah tempat.
+    // Tak diperbaiki karena keduanya redundan dengan tool yang sudah bekerja penuh:
+    // simpleTag ≈ priceLine (garis + penanda harga di sumbu Y), simpleAnnotation ≈ callout /
+    // arrowMarkUp-Down (teks berpointer & penanda di bar). Kalau suatu saat mau dihidupkan lagi,
+    // harus didaftarkan ulang sendiri tanpa `ignoreEvent` + masuk DRAW_DEFAULT + ikut jalur editor
+    // teks inline — lihat docs/e2e-drawing-findings.md (Temuan 3). Dijaga oleh test di
+    // tests/drawing/50-rail.spec.js agar tak diam-diam kembali.
   ]},
 ];
 const TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>';
