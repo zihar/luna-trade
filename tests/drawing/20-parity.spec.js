@@ -34,6 +34,17 @@ function maxAssessed(deltas, spec) {
   );
 }
 
+/**
+ * Aturan lolos yang SAMA dengan expectDeltas — sengaja satu predikat, dipakai assertion maupun
+ * status kartu galeri. Dulu keduanya beda tipis: status galeri tak menerapkan pembebasan sumbu
+ * pada Δparity dan memakai posisi array (bukan `d.i`) untuk Δlanding, jadi `horizontalRayLine`
+ * (yang Y klik ke-2-nya memang diabaikan supaya garis tetap horizontal) muncul sebagai 3 kartu
+ * merah padahal ketiga testnya lolos — galeri melaporkan "3 gagal" di suite yang 100% hijau.
+ */
+function withinTol(deltas, spec, tx) {
+  return deltas.every((d) => Math.abs(d.dx) <= tx && (axisOf(spec, d.i) === 'x' || Math.abs(d.dy) <= TOL_Y_PX));
+}
+
 async function runAndRecord(page, spec, mode, notes) {
   const r = await measureParity(page, spec.name, { mode });
   const diff = await diffShots(page, r.shots.preview, r.shots.final);
@@ -41,8 +52,8 @@ async function runAndRecord(page, spec, mode, notes) {
   const okAll =
     r.completed &&
     r.pointCount === spec.pointsAfter &&
-    r.deltaParity.every((d) => Math.abs(d.dx) <= tx && Math.abs(d.dy) <= TOL_Y_PX) &&
-    r.deltaLanding.every((d, i) => Math.abs(d.dx) <= tx && (axisOf(spec, i) === 'x' || Math.abs(d.dy) <= TOL_Y_PX));
+    withinTol(r.deltaParity, spec, tx) &&
+    withinTol(r.deltaLanding, spec, tx);
 
   gallery.record({
     tool: spec.name,

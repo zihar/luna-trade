@@ -28,8 +28,6 @@ const { TOOL_SPEC, tolX, TOL_Y_PX } = require('../helpers/spec');
 // Tool yang memang TAK diuji di sini, masing-masing dengan alasannya. Bukan daftar
 // "yang gagal" — daftar "yang jalur drag-nya bukan jalur ini".
 const DRAG_SKIP = {
-  simpleAnnotation: 'Temuan 3: tak bisa di-hover di titik mana pun → tak bisa dipilih/di-drag sama sekali',
-  simpleTag: 'Temuan 3: idem simpleAnnotation',
   longPosition: 'drag-nya jalur sendiri (handle SL/TP + panel edit posisi via showPosPopup), bukan drag titik overlay biasa',
   shortPosition: 'idem longPosition',
 };
@@ -199,10 +197,10 @@ test.describe('drag setelah objek jadi — badan', () => {
 test.describe('cakupan drag', () => {
   test('daftar pengecualian tetap eksplisit & beralasan', async () => {
     // Bukan assertion perilaku — penjaga agar pengecualian tak diam-diam bertambah.
-    expect(Object.keys(DRAG_SKIP).sort()).toEqual(['longPosition', 'shortPosition', 'simpleAnnotation', 'simpleTag']);
+    expect(Object.keys(DRAG_SKIP).sort()).toEqual(['longPosition', 'shortPosition']);
     expect(Object.keys(BODY_SKIP).sort()).toEqual(['arrowMarkDown', 'arrowMarkUp', 'text']);
-    expect(DRAGGABLE.length, 'tool yang diuji drag titik').toBe(TOOL_SPEC.length - 4);
-    expect(BODY_DRAGGABLE.length, 'tool yang diuji drag badan').toBe(TOOL_SPEC.length - 7);
+    expect(DRAGGABLE.length, 'tool yang diuji drag titik').toBe(TOOL_SPEC.length - 2);
+    expect(BODY_DRAGGABLE.length, 'tool yang diuji drag badan').toBe(TOOL_SPEC.length - 5);
     console.log(`  drag titik: ${DRAGGABLE.length} tool · drag badan: ${BODY_DRAGGABLE.length} tool`);
   });
 });
