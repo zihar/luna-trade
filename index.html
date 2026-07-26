@@ -3223,8 +3223,17 @@ function delHooks(){ return {
 // Instant-drop ala TradingView: shortcut H/V → garis langsung terpasang di posisi cursor
 // tanpa klik. Titik diambil dari cursor terakhir (lastPtr); null bila cursor di LUAR chart
 // (mis. shortcut ditekan saat pointer tak di atas chart) → fallback ke mode gambar biasa.
+//
+// Gerbang "di luar chart" WAJIB memakai ptrOverChart, bukan membandingkan lastPtr dgn rect
+// (Temuan 4 E2E): lastPtr hanya di-update mousemove pada #chart, jadi ia TAK PERNAH berisi
+// koordinat di luar chart dan cek rect di bawah tak akan pernah gugur — fallback yg ditulis di
+// sini dulu jadi kode mati, dan Alt+H yg ditekan sambil kursor di watchlist/header tetap
+// menjatuhkan garis di posisi terakhir di dalam chart, tanpa diminta & di tempat yg tak dilihat
+// user. Cek rect tetap dipertahankan sebagai lapis kedua (mis. chart menyusut setelah pointer
+// terakhir tercatat, sehingga koordinat lama jatuh di luar area plot yg baru).
 const INSTANT_DROP={horizontalStraightLine:1, verticalStraightLine:1};
 function instantDropPoint(name){
+  if(!ptrOverChart) return null;
   const el=$('#chart'), r=el.getBoundingClientRect();
   const px=lastPtr.x-r.left, py=lastPtr.y-r.top;
   if(px<0||py<0||px>r.width||py>r.height) return null;
@@ -3386,8 +3395,15 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   pendingClicks.push(Object.assign({value:v, fidx}, xa));
 }, true);
 
-// posisi kursor terakhir (client px) — untuk menempatkan popup setting objek
+// posisi kursor terakhir (client px) — untuk menempatkan popup setting objek.
+// Sengaja HANYA di-update oleh mousemove di #chart: seluruh pemakainya (popup setting/konfirmasi,
+// jaring pengaman anchor di onDrawEnd & posisi paper, hit-test badge alert, overPlaceholder)
+// berjalan saat pointer memang berada di atas chart dan butuh koordinat yg valid di dalam chart.
 let lastPtr={x:innerWidth/2,y:innerHeight/2};
+// Apakah pointer SEDANG di atas chart. Dipisah dari lastPtr justru karena lastPtr basi by design:
+// ia menyimpan posisi terakhir DI DALAM chart, jadi ia tak pernah bisa memberitahu "pointer sudah
+// di luar". Instant-drop (Alt+H/V) butuh info itu — lihat instantDropPoint (Temuan 4 E2E).
+let ptrOverChart=false;
 
 // reticle preview live: penanda titik yg akan mendarat saat menggambar — tampil di SEMUA
 // kondisi draw. Magnet ON → menempel ke OHLC terdekat (walau kursor jauh dari candle);
@@ -3421,8 +3437,12 @@ function updateMagDot(ev){
   if(!cp){ hideMagDot(); return; }
   magDot.style.left=cp.x+'px'; magDot.style.top=cp.y+'px'; magDot.style.display='block';
 }
-$('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; updateMagDot(ev); });
-$('#chart').addEventListener('mouseleave',hideMagDot);
+$('#chart').addEventListener('mousemove',ev=>{ lastPtr={x:ev.clientX,y:ev.clientY}; ptrOverChart=true; updateMagDot(ev); });
+$('#chart').addEventListener('mouseenter',()=>{ ptrOverChart=true; });
+// mouseleave (bukan mouseout) → tak ikut memadamkan flag saat pointer pindah ke elemen ANAK #chart
+// (reticle, legend, marker news). Pointer pindah ke panel melayang di atas chart = benar-benar
+// keluar dari chart → instant-drop jatuh ke mode gambar biasa, sesuai niat yg ditulis di sana.
+$('#chart').addEventListener('mouseleave',()=>{ ptrOverChart=false; hideMagDot(); });
 
 // Text: editor inline di chart (input teks LANGSUNG di canvas, TANPA modal). Dipakai saat objek
 // text/callout baru dibuat (onDrawEnd → applyTextInput) & saat klik undangan "+ Add text" pd rect/
