@@ -66,10 +66,14 @@ tests/
 
 Empat jebakan yang sudah memakan waktu; semuanya sudah ditangani helper, jangan diakali ulang.
 
-1. **Jeda antar klik minimal ~400ms.** Lapisan synthetic-event klinecharts mendeteksi
-   double-click **tanpa memeriksa jarak**, jadi dua klik berjeda lebih pendek dianggap satu
-   double-click dan klik ke-2 **ditelan** — objek tak pernah selesai. Pakai `CLICK_GAP_MS`
-   dari `helpers/draw.js`, jangan angka sendiri.
+1. **Jeda antar klik: penelanan klik sudah diperbaiki, `CLICK_GAP_MS` tetap dipakai.** Dulu
+   dua klik berjeda < ~400ms membuat klik ke-2 **ditelan** klinecharts (Temuan 2, akar
+   masalahnya: mouseup ke-2 di dalam window 500ms tak pernah dipancarkan sebagai `click`
+   bila jaraknya ≥5px — celah mati antara dobel & tunggal). Sejak `fixClickSwallow()` di
+   `index.html`, klik jeda 100ms pun mendarat. Jalur "normal" tetap memakai `CLICK_GAP_MS`
+   dari `helpers/draw.js` supaya yang diuji di sana presisi, bukan timing; jalur cepat
+   (`FAST_GAP_MS`) yang menjaga perbaikan ini tak regresi. Jangan pakai angka sendiri, dan
+   jangan menaruh dua klik dalam radius <5px kecuali memang sedang menguji dobel-klik.
 
 2. **Sumbu harga ada DI DALAM `#chart`.** Pada viewport 1600, container 1224px tapi area
    plot hanya 1172px; 52px terakhir adalah sumbu. Klik di sana tak masuk ke chart dan akan

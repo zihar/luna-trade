@@ -4,18 +4,15 @@ Tanggal: 2026-07-25 · Suite: `npm test` (163 test, project `hermetic`)
 Hasil ronde pertama: **112 lolos · 51 gagal** — semua kegagalan adalah temuan, bukan harness
 yang rusak.
 
-**Update 2026-07-26 (setelah perbaikan anchor sub-bar, Temuan 1):** suite naik jadi
+**Update 2026-07-26 (setelah anchor sub-bar / Temuan 1):** suite naik jadi
 **166 test hermetik · 160 lolos · 6 gagal** (+2 test `@integration` yang butuh server Go asli
-di `:8765`, tak tersedia di lingkungan ini, di luar jalur hermetik). Sisa merah seluruhnya
-masuk tiga kelompok yang memang dibiarkan merah dengan sengaja — Temuan 2 (klik cepat),
-Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`), Temuan 4 (instant-drop `lastPtr`
-basi). Tak ada regresi di luar itu.
+di `:8765`, tak tersedia di lingkungan ini, di luar jalur hermetik).
 
-⚠️ **Temuan 2 flaky, bukan cuma merah:** komposisi test yang gagal di kelompok itu bergeser
-antar-run. Run 2026-07-26 memerahkan `parallelStraightLine`, `priceChannelLine`, dan
-`fibonacciLine` di `20-parity.spec.js:126` sementara `10-click-timing.spec.js:57` lolos; run
-sebelumnya kebalikannya. Selama Temuan 2 terbuka, suite tak bisa dipakai sebagai gerbang
-merah/hijau yang deterministik.
+**Update 2026-07-26 (setelah penawar klik-tertelan / Temuan 2):** **166 test hermetik ·
+163 lolos · 3 gagal**. Sisa merah seluruhnya dua kelompok yang masih sengaja dibiarkan —
+Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`, 2 test) dan Temuan 4 (instant-drop
+`lastPtr` basi, 1 test). Tak ada regresi di luar itu, dan suite kini deterministik: kelompok
+klik cepat tak lagi bergantung beban mesin (lihat catatan flaky di Temuan 2).
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
@@ -94,16 +91,54 @@ Test: `tests/drawing/20-parity.spec.js` · angka per tool: `report/gallery.html`
 
 ---
 
-## Temuan 2 — Klik cepat menelan klik: menggambar cepat gagal jadi
+## Temuan 2 — Klik cepat menelan klik: menggambar cepat gagal jadi — SELESAI
+
+**Status:** diperbaiki 2026-07-26 lewat `fixClickSwallow()` di `index.html`, dipasang untuk
+chart utama dan setiap panel multi-chart (drawing bisa pindah ke panel).
 
 **Gejala terukur.** Dua klik yang berjeda **< ~400ms** membuat klik ke-2 hilang; objek tak
 pernah selesai. Jeda minimum yang berhasil terukur antara 350ms dan 400ms. Semua 14 tool
-multi-titik terdampak.
+multi-titik terdampak. Setelah fix, pengukuran yang sama
+(`10-click-timing.spec.js`) melaporkan **100ms→jadi** — tak ada lagi ambang penelanan.
 
 **Bukan double-click browser.** Listener DOM di `#chart` menerima **dua `click` normal,
-`detail=1` keduanya**. Yang menelan adalah lapisan synthetic-event klinecharts, yang
-mendeteksi double-click **tanpa memeriksa jarak** — dua klik terpisah 300px pun dianggap
-dobel.
+`detail=1` keduanya**. Yang menelan adalah lapisan synthetic-event klinecharts.
+
+**Koreksi akar masalah.** Catatan ronde pertama menyebut klinecharts "mendeteksi double-click
+**tanpa memeriksa jarak**". Itu **salah**, dan salahnya mengarahkan fix ke tempat yang keliru.
+Jarak justru **diperiksa**; yang cacat adalah apa yang terjadi ketika pemeriksaan itu gagal.
+Dari `_mouseUpHandler` bundle 9.8.10 (dinamai ulang agar terbaca):
+
+```js
+++clickCount;
+if (clickTimeoutId !== null && clickCount > 1) {
+  if (manhattan(now, firstDown) < 5) fire(dblclick);   // hanya kalau DEKAT
+  resetClickWindow();                                  // window ditutup di sini, apa pun hasilnya
+} else {
+  fire(click);
+}
+```
+
+Mouseup ke-2 di dalam window 500ms (dibuka mousedown ke-1) **selalu** masuk cabang atas. Bila
+jaraknya ≥5px, `dblclick` tak dipancarkan karena jarak — tapi `click` juga tidak, karena cabang
+`else` sudah terlewat. Klik itu hilang tanpa event apa pun: bukan "dianggap dobel", melainkan
+**jatuh ke celah mati antara dobel dan tunggal**.
+
+Bukti langsung (probe Playwright, jeda 120ms, `trendline`): klik ke-2 berjarak 200px →
+`inProgress` tetap `true` (tertelan); klik ke-2 berjarak 2px → objek **selesai** karena
+`dblclick` memicu `forceComplete`. Jarak jelas ikut menentukan.
+
+**Fix.** Listener `mousedown` fase **capture** di container chart menutup sendiri window click
+klinecharts (`_resetClickTimeout()` milik instance-nya) ketika mousedown itu jelas bukan calon
+double-click — yaitu ≥5px dari klik sebelumnya, memakai ambang milik klinecharts sendiri.
+Handler mereka lalu melihat window kosong → klik diproses lewat cabang `else` sebagai klik
+normal. Double-click asli (<5px) tak tersentuh, jadi "dobel-klik untuk menyelesaikan gambar"
+dan "dobel-klik membuka modal Style|Text" tetap hidup.
+
+Kenapa bukan menambal method klinecharts: handler-nya di-`bind` saat `_init` di constructor,
+jadi menambal prototype **setelah** init tak berpengaruh sama sekali — sudah dicoba, perilakunya
+tak bergerak. Menyentuh state instance dari listener capture adalah satu-satunya jalan dari luar
+tanpa mem-vendor & menambal bundle CDN-nya.
 
 **Dampak pengguna.** Menggambar cepat adalah kebiasaan wajar dan mulus di TradingView. Di
 sini klik ke-2 hilang tanpa umpan balik; user mengklik lagi dan sering dapat objek di tempat
@@ -112,6 +147,15 @@ yang salah.
 **Efek susulan.** Saat klik akhirnya masuk, `pendingClicks` sudah desync dengan titik
 klinecharts → guard `refine` (index.html:3063) gugur → titik jatuh kembali ke snap-per-bar.
 Itu sebabnya 8 tool juga gagal pada assertion presisi di jalur ini, bukan cuma "tak selesai".
+Efek susulan ini **ikut hilang** begitu klik tak lagi tertelan: seluruh 14 tool multi-titik
+lolos assertion presisi di jalur klik cepat, tanpa menyentuh `pendingClicks` sama sekali.
+
+**Kenapa kelompok ini dulu tampak flaky.** Yang menentukan penelanan adalah jarak waktu
+mousedown ke-1 → mouseup ke-2 (window 500ms), bukan angka jeda yang ditulis test. Saat mesin
+sibuk, `page.mouse.move` + jeda 120ms melar melewati 500ms → klik lolos & test hijau tanpa
+perubahan kode. Itu sebabnya jumlah merah bergeser antar-run (3 merah di run 4-worker vs 13
+merah di run 2-worker atas commit yang sama). Bukan test yang goyah, tapi ambang yang
+bersinggungan dengan beban mesin — dan sekarang ambangnya tak ada lagi.
 
 Test: `tests/drawing/10-click-timing.spec.js`, `20-parity.spec.js` (describe "klik cepat")
 
