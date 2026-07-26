@@ -4,12 +4,18 @@ Tanggal: 2026-07-25 · Suite: `npm test` (163 test, project `hermetic`)
 Hasil ronde pertama: **112 lolos · 51 gagal** — semua kegagalan adalah temuan, bukan harness
 yang rusak.
 
-**Update 2026-07-25 (setelah perbaikan anchor sub-bar, Temuan 1):** suite naik jadi
-**168 test · 157 lolos · 11 gagal**. Sisa merah seluruhnya masuk tiga kelompok yang memang
-dibiarkan merah dengan sengaja — Temuan 2 (klik cepat, jumlah lolos berfluktuasi antar-run),
+**Update 2026-07-26 (setelah perbaikan anchor sub-bar, Temuan 1):** suite naik jadi
+**166 test hermetik · 160 lolos · 6 gagal** (+2 test `@integration` yang butuh server Go asli
+di `:8765`, tak tersedia di lingkungan ini, di luar jalur hermetik). Sisa merah seluruhnya
+masuk tiga kelompok yang memang dibiarkan merah dengan sengaja — Temuan 2 (klik cepat),
 Temuan 3 (keterjangkauan `simpleAnnotation`/`simpleTag`), Temuan 4 (instant-drop `lastPtr`
-basi) — plus 2 test `@integration` yang butuh server Go asli di `:8765` (tak tersedia di
-lingkungan ini, di luar jalur hermetik). Tak ada regresi di luar itu.
+basi). Tak ada regresi di luar itu.
+
+⚠️ **Temuan 2 flaky, bukan cuma merah:** komposisi test yang gagal di kelompok itu bergeser
+antar-run. Run 2026-07-26 memerahkan `parallelStraightLine`, `priceChannelLine`, dan
+`fibonacciLine` di `20-parity.spec.js:126` sementara `10-click-timing.spec.js:57` lolos; run
+sebelumnya kebalikannya. Selama Temuan 2 terbuka, suite tak bisa dipakai sebagai gerbang
+merah/hijau yang deterministik.
 
 Kebijakan spec (disetujui sebelum implementasi): toleransi presisi **≤1px untuk semua tool**,
 kecuali tool yang snap-per-bar-nya disengaja & beralasan di kode. Merah di ronde pertama
