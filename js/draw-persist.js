@@ -1,0 +1,60 @@
+// ===================== persist gambar ke localStorage (per instrumen) =====================
+// Titik disimpan sbg waktu wall-clock (vt) + value → tahan refresh/ganti TF. Saat restore, titik di
+// area future (vt > candle terakhir) dipetakan ke dataIndex spt reanchorFuturePoints(). suppressDrawSave
+// menahan penyimpanan & efek-samping onDrawEnd selama proses clear/restore programatik.
+let suppressDrawSave=false, drawSaveTimer=null;
+const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
+  horizontalStraightLine:1,verticalStraightLine:1,
+  straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
+  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,arrowMarkDown:1,callout:1};
+// simpleAnnotation & simpleTag sengaja TIDAK di sini (ditarik dari rail, lihat DRAW_GROUPS):
+// buildDrawsFromArray memfilter lewat daftar ini, jadi objek lama yang masih tersimpan di
+// localStorage pengguna otomatis berhenti dimuat — tak perlu migrasi.
+function drawsKey(){ return 'br_draws_'+inst; }
+function serializeDraws(){
+  const out=[];
+  drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);
+    if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
+    const pts=o.points.map(p=>({vt:tsOf(p), value:p.value}));
+    if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
+    out.push({ name:o.name, points:pts,
+      extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
+  }catch(e){} });
+  return out;
+}
+function saveDraws(){ if(suppressDrawSave) return;
+  const json=JSON.stringify(serializeDraws());
+  try{ localStorage.setItem(drawsKey(), json); }catch(e){}
+  recordDrawHistory(json);
+}
+function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
+function restoreDraws(){
+  let arr; try{ arr=JSON.parse(localStorage.getItem(drawsKey())); }catch(e){ arr=null; }
+  buildDrawsFromArray(arr);
+}
+function buildDrawsFromArray(arr){
+  if(!Array.isArray(arr)||!arr.length) return;
+  const a=revealed(currentTF), li=a.length-1, lt=li>=0?a[li].timestamp:null, dur=DUR[currentTF];
+  const prev=suppressDrawSave; suppressDrawSave=true;
+  arr.forEach(d=>{ try{
+    if(!PERSIST_DRAW[d.name]||!Array.isArray(d.points)||!d.points.length) return;
+    if(d.points.some(pt=>pt.vt==null)) return;   // lewati gambar rusak lama (titik anchorless → far-left)
+    const pts=d.points.map(pt=>{
+      if(pt.vt==null) return {value:pt.value};
+      if(subBar(d.name)){ const fi=tsToFracIndex(pt.vt);   // tool sub-bar: SELALU dataIndex pecahan (presisi)
+        return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
+      return (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // BAR_ANCHOR: future → dataIndex
+        : {timestamp:pt.vt, value:pt.value};
+    });
+    const base={name:d.name, points:pts};
+    if(d.extendData!=null) base.extendData=d.extendData;
+    if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
+    const id=chart.createOverlay(Object.assign(base,delHooks()));
+    if(id){ drawIds.push(id);
+      try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // restore full-point tak picu onDrawEnd → set flag di sini
+      if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
+  }catch(e){} });
+  suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+}
+window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
+
