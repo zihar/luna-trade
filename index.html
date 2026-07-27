@@ -3481,6 +3481,24 @@ function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor inline s
 function editTextOverlay(o){ if(!o) return;
   if(o.name==='text') openOverlayTextEditor(o,true);            // 'text': kosong = hapus
   else if(o.name==='callout') openOverlayTextEditor(o,false); } // 'callout': kosong = tetap (default "Text")
+// titik overlay → pixel CLIENT (viewport), atau null bila konversi gagal.
+function ptToClientPx(p){
+  if(!p) return null;
+  let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){}
+  if(Array.isArray(px)) px=px[0];
+  if(!px) return null;
+  const r=$('#chart').getBoundingClientRect();
+  return {x:r.left+px.x, y:r.top+px.y};
+}
+// Kotak `rect` dalam pixel client: pusat + ukuran. Sudut diambil dari 2 titik berlawanan —
+// TL & BR bila titiknya sudah mengembang jadi 8 (expandBox), atau 2 titik awal saat baru
+// digambar. SATU sumber, dipakai bareng overlayTextAnchor & overPlaceholder: gerbang visual
+// dan gerbang hit-area undangan "+ Add text" wajib sepakat soal ukuran kotak.
+function rectBoxPx(o){
+  const pts=(o&&o.points)||[]; if(pts.length<2) return null;
+  const a=ptToClientPx(pts[0]), b=ptToClientPx(pts[pts.length>=8?4:1]); if(!a||!b) return null;
+  return {cx:(a.x+b.x)/2, cy:(a.y+b.y)/2, w:Math.abs(b.x-a.x), h:Math.abs(b.y-a.y)};
+}
 // lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
 function overlayTextAnchor(o){
   const rect=$('#chart').getBoundingClientRect();
@@ -3488,7 +3506,7 @@ function overlayTextAnchor(o){
   const pts=o.points||[];
   if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
   // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
-  if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  if(o.name==='rect'){ const b=rectBoxPx(o); if(b) return {x:b.cx, y:b.cy}; }
   if(o.name==='callout' && pts.length>=2){ const b=toPx(pts[1]); if(b) return {x:rect.left+b.x, y:rect.top+b.y}; }   // pusat kotak teks (titik ke-2), bukan jangkar penunjuk
   const p=pts[0]; if(!p) return null; const px=toPx(p);
   return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
