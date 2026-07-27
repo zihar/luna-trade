@@ -50,6 +50,18 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-8 — potongan 1541-2309 (769 baris) ke sembilan file. Titik potongnya baru bersih SETELAH
+  // penawar `candleTooltipCustom` mendarat (#145) — sebelum itu 2 bahaya senyap.
+  'chart-legend.js': 'updateChartLegend',
+  'theme.js': 'applyTheme',
+  'tf-bar.js': 'TF_LABEL',
+  'load-chart.js': 'chartLoad',
+  'switch-tf.js': 'switchTF',
+  'render.js': 'render',
+  'replay-control.js': 'togglePlay',
+  'live-refresh.js': 'LIVE_MIN',
+  'sizing-pnl.js': 'instSpec',
+
   // PR-7 — potongan 2304-3091 (788 baris) ke empat file.
   'sltp-draft.js': 'draftDom',
   'positions-onchart.js': 'paperLines',
