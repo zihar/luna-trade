@@ -77,11 +77,14 @@ fungsi/handler).
 | News (~704 baris) bersarang di dalam banner "order panel", tanpa banner primer sendiri | sub-banner `index.html:4876,4917,5022,5143,5211` |
 | `toast()` dipakai seluruh file tapi tinggal di dalam section watchlist | `index.html:4094-4123` |
 | `bootApp()` memanggil 14 fungsi lintas domain, dideklarasikan di dalam banner multi-chart | `index.html:6573` |
-| `posPressedMove` diserahkan **sebagai nilai** ke `registerOverlay`, dideklarasikan 2444 baris setelahnya | dipakai `1197-1198`, dideklarasikan `3641` |
+| `posPressedMove` diserahkan **sebagai nilai** ke `registerOverlay`, dideklarasikan 2456 baris setelahnya | dipakai `1197-1198`, dideklarasikan `3653` |
 
 Yang terakhir paling berbahaya: jalan hari ini **hanya** karena hoisting di dalam satu blok. Antar
 `<script src>` tak ada hoisting — kalau file pemakai dimuat lebih dulu, nilainya `undefined` dan
-drag long/short position mati **tanpa error**.
+drag long/short position mati **tanpa error**. Cakupannya terbatas pada satu properti:
+`posFigures('long')` di baris yang sama **tidak** bermasalah karena `posFigures` dideklarasikan di
+`1137`, di atas pemakainya — yang backward hanya `performEventPressedMove:posPressedMove`.
+Penawarnya ada di "Alternatif: drawing dulu".
 
 ## Prasyarat yang tidak bisa dilewati
 
@@ -198,6 +201,92 @@ ReferenceError** — guard itu kode mati yang tak bisa menyelamatkan apa pun. Se
 ke `<script src>` yang lebih belakang, binding-nya belum ada dan `typeof` mengembalikan
 `'undefined'` → guard mulai berfungsi. Arahnya kebetulan aman, tapi ini bukti **byte-identik ≠
 semantik-identik**. Lima lokasi: `4165, 4276, 5220, 5640, 5751`.
+
+## Urutan fase & kebijakan merge
+
+Dikupas dari ekor sampai `index.html` tinggal markup: **PR-0 + ~16 PR** di batas banner alami,
+atau ~8–10 bila digabung jadi potongan 600–800 baris.
+
+| PR | Rentang | Isi | Baris |
+|---|---|---|---|
+| 1 | 6398–6822 | multi-chart, auth, analytics, timezone | 425 |
+| 2 | 5933–6397 | indikator, chart settings, chart type, context menu | 465 |
+| 3 | 5580–5932 | keyboard, replay UI, modal objek gambar, editor fib | 353 |
+| 4–9 | 3923–5579 | stats/journal + tabel Trades, watchlist+toast, picker, stream/forming candle, order panel + news, news notif | 1.657 |
+| 10–11 | 3070–3922 | rail + flyout, drawing tools, persist, undo/redo | 853 |
+| 12–15 | 1300–3069 | broker/paper, sizing, posisi on-chart, render, replay, chart init | ~1.770 |
+| 16 | 398–1299 | konstanta, state, util, style objek, box resize, overlays | 902 |
+
+**Manfaatnya datang berlawanan dengan nilainya.** 29 dari 60 commit terakhir menyentuh drawing —
+domain terpanas di repo ini — tapi kode drawing duduk di `737-1299`, `3070-3748`, dan `5795-5932`.
+Dua yang terbesar baru tersentuh di PR-10/11 dan PR-16. Artinya ~11 PR harus merge lebih dulu
+sebelum konflik pada pekerjaan yang paling sering dilakukan mulai mereda. Sadari ini sebelum
+memilih urutan; lihat "Alternatif: drawing dulu".
+
+Reproduksi angkanya:
+
+```sh
+git log --oneline --no-merges -60 --pretty='%s' | grep -oE '^[a-z]+\(([a-z-]+)\)' | sort | uniq -c | sort -rn
+```
+
+### Merge tiap fase segera — dan JANGAN rebase kalau stale
+
+Branch pemecahan memindahkan 400+ baris `index.html`. Perubahan apa pun di file yang sama akan
+bertabrakan, dan bukan konflik biasa: "baris dihapus" vs "baris diubah".
+
+**Kalau branch pemecahan sudah stale, buang dan turunkan ulang dari main terbaru — jangan
+di-rebase.** Ekstraksinya mekanis (rentang baris + tiga perintah verifikasi), jadi mengulang lebih
+cepat *dan* lebih aman daripada menyelesaikan konflik di dalam rentang yang bergeser: setelah
+resolusi manual, byte-identik masih harus dibuktikan terhadap baseline yang **sudah berubah**, dan
+nomor `398`/`6822` di perintah verifikasinya pun ikut bergeser. Rebase di sini menghasilkan diff
+yang tampak beres padahal jaminannya sudah hilang.
+
+Dua aturan turunan:
+
+- Jangan jalankan PR pemecahan **paralel** dengan PR fitur yang menyentuh `index.html` — urutkan,
+  tunggu yang satu merge dulu.
+- Jangan tinggalkan editan `index.html` uncommitted saat ada kerja paralel; editan begitu bisa
+  tersapu commit sesi lain (`CLAUDE.md` aturan 3).
+
+## Alternatif: drawing dulu (mid-file, dengan audit)
+
+Kalau tujuannya mengurangi konflik pada pekerjaan yang **nyata** — bukan membuktikan pola — urutan
+ekor bukan pilihan terbaik. Drawing bisa diambil lebih awal dengan harga satu audit.
+
+**Jebakan utamanya punya penawar satu baris.** `registerOverlay` di `index.html:1197-1198`
+menyerahkan `performEventPressedMove:posPressedMove` **sebagai nilai**, sementara `posPressedMove`
+dideklarasikan di `3653` — di dalam wilayah drawing. Bungkus referensinya:
+
+```js
+performEventPressedMove:(...a)=>posPressedMove(...a)
+```
+
+Resolusinya berpindah ke saat **dipanggil** (user men-drag), bukan saat registrasi; semua script
+sudah termuat jauh sebelum itu. Ini menghapus jebakannya permanen, bukan menghindarinya — dan
+layak dikerjakan sebagai commit sendiri lebih dulu, **terlepas dari urutan pemecahan yang
+dipilih**, karena hari ini pun jebakan itu cuma tertahan oleh kebetulan (hoisting satu blok).
+Catatan: ini usulan, belum diuji.
+
+**Yang tetap harus dibayar: audit hoisting.** Mencabut `3070-3748` memecah blok inline jadi dua,
+jadi setiap statement top-level di `398-3069` yang memanggil fungsi berdeklarasi `>3748` akan
+rusak. Cara mekanis mencarinya: kumpulkan nama fungsi yang dideklarasikan di dalam rentang yang
+dicabut, lalu cari referensinya di antara statement top-level sebelum titik potong — bukan di dalam
+body fungsi, itu aman karena dipanggil belakangan. `posPressedMove` adalah satu-satunya instans
+backward yang sudah teridentifikasi; audit harus memastikan tak ada yang lain. Plus audit `typeof`
+di 5 lokasi (`4165, 4276, 5220, 5640, 5751`) — lihat bagian jebakan `typeof` di atas.
+
+**Perbandingan jujur:**
+
+| | Ekor dulu | Drawing dulu |
+|---|---|---|
+| Risiko PR pertama | hampir nol (pindahan murni) | sedang (audit + 1 perubahan perilaku) |
+| Konflik drawing mereda | setelah ~11 PR | setelah PR pertama |
+| Bukti pola | didapat di wilayah aman | didapat sekaligus di wilayah tersulit |
+| Kalau berhenti di tengah | 6,6% file pindah, manfaat ~nol | domain terpanas sudah terisolasi |
+
+**Belum diputuskan.** Kalau dipilih "drawing dulu", PR-0 (sync deploy) tetap wajib mendahului, dan
+commit pembungkus `posPressedMove` sebaiknya mendarat lebih dulu lagi sebagai perubahan mandiri
+yang bisa diverifikasi sendiri (drag long/short position masih jalan).
 
 ## Verifikasi
 
