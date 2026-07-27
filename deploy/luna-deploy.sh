@@ -34,7 +34,7 @@ git reset --hard "origin/$BRANCH"
 install -m 0755 /tmp/luna.new "$RUNTIME/bar-replay"
 rm -f /tmp/luna.new
 
-# Sync aset web (yang selama ini di-scp manual): index.html + assets/ + css/.
+# Sync aset web (yang selama ini di-scp manual): index.html + assets/ + css/ + js/.
 # css/ = modul CSS hasil pemecahan index.html monolitik (Fase 1) — WAJIB ikut,
 # kalau tidak index.html mereferensikan /css/*.css yang 404 → halaman tanpa styling.
 install -m 0644 "$REPO/index.html" "$RUNTIME/index.html"
@@ -42,6 +42,17 @@ rm -rf "$RUNTIME/assets"
 cp -r "$REPO/assets" "$RUNTIME/assets"
 rm -rf "$RUNTIME/css"
 cp -r "$REPO/css" "$RUNTIME/css"
+
+# js/ = modul JS hasil pemecahan Fase 2, mode kegagalannya sama seperti css/ di Fase 1:
+# /js/*.js 404 → aplikasi separuh mati. Guard [ -d ] karena skrip ini SENGAJA mendarat
+# sebelum file js/*.js pertama lahir: skrip men-self-update di akhir run (baris di bawah),
+# jadi yang jalan pada satu tick adalah salinan dari run SEBELUMNYA — memperbaiki sync di
+# commit yang sama dengan ekstraksinya tidak menolong (rekaman kejadiannya: PR #113 →
+# prod tanpa styling, docs/superpowers/specs/2026-07-27-split-index-js-phase2-design.md).
+if [ -d "$REPO/js" ]; then
+	rm -rf "$RUNTIME/js"
+	cp -r "$REPO/js" "$RUNTIME/js"
+fi
 
 # Sync unit bar-replay kalau berubah (mis. ExecStart/hardening baru) → daemon-reload.
 if ! cmp -s "$REPO/deploy/bar-replay.service" /etc/systemd/system/bar-replay.service; then
