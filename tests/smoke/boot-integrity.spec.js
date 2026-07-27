@@ -35,6 +35,12 @@ const JS_DIR = path.join(__dirname, '..', '..', 'js');
 // Sentinel per file hasil pemecahan: nama → satu identifier top-level yang HANYA file itu
 // deklarasikan. Tabel ini WAJIB tumbuh bersama tiap PR pemecahan; test di bawah gagal kalau
 // ada file js/*.js tanpa entri di sini, jadi cakupannya tak bisa berhenti tumbuh diam-diam.
+//
+// Sebagian file hasil pemecahan TIDAK mendeklarasikan apa pun di top-level — isinya IIFE atau
+// statement efek samping saja (mis. pemasangan handler). Untuk file begitu, identifier bukan
+// bukti yang tersedia, jadi entrinya berbentuk `{ probe, why }`: sebuah ekspresi yang dievaluasi
+// di halaman dan hanya benar kalau file itu benar-benar dieksekusi. `why` wajib — supaya alasan
+// memilih jalur probe (bukan lupa mencari identifier) ikut terbaca saat review.
 const SENTINEL = {
   // PR-1 — ekstraksi ekor (425 baris) ke enam file.
   'multi-chart.js': 'SEC_DEFAULTS',
@@ -43,6 +49,30 @@ const SENTINEL = {
   'analytics.js': 'openAnalyticsDashboard',
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
+
+  // PR-2 — potongan 5699-6447 (749 baris) ke tujuh file.
+  'replay-ui.js': 'pickMode',
+  'draw-style-modal.js': 'PALETTE',
+  'chart-settings.js': 'CHART_DEFAULT',
+  'indicators.js': 'IND_DEFS',
+  'context-menu.js': 'ctxMenu',
+  'chart-type.js': {
+    probe: "$('#ctBtn').title.includes(':')",
+    why: 'IIFE tanpa deklarasi top-level. Efek yang hanya bisa datang darinya: title tombol jadi "Chart type: <label>", sementara markup (index.html:121) cuma "Chart type" tanpa titik dua.',
+  },
+  'order-fields.js': {
+    // Isinya murni pemasangan handler `input` — tak ada efek yang terlihat sampai ada input.
+    // Jadi probenya memancing perilakunya: isi harga SL jauh dari harga sekarang, kirim event
+    // `input`, dan #slPips harus terhitung balik ke nilai lain (markup-nya value="100").
+    probe: `(() => {
+      const before = $('#slPips').value;
+      const el = $('#slPrice');
+      el.value = '1.0000';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      return $('#slPips').value !== before;
+    })()`,
+    why: 'IIFE tanpa deklarasi top-level; satu-satunya jejaknya adalah handler input yang harus menghitung #slPips dari #slPrice.',
+  },
 };
 
 /**
@@ -112,18 +142,36 @@ test('boot: setiap file js/*.js termuat & punya sentinel', async ({ page }) => {
   await gotoApp(page);
 
   for (const f of files) {
-    const name = SENTINEL[f];
+    const entry = SENTINEL[f];
     // Penjaga anti-celah-senyap: file baru tanpa sentinel = suite merah, bukan cakupan yang
     // diam-diam berhenti tumbuh. Sama disiplinnya dengan cek byte-identik di PR pemecahan.
     expect(
-      name,
-      `js/${f} belum punya entri di SENTINEL — tambahkan satu identifier top-level yang hanya file itu deklarasikan`
+      entry,
+      `js/${f} belum punya entri di SENTINEL — tambahkan satu identifier top-level yang hanya file itu deklarasikan, atau { probe, why } kalau file itu memang tak mendeklarasikan apa pun`
     ).toBeTruthy();
 
+    if (typeof entry === 'string') {
+      expect(
+        await typeofGlobal(page, entry),
+        `js/${f} tak termuat/tak dieksekusi: identifier '${entry}' tak terdefinisi di halaman`
+      ).not.toBe('undefined');
+      continue;
+    }
+
+    // Jalur probe (file efek-samping saja). `why` diwajibkan supaya jalur ini tak dipakai
+    // sebagai jalan pintas ketika sebenarnya ADA identifier yang bisa dipakai.
+    expect(entry.why, `js/${f}: entri probe wajib menyertakan \`why\``).toBeTruthy();
     expect(
-      await typeofGlobal(page, name),
-      `js/${f} tak termuat/tak dieksekusi: identifier '${name}' tak terdefinisi di halaman`
-    ).not.toBe('undefined');
+      await page.evaluate((src) => {
+        try {
+          // eslint-disable-next-line no-eval
+          return eval(src) === true;
+        } catch (e) {
+          return 'THROW: ' + String(e);
+        }
+      }, entry.probe),
+      `js/${f} tak termuat/tak dieksekusi: probe gagal — ${entry.why}`
+    ).toBe(true);
   }
 
   // Tiap file harus juga benar-benar direferensikan index.html — file yatim di js/ yang tak
