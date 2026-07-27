@@ -1194,8 +1194,14 @@ function posFigures(dir){
   };
 }
 // totalStep:2 → cukup 1 klik untuk menaruh entry; TP & SL ditambah otomatis (lihat expandPosition)
-klinecharts.registerOverlay({name:'longPosition', totalStep:2, needDefaultPointFigure:true, performEventPressedMove:posPressedMove, createPointFigures:posFigures('long')});
-klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointFigure:true, performEventPressedMove:posPressedMove, createPointFigures:posFigures('short')});
+// posPressedMove DIBUNGKUS, jangan diserahkan sebagai nilai: deklarasinya ~2.400 baris di bawah
+// sini, jadi hari ini hanya tertahan hoisting satu blok inline. Begitu wilayah drawing pindah ke
+// <script src> sendiri, nilainya jadi `undefined` saat registrasi & drag posisi mati TANPA error.
+// Pembungkus ini memindahkan resolusi ke saat DIPANGGIL (user men-drag), ketika semua script
+// sudah termuat — lihat docs/superpowers/plans/2026-07-28-split-index-js-chunks-800.md.
+// Dijaga tests/drawing/32-position-handles.spec.js (tanpa handler terpasang: 6/6 merah).
+klinecharts.registerOverlay({name:'longPosition', totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('long')});
+klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('short')});
 
 // custom overlay: Text bebas — 1 klik taruh titik, lalu modal Style/Text tab Text (lihat applyTextInput)
 let drawTextColor='#e8edf2';   // diperbarui oleh applyTheme agar kontras di light/dark
