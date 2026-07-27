@@ -1323,9 +1323,13 @@ const darkStyles = {
     priceMark:{ high:{show:false}, low:{show:false}, last:{ text:{color:'#101013'} } },
     // legend OHLC native (custom): O/H/L/C + change abs/% berwarna up/down; ikut crosshair; offset di bawah
     // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
+    // candleTooltipCustom DIBUNGKUS, jangan diserahkan sebagai nilai: deklarasinya ~220 baris di bawah
+    // sini, jadi hari ini hanya tertahan hoisting satu blok inline. Kalau nilainya `undefined` saat
+    // styles dibuat, klinecharts diam-diam kembali ke tooltip bawaan & legend O/H/L/C hilang tanpa
+    // error. Dijaga tests/smoke/candle-tooltip.spec.js (dengan custom:undefined → 2/2 merah).
     tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
-      custom:candleTooltipCustom },
+      custom:(...a)=>candleTooltipCustom(...a) },
   },
   indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#434346'}, tickText:{color:'#89898b', size:10, family:AXIS_FONT}, tickLine:{color:'#434346'} },
@@ -1344,7 +1348,7 @@ const lightStyles = {
     // baris info-instrumen (overlay HTML) → legend indikator menumpuk otomatis di bawahnya (ala TradingView).
     tooltip:{ showRule:'always', showType:'standard', offsetTop:11, offsetLeft:120,
       text:{ size:11, family:AXIS_FONT, weight:'bold', marginLeft:0, marginRight:8, marginTop:2, marginBottom:2 },
-      custom:candleTooltipCustom },
+      custom:(...a)=>candleTooltipCustom(...a) },
   },
   indicator:{ tooltip:{ showRule:'none' } },
   xAxis:{ axisLine:{color:'#d6dbe2'}, tickText:{color:'#697280', size:10, family:AXIS_FONT}, tickLine:{color:'#d6dbe2'} },
@@ -1539,7 +1543,9 @@ fixClickSwallow(chart, $('#chart'));
 //  • Info instrumen (overlay HTML #chartLegend, kiri): ikon pair + nama lengkap + TF; klik → picker.
 //  • OHLC + change abs/% (legend candle NATIVE klinecharts, custom): SEJAJAR di kanan nama via offsetLeft
 //    dinamis (= lebar blok nama). Native → ikut crosshair otomatis & legend indikator menumpuk di bawahnya.
-// candleTooltipCustom dipakai di darkStyles/lightStyles (custom candle.tooltip).
+// candleTooltipCustom dipakai di darkStyles/lightStyles, DIBUNGKUS di sana jadi pemanggilan
+// tertunda: deklarasinya ada di bawah pemakainya, jadi menyerahkannya sebagai nilai hanya aman
+// selama satu blok inline. Lihat komentar di titik pemakaiannya.
 function chartLegendColors(){
   return document.body.classList.contains('light')
     ? {up:'#1a9d6e', down:'#d8504e', mut:'#697280'}
