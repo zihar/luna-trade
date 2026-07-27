@@ -191,21 +191,22 @@ test.describe('teks inline', () => {
     });
     expect(obj, 'objek harus terbentuk lebih dulu').toBeTruthy();
 
+    const [MINW, MINH] = await page.evaluate(() => [ADDTEXT_MIN_W, ADDTEXT_MIN_H]);
     // Ukuran nyata diperiksa, bukan diasumsikan: expandBox memaksa lebar minimum 1 bar
     // (index.html:832), jadi pada barSpace yang besar kotak uji ini bisa jadi melebar
     // melampaui ambang. Kalau itu terjadi, test harus GAGAL berisik di sini — bukan lolos
     // diam-diam karena mengukur kotak yang ternyata besar.
     const px = await toPixels(page, obj.points);
     const w = Math.abs(px[4].x - px[0].x), h = Math.abs(px[4].y - px[0].y);
-    expect(w, 'kotak uji harus lebih sempit dari ADDTEXT_MIN_W').toBeLessThan(90);
-    expect(h, 'kotak uji harus lebih pendek dari ADDTEXT_MIN_H').toBeLessThan(28);
+    expect(w, 'kotak uji harus lebih sempit dari ADDTEXT_MIN_W').toBeLessThan(MINW);
+    expect(h, 'kotak uji harus lebih pendek dari ADDTEXT_MIN_H').toBeLessThan(MINH);
 
     const cx = (px[0].x + px[4].x) / 2, cy = (px[0].y + px[4].y) / 2;
     await page.mouse.move(rect.x + cx, rect.y + cy, { steps: 8 });
     await page.mouse.down();
     await page.mouse.up();
 
-    // Editor inline dibuka oleh timer 220ms (index.html:3237) — tunggu melampauinya, supaya
+    // Editor inline dibuka oleh timer 220ms (index.html:3253) — tunggu melampauinya, supaya
     // "tak muncul" bukan sekadar karena keburu diperiksa.
     await page.waitForTimeout(600);
     expect(
@@ -235,13 +236,14 @@ test.describe('teks inline', () => {
     });
     expect(obj, 'objek harus terbentuk lebih dulu').toBeTruthy();
 
+    const [MINW, MINH] = await page.evaluate(() => [ADDTEXT_MIN_W, ADDTEXT_MIN_H]);
     // Ukuran nyata diperiksa, bukan diasumsikan (lihat alasan yg sama di test "rect kecil" di
     // atas): kalau snapping bar/harga membuat kotak ini jatuh DI BAWAH ambang, test harus GAGAL
     // berisik di sini — bukan lolos diam-diam karena mengukur kotak yg salah ukuran.
     const px = await toPixels(page, obj.points);
     const w = Math.abs(px[4].x - px[0].x), h = Math.abs(px[4].y - px[0].y);
-    expect(w, 'kotak uji harus di atas ADDTEXT_MIN_W').toBeGreaterThanOrEqual(90);
-    expect(h, 'kotak uji harus di atas ADDTEXT_MIN_H').toBeGreaterThanOrEqual(28);
+    expect(w, 'kotak uji harus di atas ADDTEXT_MIN_W').toBeGreaterThanOrEqual(MINW);
+    expect(h, 'kotak uji harus di atas ADDTEXT_MIN_H').toBeGreaterThanOrEqual(MINH);
 
     // Titik indeks 1 = TC (top-center), lihat urutan 8-titik di writeBox (index.html:798) —
     // itu PERSIS koordinat handle resize tepi atas yg dirender klinecharts, bukan titik
