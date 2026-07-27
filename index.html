@@ -3498,6 +3498,9 @@ function editTextOverlay(o){ if(!o) return;
   if(o.name==='text') openOverlayTextEditor(o,true);            // 'text': kosong = hapus
   else if(o.name==='callout') openOverlayTextEditor(o,false); } // 'callout': kosong = tetap (default "Text")
 // titik overlay → pixel CLIENT (viewport), atau null bila konversi gagal.
+// getBoundingClientRect() per titik → aman selama satu-satunya pemanggil overPlaceholder tetap
+// onClick overlay (index.html:3251, sekali per klik); kalau ini pernah dikawat ke mousemove,
+// rectBoxPx (2 titik) + getBoundingClientRect overlayTextAnchor sendiri jadi 3 forced layout/event.
 function ptToClientPx(p){
   if(!p) return null;
   let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){}
@@ -3910,9 +3913,12 @@ _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetO
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
 // Catatan: undangan "+ Add text" MENYATU di canvas — placeholder muted di dalam rect/trendline
-// saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Klik pada area
-// placeholder → editor teks INLINE (openOverlayTextEditor), BUKAN modal (lihat onClick overlay).
-// Modal Style/Text hanya via double-click / klik-kanan (onDoubleClick / contextmenu).
+// saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Untuk rect, label
+// dan hit-area-nya juga digerbang oleh ukuran kotak (ADDTEXT_MIN_W/ADDTEXT_MIN_H, index.html:847):
+// kotak yang lebih kecil dari itu dibiarkan bersih — labelnya mati BERSAMA hit-area-nya, tak
+// pernah salah satu saja (lihat docs/superpowers/specs/2026-07-27-rect-addtext-small-box-design.md).
+// Klik pada area placeholder → editor teks INLINE (openOverlayTextEditor), BUKAN modal (lihat
+// onClick overlay). Modal Style/Text hanya via double-click / klik-kanan (onDoubleClick / contextmenu).
 
 // ===================== stats & journal =====================
 function renderStats(){
