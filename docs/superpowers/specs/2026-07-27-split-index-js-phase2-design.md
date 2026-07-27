@@ -3,7 +3,8 @@
 **Tanggal:** 2026-07-27
 **Status:** Disetujui (brainstorming) — belum dikerjakan
 **Scope:** Fase 2 dari inisiatif `CLAUDE.md:32-42`; Fase 1 (CSS) sudah merged di PR #113
-**Basis pengukuran:** `index.html` pada commit `2202a73` (main setelah PR #129), 6823 baris
+**Basis pengukuran:** `index.html` pada commit `2202a73` (6823 baris) — **SUDAH STALE**, main kini
+`be663e3` (6862 baris). Lihat "Cara melanjutkan" poin 2 sebelum memakai nomor baris apa pun.
 
 ## Cara melanjutkan
 
@@ -14,11 +15,21 @@ Dua hal yang tidak boleh dibalik:
 
 1. **Urutan merge:** PR-0 (sync deploy) → tunggu satu tick timer deploy → PR-1 (ekstraksi ekor).
    Alasannya di bagian "Prasyarat" — melanggar ini pernah menjatuhkan produksi.
-2. **Verifikasi ulang nomor baris.** Semua rentang di sini mengacu `index.html` di `2202a73`.
-   Batas potong `6398-6822` diturunkan dari **nomor baris**, bukan dari penanda di kode — kalau
-   ada PR lain mendarat lebih dulu dan menggeser baris, rentangnya wajib dicek ulang sebelum
-   memotong. Ini bukan kehati-hatian teoretis: pergeseran semacam itulah yang membuat 245 sitasi
-   `index.html:NNNN` di `docs/` kini menunjuk konten yang salah.
+2. **Turunkan nomor baris, jangan percaya tabel.** Semua rentang di dokumen ini adalah
+   **ilustrasi ukuran & pengelompokan**, bukan sumber kebenaran. Sumber kebenarannya:
+
+   ```sh
+   grep -n '^// =\{5,\}' index.html    # 63 banner section, urut sumber
+   ```
+
+   **Bukti bahwa ini bukan kehati-hatian teoretis:** angka di dokumen ini ditulis terhadap
+   `2202a73` (6823 baris). Dalam sesi yang sama, dua PR lain mendarat di main — #130
+   (`cf929df`, klik-kanan batal menggambar) dan #132 (`bfd8026`, forming candle) — menyisipkan
+   di **8 tempat** (`1900, 2153, 3070, 3253, 3739, 4648, 5645, 6341`) sehingga file jadi 6862
+   baris. Hasilnya: batas ekor `6398-6822` **sudah salah dalam hitungan menit** — baris 6398
+   kini jatuh di kode context-menu. Posisi ekor per `be663e3` adalah **6437-6861** (ukurannya
+   tetap 425 baris, karena seluruh ekor bergeser seragam +39). Rentang lain di tabel bergeser
+   dengan besaran BERBEDA-BEDA karena hunk-nya tersebar — jangan diseragamkan +39.
 
 ## Context
 
@@ -28,7 +39,7 @@ file yang sama → hampir pasti konflik** (PR #10 jadi 7 konflik & harus dipecah
 sudah jalan — blok `<style>` ~1500 baris keluar ke 11 modul `css/*.css` (PR #113).
 
 Biayanya juga terasa di luar konflik: karena satu file memuat segalanya, tak ada isolasi,
-sehingga gerbang test untuk perubahan sekecil apa pun adalah **seluruh** suite (205 test,
+sehingga gerbang test untuk perubahan sekecil apa pun adalah **seluruh** suite (213 test,
 ~5 menit) — bukan `tests/drawing/` saja.
 
 Hasil yang dituju: fitur berbeda menyentuh file berbeda. Bukan kerapian demi kerapian.
@@ -119,19 +130,25 @@ berubah **senyap**. Keduanya di luar ekor `6398+`, jadi PR-1 aman; ini prasyarat
 menyentuh wilayah itu (rename salah satunya + test yang menunjukkan perilaku mana yang sebenarnya
 dipakai hari ini).
 
-## PR-1: ekstraksi ekor `6398-6822`
+## PR-1: ekstraksi ekor `6437-6861` (posisi per `be663e3`)
 
-425 baris keluar; blok inline sisa tetap **satu blok kontigu `398-6397`** → nol perubahan
+425 baris keluar; blok inline sisa tetap **satu blok kontigu `398-6436`** → nol perubahan
 hoisting. Enam potongan kontigu, urutan `<script src>` = urutan sumber:
 
 | File | Baris | Jml |
 |---|---|---|
-| `js/multi-chart.js` | 6398–6570 | 173 |
-| `js/boot.js` | 6571–6585 | 15 |
-| `js/auth-menu.js` | 6586–6649 | 64 |
-| `js/analytics.js` | 6650–6705 | 56 |
-| `js/auth-overlay.js` | 6706–6776 | 71 |
-| `js/timezone.js` | 6777–6822 | 46 |
+| `js/multi-chart.js` | 6437–6609 | 173 |
+| `js/boot.js` | 6610–6624 | 15 |
+| `js/auth-menu.js` | 6625–6688 | 64 |
+| `js/analytics.js` | 6689–6744 | 56 |
+| `js/auth-overlay.js` | 6745–6815 | 71 |
+| `js/timezone.js` | 6816–6861 | 46 |
+
+Batas-batas di atas sudah diverifikasi terhadap `be663e3`: `6437` banner multi-chart, `6610`
+komentar `bootApp`, `6625` banner auth, `6689` banner analytics, `6745` komentar overlay login,
+`6861` statement JS terakhir, `6862` = `</script>`. Baris `6816` adalah **baris kosong** (jahitan
+antara IIFE `authGate` di `6815` dan komentar timezone di `6817`) — ia ikut ke `timezone.js`.
+Jangan "dirapikan": tiap baris harus dimiliki tepat satu file, kalau tidak cek byte-identik gagal.
 
 Tag `<script src>` dipasang **setelah** `</script>` blok inline (kode ini aslinya paling akhir),
 diawali komentar meniru `index.html:29-30`: *"URUTAN script = urutan sumber lama. JANGAN diacak."*
@@ -143,7 +160,7 @@ newline. Rantai runtime tetap utuh: `boot.js` (deklarasi `bootApp`) dimuat sebel
 
 ```sh
 cd /Users/zihar/Projects/luna-trade
-diff <(git show HEAD:index.html | sed -n '398,6822p') \
+diff <(git show HEAD:index.html | sed -n '398,6861p') \
      <({ awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html; \
          grep -o 'src="/js/[^"]*"' index.html | sed 's|src="/||;s|"$||' | xargs cat; }) \
   && echo "BYTE-IDENTICAL"
@@ -168,12 +185,19 @@ for f in js/*.js; do curl -sf -o /dev/null -w "%{http_code} $f\n" http://localho
 Ekor ini justru wilayah **paling tak tertest** di aplikasi — verifikasi byte-identik akan hijau
 walau kodenya rusak:
 
-- `showAuthOverlay()` **tak pernah dieksekusi** di 205 test: `/api/auth/me` selalu distub 200
+- `showAuthOverlay()` **tak pernah dieksekusi** di 213 test: `/api/auth/me` selalu distub 200
   (`tests/fixtures/api.js:112`), hanya dipastikan absen (`tests/drawing/00-harness.spec.js:18`).
   → tambah test: stub `/api/auth/me` → 401, pastikan `#authOverlay` tampil & nol pageerror.
-- Jam timezone: `grep -rl toHaveScreenshot tests/` = **0 file**, jadi kalau `tzClock`/`tzMenu`
-  berhenti muncul tak ada yang merah. → tambah test: `#tzClock` ada & teksnya tak kosong.
+- Jam timezone: **SUDAH DITUTUP** oleh PR #133 (`tests/smoke/boot-integrity.spec.js`) — `#tzClock`
+  dipastikan ada & teksnya tak kosong. Tak perlu diulang di PR-1.
 - `#anModal` (analytics) tak pernah dibuka test mana pun — dibiarkan, admin-gated.
+
+**Wajib di PR-1: isi tabel `SENTINEL`** di `tests/smoke/boot-integrity.spec.js` untuk keenam file
+baru (`multi-chart.js`→`SEC_DEFAULTS`, `boot.js`→`bootApp`, `auth-menu.js`→`setAvatar`,
+`analytics.js`→`openAnalyticsDashboard`, `auth-overlay.js`→`showAuthOverlay`,
+`timezone.js`→`TZ_LIST`). Test itu **sengaja merah** untuk file `js/*.js` tanpa entri sentinel —
+itulah penjaga yang membuat cakupan tak bisa berhenti tumbuh diam-diam, dan itu juga satu-satunya
+cek yang membuktikan file benar-benar termuat di browser (byte-identik tak membuktikan itu).
 
 ### Mode kegagalan baru yang diperkenalkan pemecahan ini
 
@@ -238,7 +262,7 @@ bertabrakan, dan bukan konflik biasa: "baris dihapus" vs "baris diubah".
 di-rebase.** Ekstraksinya mekanis (rentang baris + tiga perintah verifikasi), jadi mengulang lebih
 cepat *dan* lebih aman daripada menyelesaikan konflik di dalam rentang yang bergeser: setelah
 resolusi manual, byte-identik masih harus dibuktikan terhadap baseline yang **sudah berubah**, dan
-nomor `398`/`6822` di perintah verifikasinya pun ikut bergeser. Rebase di sini menghasilkan diff
+nomor `398`/`6861` di perintah verifikasinya pun ikut bergeser. Rebase di sini menghasilkan diff
 yang tampak beres padahal jaminannya sudah hilang.
 
 Dua aturan turunan:
@@ -290,8 +314,9 @@ yang bisa diverifikasi sendiri (drag long/short position masih jalan).
 
 ## Verifikasi
 
-1. `npx playwright test --project=hermetic` → 205 lulus (+2 test baru = 207).
-   Catatan: `npm test` telanjang **juga** menjalankan project `live` (205 test) ke `:8765` yang
+1. `npx playwright test --project=hermetic` → hitung ulang di main dulu, jangan pakai angka
+   dari cabang: main per `be663e3` = **213**, plus 2 test integritas boot (PR #133) = **215**.
+   Catatan: `npm test` telanjang **juga** menjalankan project `live` ke `:8765` yang
    tak dinyalakan `webServer` → merah environmental. Gerbang sesungguhnya adalah
    `--project=hermetic`; `CLAUDE.md:46` menyesatkan di titik ini.
 2. Ketiga perintah shell di atas: BYTE-IDENTICAL, ORDER OK, nol MISMATCH.
