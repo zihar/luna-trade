@@ -3674,7 +3674,12 @@ function posPressedMove(t){
   const entry = (k===0)?pts[5].value : pts[0].value;
   const tpRef = (k===1)?pts[3].value : pts[1].value;
   const slRef = (k===2)?pts[4].value : pts[2].value;
-  const tpSide=Math.sign(tpRef-entry)||1, slSide=Math.sign(slRef-entry)||-1;
+  // Arah tiap level relatif Entry. Kalau referensinya PAS di Entry (sign 0) — persis yang terjadi
+  // sesaat setelah sebuah level ter-clamp — jangan pakai orientasi long sebagai fallback: pada
+  // shortPosition TP ada di BAWAH & SL di ATAS, jadi fallback itu membalik arah clamp dan gerakan
+  // berikutnya lolos menyeberangi Entry. Turunkan dari level seberang dulu (selalu sisi lawan).
+  const tpSide=Math.sign(tpRef-entry)|| -Math.sign(slRef-entry)||1;
+  const slSide=Math.sign(slRef-entry)|| -Math.sign(tpRef-entry)||-1;
   const clamp=(v,side)=> side>0 ? Math.max(v,entry) : Math.min(v,entry);  // TP/SL tak boleh seberangi Entry
   let tp=tpRef, sl=slRef;
   if(k===1||k===3) tp=clamp(pp.value,tpSide);   // pojok TP: ubah level (clamp)
