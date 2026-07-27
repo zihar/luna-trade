@@ -50,6 +50,10 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-3 — potongan 5316-5698 (383 baris) ke dua file.
+  'news-notify.js': 'NEWS_NOTIFY_LEAD',
+  'keyboard.js': 'MIN_TO_TF',
+
   // PR-2 — potongan 5699-6447 (749 baris) ke tujuh file.
   'replay-ui.js': 'pickMode',
   'draw-style-modal.js': 'PALETTE',
