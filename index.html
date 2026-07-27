@@ -839,10 +839,26 @@ function expandBox(o){
 // Undangan "+ Add text" (ala TradingView) hanya muncul saat objek SUDAH JADI & sedang
 // di-hover atau terpilih — bukan saat digambar. Dipakai rect & trendline saat teks kosong.
 function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && overlay.id!==editingTextId && (overlay.id===hoverId || overlay.id===selectedId); }
+// Undangan hanya muat di kotak yg cukup besar: label "+ Add text" ~66px lebar pada
+// 12px/AXIS_FONT, plus ~12px napas per sisi. Di bawah ambang ini kotak dibiarkan BERSIH,
+// dan label + hit-area mati BERSAMAAN: kalau cuma labelnya yg disembunyikan, tersisa area
+// hantu — klik di tengah kotak kecil tetap membuka editor tanpa sebab yg terlihat.
+// Rancangan: docs/superpowers/specs/2026-07-27-rect-addtext-small-box-design.md
+const ADDTEXT_MIN_W=90, ADDTEXT_MIN_H=28;
+const ADDTEXT_PAD=8;    // jarak aman hit-area label dari tepi/handle kotak
 // apakah kursor terakhir berada di atas area undangan "+ Add text" objek (utk membedakan klik
-// "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label.
+// "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label — utk rect juga
+// dibatasi ukuran kotaknya (ADDTEXT_MIN_*), sejalan dgn gerbang visual di createPointFigures.
 function overPlaceholder(o){ try{ const a=overlayTextAnchor(o); if(!a) return false;
-  return Math.abs(lastPtr.x-a.x)<=55 && Math.abs(lastPtr.y-a.y)<=16; }catch(e){ return false; } }
+  let hw=55, hh=16;
+  if(o.name==='rect'){ const b=rectBoxPx(o); if(!b) return false;
+    if(b.w<ADDTEXT_MIN_W || b.h<ADDTEXT_MIN_H) return false;   // kotak kecil: tak ada undangan → tak ada hit-area
+    // potong ke DALAM kotak: kotak lebar-tapi-tipis (mis. 300×30) memuat labelnya, tapi
+    // toleransi ±16 melampaui tingginya → klik persis di handle tepi atas/bawah salah
+    // terbaca "tambah teks". Gerbang ukuran di atas menjamin sisanya positif.
+    hw=Math.min(hw, b.w/2-ADDTEXT_PAD); hh=Math.min(hh, b.h/2-ADDTEXT_PAD); }
+  return Math.abs(lastPtr.x-a.x)<=hw && Math.abs(lastPtr.y-a.y)<=hh;
+}catch(e){ return false; } }
 // ===================== custom overlay: rectangle/zona =====================
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
@@ -862,7 +878,7 @@ klinecharts.registerOverlay({
       const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
       lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
         styles:{color:drawTextColor,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
-    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → undangan "+ Add text" menyatu di tengah kotak (ala TradingView)
+    else if(showAddTextHint(overlay) && w>=ADDTEXT_MIN_W && h>=ADDTEXT_MIN_H)    // kosong + hover/terpilih & kotak sanggup memuat label → undangan "+ Add text" menyatu di tengah (ala TradingView); kotak kecil dibiarkan bersih
       figs.push({type:'text',attrs:{x:x+w/2,y:y+h/2,text:'+ Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     return figs;

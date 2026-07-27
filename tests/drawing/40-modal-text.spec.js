@@ -178,4 +178,47 @@ test.describe('teks inline', () => {
     expect(objs[0].extendData).toContain('dari placeholder');
     assertNoPageErrors(page);
   });
+
+  test('rect kecil: undangan "+ Add text" & hit-area-nya mati, teks tetap lewat modal', async ({ page }) => {
+    // Kotak yang lebih sempit dari labelnya (~66px) membuat "+ Add text" meluber & menutupi
+    // handle → kotak susah dilebarkan (ADDTEXT_MIN_W/H di index.html). Placeholder digambar
+    // di canvas, jadi yang bisa dihakimi dari DOM adalah AKIBATNYA: klik di tengah kotak
+    // kecil tak membuka editor inline, klik itu jatuh sebagai "pilih objek", dan jalan
+    // menambah teks (modal tab Text) tetap terbuka.
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'rect', {
+      targets: [{ x: 200, y: 200 }, { x: 255, y: 220 }],   // 55×20 px → di bawah kedua ambang
+    });
+    expect(obj, 'objek harus terbentuk lebih dulu').toBeTruthy();
+
+    // Ukuran nyata diperiksa, bukan diasumsikan: expandBox memaksa lebar minimum 1 bar
+    // (index.html:832), jadi pada barSpace yang besar kotak uji ini bisa jadi melebar
+    // melampaui ambang. Kalau itu terjadi, test harus GAGAL berisik di sini — bukan lolos
+    // diam-diam karena mengukur kotak yang ternyata besar.
+    const px = await toPixels(page, obj.points);
+    const w = Math.abs(px[4].x - px[0].x), h = Math.abs(px[4].y - px[0].y);
+    expect(w, 'kotak uji harus lebih sempit dari ADDTEXT_MIN_W').toBeLessThan(90);
+    expect(h, 'kotak uji harus lebih pendek dari ADDTEXT_MIN_H').toBeLessThan(28);
+
+    const cx = (px[0].x + px[4].x) / 2, cy = (px[0].y + px[4].y) / 2;
+    await page.mouse.move(rect.x + cx, rect.y + cy, { steps: 8 });
+    await page.mouse.down();
+    await page.mouse.up();
+
+    // Editor inline dibuka oleh timer 220ms (index.html:3237) — tunggu melampauinya, supaya
+    // "tak muncul" bukan sekadar karena keburu diperiksa.
+    await page.waitForTimeout(600);
+    expect(
+      await page.locator('textarea.text-editor').count(),
+      'editor inline tak boleh terbuka di kotak kecil',
+    ).toBe(0);
+    expect(await page.evaluate(() => selectedId), 'klik harus jatuh sebagai "pilih objek"').toBe(obj.id);
+
+    // Jalan menambah teks untuk kotak kecil: double-click → modal, tab awal Text.
+    await dblclickObject(page, obj, rect);
+    const modal = page.locator('.dmodal-scrim.show');
+    await expect(modal, 'modal harus terbuka').toBeVisible();
+    await expect(modal.locator('.dm-tab.on')).toHaveAttribute('data-tab', 'text');
+    assertNoPageErrors(page);
+  });
 });
