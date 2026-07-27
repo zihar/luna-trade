@@ -36,6 +36,14 @@ hit-area-nya mati bersamaan. Alternatif yang ditimbang dan ditolak:
   satu masalah kecil.
 - *Pindah label ke luar kotak* sebagai chip melayang: undangan selalu terlihat, tapi
   menambah elemen yang bertumpuk dengan objek lain dan label harga di chart padat.
+- *Ukur lebar label otomatis* (`measureText`/`calcTextWidth`, bukan konstanta literal):
+  ditolak — bukan karena string placeholder-nya tetap (string tetap tak membuat lebar
+  RENDER-nya tetap), tapi karena mengukurnya tetap butuh tahu font yang dipakai
+  (`AXIS_FONT`, `index.html:1303`), dan proyek ini sudah pernah mengganti font sebelumnya
+  (mis. migrasi ke Sora/Inter Tight/Chivo Mono). Konstanta literal + komentar asal-usul angka tetap lebih
+  sederhana: kalau font berubah lagi, `ADDTEXT_MIN_W/H` memang harus ditinjau ulang manual —
+  sama seperti `measureText` juga akan perlu di-re-run, hanya bedanya konstanta literal tak
+  diam-diam salah di production sebelum ada yang sadar.
 
 Harga dari keputusan ini: untuk kotak kecil, petunjuk visual "kotak ini bisa diberi teks"
 hilang. Jalannya tinggal double-click → modal tab **Text**, yang sudah berjalan hari ini
@@ -101,8 +109,19 @@ Kedua jalur mengukur hal yang sama lewat sumber berbeda — figure memakai `coor
 canvas dari `subBarCoords`, hit-area memakai `convertToPixel(..., {absolute:true})`. Selama
 keduanya CSS-pixel (dan sekarang begitu) ambang yang sama menghasilkan keputusan yang sama.
 Kalau satu hari nanti skalanya menyimpang, gejalanya adalah area hantu yang justru mau
-dihilangkan desain ini — jadi test baru di bawah menguji tepat perbatasan itu, bukan cuma
-"tak ada error".
+dihilangkan desain ini.
+
+Yang benar-benar teruji dari dua jalur ini: hit-area-nya (`overPlaceholder`, lewat
+`40-modal-text.spec.js`) dan — sejak temuan review perlu ditutup — gerbang visualnya
+sendiri (`createPointFigures`, lewat diff screenshot di `41-addtext-visual-gate.spec.js`).
+Test-test itu berada di 55×20 dan ~300×30 px, JAUH dari ambang 90×28 — bukan di
+perbatasannya. Menguji bahwa kedua jalur SEPAKAT tepat di garis 90×28 (mis. satu jalur
+bilang 89.6px, jalur lain bilang 90.1px, lalu keduanya masih menghasilkan keputusan yang
+sama) butuh membandingkan posisi sub-pixel canvas sungguhan dengan output
+`convertToPixel`, sesuatu yang tak bisa dijangkau dari DOM/E2E — jadi itu TETAP tak
+teruji secara otomatis. Kalau suatu hari skalanya menyimpang, sinyalnya adalah area
+hantu (klik "tambah teks" atau sebaliknya tepat di sekitar ambang) yang harus ditangkap
+manual atau lewat laporan pengguna, bukan lewat suite ini.
 
 ### 4. Satu sumber konversi titik → pixel
 

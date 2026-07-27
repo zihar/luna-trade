@@ -389,4 +389,5 @@ EOF
 
 Angka `90×28` berasal dari lebar label terukur (~66px pada 12px/`AXIS_FONT`) + ~12px napas
 per sisi. Kalau ukuran/font placeholder berubah, ambang ini harus ikut — atau diganti
-pengukuran `measureText` (ditimbang & ditolak di spec karena stringnya tetap).
+pengukuran `measureText` (ditimbang & ditolak di spec: bukan karena stringnya tetap, tapi
+karena lebar render tetap terikat ke font `AXIS_FONT` yang sudah pernah berubah sebelumnya).
