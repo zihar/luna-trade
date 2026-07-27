@@ -1900,7 +1900,18 @@ function render(full){
   // applyNewData menyentak viewport ke tepi kanan → pan/zoom user hilang tiap frame saat Play.
   // Dorong forming bar via updateData (sama seperti Live/pushFormingCandle) → posisi scroll
   // dipertahankan; auto-follow hanya terjadi bila user memang di tepi kanan (perilaku ala TradingView).
-  const needFull = full || lastLen<0 || data.length<lastLen
+  // Jaring pengaman: klinecharts.updateData MEMBUANG datum yg timestamp-nya < bar terakhir di
+  // chart (ChartStore.addData, tanpa error). Kalau bar terakhir di chart lebih baru dari bar
+  // tutup yang mau di-push (mis. forming bar sempat melompat periode), push incremental menelan
+  // bar itu diam-diam — dan karena lastLen tetap maju, ia TAK PERNAH dicoba lagi → lubang
+  // permanen sampai reload. Deteksi & sembuhkan dgn satu applyNewData (viewport tersentak ke
+  // tepi kanan, tapi ini jalur pemulihan data rusak, bukan jalur normal).
+  let stale=false;
+  if(data.length>lastLen && lastLen>=0){
+    const cl=chart.getDataList();
+    stale = cl.length>0 && data[lastLen].timestamp < cl[cl.length-1].timestamp;
+  }
+  const needFull = full || lastLen<0 || data.length<lastLen || stale
                  || (chartHasPartial && !hasPartial && data.length===lastLen);
   if(needFull){ chart.applyNewData(data); }
   else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
@@ -2153,7 +2164,12 @@ async function fetchFormingSeed(){
     const j=await r.json();
     if(tf!==currentTF || sym!==inst || !j.candles) return;     // TF/pair keburu ganti
     const inc=j.candles.find(c=>c.complete===false);
-    formingSeed = inc ? {tf, inst:sym, candle:{
+    // Candle TUTUP terakhir yang server punya. Dipakai pushFormingCandle utk tahu apakah data
+    // lokal ketinggalan (server punya bar tutup yang belum kita muat) — satu-satunya cara
+    // membedakan "boundary non-grid yang sah" (H4/D/akhir pekan) dari "kita yang tertinggal".
+    const done=j.candles.filter(c=>c.complete!==false);
+    const prevTs=done.length ? Date.parse(done[done.length-1].time) : null;
+    formingSeed = inc ? {tf, inst:sym, prevTs, candle:{
       timestamp:Date.parse(inc.time), open:+inc.mid.o, high:+inc.mid.h, low:+inc.mid.l, close:+inc.mid.c, volume:+(inc.volume||0)
     }} : null;
   }catch(e){}
@@ -4660,6 +4676,14 @@ function pushFormingCandle(){
   // lalu keluar; forming digambar normal setelah data catch-up. Hanya jalur grid: dgn seed
   // otoritatif, openTs pasti = periode kini (risiko bar-raksasa tak ada).
   if(!seed && now>=openTs+dur){ scheduleRollRefresh(); return; }
+  // Jalur seed: server punya candle TUTUP yang belum kita muat (mis. sesudah tab lama idle —
+  // timer di-throttle/freeze → tfData ketinggalan, sementara seed sudah di periode kini).
+  // Menggambar forming di openTs itu MELOMPATI periode di antaranya, dan klinecharts
+  // MEMBUANG candle tutup yang menyusul (timestamp < bar terakhir di chart, tanpa error) →
+  // gap permanen. Jadi tarik candle tutup dulu; forming digambar setelah data catch-up.
+  // Cek pakai prevTs (bukan openTs>last+dur) supaya boundary sah tetap lolos: H4/D align
+  // 18:00 NY & gap akhir pekan memang membuat openTs > last+dur tanpa ada bar yang terlewat.
+  if(seed && formingSeed.prevTs!=null && formingSeed.prevTs>last.timestamp){ scheduleRollRefresh(); return; }
   if(!formingBar || formingBar.timestamp!==openTs){
     const o = seed ? seed.open : last.close;
     const hi = seed ? seed.high : last.close;

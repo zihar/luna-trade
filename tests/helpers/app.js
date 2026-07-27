@@ -97,6 +97,11 @@ async function loginLive(page) {
 /**
  * Pasang stub + init script, buka halaman, tunggu chart benar-benar siap.
  * Mengembalikan { state } — state server palsu (lihat fixtures/api.js); null di mode LIVE.
+ *
+ * `opts.beforeGoto(page)` dipanggil SESUDAH stub default terpasang tapi SEBELUM navigasi.
+ * Di situlah tempat memasang `page.route` yang harus MENANG atas stub default: Playwright
+ * memeriksa handler dalam urutan terbalik pendaftaran, jadi route apa pun yang didaftarkan
+ * sebelum `gotoApp` justru tak akan pernah terpakai (`**\/api\/**` dari installStubs menelannya).
  */
 async function gotoApp(page, opts = {}) {
   const errors = [];
@@ -109,6 +114,7 @@ async function gotoApp(page, opts = {}) {
   await page.addInitScript(harnessInit);
   const state = LIVE ? null : await installStubs(page);
   if (LIVE) await loginLive(page);
+  if (opts.beforeGoto) await opts.beforeGoto(page);
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
