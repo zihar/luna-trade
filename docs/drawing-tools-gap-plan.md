@@ -65,6 +65,16 @@ Gann (box/fan/square) · Fib circles/arcs/fans/spiral/wedge · pola XABCD/ABCD/H
 Elliott/Three Drives · Cyclic/Sine · Forecast · Bars Pattern · Ghost Feed · Fixed-range Volume
 Profile · Image/X-post embed · cursor Demonstration/Magic.
 
+## Bug diketahui (bukan gap fitur, tapi dicatat di sini juga supaya findable)
+
+- **trendline "Add text" meluber pada garis pendek** — kembar dari bug rect yg baru
+  ditutup (`zihar/zihar/fix/rect-addtext-small-box`, hanya utk `rect`): label ukuran tetap
+  di titik tengah garis (`index.html:994-995`) tak digerbang ukuran sama sekali, dan
+  `overPlaceholder` memberi hit-area ±55×±16 tanpa clamp ke panjang garis → garis pendek
+  kehilangan endpoint handle-nya sendiri ke area "tambah teks". Sengaja di luar cakupan PR
+  itu (lihat `docs/superpowers/specs/2026-07-27-rect-addtext-small-box-design.md`, bagian
+  "Di luar cakupan"); layak jadi PR kecil terpisah bila laporannya muncul.
+
 ## Urutan kerja yang disarankan
 
 1. T1.1 Measure → T1.2 Keep drawing → T1.3 Lock → T1.5 Duplicate (semua FE-only, rasio nilai/effort tertinggi)

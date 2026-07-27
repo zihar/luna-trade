@@ -839,10 +839,26 @@ function expandBox(o){
 // Undangan "+ Add text" (ala TradingView) hanya muncul saat objek SUDAH JADI & sedang
 // di-hover atau terpilih — bukan saat digambar. Dipakai rect & trendline saat teks kosong.
 function showAddTextHint(overlay){ return overlay && overlay.id!==inProgressId && overlay.id!==editingTextId && (overlay.id===hoverId || overlay.id===selectedId); }
+// Undangan hanya muat di kotak yg cukup besar: label "+ Add text" ~66px lebar pada
+// 12px/AXIS_FONT, plus ~12px napas per sisi. Di bawah ambang ini kotak dibiarkan BERSIH,
+// dan label + hit-area mati BERSAMAAN: kalau cuma labelnya yg disembunyikan, tersisa area
+// hantu — klik di tengah kotak kecil tetap membuka editor tanpa sebab yg terlihat.
+// Rancangan: docs/superpowers/specs/2026-07-27-rect-addtext-small-box-design.md
+const ADDTEXT_MIN_W=90, ADDTEXT_MIN_H=28;
+const ADDTEXT_PAD=8;    // jarak aman hit-area label dari tepi/handle kotak
 // apakah kursor terakhir berada di atas area undangan "+ Add text" objek (utk membedakan klik
-// "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label.
+// "tambah teks" dari klik "pilih objek"). Toleransi kira-kira selebar label — utk rect juga
+// dibatasi ukuran kotaknya (ADDTEXT_MIN_*), sejalan dgn gerbang visual di createPointFigures.
 function overPlaceholder(o){ try{ const a=overlayTextAnchor(o); if(!a) return false;
-  return Math.abs(lastPtr.x-a.x)<=55 && Math.abs(lastPtr.y-a.y)<=16; }catch(e){ return false; } }
+  let hw=55, hh=16;
+  if(o.name==='rect'){ const b=rectBoxPx(o); if(!b) return false;
+    if(b.w<ADDTEXT_MIN_W || b.h<ADDTEXT_MIN_H) return false;   // kotak kecil: tak ada undangan → tak ada hit-area
+    // potong ke DALAM kotak: kotak lebar-tapi-tipis (mis. 300×30) memuat labelnya, tapi
+    // toleransi ±16 melampaui tingginya → klik persis di handle tepi atas/bawah salah
+    // terbaca "tambah teks". Gerbang ukuran di atas menjamin sisanya positif.
+    hw=Math.min(hw, b.w/2-ADDTEXT_PAD); hh=Math.min(hh, b.h/2-ADDTEXT_PAD); }
+  return Math.abs(lastPtr.x-a.x)<=hw && Math.abs(lastPtr.y-a.y)<=hh;
+}catch(e){ return false; } }
 // ===================== custom overlay: rectangle/zona =====================
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
@@ -862,7 +878,7 @@ klinecharts.registerOverlay({
       const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
       lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
         styles:{color:drawTextColor,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
-    else if(showAddTextHint(overlay))    // kosong + hover/terpilih → undangan "+ Add text" menyatu di tengah kotak (ala TradingView)
+    else if(showAddTextHint(overlay) && w>=ADDTEXT_MIN_W && h>=ADDTEXT_MIN_H)    // kosong + hover/terpilih & kotak sanggup memuat label → undangan "+ Add text" menyatu di tengah (ala TradingView); kotak kecil dibiarkan bersih
       figs.push({type:'text',attrs:{x:x+w/2,y:y+h/2,text:'+ Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     return figs;
@@ -3481,6 +3497,27 @@ function applyTextInput(o){ editTextOverlay(o); }   // auto-buka editor inline s
 function editTextOverlay(o){ if(!o) return;
   if(o.name==='text') openOverlayTextEditor(o,true);            // 'text': kosong = hapus
   else if(o.name==='callout') openOverlayTextEditor(o,false); } // 'callout': kosong = tetap (default "Text")
+// titik overlay → pixel CLIENT (viewport), atau null bila konversi gagal.
+// getBoundingClientRect() per titik → aman selama satu-satunya pemanggil overPlaceholder tetap
+// onClick overlay (index.html:3251, sekali per klik); kalau ini pernah dikawat ke mousemove,
+// rectBoxPx (2 titik) + getBoundingClientRect overlayTextAnchor sendiri jadi 3 forced layout/event.
+function ptToClientPx(p){
+  if(!p) return null;
+  let px=null; try{ px=chart.convertToPixel(Object.assign(keyOf(p),{value:p.value}),{paneId:'candle_pane',absolute:true}); }catch(e){}
+  if(Array.isArray(px)) px=px[0];
+  if(!px) return null;
+  const r=$('#chart').getBoundingClientRect();
+  return {x:r.left+px.x, y:r.top+px.y};
+}
+// Kotak `rect` dalam pixel client: pusat + ukuran. Sudut diambil dari 2 titik berlawanan —
+// TL & BR bila titiknya sudah mengembang jadi 8 (expandBox), atau 2 titik awal saat baru
+// digambar. SATU sumber, dipakai bareng overlayTextAnchor & overPlaceholder: gerbang visual
+// dan gerbang hit-area undangan "+ Add text" wajib sepakat soal ukuran kotak.
+function rectBoxPx(o){
+  const pts=(o&&o.points)||[]; if(pts.length<2) return null;
+  const a=ptToClientPx(pts[0]), b=ptToClientPx(pts[pts.length>=8?4:1]); if(!a||!b) return null;
+  return {cx:(a.x+b.x)/2, cy:(a.y+b.y)/2, w:Math.abs(b.x-a.x), h:Math.abs(b.y-a.y)};
+}
 // lokasi (client px) tempat teks dirender → editor muncul persis di situ (in-place)
 function overlayTextAnchor(o){
   const rect=$('#chart').getBoundingClientRect();
@@ -3488,7 +3525,7 @@ function overlayTextAnchor(o){
   const pts=o.points||[];
   if(o.name==='trendline' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
   // rect: tengah kotak (2 sudut berlawanan — TL & BR bila sudah 8 titik, atau 2 titik awal)
-  if(o.name==='rect' && pts.length>=2){ const a=toPx(pts[0]), b=toPx(pts[pts.length>=8?4:1]); if(a&&b) return {x:rect.left+(a.x+b.x)/2, y:rect.top+(a.y+b.y)/2}; }
+  if(o.name==='rect'){ const b=rectBoxPx(o); if(b) return {x:b.cx, y:b.cy}; }
   if(o.name==='callout' && pts.length>=2){ const b=toPx(pts[1]); if(b) return {x:rect.left+b.x, y:rect.top+b.y}; }   // pusat kotak teks (titik ke-2), bukan jangkar penunjuk
   const p=pts[0]; if(!p) return null; const px=toPx(p);
   return {x:rect.left+(px?px.x:rect.width/2), y:rect.top+(px?px.y:rect.height/2)};
@@ -3876,9 +3913,12 @@ _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetO
 _dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
 // Catatan: undangan "+ Add text" MENYATU di canvas — placeholder muted di dalam rect/trendline
-// saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Klik pada area
-// placeholder → editor teks INLINE (openOverlayTextEditor), BUKAN modal (lihat onClick overlay).
-// Modal Style/Text hanya via double-click / klik-kanan (onDoubleClick / contextmenu).
+// saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Untuk rect, label
+// dan hit-area-nya juga digerbang oleh ukuran kotak (ADDTEXT_MIN_W/ADDTEXT_MIN_H, index.html:847):
+// kotak yang lebih kecil dari itu dibiarkan bersih — labelnya mati BERSAMA hit-area-nya, tak
+// pernah salah satu saja (lihat docs/superpowers/specs/2026-07-27-rect-addtext-small-box-design.md).
+// Klik pada area placeholder → editor teks INLINE (openOverlayTextEditor), BUKAN modal (lihat
+// onClick overlay). Modal Style/Text hanya via double-click / klik-kanan (onDoubleClick / contextmenu).
 
 // ===================== stats & journal =====================
 function renderStats(){
