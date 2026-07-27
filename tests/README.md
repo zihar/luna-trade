@@ -78,6 +78,8 @@ tests/
     api.js                SEMUA stub /api + intercept unpkg, di satu tempat
     candles-eurusd-m15.json   500 bar deterministik (di-commit)
     gen-candles.js        generator fixture (PRNG ber-seed; jalankan manual bila perlu)
+    lagging-candles.js    stub /api/candles utk keadaan pasca-idle (muatan awal ketinggalan
+                          N periode, candle incomplete sudah di periode kini)
     klinecharts-9.8.10.min.js salinan lokal CDN → offline + versi terkunci
   helpers/
     spec.js               TOOL_SPEC — tabel ekspektasi, satu sumber kebenaran
@@ -88,6 +90,7 @@ tests/
   drawing/                00 harness · 10 timing klik · 20 presisi · 30 interaksi
                           31 presisi drag · 40 modal/teks · 50 rail · 60 magnet/TF
                           70 reticle
+  chart/                  perilaku data chart (live/forming candle) — bukan drawing
   smoke/areas.spec.js     1 test tipis per area non-drawing
   integration/            @integration (butuh server Go)
   build-gallery.js        globalTeardown → report/gallery.html
@@ -95,7 +98,7 @@ tests/
 
 ## Hal-hal yang harus diketahui sebelum menambah test
 
-Empat jebakan yang sudah memakan waktu; semuanya sudah ditangani helper, jangan diakali ulang.
+Lima jebakan yang sudah memakan waktu; 1–4 sudah ditangani helper, jangan diakali ulang.
 
 1. **Jeda antar klik: penelanan klik sudah diperbaiki, `CLICK_GAP_MS` tetap dipakai.** Dulu
    dua klik berjeda < ~400ms membuat klik ke-2 **ditelan** klinecharts (Temuan 2, akar
@@ -119,6 +122,12 @@ Empat jebakan yang sudah memakan waktu; semuanya sudah ditangani helper, jangan 
    (`expandBox`), `long/shortPosition` jadi 6 (`expandPosition`). Karena itu perbandingan
    posisi memakai pencocokan titik **terdekat** (dibatasi kandidat yang selevel secara Y),
    bukan per-indeks. Lihat `nearestDelta`.
+
+5. **`chart.getDataList()` bisa TAK SAMA dengan `tfData`.** `chart.updateData(bar)` membuang
+   datum yang timestamp-nya lebih tua dari bar terakhir di chart — diam-diam, tanpa error
+   (klinecharts `ChartStore.addData`). Jadi kalau sebuah test mengandalkan isi chart, bandingkan
+   dengan `revealed(currentTF)`, jangan asumsikan keduanya sinkron. Ini akar bug gap pasca-idle
+   yang dijaga `tests/chart/10-forming-gap.spec.js`.
 
 Tambahan: `text` & `callout` membuka editor teks inline sendiri setelah jadi. Menekan
 Escape di editor `text` yang masih kosong **menghapus objeknya** (memang desainnya) — pakai
