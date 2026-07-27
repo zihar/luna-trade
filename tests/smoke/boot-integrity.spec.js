@@ -50,6 +50,13 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-5 — potongan 3769-4524 (756 baris) ke lima file.
+  'draw-rail.js': 'setCursorMode',
+  'stats-journal.js': 'renderStats',
+  'trades-panel.js': 'activeTradeTab',
+  'watchlist.js': 'WATCH_SYMS',
+  'instrument-picker.js': 'IPK_GROUPS',
+
   // PR-4 — potongan 4525-5315 (791 baris) ke empat file.
   'price-stream.js': 'priceES',
   'countdown.js': 'updatePriceTimer',
