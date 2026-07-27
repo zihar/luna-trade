@@ -3070,6 +3070,15 @@ function updateOpenTradeBox(){
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null, addTextTimer=null;
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
+// Batalkan gambar yang belum jadi — satu-satunya jalur batal (Esc, klik kanan, ganti cursor).
+// Membuang overlay saja tak cukup: pendingClicks, tombol rail yang 'armed', dan reticle titik
+// ikut nyangkut. drawIds dibersihkan oleh onRemoved. Balikan: true bila memang ada yg dibatalkan.
+function cancelInProgressDraw(){
+  if(!inProgressId) return false;
+  try{chart.removeOverlay(inProgressId);}catch(_){}
+  inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){}
+  return true;
+}
 // Lepas seleksi objek gambar yang sudah jadi (Esc). selectedId=null saja TAK cukup: klinecharts
 // menyimpan state seleksi di OverlayStore._clickInstanceInfo (inilah yang menggambar handle). Bersihkan
 // lewat setClickInstanceInfo(instance:null) → memicu onDeselected (yang mereset selectedId) + re-render pane.
@@ -3253,7 +3262,10 @@ function delHooks(){ return {
       addTextTimer=setTimeout(()=>{ const c=chart.getOverlayById(o.id); if(c && !(c.extendData&&String(c.extendData).trim())) openOverlayTextEditor(c,false); }, 220);
     }
     return false; },
-  onRightClick:(e)=>{ selectedId=e.overlay.id; return true; },   // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM
+  // return true → cegah hapus default klinecharts; popup setting tetap via handler contextmenu DOM.
+  // Objek yang MASIH digambar sengaja tak di-select: klik kanan di atasnya = batal (diurus handler
+  // contextmenu), jadi ia tak boleh meninggalkan selectedId ke objek yang sebentar lagi dibuang.
+  onRightClick:(e)=>{ if(e.overlay.id!==inProgressId) selectedId=e.overlay.id; return true; },
   onDoubleClick:(e)=>{ clearTimeout(addTextTimer); try{ const o=e.overlay, n=o&&o.name;   // batalkan editor inline → double-click = modal
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
@@ -3739,7 +3751,7 @@ function applyCursorStyle(name){
   }catch(_){}
 }
 function setCursorMode(name){
-  if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} drawIds=drawIds.filter(id=>id!==inProgressId); inProgressId=null; }
+  cancelInProgressDraw();
   disarmIcons();
   eraserOn=(name==='eraser'); cursorMode=name; try{localStorage.setItem('br_cursor',name);}catch(_){}
   applyCursorStyle(name);
@@ -5645,7 +5657,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); try{chart.removeOverlay(id);}catch(_){} } }
-  else if(e.key==='Escape'){ if(inProgressId){ try{chart.removeOverlay(inProgressId);}catch(_){} inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){} } else if(selectedId){ deselectOverlay(); } }
+  else if(e.key==='Escape'){ if(!cancelInProgressDraw() && selectedId){ deselectOverlay(); } }
   // ('b'/'s' telanjang → submit order dihapus: huruf kini memicu symbol search, bukan eksekusi order)
 });
 
@@ -6341,6 +6353,9 @@ function removeMenuItems(){
 function openRemoveMenu(x,y){ showCtx(x,y,removeMenuItems()); }
 $('#chart').addEventListener('contextmenu',e=>{
   e.preventDefault();
+  // Sedang menggambar → klik kanan = BATAL, bukan menu. Wajib sebelum cek hoverId: saat menggambar
+  // hoverId sering menunjuk objek in-progress itu sendiri, dan itu akan membuka modal Style-nya.
+  if(cancelInProgressDraw()){ hideCtx(); return; }
   if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
   const rect=$('#chart').getBoundingClientRect();
   const yIn=e.clientY-rect.top;

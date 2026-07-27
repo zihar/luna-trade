@@ -7,7 +7,7 @@
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect, toPixels } = require('../helpers/chart');
-const { drawTool, overlays, dragPoint, armTool, clickAt, setCursor, CLICK_GAP_MS } = require('../helpers/draw');
+const { drawTool, overlays, dragPoint, armTool, clickAt, setCursor, hoverableSpot, CLICK_GAP_MS } = require('../helpers/draw');
 const { byName, TOL_Y_PX } = require('../helpers/spec');
 
 const SAMPLES = ['trendline', 'rect', 'horizontalStraightLine'];
@@ -152,6 +152,57 @@ test.describe('batal menggambar', () => {
     await page.keyboard.press('Escape');
     await expect.poll(async () => (await overlays(page)).length, { timeout: 3000 }).toBe(0);
     expect(await page.evaluate(() => inProgressId), 'inProgressId harus dibersihkan').toBeNull();
+    assertNoPageErrors(page);
+  });
+
+  // Klik kanan saat menggambar = batal (sama seperti ESC), BUKAN buka menu/config.
+  // klinecharts 9.8.10 sebenarnya membatalkan sendiri lewat mouseRightClickEvent →
+  // removeInstance, tapi onRightClick kita (index.html:3256) selalu `return true` demi
+  // menjaga klik-kanan objek jadi tetap membuka modal Style — jadi pembatalannya harus
+  // kita lakukan sendiri di handler contextmenu.
+  test('klik kanan setelah titik pertama: batal menggambar, tanpa menu apa pun', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await armTool(page, 'trendline');
+    await clickAt(page, rect, { x: Math.round(rect.width * 0.35), y: Math.round(rect.height * 0.5) });
+    await page.waitForTimeout(CLICK_GAP_MS);
+
+    await page.mouse.click(rect.x + Math.round(rect.width * 0.45), rect.y + Math.round(rect.height * 0.45), { button: 'right' });
+
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 3000 }).toBe(0);
+    expect(await page.evaluate(() => inProgressId), 'inProgressId harus dibersihkan').toBeNull();
+    await expect(page.locator('.ctxmenu'), 'menu chart tak boleh muncul').toBeHidden();
+    await expect(page.locator('.dmodal-scrim.show'), 'modal Style tak boleh muncul').toHaveCount(0);
+    await expect(page.locator('.objpop.show'), 'popup objek tak boleh muncul').toHaveCount(0);
+    expect(await page.evaluate(() => document.querySelectorAll('.dtool.armed:not(#magBtn)').length), 'tool harus disarm').toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  test('klik kanan saat tool baru di-arm (belum ada titik): ikut batal', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await armTool(page, 'rect');
+
+    await page.mouse.click(rect.x + Math.round(rect.width * 0.4), rect.y + Math.round(rect.height * 0.5), { button: 'right' });
+
+    await expect.poll(async () => page.evaluate(() => inProgressId), { timeout: 3000 }).toBeNull();
+    expect(await overlays(page), 'tak boleh menyisakan objek').toHaveLength(0);
+    await expect(page.locator('.ctxmenu')).toBeHidden();
+    expect(await page.evaluate(() => document.querySelectorAll('.dtool.armed:not(#magBtn)').length), 'tool harus disarm').toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  test('klik kanan pada objek yang SUDAH jadi tetap membuka config', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    const px = await hoverableSpot(page, obj, rect);
+    await page.mouse.move(rect.x + px.x, rect.y + px.y, { steps: 6 });
+    await expect.poll(async () => page.evaluate(() => hoverId), { timeout: 3000 }).not.toBeNull();
+
+    await page.mouse.click(rect.x + px.x, rect.y + px.y, { button: 'right' });
+
+    await expect(page.locator('.dmodal-scrim.show'), 'modal Style harus terbuka').toHaveCount(1);
+    expect(await overlays(page), 'objek tak boleh terhapus').toHaveLength(1);
     assertNoPageErrors(page);
   });
 
