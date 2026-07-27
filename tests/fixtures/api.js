@@ -1,7 +1,8 @@
 // Semua stub jaringan untuk E2E, di satu tempat.
 //
-// Frontend luna-trade hanya punya SATU gerbang: /api/auth/me (index.html:6517). Distub
-// jadi 200 → bootApp() jalan dan layar login dilewati. Endpoint lain distub dengan bentuk
+// Frontend luna-trade hanya punya SATU gerbang: /api/auth/me (`authGate`,
+// js/auth-overlay.js:65). Distub jadi 200 → bootApp() jalan dan layar login dilewati.
+// Endpoint lain distub dengan bentuk
 // yang meniru handler Go aslinya (api.go / auth.go / main.go) supaya test tak perlu
 // server Go, .env, token OANDA, atau luna.db.
 //
