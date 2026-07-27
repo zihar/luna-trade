@@ -50,6 +50,12 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-4 — potongan 4525-5315 (791 baris) ke empat file.
+  'price-stream.js': 'priceES',
+  'countdown.js': 'updatePriceTimer',
+  'forming-candle.js': 'pushFormingCandle',
+  'order-panel.js': 'setOrderDock',
+
   // PR-3 — potongan 5316-5698 (383 baris) ke dua file.
   'news-notify.js': 'NEWS_NOTIFY_LEAD',
   'keyboard.js': 'MIN_TO_TF',
@@ -136,6 +142,30 @@ test('boot: tiap wilayah UI terbangun oleh JS', async ({ page }) => {
   for (const [sel, what] of filled) {
     expect((await page.locator(sel).innerText()).trim(), `${what} kosong → tak terisi JS`).not.toBe('');
   }
+
+  assertNoPageErrors(page);
+});
+
+/**
+ * `fmtCountdown` dideklarasikan DUA KALI dengan isi berbeda — `js/countdown.js` (mendukung satuan
+ * hari) dan `js/order-panel.js` (maksimal jam, mengembalikan 'now' untuk nol). Selama semua JS satu
+ * blok inline, yang menang untuk SEMUA pemanggil adalah deklarasi terakhir; setelah dipecah,
+ * pemenangnya jadi file yang dimuat terakhir. Keduanya kebetulan menghasilkan pemenang yang sama
+ * (order-panel), dan itu aman HANYA karena tak ada satu pun referensi eager ke nama ini — semua
+ * pemanggilnya berjalan setelah seluruh script termuat.
+ *
+ * Test ini memaku fakta itu supaya tak berubah diam-diam: kalau urutan tag tertukar, atau salah
+ * satu deklarasi dipindah/di-rename tanpa memikirkan pemenangnya, format countdown di UI berubah
+ * tanpa error dan tanpa test lain yang peduli.
+ */
+test('boot: nama ganda fmtCountdown — pemenangnya tetap varian order-panel', async ({ page }) => {
+  await gotoApp(page);
+
+  expect(await page.evaluate(() => fmtCountdown(0)), 'varian order-panel mengembalikan "now" untuk nol').toBe('now');
+  expect(
+    await page.evaluate(() => fmtCountdown(2 * 86400 * 1000)),
+    'dua hari harus jadi 48:00:00 (varian order-panel), bukan "2d 00:00:00" (varian countdown)'
+  ).toBe('48:00:00');
 
   assertNoPageErrors(page);
 });
