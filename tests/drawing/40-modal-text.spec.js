@@ -221,4 +221,56 @@ test.describe('teks inline', () => {
     await expect(modal.locator('.dm-tab.on')).toHaveAttribute('data-tab', 'text');
     assertNoPageErrors(page);
   });
+
+  test('rect lebar-tapi-tipis: klik di handle tepi atas tak buka editor, klik tengah tetap buka', async ({ page }) => {
+    // Kotak lebar (~300px) tapi tipis (~30px) — di ATAS kedua ambang (ADDTEXT_MIN_W/H), jadi
+    // undangan "+ Add text" & hit-area-nya AKTIF. Tanpa pemotongan `ADDTEXT_PAD` (index.html:859)
+    // toleransi vertikal ±16px melampaui setengah tinggi kotak (~15px), jadi klik PERSIS di
+    // handle tepi atas/bawah salah terbaca "tambah teks" — padahal seharusnya jatuh sebagai
+    // drag/pilih handle resize. Ini satu-satunya skenario di brief tanpa cakupan test otomatis;
+    // ditutup di sini alih-alih verifikasi manual sekali-jalan.
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'rect', {
+      targets: [{ x: 200, y: 200 }, { x: 500, y: 230 }],   // ~300×30 px → di ATAS kedua ambang
+    });
+    expect(obj, 'objek harus terbentuk lebih dulu').toBeTruthy();
+
+    // Ukuran nyata diperiksa, bukan diasumsikan (lihat alasan yg sama di test "rect kecil" di
+    // atas): kalau snapping bar/harga membuat kotak ini jatuh DI BAWAH ambang, test harus GAGAL
+    // berisik di sini — bukan lolos diam-diam karena mengukur kotak yg salah ukuran.
+    const px = await toPixels(page, obj.points);
+    const w = Math.abs(px[4].x - px[0].x), h = Math.abs(px[4].y - px[0].y);
+    expect(w, 'kotak uji harus di atas ADDTEXT_MIN_W').toBeGreaterThanOrEqual(90);
+    expect(h, 'kotak uji harus di atas ADDTEXT_MIN_H').toBeGreaterThanOrEqual(28);
+
+    // Titik indeks 1 = TC (top-center), lihat urutan 8-titik di writeBox (index.html:798) —
+    // itu PERSIS koordinat handle resize tepi atas yg dirender klinecharts, bukan titik
+    // tengah label yg diasumsikan.
+    const topHandle = px[1];
+    await page.mouse.move(rect.x + topHandle.x, rect.y + topHandle.y, { steps: 8 });
+    await page.mouse.down();
+    await page.mouse.up();
+
+    // Editor inline dibuka lewat timer 220ms (index.html:3253) — tunggu melampauinya, supaya
+    // "tak muncul" bukan sekadar karena keburu diperiksa.
+    await page.waitForTimeout(600);
+    expect(
+      await page.locator('textarea.text-editor').count(),
+      'klik di handle tepi atas tak boleh membuka editor inline',
+    ).toBe(0);
+    expect(await page.evaluate(() => selectedId), 'klik di handle tetap harus jatuh sebagai "pilih objek"').toBe(obj.id);
+
+    // Kontrol: klik di TENGAH kotak yg sama tetap membuka editor — membuktikan test ini betul
+    // menguji klem ADDTEXT_PAD (bukan sekadar kotak yg mati total / hit-area kebetulan nol).
+    const cx = (px[0].x + px[4].x) / 2, cy = (px[0].y + px[4].y) / 2;
+    await page.mouse.move(rect.x + cx, rect.y + cy, { steps: 8 });
+    await page.mouse.down();
+    await page.mouse.up();
+
+    await expect(page.locator('textarea.text-editor')).toBeVisible({ timeout: 3000 });
+    await commitTextEditor(page, 'dari tengah kotak tipis');
+    const objs = await overlays(page);
+    expect(objs[objs.length - 1].extendData).toContain('dari tengah kotak tipis');
+    assertNoPageErrors(page);
+  });
 });
