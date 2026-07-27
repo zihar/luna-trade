@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Audit titik potong pemecahan index.html — dengan parser sungguhan (acorn), bukan regex.
 //
-// Pakai:
-//   npm i --no-save acorn          # sekali per checkout (bukan devDependency: alat sekali pakai per PR)
+// Pakai (acorn = devDependency, jadi cukup `npm i` sekali di checkout baru):
 //   node tools/audit-cut.js 5688   # satu titik potong
 //   node tools/audit-cut.js        # tanpa argumen: usulkan potongan ≤800 baris + audit semuanya
 //
@@ -31,7 +30,7 @@ let acorn;
 try {
   acorn = require('acorn');
 } catch (_) {
-  console.error('Butuh acorn. Jalankan dulu:  npm i --no-save acorn');
+  console.error('Butuh acorn (devDependency). Jalankan dulu:  npm i');
   process.exit(2);
 }
 

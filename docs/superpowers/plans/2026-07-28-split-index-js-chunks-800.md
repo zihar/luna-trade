@@ -74,7 +74,7 @@ lalu memilah temuan jadi dua kelas menurut konsekuensinya (`CALL` = berisik & ke
 `VALUE` = senyap & wajib diperbaiki).
 
 ```sh
-npm i --no-save acorn
+npm i                              # acorn = devDependency (sekali per checkout)
 node tools/audit-cut.js            # usulkan potongan ≤800 + audit semua titik potong
 node tools/audit-cut.js 3086       # audit satu titik potong
 ```
