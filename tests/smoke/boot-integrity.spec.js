@@ -35,15 +35,15 @@ const JS_DIR = path.join(__dirname, '..', '..', 'js');
 // Sentinel per file hasil pemecahan: nama → satu identifier top-level yang HANYA file itu
 // deklarasikan. Tabel ini WAJIB tumbuh bersama tiap PR pemecahan; test di bawah gagal kalau
 // ada file js/*.js tanpa entri di sini, jadi cakupannya tak bisa berhenti tumbuh diam-diam.
-//
-// Contoh untuk PR-1 (ekstraksi ekor 6398-6822), tinggal dibuka saat file-nya lahir:
-//   'multi-chart.js':  'SEC_DEFAULTS',
-//   'boot.js':         'bootApp',
-//   'auth-menu.js':    'setAvatar',
-//   'analytics.js':    'openAnalyticsDashboard',
-//   'auth-overlay.js': 'showAuthOverlay',
-//   'timezone.js':     'TZ_LIST',
-const SENTINEL = {};
+const SENTINEL = {
+  // PR-1 — ekstraksi ekor (425 baris) ke enam file.
+  'multi-chart.js': 'SEC_DEFAULTS',
+  'boot.js': 'bootApp',
+  'auth-menu.js': 'setAvatar',
+  'analytics.js': 'openAnalyticsDashboard',
+  'auth-overlay.js': 'showAuthOverlay',
+  'timezone.js': 'TZ_LIST',
+};
 
 /**
  * `typeof` di dalam eval: aman untuk identifier yang tak dideklarasikan (mengembalikan
@@ -84,7 +84,7 @@ test('boot: tiap wilayah UI terbangun oleh JS', async ({ page }) => {
     expect(await page.locator(sel).count(), `${what} tak terbangun — ${sel} kosong`).toBeGreaterThan(0);
   }
 
-  // Node yang DIBUAT JS lalu di-append (index.html:6847-6849) — tak ada di markup sama sekali,
+  // Node yang DIBUAT JS lalu di-append (js/timezone.js:32-34) — tak ada di markup sama sekali,
   // jadi ketiadaannya membuktikan potongan timezone tak dieksekusi.
   await expect(page.locator('#tzClock'), 'jam timezone (#tzClock) tak dibuat JS').toHaveCount(1);
   expect(
