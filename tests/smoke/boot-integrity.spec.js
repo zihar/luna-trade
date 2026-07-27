@@ -50,6 +50,12 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-7 — potongan 2304-3091 (788 baris) ke empat file.
+  'sltp-draft.js': 'draftDom',
+  'positions-onchart.js': 'paperLines',
+  'replay-intrabar.js': 'evalFills',
+  'broker-paper.js': 'ReplayBroker',
+
   // PR-6 — potongan 3092-3768 (677 baris) ke tiga file. Wilayah drawing: titik potongnya baru
   // bersih SETELAH penawar `posPressedMove` mendarat (#138) — sebelum itu ada 2 bahaya senyap.
   'draw-tools.js': 'hoverName',
