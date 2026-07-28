@@ -5,24 +5,24 @@
 // menambatkan sumbu X. Keputusan desain (docs/superpowers/specs/2026-07-25-e2e-ui-drawing-design.md):
 // semua tool wajib presisi sub-bar (preview == final, mendarat di titik klik), KECUALI tool
 // yang penambatan-per-bar-nya memang disengaja dan beralasan di kode:
-//   - verticalStraightLine — penanda waktu harus = waktu candle yang diklik (index.html:590)
+//   - verticalStraightLine — penanda waktu harus = waktu candle yang diklik (index.html pra-Fase-2:590)
 //   - longPosition / shortPosition — entry harus mendarat di center candle terpilih,
-//     snapTimeToBar eksplisit dengan alasan tertulis (index.html:3408-3412)
+//     snapTimeToBar eksplisit dengan alasan tertulis (index.html pra-Fase-2:3408-3412)
 //
 // clicks      = jumlah klik untuk menyelesaikan objek (TERVERIFIKASI lewat penemuan otomatis
 //               atas ke-24 tool, termasuk 9 overlay built-in klinecharts).
 // pointsAfter = jumlah titik SETELAH onDrawEnd. Sebagian tool mengembang: rect & fib3 → 8
-//               titik (expandBox, index.html:796), posisi → 6 titik (expandPosition,
-//               index.html:3397). Karena itu parity/landing dibandingkan lewat pencocokan
+//               titik (expandBox, index.html pra-Fase-2:796), posisi → 6 titik (expandPosition,
+//               index.html pra-Fase-2:3397). Karena itu parity/landing dibandingkan lewat pencocokan
 //               titik TERDEKAT, bukan per-indeks.
 // anchor      = 'subbar' (wajib ≤1px dari titik klik) | 'bar' (boleh snap ke bar terdekat)
-// text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, index.html:5546)
+// text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, index.html pra-Fase-2:5546)
 // autoEditor  = true bila editor teks inline terbuka sendiri setelah objek jadi
-//               (applyTextInput → editTextOverlay, index.html:3306) → test wajib menutupnya.
-// persist     = ada di PERSIST_DRAW (index.html:3158) → wajib bertahan setelah reload.
+//               (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306) → test wajib menutupnya.
+// persist     = ada di PERSIST_DRAW (index.html pra-Fase-2:3158) → wajib bertahan setelah reload.
 // settings    = 'modal' (double-click → modal Style|Text) | 'pospopup' (long/shortPosition
-//               dialihkan ke showPosPopup, index.html:5573) | null (tak ada di DRAW_DEFAULT
-//               index.html:715 → memang tak punya panel setting).
+//               dialihkan ke showPosPopup, index.html pra-Fase-2:5573) | null (tak ada di DRAW_DEFAULT
+//               index.html pra-Fase-2:715 → memang tak punya panel setting).
 
 const TOOL_SPEC = [
   // ---- Trend Lines ----
@@ -33,7 +33,7 @@ const TOOL_SPEC = [
   // Horizontal Ray: klik ke-2 hanya menentukan arah/panjang di sumbu X — Y-nya WAJIB diabaikan,
   // kalau tidak garisnya tak lagi horizontal. Jadi landing Y klik ke-2 memang tak dinilai.
   { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'subbar', clickAxes: ['xy', 'x'], text: null, settings: 'modal', persist: true, builtin: true },
-  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html:590)', text: null, settings: 'modal', persist: true, sc: 'V' },
+  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: null, settings: 'modal', persist: true, sc: 'V' },
   { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', persist: true, sc: 'P', builtin: true },
 
   // ---- Channels ----
@@ -53,8 +53,8 @@ const TOOL_SPEC = [
   { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', persist: true },
 
   // ---- Positions ----
-  { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html:3408-3412)', text: null, settings: 'pospopup', persist: true },
-  { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html:3408-3412)', text: null, settings: 'pospopup', persist: true },
+  { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', persist: true },
+  { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', persist: true },
   { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', persist: true },
 
   // ---- Text ----
@@ -74,7 +74,7 @@ const RETIRED_TOOLS = [
   { name: 'simpleTag', title: 'Tag', why: 'figure ber-ignoreEvent → tak bisa dijangkau; redundan dgn priceLine' },
 ];
 
-// Mode cursor (bukan overlay — mengubah crosshair global, index.html:3509).
+// Mode cursor (bukan overlay — mengubah crosshair global, index.html pra-Fase-2:3509).
 const CURSOR_MODES = [
   { name: 'cross', title: 'Cross', crosshair: true, line: true },
   { name: 'dot', title: 'Dot', crosshair: true, line: false },

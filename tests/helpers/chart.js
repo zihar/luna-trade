@@ -2,7 +2,7 @@
 //
 // Tak ada pixel yang di-hardcode. Semua target klik dihitung lewat converter chart
 // (`chart.convertToPixel` dengan paneId 'candle_pane' + absolute:true — sama seperti
-// idxToPx/tsToPx di index.html:525-526), lalu digeser dengan bounding box #chart untuk jadi
+// idxToPx/tsToPx di index.html pra-Fase-2:525-526), lalu digeser dengan bounding box #chart untuk jadi
 // koordinat viewport. Konsekuensinya: test tahan terhadap perubahan ukuran window, barSpace,
 // padding kanan, atau lebar sumbu harga.
 
@@ -46,7 +46,7 @@ async function fromPixel(page, x, y) {
   }, [x, y]);
 }
 
-/** Lebar satu bar dalam pixel (mengikuti barSpacePx di index.html:527). */
+/** Lebar satu bar dalam pixel (mengikuti barSpacePx di index.html pra-Fase-2:527). */
 async function barSpace(page) {
   return page.evaluate(() => {
     let a = chart.convertToPixel({ dataIndex: chart.getDataList().length - 1, value: 0 }, { paneId: 'candle_pane', absolute: true });

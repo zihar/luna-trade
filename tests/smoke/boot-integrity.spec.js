@@ -156,7 +156,8 @@ test('boot: tiap wilayah UI terbangun oleh JS', async ({ page }) => {
   // gotoApp sudah menunggu `chart`/`T`/`drawIds` (tests/helpers/app.js:125-134) — jangan
   // diulang di sini. Yang berikut ini lapisan yang belum dijaga siapa pun.
 
-  // Canvas chart dibuat oleh klinecharts.init (index.html:1475), bukan ada di markup.
+  // Canvas chart dibuat oleh klinecharts.init (js/ny-time.js — ya, di file itu; batas potong
+  // per-banner menaruhnya di sana, lihat catatan sitasi di tests/README.md), bukan ada di markup.
   expect(
     await page.locator('#chart canvas').count(),
     'klinecharts.init tak menghasilkan canvas di #chart'

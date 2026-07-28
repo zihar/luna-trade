@@ -121,7 +121,7 @@ async function gotoApp(page, opts = {}) {
   // Chart siap = data termuat, cursor waktu terisi, bookkeeping drawing ada.
   // `chart`/`T`/`drawIds` adalah `const`/`let` top-level di classic script → ada di global
   // lexical scope (BUKAN properti window), jadi diakses sebagai identifier polos.
-  // loadInit() menunggu font sumbu dulu (index.html:1723) → timeout longgar.
+  // loadInit() menunggu font sumbu dulu (index.html pra-Fase-2:1723) → timeout longgar.
   await page.waitForFunction(
     () =>
       typeof chart !== 'undefined' &&

@@ -1,5 +1,17 @@
 # Temuan ronde pertama E2E drawing
 
+> **DITUTUP — status per 2026-07-28.** Temuan 1–6 semuanya selesai; suite hermetik **230 test,
+> hijau seluruhnya**, dan sejak PR #154 ia dijalankan otomatis di CI (3 shard, ~4,9 menit) untuk
+> tiap PR & tiap push ke `main`. Dokumen ini **tak lagi menggambarkan keadaan sekarang** —
+> angka-angka di bawah (163/166/204 test, 51/35/2 gagal) adalah rekaman perjalanan ronde pertama
+> dan sengaja dibiarkan utuh, karena nilainya justru pada urutan "test dulu, fix belakangan" yang
+> terlihat dari sana.
+>
+> Dua hal yang perlu dibaca ulang dengan kacamata sekarang: (1) gerbangnya `npx playwright test
+> --project=hermetic`, bukan `npm test` telanjang (yang ikut menembak project `live` ke `:8765`);
+> (2) sitasi `index.html:NNNN` di dokumen ini semuanya **pra-pemecahan** — seluruh JS kini di
+> `js/*.js`, lihat catatan sitasi di `tests/README.md`.
+
 Tanggal: 2026-07-25 · Suite: `npm test` (163 test, project `hermetic`)
 Hasil ronde pertama: **112 lolos · 51 gagal** — semua kegagalan adalah temuan, bukan harness
 yang rusak.

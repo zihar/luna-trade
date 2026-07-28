@@ -138,6 +138,31 @@ Escape di editor `text` yang masih kosong **menghapus objeknya** (memang desainn
 Satu baris di `TOOL_SPEC` (`helpers/spec.js`) sudah cukup: seluruh aspek
 (create, presisi, drag, modal/teks, keterjangkauan, shortcut) mengiterasi tabel itu.
 
+## Menyitasi kode aplikasi dari komentar test
+
+`index.html` kini **markup saja** (450 baris) — seluruh JS ada di 51 modul `js/*.js` (Fase 2). Karena
+itu:
+
+- **Sitasi baru: tunjuk MODUL + nama simbol**, mis. `js/box-resize.js (expandBox)`. Jangan pakai
+  nomor baris — 58 sitasi `index.html:NNNN` di folder ini jadi menyesatkan begitu kode pindah, dan
+  memperbaikinya massal tak bisa dilakukan aman (lihat di bawah).
+- **Sitasi lama ditandai `index.html pra-Fase-2:NNNN`.** Nomornya benar untuk file SEBELUM
+  pemecahan, jadi ia jejak sejarah yang bisa dilacak (`git show be663e3:index.html`), bukan petunjuk
+  ke file hari ini.
+
+Kenapa tak dipetakan otomatis ke modul: dicoba dua cara dan keduanya menghasilkan jawaban yang
+tampak percaya diri padahal salah. (1) Pencocokan teks-baris terhadap `index.html` lama memetakan
+sitasi `klinecharts.init` ke `js/ny-time.js`… yang ternyata KEBETULAN benar, tapi memetakan sitasi
+lain ke modul yang sama sekali tak berhubungan. (2) Pemetaan lewat identifier memetakan sitasi
+`registerOverlay` (lokasi PEMAKAIAN) ke pemilik DEKLARASI-nya — dua hal berbeda yang tak bisa
+dibedakan tanpa membaca kalimatnya. Jadi yang dikerjakan: tandai historis (selalu benar), lalu
+perbaiki satu-satu saat menyentuh testnya.
+
+**Catatan penamaan modul yang bisa mengejutkan:** batas potong pemecahan mengikuti banner section,
+bukan makna, jadi ada isi yang mendarat di file yang namanya tak menduga — `chart` (objek
+klinecharts) dideklarasikan di `js/ny-time.js`, dan `posPressedMove` (drag posisi) di
+`js/draw-undo.js`. Cari dengan `grep -ln "^function <nama>" js/*.js`, jangan menebak dari nama file.
+
 ## Temuan
 
 Daftar apa yang merah dan mengapa: `docs/e2e-drawing-findings.md`.

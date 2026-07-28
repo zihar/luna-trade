@@ -17,7 +17,7 @@ const { byName } = require('./spec');
 // jeda di atas ambang supaya yang diuji adalah presisi, bukan penelanan klik.
 const CLICK_GAP_MS = 450;
 // Jalur "fast" sengaja di bawah ambang: memancing klik tertelan + desync pendingClicks
-// (index.html:3063) yang membuat titik jatuh kembali ke snap-per-bar.
+// (index.html pra-Fase-2:3063) yang membuat titik jatuh kembali ke snap-per-bar.
 const FAST_GAP_MS = 120;
 
 /** Titik-titik overlay yang tercatat aplikasi (urutan = drawIds). */
@@ -107,11 +107,11 @@ function defaultTargets(rect, n) {
 
 /**
  * Tutup editor teks inline yang terbuka sendiri untuk tool text/callout
- * (applyTextInput → editTextOverlay, index.html:3306).
+ * (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306).
  *
  * PENTING: Escape pada tool `text` yang masih kosong MENGHAPUS objeknya
- * (close(false) + removeIfEmpty, index.html:3370) — jadi jangan pakai Escape di sini.
- * Isi teks lalu blur = jalur simpan (index.html:3382).
+ * (close(false) + removeIfEmpty, index.html pra-Fase-2:3370) — jadi jangan pakai Escape di sini.
+ * Isi teks lalu blur = jalur simpan (index.html pra-Fase-2:3382).
  */
 async function commitTextEditor(page, value = 'E2E') {
   const ta = page.locator('textarea.text-editor');
@@ -162,7 +162,7 @@ async function clickAt(page, rect, p, opts = {}) {
  *
  * mode:
  *   'normal' — gerak halus + jeda antar klik (pemakaian biasa)
- *   'fast'   — klik beruntun tanpa jeda → memancing desync pendingClicks (index.html:3063)
+ *   'fast'   — klik beruntun tanpa jeda → memancing desync pendingClicks (index.html pra-Fase-2:3063)
  *   'drag'   — press-move-release untuk titik terakhir (jalur onPressedMoving)
  *
  * Mengembalikan { targets, previewPx, finalPx, points, deltaParity, deltaLanding, shots }.
@@ -222,7 +222,7 @@ async function measureParity(page, name, opts = {}) {
   }
 
   // Tool text/callout membuka editor inline sendiri → commit dulu (Escape akan MENGHAPUS
-  // objek `text` yang masih kosong, index.html:3370).
+  // objek `text` yang masih kosong, index.html pra-Fase-2:3370).
   const textCommitted = spec.autoEditor ? await commitTextEditor(page) : false;
 
   // Deselect + jauhkan pointer supaya handle bulat (hover/selected) tak ikut ter-foto.

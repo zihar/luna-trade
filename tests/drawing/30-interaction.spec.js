@@ -157,7 +157,7 @@ test.describe('batal menggambar', () => {
 
   // Klik kanan saat menggambar = batal (sama seperti ESC), BUKAN buka menu/config.
   // klinecharts 9.8.10 sebenarnya membatalkan sendiri lewat mouseRightClickEvent →
-  // removeInstance, tapi onRightClick kita (index.html:3256) selalu `return true` demi
+  // removeInstance, tapi onRightClick kita (index.html pra-Fase-2:3256) selalu `return true` demi
   // menjaga klik-kanan objek jadi tetap membuka modal Style — jadi pembatalannya harus
   // kita lakukan sendiri di handler contextmenu.
   test('klik kanan setelah titik pertama: batal menggambar, tanpa menu apa pun', async ({ page }) => {
