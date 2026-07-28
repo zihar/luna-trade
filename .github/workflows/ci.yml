@@ -1,0 +1,80 @@
+# Gerbang otomatis untuk tiap PR ke main.
+#
+# Kenapa ini ada: sampai sekarang SELURUH verifikasi repo ini berjalan manual di laptop, sementara
+# `main` = produksi (auto-deploy ≤1 menit, tanpa build step). Satu PR yang lupa dijalankan suite-nya
+# langsung sampai ke pengguna. Setelah pemecahan Fase 2 taruhannya naik: 51 modul JS yang dimuat
+# berurutan, dan mode kegagalan khasnya SENYAP (file tak termuat → fitur mati tanpa error).
+#
+# Gerbangnya sengaja `--project=hermetic`, bukan `npm test` telanjang: `npm test` ikut menjalankan
+# project `live` yang menembak server Go di :8765 (tak dinyalakan di CI) → merah environmental yang
+# tak ada hubungannya dengan perubahan. Suite hermetik menstub semua /api + memakai fixture candle,
+# jadi ia deterministik dan tak butuh .env, token OANDA, maupun luna.db.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# PR yang di-push berkali-kali: batalkan run lama, sisakan yang terbaru.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go — build, vet, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod   # satu sumber kebenaran versi Go (jangan dipatok ganda di sini)
+          cache: true
+      # Dependency di-vendor → build & test jalan tanpa mengambil apa pun dari jaringan.
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  e2e:
+    # DIBAGI 3 RUNNER, bukan diperkecil cakupannya. Alasannya terukur: run pertama CI memakai 1.006
+    # worker-detik untuk 228 test (rata-rata 4,4s) dan efisiensi paralelnya 99% pada 2 worker —
+    # artinya kedua core runner sudah jenuh, jadi menambah `workers` cuma membagi core yang sama.
+    # Satu-satunya cara memperpendek wall-clock tanpa mengurangi cakupan adalah menambah MESIN.
+    #
+    # Kenapa TIDAK "hanya test yang berubah": 735 deklarasi global dipakai bersama & setiap page
+    # load mengeksekusi ke-51 modul, jadi satu baris di util.js/state.js bisa menjatuhkan test mana
+    # pun. Tak ada dependency graph yang bisa menurunkan subset yang aman — pemetaan modul→spec akan
+    # jadi tebakan, dan mode kegagalannya SENYAP (suite hijau, fitur mati). Itu justru kelas bug
+    # yang seluruh penjaga di repo ini dibangun untuk menangkap.
+    name: E2E hermetik ${{ matrix.shard }}/3
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false   # shard lain tetap jalan → satu run memberi gambaran utuh, bukan separuh
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Hanya chromium: kedua project memakai devices['Desktop Chrome'].
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=hermetic --shard=${{ matrix.shard }}/3
+
+      # Gagal itu justru saat butuh bukti: trace & screenshot sudah diaktifkan
+      # di playwright.config.js (`trace: retain-on-failure`). Nama artefak dibedakan per shard —
+      # kalau sama, unggahan shard kedua akan bentrok.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-shard${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
