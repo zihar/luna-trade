@@ -1,0 +1,65 @@
+# Gerbang otomatis untuk tiap PR ke main.
+#
+# Kenapa ini ada: sampai sekarang SELURUH verifikasi repo ini berjalan manual di laptop, sementara
+# `main` = produksi (auto-deploy ≤1 menit, tanpa build step). Satu PR yang lupa dijalankan suite-nya
+# langsung sampai ke pengguna. Setelah pemecahan Fase 2 taruhannya naik: 51 modul JS yang dimuat
+# berurutan, dan mode kegagalan khasnya SENYAP (file tak termuat → fitur mati tanpa error).
+#
+# Gerbangnya sengaja `--project=hermetic`, bukan `npm test` telanjang: `npm test` ikut menjalankan
+# project `live` yang menembak server Go di :8765 (tak dinyalakan di CI) → merah environmental yang
+# tak ada hubungannya dengan perubahan. Suite hermetik menstub semua /api + memakai fixture candle,
+# jadi ia deterministik dan tak butuh .env, token OANDA, maupun luna.db.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# PR yang di-push berkali-kali: batalkan run lama, sisakan yang terbaru.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go — build, vet, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod   # satu sumber kebenaran versi Go (jangan dipatok ganda di sini)
+          cache: true
+      # Dependency di-vendor → build & test jalan tanpa mengambil apa pun dari jaringan.
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  e2e:
+    name: E2E hermetik (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # suite ~7 menit di laptop 4 worker; runner 2 core lebih lambat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Hanya chromium: kedua project memakai devices['Desktop Chrome'].
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=hermetic
+
+      # Gagal itu justru saat butuh bukti: trace & screenshot sudah diaktifkan
+      # di playwright.config.js (`trace: retain-on-failure`).
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
