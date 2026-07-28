@@ -67,6 +67,7 @@ const SENTINEL = {
   'chart-styles.js': 'AXIS_FONT',
   'ny-time.js': 'nyParts',
   'click-guard.js': 'DBLCLICK_SLOP_PX',
+  'price-scale.js': 'attachPriceScale',
 
   // PR-8 — potongan 1541-2309 (769 baris) ke sembilan file. Titik potongnya baru bersih SETELAH
   // penawar `candleTooltipCustom` mendarat (#145) — sebelum itu 2 bahaya senyap.
