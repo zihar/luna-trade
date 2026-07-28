@@ -1,5 +1,10 @@
 // ===================== countdown candle berikutnya (mode Live) =====================
+// Satu-satunya fmtCountdown di aplikasi. Dua pemakainya butuh rentang yang jauh berbeda: pill ⏱
+// candle berikutnya (TF sampai W/MN → bisa berhari-hari) dan hitung-mundur event di panel News
+// (bisa berhari-hari juga). Karena itu satuan HARI dipertahankan; "now" datang dari varian hero
+// yang dulu berdiri sendiri di order-panel.js dan kini disatukan ke sini.
 function fmtCountdown(ms){
+  if(!(ms>0)) return 'now';
   let s=Math.max(0,Math.floor(ms/1000));
   const d=Math.floor(s/86400); s-=d*86400;
   const h=Math.floor(s/3600);  s-=h*3600;

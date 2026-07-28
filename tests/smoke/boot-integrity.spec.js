@@ -196,25 +196,35 @@ test('boot: tiap wilayah UI terbangun oleh JS', async ({ page }) => {
 });
 
 /**
- * `fmtCountdown` dideklarasikan DUA KALI dengan isi berbeda — `js/countdown.js` (mendukung satuan
- * hari) dan `js/order-panel.js` (maksimal jam, mengembalikan 'now' untuk nol). Selama semua JS satu
- * blok inline, yang menang untuk SEMUA pemanggil adalah deklarasi terakhir; setelah dipecah,
- * pemenangnya jadi file yang dimuat terakhir. Keduanya kebetulan menghasilkan pemenang yang sama
- * (order-panel), dan itu aman HANYA karena tak ada satu pun referensi eager ke nama ini — semua
- * pemanggilnya berjalan setelah seluruh script termuat.
- *
- * Test ini memaku fakta itu supaya tak berubah diam-diam: kalau urutan tag tertukar, atau salah
- * satu deklarasi dipindah/di-rename tanpa memikirkan pemenangnya, format countdown di UI berubah
- * tanpa error dan tanpa test lain yang peduli.
+ * `fmtCountdown` DULU dideklarasikan dua kali dengan isi berbeda (`js/countdown.js` mendukung
+ * satuan hari, `js/order-panel.js` maksimal jam) — dan karena order-panel dimuat belakangan, ia
+ * diam-diam menggantikan varian hari untuk SEMUA pemanggil. Keduanya sudah disatukan; test ini
+ * sekarang memaku format yang berlaku, karena dua pemakainya (pill ⏱ candle berikutnya & hitung-
+ * mundur event News) sama-sama bisa melampaui 24 jam dan salah format di situ tak melempar error.
  */
-test('boot: nama ganda fmtCountdown — pemenangnya tetap varian order-panel', async ({ page }) => {
+test('boot: fmtCountdown tunggal — format hari, jam, menit, dan "now"', async ({ page }) => {
   await gotoApp(page);
 
-  expect(await page.evaluate(() => fmtCountdown(0)), 'varian order-panel mengembalikan "now" untuk nol').toBe('now');
+  const f = (ms) => page.evaluate((v) => fmtCountdown(v), ms);
+
+  expect(await f(0), 'nol/negatif harus "now"').toBe('now');
+  expect(await f(-5000), 'sudah lewat harus "now"').toBe('now');
+  expect(await f(4 * 60 * 1000 + 12_000), 'kurang dari sejam: tanpa segmen jam').toBe('04:12');
+  expect(await f(20 * 3600 * 1000 + 15 * 60 * 1000 + 3000), 'kurang dari sehari: HH:MM:SS').toBe('20:15:03');
   expect(
-    await page.evaluate(() => fmtCountdown(2 * 86400 * 1000)),
-    'dua hari harus jadi 48:00:00 (varian order-panel), bukan "2d 00:00:00" (varian countdown)'
-  ).toBe('48:00:00');
+    await f(6 * 86400 * 1000),
+    'lebih dari sehari harus pakai satuan hari (TF W/MN & event News bisa berhari-hari), bukan 144:00:00'
+  ).toBe('6d 00:00:00');
+
+  // Tak boleh ada deklarasi kedua yang menghidupkan lagi tabrakan nama ini.
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', '..', 'js');
+  const pemilik = fs
+    .readdirSync(dir)
+    .filter((f2) => f2.endsWith('.js'))
+    .filter((f2) => /^\s*function fmtCountdown\s*\(/m.test(fs.readFileSync(path.join(dir, f2), 'utf8')));
+  expect(pemilik, 'fmtCountdown harus dideklarasikan tepat di satu file').toEqual(['countdown.js']);
 
   assertNoPageErrors(page);
 });

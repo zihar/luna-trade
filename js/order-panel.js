@@ -275,13 +275,9 @@ function biasArrow(b){ return b==='bullish'?'▲':b==='bearish'?'▼':'—'; }
 // (nama rilis, currency, forecast/previous/actual, playbook) sebelum masuk innerHTML —
 // mencegah injeksi script kalau respons feed dipalsukan/di-compromise.
 function newsEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-// Hitung-mundur "HH:MM:SS" (drop jam bila <1 jam → "MM:SS") utk hero next-release; <=0 → "now".
-function fmtCountdown(ms){
-  if(!(ms>0)) return 'now';
-  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
-  const p=n=>String(n).padStart(2,'0');
-  return (h>0?p(h)+':':'')+p(m)+':'+p(sec);
-}
+// (fmtCountdown untuk hero next-release dulu dideklarasikan di sini — ia bertabrakan nama dengan
+// deklarasi lebih awal di js/countdown.js dan, karena file ini dimuat belakangan, diam-diam
+// MENGGANTIKAN varian itu untuk SEMUA pemanggil. Keduanya kini disatukan di js/countdown.js.)
 // Angka pertama dari figur ekonomi ("3.1%","236K","-0.2","1,024") → float | null. Suffix
 // unit diabaikan; delta hanya dipakai bila forecast & actual sama-unit (dijamin per-rilis).
 function parseNum(s){
