@@ -43,7 +43,8 @@ echo "==> Pasang & restart service…"
 ssh "$HOST" 'bash -s' <<REMOTE
 set -e
 sudo mv /tmp/bar-replay-arm64 $REMOTE_DIR/bar-replay
-sudo mv /tmp/index.html $REMOTE_DIR/
+# Aset dulu, index.html TERAKHIR — ia menunjuk ke semua yang lain (50 <script src> + 11 <link>),
+# jadi memasangnya duluan membuka jendela di mana halaman baru meminta aset yang belum ada.
 sudo rm -rf $REMOTE_DIR/assets
 sudo mv /tmp/luna-assets $REMOTE_DIR/assets
 sudo rm -rf $REMOTE_DIR/css
@@ -52,6 +53,7 @@ if [ "$HAS_JS" = 1 ]; then
 	sudo rm -rf $REMOTE_DIR/js
 	sudo mv /tmp/luna-js $REMOTE_DIR/js
 fi
+sudo mv /tmp/index.html $REMOTE_DIR/
 sudo chmod +x $REMOTE_DIR/bar-replay
 sudo systemctl restart bar-replay
 sleep 1
