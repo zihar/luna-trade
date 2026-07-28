@@ -32,3 +32,6 @@ node_modules/
 test-results/
 playwright-report/
 report/
+
+# Skrip Pine (TradingView) milik pemilik repo — bukan bagian aplikasi.
+mml.pine
