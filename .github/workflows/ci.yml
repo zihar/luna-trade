@@ -63,8 +63,25 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+
+      # Cache binary browser. Ukurannya kecil & jujur: dari 270 detik per shard, setup cuma ~43
+      # detik (checkout 3 + setup-node 12 + npm ci 1 + install chromium 25) — sisanya test. Cache
+      # ini menyasar bagian UNDUHAN dari 25 detik itu saja; paket OS (`install-deps`) tetap dipasang
+      # tiap run karena tak tinggal di folder ini. Jadi jangan harap lebih dari ~5% wall-clock.
+      # Key di-ikat ke package-lock.json: versi @playwright/test berubah → cache baru, tak ada
+      # risiko binary basi dipakai versi lain.
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       # Hanya chromium: kedua project memakai devices['Desktop Chrome'].
-      - run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium   # binary dari cache, lib OS tetap perlu
+
       - run: npx playwright test --project=hermetic --shard=${{ matrix.shard }}/3
 
       # Gagal itu justru saat butuh bukti: trace & screenshot sudah diaktifkan
