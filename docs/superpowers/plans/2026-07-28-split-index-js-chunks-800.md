@@ -78,19 +78,20 @@ Hari ini pun keduanya cuma tertahan oleh kebetulan (hoisting satu blok), jadi co
 sendiri — jalankan lebih dulu, terpisah, dengan verifikasi perilakunya sendiri (drag posisi
 long/short jalan; tooltip candle masih tampil di tema gelap & terang).
 
-## `tools/audit-cut.js` — audit yang menggantikan pembacaan tangan
+## `tools/audit-cut.js` — audit yang menggantikan pembacaan tangan (SUDAH DIHAPUS)
+
+> **Catatan pasca-selesai:** alat ini dihapus setelah PR-10. Pekerjaannya adalah memilih & mengaudit
+> titik potong pada blok `<script>` inline — dan blok itu sudah habis, jadi menjalankannya hanya
+> mencetak "tak menemukan blok inline". Metodenya tidak hilang: bagian yang masih relevan
+> selamanya — deteksi referensi eager lintas file & nama top-level ganda — kini hidup sebagai test
+> di `tests/smoke/module-hygiene.spec.js`, jadi ia berjalan otomatis tiap suite, bukan hanya saat
+> ada yang ingat menjalankannya.
 
 Spec lama meminta audit hoisting manual per PR mid-file ("kumpulkan nama, cari referensinya di
-antara statement top-level"). Itu sudah tak perlu: `tools/audit-cut.js` menjawabnya dengan parser
+antara statement top-level"). Itu sudah tak perlu: alat ini menjawabnya dengan parser
 (acorn AST), memisahkan referensi yang **dievaluasi langsung** dari yang ada di dalam body fungsi,
 lalu memilah temuan jadi dua kelas menurut konsekuensinya (`CALL` = berisik & ketangkap suite,
 `VALUE` = senyap & wajib diperbaiki).
-
-```sh
-npm i                              # acorn = devDependency (sekali per checkout)
-node tools/audit-cut.js            # usulkan potongan ≤800 + audit semua titik potong
-node tools/audit-cut.js 3086       # audit satu titik potong
-```
 
 **Jalankan ulang tiap PR**, jangan percaya tabel di atas: nomor baris bergeser tiap kali ada commit
 yang menyentuh `index.html`, dan alat itu menurunkan banner + rentang dari file yang sedang ada.

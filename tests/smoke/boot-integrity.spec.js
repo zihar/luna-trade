@@ -216,15 +216,9 @@ test('boot: fmtCountdown tunggal — format hari, jam, menit, dan "now"', async 
     'lebih dari sehari harus pakai satuan hari (TF W/MN & event News bisa berhari-hari), bukan 144:00:00'
   ).toBe('6d 00:00:00');
 
-  // Tak boleh ada deklarasi kedua yang menghidupkan lagi tabrakan nama ini.
-  const fs = require('fs');
-  const path = require('path');
-  const dir = path.join(__dirname, '..', '..', 'js');
-  const pemilik = fs
-    .readdirSync(dir)
-    .filter((f2) => f2.endsWith('.js'))
-    .filter((f2) => /^\s*function fmtCountdown\s*\(/m.test(fs.readFileSync(path.join(dir, f2), 'utf8')));
-  expect(pemilik, 'fmtCountdown harus dideklarasikan tepat di satu file').toEqual(['countdown.js']);
+  // Penjaga "tak boleh ada deklarasi kedua" TIDAK lagi di sini: ia sudah digantikan versi generik
+  // di tests/smoke/module-hygiene.spec.js yang berlaku untuk SEMUA nama, bukan cuma fmtCountdown.
+  // Yang tersisa di test ini murni soal format — perilaku yang dipilih pemilik pekerjaan.
 
   assertNoPageErrors(page);
 });
