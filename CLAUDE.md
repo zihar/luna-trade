@@ -23,7 +23,15 @@ masalah yang sudah terjadi: branch lama mengendap → main jalan → konflik men
    (mis. saat rebase harian) diingat & diterapkan otomatis.
 6. **Branch dari & PR ke `main`.** Pola nama: `zihar/zihar/<tipe>/<slug>`
    (`feat` / `fix` / `chore` / `docs`). Commit conventional (Indonesian) + trailer
-   `Co-Authored-By`. Merge lewat `gh pr merge <n> --merge --delete-branch`.
+   `Co-Authored-By`. **Merge lewat `scripts/merge-pr.sh <n>`**, bukan `gh pr merge` langsung.
+8. **Jangan merge sebelum CI hijau — termasuk check yang masih pending.** Branch protection GitHub
+   tak bisa dipasang di repo private tanpa GitHub Pro (`/branches/main/protection` & `/rulesets`
+   sama-sama balas 403), jadi platform hanya memberi tahu, tak menahan. `scripts/merge-pr.sh`
+   menolak PR yang checknya merah/pending dan PR yang **ketinggalan dari main** — yang kedua bukan
+   formalitas: PR #151 & #152 masing-masing hijau di basis berbeda dan gabungannya belum pernah
+   diuji siapa pun. Kalau suatu saat repo jadi public atau berlangganan Pro, pasang branch
+   protection (required: `Go — build, vet, test` + `E2E gate`) dan skrip ini jadi sekadar
+   kenyamanan.
 7. **Kalau sebuah branch terlanjur stale + konflik berat:** rebase ke main & selesaikan;
    bila terlalu jauh / tercampur, **port ulang hunk-nya secara selektif** ke main
    terkini (jangan merge buta — bisa menimpa perubahan baru main), lalu **pecah** jadi
