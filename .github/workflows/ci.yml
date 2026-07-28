@@ -39,9 +39,23 @@ jobs:
       - run: go test ./...
 
   e2e:
-    name: E2E hermetik (Playwright)
+    # DIBAGI 3 RUNNER, bukan diperkecil cakupannya. Alasannya terukur: run pertama CI memakai 1.006
+    # worker-detik untuk 228 test (rata-rata 4,4s) dan efisiensi paralelnya 99% pada 2 worker —
+    # artinya kedua core runner sudah jenuh, jadi menambah `workers` cuma membagi core yang sama.
+    # Satu-satunya cara memperpendek wall-clock tanpa mengurangi cakupan adalah menambah MESIN.
+    #
+    # Kenapa TIDAK "hanya test yang berubah": 735 deklarasi global dipakai bersama & setiap page
+    # load mengeksekusi ke-51 modul, jadi satu baris di util.js/state.js bisa menjatuhkan test mana
+    # pun. Tak ada dependency graph yang bisa menurunkan subset yang aman — pemetaan modul→spec akan
+    # jadi tebakan, dan mode kegagalannya SENYAP (suite hijau, fitur mati). Itu justru kelas bug
+    # yang seluruh penjaga di repo ini dibangun untuk menangkap.
+    name: E2E hermetik ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # suite ~7 menit di laptop 4 worker; runner 2 core lebih lambat
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false   # shard lain tetap jalan → satu run memberi gambaran utuh, bukan separuh
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,14 +65,15 @@ jobs:
       - run: npm ci
       # Hanya chromium: kedua project memakai devices['Desktop Chrome'].
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --project=hermetic
+      - run: npx playwright test --project=hermetic --shard=${{ matrix.shard }}/3
 
       # Gagal itu justru saat butuh bukti: trace & screenshot sudah diaktifkan
-      # di playwright.config.js (`trace: retain-on-failure`).
+      # di playwright.config.js (`trace: retain-on-failure`). Nama artefak dibedakan per shard —
+      # kalau sama, unggahan shard kedua akan bentrok.
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
