@@ -40,25 +40,38 @@ git reset --hard "origin/$BRANCH"
 install -m 0755 /tmp/luna.new "$RUNTIME/bar-replay"
 rm -f /tmp/luna.new
 
-# Sync aset web (yang selama ini di-scp manual): index.html + assets/ + css/ + js/.
-# css/ = modul CSS hasil pemecahan index.html monolitik (Fase 1) — WAJIB ikut,
-# kalau tidak index.html mereferensikan /css/*.css yang 404 → halaman tanpa styling.
-install -m 0644 "$REPO/index.html" "$RUNTIME/index.html"
-rm -rf "$RUNTIME/assets"
-cp -r "$REPO/assets" "$RUNTIME/assets"
-rm -rf "$RUNTIME/css"
-cp -r "$REPO/css" "$RUNTIME/css"
-
-# js/ = modul JS hasil pemecahan Fase 2, mode kegagalannya sama seperti css/ di Fase 1:
-# /js/*.js 404 → aplikasi separuh mati. Guard [ -d ] karena skrip ini SENGAJA mendarat
-# sebelum file js/*.js pertama lahir: skrip men-self-update di akhir run (baris di bawah),
-# jadi yang jalan pada satu tick adalah salinan dari run SEBELUMNYA — memperbaiki sync di
-# commit yang sama dengan ekstraksinya tidak menolong (rekaman kejadiannya: PR #113 →
-# prod tanpa styling, docs/superpowers/specs/2026-07-27-split-index-js-phase2-design.md).
-if [ -d "$REPO/js" ]; then
-	rm -rf "$RUNTIME/js"
-	cp -r "$REPO/js" "$RUNTIME/js"
-fi
+# Sync aset web (yang selama ini di-scp manual): assets/ + css/ + js/, LALU index.html.
+#
+# URUTANNYA MENGIKAT: index.html dipasang TERAKHIR. Ia satu-satunya file yang menunjuk ke semua
+# yang lain (50 tag <script src> + 11 <link> setelah pemecahan Fase 1 & 2), jadi memasangnya
+# duluan membuka jendela di mana halaman baru meminta aset yang belum ada → 404 senyap. Server
+# ini serve dari disk dengan no-store, jadi jendela sekecil apa pun benar-benar bisa terkena
+# request. Kebalikannya (aset baru + index.html lama) tak berbahaya: aset ekstra cuma tak dipakai.
+#
+# css/ (Fase 1) & js/ (Fase 2) WAJIB ikut — kalau tidak, /css/*.css & /js/*.js 404 dan aplikasi
+# separuh mati. Guard [ -d ] pada js/ karena skrip ini pernah mendarat sebelum file js/ pertama
+# lahir: skrip men-self-update di AKHIR run, jadi yang jalan pada satu tick adalah salinan dari run
+# SEBELUMNYA — memperbaiki sync di commit yang sama dengan file barunya tidak menolong (rekaman:
+# PR #113 → prod tanpa styling, docs/superpowers/specs/2026-07-27-split-index-js-phase2-design.md).
+#
+# sync_dir memakai tukar-nama, bukan hapus-lalu-salin: `rm -rf` + `cp -r` membuat foldernya HILANG
+# selama penyalinan (untuk js/ = 50 file, itu jendela puluhan milidetik dengan seluruh aplikasi
+# 404). Dengan menyalin ke .new lalu dua kali mv, jendelanya tinggal jeda antar-mv.
+sync_dir() {
+	local name="$1"
+	[ -d "$REPO/$name" ] || return 0
+	rm -rf "$RUNTIME/$name.new" "$RUNTIME/$name.old"
+	cp -r "$REPO/$name" "$RUNTIME/$name.new"
+	# `if`, bukan `[ ... ] && mv`: di bawah `set -e`, test yang gagal (folder belum pernah ada —
+	# sinkron pertama di instance baru) membuat seluruh skrip keluar.
+	if [ -d "$RUNTIME/$name" ]; then mv "$RUNTIME/$name" "$RUNTIME/$name.old"; fi
+	mv "$RUNTIME/$name.new" "$RUNTIME/$name"
+	rm -rf "$RUNTIME/$name.old"
+}
+sync_dir assets
+sync_dir css
+sync_dir js
+install -m 0644 "$REPO/index.html" "$RUNTIME/index.html"   # TERAKHIR — lihat catatan urutan di atas
 
 # Sync unit bar-replay kalau berubah (mis. ExecStart/hardening baru) → daemon-reload.
 if ! cmp -s "$REPO/deploy/bar-replay.service" /etc/systemd/system/bar-replay.service; then
