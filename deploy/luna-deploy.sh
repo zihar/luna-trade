@@ -12,7 +12,13 @@ BRANCH=main
 GO=/usr/local/go/bin/go
 
 export HOME=/root   # GOCACHE/GOMODCACHE default (build cache persisten antar-run)
-# Repo public → fetch anonim via HTTPS, tak perlu SSH deploy key.
+# Repo PRIVATE → fetch lewat SSH deploy key read-only di /root/.ssh/luna_deploy.
+# github.com dialihkan ke ssh.github.com:443 lewat /root/.ssh/config (2026-07-28): SSH port 22 dari
+# instance ini intermiten — terukur 4 tick gagal/24 jam dengan "connect to host github.com port 22:
+# Connection timed out". Tiap kegagalan menunda go-live ~2 menit (menunggu timeout TCP), dan kalau
+# egress:22 mati total, deploy berhenti SENYAP (binary lama tetap jalan, site membeku diam-diam).
+# Kalau fetch tiba-tiba gagal lagi: cek `sudo ssh -T git@github.com` di instance, dan rollback ada
+# di /root/.ssh/config.bak-* (HostName github.com, tanpa Port).
 
 cd "$REPO"
 
