@@ -158,10 +158,11 @@ lain ke modul yang sama sekali tak berhubungan. (2) Pemetaan lewat identifier me
 dibedakan tanpa membaca kalimatnya. Jadi yang dikerjakan: tandai historis (selalu benar), lalu
 perbaiki satu-satu saat menyentuh testnya.
 
-**Catatan penamaan modul yang bisa mengejutkan:** batas potong pemecahan mengikuti banner section,
-bukan makna, jadi ada isi yang mendarat di file yang namanya tak menduga — `chart` (objek
-klinecharts) dideklarasikan di `js/ny-time.js`, dan `posPressedMove` (drag posisi) di
-`js/draw-undo.js`. Cari dengan `grep -ln "^function <nama>" js/*.js`, jangan menebak dari nama file.
+**Nama file sekarang menepati isinya** — tapi jangan tetap menebak: cari pemilik sebuah nama dengan
+`grep -ln "^function <nama>" js/*.js`. Dulu tidak begitu: batas potong pemecahan mengikuti banner
+section dan bukan makna, sehingga `chart` mendarat di `js/ny-time.js` dan `posPressedMove` di
+`js/draw-undo.js`. Keduanya sudah dipecah ke file yang namanya benar (`chart-init.js`,
+`draw-position-tool.js`) lewat pemindahan murni yang urutan muatnya tak berubah.
 
 ## Temuan
 

@@ -17,7 +17,7 @@
 //
 // Kenapa test ini ada sekarang: `posPressedMove` diserahkan ke `registerOverlay` sebagai NILAI
 // (js/overlays-custom.js, registerOverlay long/shortPosition) sementara deklarasinya ada di file
-// LAIN yang dimuat belakangan (js/draw-undo.js). Dulu keduanya di satu blok & jalan karena
+// LAIN yang dimuat belakangan (js/draw-position-tool.js). Dulu keduanya di satu blok & jalan karena
 // hoisting satu blok inline; begitu wilayah drawing pindah ke `<script src>` sendiri (PR-6 di
 // docs/superpowers/plans/2026-07-28-split-index-js-chunks-800.md), nilainya jadi `undefined` dan
 // kedua invarian di atas mati TANPA error — drag posisi berhenti bekerja diam-diam. Penawarnya

@@ -64,7 +64,7 @@ const SENTINEL = {
   // PR-9 — potongan 797-1540 (744 baris) ke lima file.
   'box-resize.js': 'BOX_TOOLS',
   'overlays-custom.js': 'arrowMarkFigures',
-  'chart-init.js': 'AXIS_FONT',
+  'chart-styles.js': 'AXIS_FONT',
   'ny-time.js': 'nyParts',
   'click-guard.js': 'DBLCLICK_SLOP_PX',
 
@@ -91,6 +91,14 @@ const SENTINEL = {
   'draw-tools.js': 'hoverName',
   'draw-persist.js': 'PERSIST_DRAW',
   'draw-undo.js': 'DRAW_HISTORY_MAX',
+  // Dipecah dari draw-undo.js (2026-07-28): file itu dulu memuat LIMA domain, cuma 38 baris
+  // pertamanya undo/redo. Pemindahan murni, urutan muat tak berubah.
+  'draw-pointer.js': 'lastPtr',
+  'draw-text-editor.js': 'applyTextInput',
+  'draw-position-tool.js': 'posPressedMove',
+  'draw-catalog.js': 'DRAW_GROUPS',
+  // Dipecah dari ekor ny-time.js: klinecharts.init memang bukan util waktu NY.
+  'chart-init.js': 'chart',
 
   // PR-5 — potongan 3769-4524 (756 baris) ke lima file.
   'draw-rail.js': 'setCursorMode',
@@ -156,8 +164,7 @@ test('boot: tiap wilayah UI terbangun oleh JS', async ({ page }) => {
   // gotoApp sudah menunggu `chart`/`T`/`drawIds` (tests/helpers/app.js:125-134) — jangan
   // diulang di sini. Yang berikut ini lapisan yang belum dijaga siapa pun.
 
-  // Canvas chart dibuat oleh klinecharts.init (js/ny-time.js — ya, di file itu; batas potong
-  // per-banner menaruhnya di sana, lihat catatan sitasi di tests/README.md), bukan ada di markup.
+  // Canvas chart dibuat oleh klinecharts.init (js/chart-init.js), bukan ada di markup.
   expect(
     await page.locator('#chart canvas').count(),
     'klinecharts.init tak menghasilkan canvas di #chart'

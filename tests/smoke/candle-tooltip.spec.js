@@ -1,7 +1,7 @@
 // Legend OHLC native di chart: `candleTooltipCustom` yang DIPASANG ke styles klinecharts.
 //
 // Yang dijaga di sini bukan isi fungsinya, tapi WIRING-nya. `candleTooltipCustom` diserahkan
-// sebagai NILAI ke `darkStyles`/`lightStyles` (js/chart-init.js) sementara deklarasinya ada di
+// sebagai NILAI ke `darkStyles`/`lightStyles` (js/chart-styles.js) sementara deklarasinya ada di
 // js/chart-legend.js — dulu ~220
 // baris di bawahnya. Hari ini jalan karena hoisting berlaku di dalam satu blok inline; begitu
 // wilayah ini pindah ke <script src> sendiri (PR-8 di
