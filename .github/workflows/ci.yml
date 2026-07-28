@@ -23,6 +23,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Apakah PR ini bisa mempengaruhi suite hermetik? Arah amannya SENGAJA dibalik: daftar di bawah
+  # adalah ALLOW-LIST hal yang MUSTAHIL berpengaruh, dan apa pun di luar itu → e2e jalan. Jadi file
+  # jenis baru (mis. folder aset baru) otomatis dianggap berpengaruh, bukan diam-diam dilewati.
+  #
+  # Kenapa Go boleh dilewati & itu bisa dibuktikan: project `hermetic` tak pernah menjalankan binary
+  # Go sama sekali — halaman dilayani `tests/static-server.js` dan seluruh `/api` distub
+  # (tests/fixtures/api.js). Perubahan Go tetap dijaga job `go`.
+  #
+  # Hanya berlaku untuk pull_request. Push ke `main` SELALU menjalankan e2e: `main` = produksi, dan
+  # di situ yang diverifikasi bukan "apa yang berubah" tapi "kondisi main sekarang".
+  changes:
+    name: Cakupan yang terdampak
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # butuh base ref untuk diff
+      - id: filter
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "event=${{ github.event_name }} → e2e selalu jalan"
+            echo "web=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "Berubah:"; echo "$files" | sed 's/^/  /'
+          # Sisa = file yang TIDAK ada di allow-list.
+          rest=$(printf '%s\n' "$files" | grep -vE '^(vendor/|docs/)' | grep -vE '(\.go|\.md|go\.mod|go\.sum)$' || true)
+          if [ -z "$rest" ]; then
+            echo "→ semuanya Go/docs-only: e2e DILEWATI (mustahil mempengaruhi suite hermetik)"
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "→ ada yang bisa berpengaruh:"; printf '%s\n' "$rest" | sed 's/^/    /'
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          fi
+
   go:
     name: Go — build, vet, test
     runs-on: ubuntu-latest
@@ -50,6 +89,8 @@ jobs:
     # jadi tebakan, dan mode kegagalannya SENYAP (suite hijau, fitur mati). Itu justru kelas bug
     # yang seluruh penjaga di repo ini dibangun untuk menangkap.
     name: E2E hermetik ${{ matrix.shard }}/3
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -78,3 +119,24 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Satu check yang SELALU melapor, apa pun yang terjadi pada shard di atas.
+  #
+  # Ini bukan hiasan: job yang di-skip lewat `if:` tak menghasilkan status sendiri, jadi kalau nanti
+  # branch protection dipasang ke nama shard ("E2E hermetik 1/3", …), PR Go-only akan tersangkut
+  # menunggu status yang tak akan pernah datang. Jadikan job INI yang required (bersama `go`) —
+  # namanya juga stabil, tak ikut berubah kalau jumlah shard diubah.
+  e2e-gate:
+    name: E2E gate
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          hasil="${{ needs.e2e.result }}"
+          case "$hasil" in
+            success) echo "e2e lulus" ;;
+            skipped) echo "e2e dilewati — perubahan Go/docs-only (lihat job 'Cakupan yang terdampak')" ;;
+            *)       echo "e2e: $hasil"; exit 1 ;;
+          esac
