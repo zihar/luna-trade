@@ -28,7 +28,7 @@ function makeSecondary(slot){
   const c=klinecharts.init(cdiv,{styles:light?lightStyles:darkStyles, timezone:chartTZ, customApi:{formatDate:chartFormatDate}});
   try{ c.setStyles({candle:{type:chartType, bar:candleBarCfg()}}); }catch(e){}   // ikut warna & tipe candle kustom user
   fixClickSwallow(c, cdiv);                                                      // drawing bisa pindah ke panel ini → butuh penawar klik-tertelan yg sama
-  attachPriceWheelZoom(cdiv);   // zoom harga via scroll di sumbu (sama spt panel utama)
+  attachPriceScale(cdiv, c);    // skala harga via scroll di sumbu (sama spt panel utama)
   const ro=new ResizeObserver(()=>{ try{c.resize();}catch(e){} }); ro.observe(cdiv);
 
   const sc={ slot, panel, chart:c, el:cdiv, selEl:sel, tfsEl:tfs, menuEl:menu, moreEl:moreBtn, lastEl:last,
