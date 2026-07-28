@@ -401,6 +401,10 @@
 <script src="/js/constants.js"></script>
 <script src="/js/state.js"></script>
 <script src="/js/util.js"></script>
+<!-- toast.js sengaja di sini (bukan di posisi sumber lamanya, di dalam watchlist): ia util UI yang
+     dipakai 7 modul, dan tak ada satu pun pemanggil eager — dicek lewat AST, semua pemanggilnya di
+     dalam fungsi — jadi memindahkannya lebih awal tak mengubah apa pun kecuali kejelasan. -->
+<script src="/js/toast.js"></script>
 <script src="/js/replay-forming-bar.js"></script>
 <script src="/js/draw-style.js"></script>
 <script src="/js/box-resize.js"></script>

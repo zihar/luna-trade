@@ -50,6 +50,9 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // Dicabut dari watchlist.js jadi modul sendiri (util UI yang dipakai tujuh modul).
+  'toast.js': 'TOAST_MS',
+
   // PR-10 — potongan terakhir 398-796 (399 baris) ke lima file. Sesudah ini blok <script> inline
   // habis dan index.html tinggal markup.
   'constants.js': 'TF_LIST',
