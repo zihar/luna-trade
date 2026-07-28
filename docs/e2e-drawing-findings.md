@@ -443,3 +443,8 @@ supaya tak diulang (detail di `tests/README.md`):
    → dikira modal tak terbuka.
 3. `horizontalRayLine`: Y klik ke-2 **wajib** diabaikan (garis harus tetap horizontal) →
    Δlanding Y 197px di situ bukan cacat.
+
+## Catatan CI (2026-07-28)
+
+Perubahan Go-only & docs-only melewati job e2e — lihat job `Cakupan yang terdampak`
+di `.github/workflows/ci.yml`. Yang required tetap `Go — build, vet, test` + `E2E gate`.
