@@ -1,7 +1,20 @@
 # Pemecahan `index.html` Fase 2 — rencana potongan ≤800 baris
 
 **Tanggal:** 2026-07-28
-**Status:** disetujui pemilik pekerjaan (memilih "gabungkan jadi potongan sampai 800 baris")
+**Status:** **SELESAI** — kesembilan PR (PR-2…PR-10) mendarat 2026-07-28 bersama dua PR penawar.
+`index.html` 6.862 → **450 baris (markup saja)**, 50 modul `js/`, suite hermetik 227 hijau di tiap
+langkah. Yang berubah dari rencana ini saat dikerjakan, biar tercatat jujur:
+
+- **Rentang bergeser terus.** Nomor di tabel di bawah basi setelah PR pertama; dua PR penawar
+  menambah baris komentar dan bahkan mengubah PEMBAGIAN potongan (PR-9 jadi `797-1540` bukan
+  `737-1536`, karena `737-1540` melewati 800 baris). `tools/audit-cut.js` dijalankan ulang tiap PR.
+- **`fmtCountdown` tidak berakhir di satu file** seperti diduga di bagian "Landmine yang gugur":
+  kedua deklarasinya di banner berbeda → dua file. Tetap aman (nol referensi eager), dan
+  perilakunya dipaku test di boot-integrity.
+- **Penjaga `SENTINEL` perlu diperluas** dengan entri `{ probe, why }`: sebagian file hasil
+  pemecahan tak mendeklarasikan apa pun (IIFE / efek samping saja).
+- **Verifikasi sentinel harus pakai parser, bukan grep** — deklarator kedua dalam satu baris `let`
+  (`hoverName`, `inProgressId`) membuat pola `^let <nama>` melaporkan positif palsu "tak ada".
 **Basis:** `docs/superpowers/specs/2026-07-27-split-index-js-phase2-design.md` (spec Fase 2).
 Rencana ini **menggantikan** tabel "PR-0 + ~16 PR di batas banner alami" di spec itu, dan
 memperbaiki dua klaim landmine-nya (lihat "Landmine spec yang gugur").

@@ -50,6 +50,14 @@ const SENTINEL = {
   'auth-overlay.js': 'showAuthOverlay',
   'timezone.js': 'TZ_LIST',
 
+  // PR-10 — potongan terakhir 398-796 (399 baris) ke lima file. Sesudah ini blok <script> inline
+  // habis dan index.html tinggal markup.
+  'constants.js': 'TF_LIST',
+  'state.js': 'tfData',
+  'util.js': 'priceDecimals',
+  'replay-forming-bar.js': 'buildReplayPartial',
+  'draw-style.js': 'DRAW_DEFAULT',
+
   // PR-9 — potongan 797-1540 (744 baris) ke lima file.
   'box-resize.js': 'BOX_TOOLS',
   'overlays-custom.js': 'arrowMarkFigures',
