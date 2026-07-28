@@ -28,14 +28,34 @@ read -r pr_state merge_state is_draft <<<"$state"
 [ "$pr_state" = "OPEN" ] || { echo "PR #$pr statusnya $pr_state — tak ada yang di-merge." >&2; exit 1; }
 [ "$is_draft" = "false" ] || { echo "PR #$pr masih draft." >&2; exit 1; }
 
+# Daftar wajib didefinisikan DI SINI, bukan diambil dari GitHub. Sebabnya konkret: tanpa branch
+# protection (403 di repo private tanpa Pro) GitHub melaporkan NOL required check, jadi
+# `gh pr checks --required` selalu gagal — skrip yang mengandalkannya takkan pernah mau merge apa
+# pun, bahkan saat semua hijau. Ini ketemu saat menguji skrip ini pada PR-nya sendiri.
+# Kalau nanti branch protection bisa dipasang, samakan daftar ini dengan required check di sana.
+WAJIB=("Go — build, vet, test" "E2E gate")
+
 echo "== check PR #$pr"
-# --required: hanya check yang wajib. Keluar non-zero kalau ada yang gagal ATAU masih pending.
-if ! gh pr checks "$pr" --required; then
-  echo
-  echo "DITOLAK: masih ada check wajib yang merah atau belum selesai." >&2
-  echo "         'belum tahu' bukan 'aman' — tunggu sampai hijau, jangan di-merge dulu." >&2
-  exit 1
-fi
+checks=$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || echo '[]')
+printf '%s' "$checks" | jq -r '.[] | "  \(.bucket=="pass" and true | if . then "✓" else "·" end) \(.name): \(.state)"' 2>/dev/null || true
+
+gagal=0
+for nama in "${WAJIB[@]}"; do
+  bucket=$(printf '%s' "$checks" | jq -r --arg n "$nama" '[.[] | select(.name==$n)] | if length==0 then "TIDAK-ADA" else (.[0].bucket) end')
+  case "$bucket" in
+    pass) ;;
+    TIDAK-ADA) echo "DITOLAK: check wajib '$nama' belum melapor sama sekali." >&2; gagal=1 ;;
+    pending)   echo "DITOLAK: check wajib '$nama' masih berjalan — 'belum tahu' bukan 'aman'." >&2; gagal=1 ;;
+    *)         echo "DITOLAK: check wajib '$nama' → $bucket." >&2; gagal=1 ;;
+  esac
+done
+
+# Check lain (bukan daftar wajib) yang merah juga menahan: kalau sesuatu gagal, jangan dilewati
+# hanya karena namanya tak ada di daftar.
+lain=$(printf '%s' "$checks" | jq -r '[.[] | select(.bucket=="fail")] | map(.name) | join(", ")')
+if [ -n "$lain" ]; then echo "DITOLAK: ada check gagal: $lain" >&2; gagal=1; fi
+
+[ "$gagal" = 0 ] || exit 1
 
 if [ "$merge_state" = "BEHIND" ]; then
   echo
