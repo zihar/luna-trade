@@ -43,7 +43,7 @@ test.describe('magnet', () => {
   });
 
   test('magnet ON: preview juga sudah menempel (mode strong_magnet), bukan cuma hasil akhir', async ({ page }) => {
-    // index.html:3129-3132 — magnet ON menyetel mode overlay ke 'strong_magnet' supaya garis
+    // index.html pra-Fase-2:3129-3132 — magnet ON menyetel mode overlay ke 'strong_magnet' supaya garis
     // preview langsung nempel. Kalau hanya hasil akhir yang nempel, objek akan "melompat"
     // ke OHLC saat klik terakhir.
     await gotoApp(page);
@@ -102,7 +102,7 @@ test.describe('ganti timeframe', () => {
       before
     );
 
-    // H1 bukan favorit default (TF_FAV_DEFAULT = M15, D di index.html:1582) → lewat dropdown.
+    // H1 bukan favorit default (TF_FAV_DEFAULT = M15, D di index.html pra-Fase-2:1582) → lewat dropdown.
     await page.locator('#tfMore').click();
     await page.locator('#tfMenu.open').waitFor();
     await page.locator('#tfMenu .tf-row', { has: page.locator('.tf-lbl', { hasText: /^H1$/ }) }).locator('.tf-lbl').click();
@@ -136,7 +136,7 @@ test.describe('ganti timeframe', () => {
 
 test.describe('area future', () => {
   test('titik di kanan bar terakhir tak "kelempar" ke tepi kiri', async ({ page }) => {
-    // Jaring pengaman eksplisit di index.html:3081 — titik tanpa anchor (timestamp & dataIndex
+    // Jaring pengaman eksplisit di index.html pra-Fase-2:3081 — titik tanpa anchor (timestamp & dataIndex
     // null) akan tergambar di x=0. Test menggambar SENGAJA di area kosong kanan.
     await gotoApp(page);
     const rect = await chartRect(page);

@@ -3,7 +3,7 @@
 // Aturan yang diuji, sesuai TOOL_SPEC.settings / .text:
 //   settings 'modal'    → double-click membuka modal; tab awal = Text untuk objek bisa-teks
 //                         (DM_TEXT_OBJS), Style untuk sisanya
-//   settings 'pospopup' → long/shortPosition dialihkan ke popup posisi (index.html:5573)
+//   settings 'pospopup' → long/shortPosition dialihkan ke popup posisi (index.html pra-Fase-2:5573)
 //   settings null       → tak punya panel setting (sejak simpleAnnotation/simpleTag ditarik dari
 //                         rail — Temuan 3 — tak ada lagi tool berkategori ini; kolomnya disimpan
 //                         karena tool baru bisa masuk kategori itu lagi)
@@ -38,7 +38,7 @@ test.describe('modal setting objek', () => {
       const modal = page.locator('.dmodal-scrim.show');
       await expect(modal, `modal ${spec.name} harus terbuka`).toBeVisible();
 
-      // Tab awal: Text untuk objek bisa-teks, Style untuk sisanya (index.html:5580).
+      // Tab awal: Text untuk objek bisa-teks, Style untuk sisanya (index.html pra-Fase-2:5580).
       const expectTab = spec.text ? 'text' : 'style';
       await expect(modal.locator('.dm-tab.on')).toHaveAttribute('data-tab', expectTab);
       // Pane yang tampil harus sesuai tab aktif.
@@ -101,7 +101,7 @@ test.describe('objek tanpa modal', () => {
     test(`${spec.name}: memang tak punya panel setting`, async ({ page }) => {
       await gotoApp(page);
       await drawTool(page, spec.name);
-      // Gerbangnya adalah DRAW_DEFAULT (index.html:715): tanpa entri di situ,
+      // Gerbangnya adalah DRAW_DEFAULT (index.html pra-Fase-2:715): tanpa entri di situ,
       // openObjSettings langsung return. Diperiksa lewat gerbang itu, bukan lewat
       // double-click, karena kedua tool ini tak bisa di-hover sama sekali (lihat
       // describe "keterjangkauan objek" di bawah).
@@ -143,7 +143,7 @@ test.describe('teks inline', () => {
   }
 
   test('text: membatalkan editor saat masih kosong MENGHAPUS objek (sesuai desain)', async ({ page }) => {
-    // index.html:3370 — removeIfEmpty untuk tool `text`. Diuji eksplisit supaya perubahan
+    // index.html pra-Fase-2:3370 — removeIfEmpty untuk tool `text`. Diuji eksplisit supaya perubahan
     // perilaku ini tak lolos diam-diam.
     await gotoApp(page);
     const { armTool, clickAt, CLICK_GAP_MS } = require('../helpers/draw');
@@ -164,7 +164,7 @@ test.describe('teks inline', () => {
     expect(obj.extendData || '').toBe('');
 
     // Placeholder digambar di canvas (bukan DOM) → yang bisa diuji: klik di tengah kotak
-    // saat kosong membuka editor inline (ADDTEXT_CLICK, index.html:5548).
+    // saat kosong membuka editor inline (ADDTEXT_CLICK, index.html pra-Fase-2:5548).
     const px = await toPixels(page, obj.points);
     const cx = (px[0].x + px[4].x) / 2;
     const cy = (px[0].y + px[4].y) / 2;
@@ -193,7 +193,7 @@ test.describe('teks inline', () => {
 
     const [MINW, MINH] = await page.evaluate(() => [ADDTEXT_MIN_W, ADDTEXT_MIN_H]);
     // Ukuran nyata diperiksa, bukan diasumsikan: expandBox memaksa lebar minimum 1 bar
-    // (index.html:832), jadi pada barSpace yang besar kotak uji ini bisa jadi melebar
+    // (index.html pra-Fase-2:832), jadi pada barSpace yang besar kotak uji ini bisa jadi melebar
     // melampaui ambang. Kalau itu terjadi, test harus GAGAL berisik di sini — bukan lolos
     // diam-diam karena mengukur kotak yang ternyata besar.
     const px = await toPixels(page, obj.points);
@@ -206,7 +206,7 @@ test.describe('teks inline', () => {
     await page.mouse.down();
     await page.mouse.up();
 
-    // Editor inline dibuka oleh timer 220ms (index.html:3253) — tunggu melampauinya, supaya
+    // Editor inline dibuka oleh timer 220ms (index.html pra-Fase-2:3253) — tunggu melampauinya, supaya
     // "tak muncul" bukan sekadar karena keburu diperiksa.
     await page.waitForTimeout(600);
     expect(
@@ -225,7 +225,7 @@ test.describe('teks inline', () => {
 
   test('rect lebar-tapi-tipis: klik di handle tepi atas tak buka editor, klik tengah tetap buka', async ({ page }) => {
     // Kotak lebar (~300px) tapi tipis (~30px) — di ATAS kedua ambang (ADDTEXT_MIN_W/H), jadi
-    // undangan "+ Add text" & hit-area-nya AKTIF. Tanpa pemotongan `ADDTEXT_PAD` (index.html:859)
+    // undangan "+ Add text" & hit-area-nya AKTIF. Tanpa pemotongan `ADDTEXT_PAD` (index.html pra-Fase-2:859)
     // toleransi vertikal ±16px melampaui setengah tinggi kotak (~15px), jadi klik PERSIS di
     // handle tepi atas/bawah salah terbaca "tambah teks" — padahal seharusnya jatuh sebagai
     // drag/pilih handle resize. Ini satu-satunya skenario di brief tanpa cakupan test otomatis;
@@ -245,7 +245,7 @@ test.describe('teks inline', () => {
     expect(w, 'kotak uji harus di atas ADDTEXT_MIN_W').toBeGreaterThanOrEqual(MINW);
     expect(h, 'kotak uji harus di atas ADDTEXT_MIN_H').toBeGreaterThanOrEqual(MINH);
 
-    // Titik indeks 1 = TC (top-center), lihat urutan 8-titik di writeBox (index.html:798) —
+    // Titik indeks 1 = TC (top-center), lihat urutan 8-titik di writeBox (index.html pra-Fase-2:798) —
     // itu PERSIS koordinat handle resize tepi atas yg dirender klinecharts, bukan titik
     // tengah label yg diasumsikan.
     const topHandle = px[1];
@@ -253,7 +253,7 @@ test.describe('teks inline', () => {
     await page.mouse.down();
     await page.mouse.up();
 
-    // Editor inline dibuka lewat timer 220ms (index.html:3253) — tunggu melampauinya, supaya
+    // Editor inline dibuka lewat timer 220ms (index.html pra-Fase-2:3253) — tunggu melampauinya, supaya
     // "tak muncul" bukan sekadar karena keburu diperiksa.
     await page.waitForTimeout(600);
     expect(

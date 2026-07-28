@@ -1,4 +1,4 @@
-// Reticle preview (#chart .mag-dot, index.html:3275) adalah bidikan: ia menjanjikan "titik akan
+// Reticle preview (#chart .mag-dot, index.html pra-Fase-2:3275) adalah bidikan: ia menjanjikan "titik akan
 // mendarat DI SINI". Janji itu hanya benar bila ia memakai anchor yang IDENTIK dengan yang
 // di-commit onDrawEnd. Sebelum anchor sub-bar digeneralisasi, reticle memakai xAnchorFromPx
 // (timestamp → snap ke pusat bar) untuk semua tool kecuali trendline → meleset ½ bar.
@@ -29,7 +29,7 @@ test.describe('reticle preview', () => {
       await gotoApp(page);
       const rect = await chartRect(page);
 
-      // Reticle hanya tampil pada mode cursor 'dot' (index.html:3282).
+      // Reticle hanya tampil pada mode cursor 'dot' (index.html pra-Fase-2:3282).
       await setCursor(page, 'dot');
       await armTool(page, name);
 

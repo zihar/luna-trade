@@ -1,4 +1,4 @@
-// Gerbang VISUAL undangan "+ Add text" pada rect (index.html:881), diuji lewat diff screenshot.
+// Gerbang VISUAL undangan "+ Add text" pada rect (index.html pra-Fase-2:881), diuji lewat diff screenshot.
 //
 // tests/drawing/40-modal-text.spec.js hanya membuktikan AKIBAT hit-area lewat onClick
 // (editor inline terbuka/tidak) — tak ada test yang benar-benar MELIHAT figure canvasnya. Kalau
@@ -6,7 +6,7 @@
 // (label tak pernah tergambar sama sekali, ATAU tetap tergambar pada kotak kecil), test onClick
 // tak akan pernah menangkapnya. Berkas ini melengkapi itu — precedent diff-based: 20-parity.spec.js.
 //
-// Baseline WAJIB bukan hover maupun selected: showAddTextHint (index.html:841) menyalakan label
+// Baseline WAJIB bukan hover maupun selected: showAddTextHint (index.html pra-Fase-2:841) menyalakan label
 // pada KEDUANYA, jadi baseline yg masih ke-hover/ke-select sudah berisi labelnya sendiri dan diff
 // jadi tak berarti. Diverifikasi lewat page.evaluate(() => [hoverId, selectedId]) — bukan
 // diasumsikan dari Escape + mouse-move-nya drawTool.
@@ -44,7 +44,7 @@ test.describe('rect "+ Add text" — gerbang visual (diff screenshot)', () => {
     expect(state, 'baseline harus TANPA hover & TANPA seleksi').toEqual([null, null]);
 
     const box = await boxOf(page, obj);
-    // Region tengah: cukup jauh dari tepi supaya handle titik (OVERLAY_POINT, index.html:1309 —
+    // Region tengah: cukup jauh dari tepi supaya handle titik (OVERLAY_POINT, index.html pra-Fase-2:1309 —
     // radius 3.5 + border 1.5 ≈ 5px dari titiknya, yg persis duduk DI tepi/sudut kotak) tak ikut
     // masuk crop, tapi cukup lebar untuk menangkap label "+ Add text" (~66px, dipusatkan di
     // tengah kotak persis di titik yg sama dgn crop ini).
@@ -80,7 +80,7 @@ test.describe('rect "+ Add text" — gerbang visual (diff screenshot)', () => {
     const [MINW, MINH] = await page.evaluate(() => [ADDTEXT_MIN_W, ADDTEXT_MIN_H]);
     const box = await boxOf(page, obj);
     // Ukuran nyata diperiksa, bukan diasumsikan (expandBox punya lebar minimum 1 bar,
-    // index.html:832) — kalau kotak ini ternyata jatuh DI ATAS ambang, test harus GAGAL
+    // index.html pra-Fase-2:832) — kalau kotak ini ternyata jatuh DI ATAS ambang, test harus GAGAL
     // berisik di sini, bukan lolos diam-diam karena mengukur kotak yg salah ukuran.
     expect(box.w, 'kotak uji harus lebih sempit dari ADDTEXT_MIN_W').toBeLessThan(MINW);
     expect(box.h, 'kotak uji harus lebih pendek dari ADDTEXT_MIN_H').toBeLessThan(MINH);
@@ -92,7 +92,7 @@ test.describe('rect "+ Add text" — gerbang visual (diff screenshot)', () => {
     // ukuran rusak) — sengaja JAUH dari tepi kotak supaya handle titik (yg selalu tergambar saat
     // hover, terlepas dari gerbang ini) tak ikut masuk & tak menyamarkan sinyalnya. Setengah-lebar/
     // tinggi crop dipilih kecil (8×3px) supaya tetap comfortably di dalam kotak 55×20 dgn margin ke
-    // tepi > radius+border handle titik (≈5px, OVERLAY_POINT index.html:1309).
+    // tepi > radius+border handle titik (≈5px, OVERLAY_POINT index.html pra-Fase-2:1309).
     const half = { x: 8, y: 3 };
     const clip = {
       x: rect.x + box.x + box.w / 2 - half.x,
@@ -111,7 +111,7 @@ test.describe('rect "+ Add text" — gerbang visual (diff screenshot)', () => {
     const hovered = await page.screenshot({ clip });
     const diff = await diffShots(page, baseline, hovered);
     expect(diff, 'diff harus terhitung').toBeTruthy();
-    // Ini sinyal utama test ini: kalau gerbang ukuran (index.html:881) rusak sehingga label tetap
+    // Ini sinyal utama test ini: kalau gerbang ukuran (index.html pra-Fase-2:881) rusak sehingga label tetap
     // tergambar pada kotak kecil, glyph tepat di tengah kotak inilah yg akan berubah. Kalau
     // gerbangnya benar, kotak kecil dibiarkan bersih dan titik tengah ini tak tersentuh apa pun.
     expect(diff.diffPixels, 'titik tengah kotak kecil TIDAK boleh berubah saat hover (label harus tetap mati)').toBe(0);

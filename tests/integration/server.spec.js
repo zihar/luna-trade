@@ -39,7 +39,7 @@ test.describe('@integration server asli', () => {
 
     const acct = await (await request.get('/api/account')).json();
     for (const k of ['balance', 'equity', 'unrealizedPl', 'marginUsed', 'marginAvailable']) {
-      expect(acct, `field akun ${k} dipakai spRenderAcct (index.html:2864)`).toHaveProperty(k);
+      expect(acct, `field akun ${k} dipakai spRenderAcct (index.html pra-Fase-2:2864)`).toHaveProperty(k);
     }
 
     const alerts = await (await request.get('/api/alerts')).json();

@@ -33,7 +33,7 @@ test.describe('harness', () => {
       const back = await toPixel(page, { timestamp: at.timestamp, value: at.value });
       expect(back, 'convertToPixel gagal').toBeTruthy();
       // Y wajib presisi; X boleh meleset ≤1 bar karena timestamp di-snap ke bar oleh
-      // convertToPixel (index.html:587) — itu justru yang diukur spec parity.
+      // convertToPixel (index.html pra-Fase-2:587) — itu justru yang diukur spec parity.
       expect(Math.abs(back.y - y), `round-trip Y di fy=${fy}`).toBeLessThanOrEqual(1);
       expect(Math.abs(back.x - x)).toBeLessThanOrEqual(bs);
     }

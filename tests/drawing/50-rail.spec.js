@@ -141,7 +141,7 @@ test.describe('shortcut Alt+huruf', () => {
       await gotoApp(page);
       const rect = await chartRect(page);
       // Pointer harus di atas chart: jalur instant-drop (H/V) mengambil posisi dari lastPtr
-      // dan jatuh kembali ke mode gambar bila cursor di luar chart (index.html:3135).
+      // dan jatuh kembali ke mode gambar bila cursor di luar chart (index.html pra-Fase-2:3135).
       await page.mouse.move(rect.x + rect.width * 0.45, rect.y + rect.height * 0.45, { steps: 4 });
       await page.keyboard.press(`Alt+${spec.sc}`);
 
@@ -159,9 +159,9 @@ test.describe('shortcut Alt+huruf', () => {
   }
 
   test('instant-drop tak boleh memakai posisi kursor BASI saat pointer di luar chart', async ({ page }) => {
-    // Niat yang tertulis di kode (index.html:3131-3137): instantDropPoint mengembalikan null
+    // Niat yang tertulis di kode (index.html pra-Fase-2:3131-3137): instantDropPoint mengembalikan null
     // bila cursor di LUAR chart → jatuh ke mode gambar biasa. Tapi lastPtr hanya di-update
-    // oleh mousemove pada #chart (index.html:3299), jadi ia tak pernah berisi koordinat di
+    // oleh mousemove pada #chart (index.html pra-Fase-2:3299), jadi ia tak pernah berisi koordinat di
     // luar chart: shortcut yang ditekan sambil kursor berada di watchlist/header akan
     // menjatuhkan garis di posisi kursor TERAKHIR di dalam chart, tanpa diminta.
     await gotoApp(page);
@@ -237,8 +237,8 @@ test.describe('tool yang ditarik', () => {
 
 test.describe('tabrakan nama tool', () => {
   test('`arrow` ada di grup Cursor DAN Shapes — keduanya harus bisa dipakai', async ({ page }) => {
-    // toolByName('arrow') (index.html:3532) mengembalikan yang PERTAMA (cursor), sedangkan
-    // OBJ_TITLE (index.html:5550) dibangun "definisi belakang menang" → arrow = shape.
+    // toolByName('arrow') (index.html pra-Fase-2:3532) mengembalikan yang PERTAMA (cursor), sedangkan
+    // OBJ_TITLE (index.html pra-Fase-2:5550) dibangun "definisi belakang menang" → arrow = shape.
     // Dua sumber kebenaran untuk satu nama; test ini menegaskan konsekuensi praktisnya.
     await gotoApp(page);
 

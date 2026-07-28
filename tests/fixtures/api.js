@@ -12,7 +12,7 @@
 //   /api/candles      → passthrough OANDA (main.go:246) = {candles:[{time,mid,volume,complete}]}
 //   /api/alerts       → []alertView (api.go:131)
 //   /api/news/calendar→ calResponse (news.go:57)
-//   /api/positions    → {positions:[…]}, /api/journal → {trades:[…]} (index.html:2803-2810)
+//   /api/positions    → {positions:[…]}, /api/journal → {trades:[…]} (index.html pra-Fase-2:2803-2810)
 
 const fs = require('fs');
 const path = require('path');

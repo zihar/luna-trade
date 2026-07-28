@@ -131,7 +131,7 @@ test.describe('presisi menggambar — press-drag', () => {
 
 test.describe('presisi menggambar — klik cepat', () => {
   // Memancing dua masalah sekaligus: (a) klik tertelan oleh deteksi double-click klinecharts
-  // (< ~400ms, lihat 10-click-timing.spec.js), dan (b) desync pendingClicks (index.html:3063)
+  // (< ~400ms, lihat 10-click-timing.spec.js), dan (b) desync pendingClicks (index.html pra-Fase-2:3063)
   // yang membuat titik jatuh kembali ke snap-per-bar.
   for (const spec of TOOL_SPEC.filter((t) => t.clicks > 1)) {
     test(`${spec.name}: klik cepat tetap presisi`, async ({ page }) => {

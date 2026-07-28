@@ -8,7 +8,7 @@
 // apa pun kecuali parameter di bawah diubah dengan sengaja.
 //
 // Bentuk respons meniru passthrough OANDA di candlesHandler (main.go): objek
-// { candles: [{ time, mid:{o,h,l,c}, volume, complete }] }. fetchCandles (index.html:1766)
+// { candles: [{ time, mid:{o,h,l,c}, volume, complete }] }. fetchCandles (index.html pra-Fase-2:1766)
 // memfilter c.complete → semua bar di sini complete:true.
 
 const fs = require('fs');
@@ -36,7 +36,7 @@ function rng(seed) {
 
 // Pasar FX tutup Jumat 21:00 UTC → Minggu 21:00 UTC. Gap akhir pekan disertakan supaya
 // jalur pemetaan timestamp↔dataIndex yang tak rata per-piksel (lihat komentar
-// index.html:582-585) ikut terpakai, bukan cuma kasus bar kontigu.
+// index.html pra-Fase-2:582-585) ikut terpakai, bukan cuma kasus bar kontigu.
 function marketOpen(ts) {
   const d = new Date(ts);
   const day = d.getUTCDay();
