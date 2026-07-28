@@ -98,7 +98,7 @@ tests/
 
 ## Hal-hal yang harus diketahui sebelum menambah test
 
-Lima jebakan yang sudah memakan waktu; 1–4 sudah ditangani helper, jangan diakali ulang.
+Enam jebakan yang sudah memakan waktu; 1–4 dan 6 sudah ditangani helper, jangan diakali ulang.
 
 1. **Jeda antar klik: penelanan klik sudah diperbaiki, `CLICK_GAP_MS` tetap dipakai.** Dulu
    dua klik berjeda < ~400ms membuat klik ke-2 **ditelan** klinecharts (Temuan 2, akar
@@ -128,6 +128,13 @@ Lima jebakan yang sudah memakan waktu; 1–4 sudah ditangani helper, jangan diak
    (klinecharts `ChartStore.addData`). Jadi kalau sebuah test mengandalkan isi chart, bandingkan
    dengan `revealed(currentTF)`, jangan asumsikan keduanya sinkron. Ini akar bug gap pasca-idle
    yang dijaga `tests/chart/10-forming-gap.spec.js`.
+
+6. **`barSpace()` (pixel) tak bisa mendeteksi perubahan zoom kecil — pakai `barSpaceApi()`.**
+   Helper pixel mengurangi dua posisi bar yang sudah dibulatkan, jadi satu langkah zoom-waktu
+   (8 → 8.8 menurut klinecharts) kadang terbaca 9 dan kadang tetap 8, tergantung fase sub-pixel
+   bar terakhir. Fase itu ikut lebar sumbu harga, yang berbeda antar-platform karena metrik font
+   (52px di macOS, 58px di runner Linux CI). Sebuah assertion `not.toBeCloseTo(bs0, 2)` karena itu
+   pernah hijau di lokal & merah di CI padahal aplikasinya benar.
 
 Tambahan: `text` & `callout` membuka editor teks inline sendiri setelah jadi. Menekan
 Escape di editor `text` yang masih kosong **menghapus objeknya** (memang desainnya) — pakai

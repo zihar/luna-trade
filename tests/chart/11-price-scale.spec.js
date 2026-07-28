@@ -14,7 +14,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { chartRect, fromPixel, plotWidth, barSpace } = require('../helpers/chart');
+const { chartRect, fromPixel, plotWidth, barSpaceApi } = require('../helpers/chart');
 
 /**
  * Rentang harga yang tampak di pane candle.
@@ -91,14 +91,14 @@ test('Shift+wheel di area plot tetap men-skala harga, bukan zoom waktu', async (
   const pt = await plotPoint(page, 0.5, 0.5);
 
   const span0 = await priceSpan(page);
-  const bs0 = await barSpace(page);
+  const bs0 = await barSpaceApi(page);
 
   await page.keyboard.down('Shift');
   await wheelAt(page, pt, -100);
   await page.keyboard.up('Shift');
 
   expect((await priceSpan(page)) / span0).toBeLessThan(0.99);
-  expect(await barSpace(page)).toBeCloseTo(bs0, 2); // Shift menahan zoom waktu
+  expect(await barSpaceApi(page)).toBe(bs0); // Shift menahan zoom waktu
 
   assertNoPageErrors(page);
 });
@@ -110,11 +110,11 @@ test('wheel di area plot tetap zoom-waktu dan tak menggeser skala harga terkunci
   // sesudahnya benar-benar berarti "plot ikut men-skala harga", bukan auto-fit data biasa.
   await wheelAt(page, await axisPoint(page, 300), -100);
   const span0 = await priceSpan(page);
-  const bs0 = await barSpace(page);
+  const bs0 = await barSpaceApi(page);
 
   await wheelAt(page, await plotPoint(page, 0.5, 0.5), -100);
 
-  expect(await barSpace(page)).not.toBeCloseTo(bs0, 2); // zoom waktu tetap jalan
+  expect(await barSpaceApi(page)).toBeGreaterThan(bs0); // zoom waktu tetap jalan
   expect(Math.abs((await priceSpan(page)) / span0 - 1)).toBeLessThan(0.005);
 
   assertNoPageErrors(page);

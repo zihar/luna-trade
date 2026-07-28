@@ -57,6 +57,19 @@ async function barSpace(page) {
   });
 }
 
+/**
+ * barSpace menurut API klinecharts — bilangan pecahan, bukan proksi pixel.
+ *
+ * JANGAN pakai `barSpace()` di atas untuk mendeteksi PERUBAHAN kecil level zoom: ia mengurangi
+ * dua posisi pixel yang sudah dibulatkan, jadi satu langkah zoom-waktu (8 → 8.8) kadang tampak
+ * 9 dan kadang tetap 8, tergantung fase sub-pixel bar terakhir. Fase itu ikut lebar sumbu harga,
+ * yang berbeda antar-platform karena metrik font (52px di macOS, 58px di runner Linux) — satu
+ * assertion pernah hijau di lokal & merah di CI justru karena itu.
+ */
+async function barSpaceApi(page) {
+  return page.evaluate(() => chart.getBarSpace());
+}
+
 /** Data bar yang sedang dirender chart. */
 async function dataList(page) {
   return page.evaluate(() => chart.getDataList().map((d) => ({ timestamp: d.timestamp, open: d.open, high: d.high, low: d.low, close: d.close })));
@@ -105,4 +118,4 @@ function toViewport(rect, p) {
   return { x: rect.x + p.x, y: rect.y + p.y };
 }
 
-module.exports = { chartRect, toPixel, toPixels, fromPixel, barSpace, plotWidth, dataList, barAt, visibleValueRange, toViewport };
+module.exports = { chartRect, toPixel, toPixels, fromPixel, barSpace, barSpaceApi, plotWidth, dataList, barAt, visibleValueRange, toViewport };
