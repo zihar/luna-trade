@@ -28,7 +28,7 @@ async function buildReplayPartial(tf){
   if(!forming) return null;
   const open=forming.timestamp;                  // HANYA open (waktu) dipakai; OHLC bar kasar diabaikan
   if(open>=T) return null;                        // T di boundary/gap → tak ada partial
-  const end=arr[rev.length+1]?arr[rev.length+1].timestamp:open+DUR[tf];
+  const end=barEndAt(tf, rev.length, arr);
   const fineTF=pickFineTF(tf, end-open); if(!fineTF) return null;
   // window sub-bar = rentang PENUH bar kasar [open,end) → kunci cache STABIL antar-frame saat Play
   // (fetch sekali per bar, bukan tiap frame). Anti-lookahead tetap dijaga loop di bawah (b.timestamp+fdur>T).
@@ -68,7 +68,7 @@ async function refineMagnetPoints(id){
       // menggambar tetap aktif di area itu — pakai tfData akan membocorkan OHLC candle yang
       // belum bisa dilihat pengguna ke titik yg dijatuhkan di area "kosong" kanan kursor replay.
       const arrC=revealed(cur); if(!arrC.length) continue;
-      if(t>=arrC[arrC.length-1].timestamp+DUR[cur]) continue;
+      if(t>=stepBarTs(cur, arrC[arrC.length-1].timestamp, 1)) continue;
       const rng=barRangeContaining(cur,t); if(!rng) continue;
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
       let best=null,bd=Infinity;

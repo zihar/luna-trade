@@ -21,7 +21,7 @@ function reanchorFuturePoints(snap){
     // gap dihitung sbg 1 bar hantu → "kegeser jauh". tsToFracIndex bisection ke bar nyata = presisi.
     // Titik future (vt>=lt): tsToFracIndex jatuh ke ekstrapolasi linear yg sama → tanpa regresi.
     byId[id].forEach(s=>{ if(pts[s.i]){ const fi=tsToFracIndex(s.vt);
-      pts[s.i].dataIndex = (fi!=null)?fi:(li+(s.vt-lt)/DUR[currentTF]); delete pts[s.i].timestamp; } });
+      pts[s.i].dataIndex = (fi!=null)?fi:(li+barStepsFrom(currentTF,lt,s.vt)); delete pts[s.i].timestamp; } });
     chart.overrideOverlay({id, points:pts});
   }catch(e){} });
 }
@@ -34,10 +34,14 @@ async function switchTF(tf){
   // cache mentok di tepi live → wilayah setelah bar complete terakhir = bar forming
   // (memang tak pernah ter-cache karna filter c.complete), bukan data hilang → jangan refetch.
   // Tanpa ini, cursor M15 (halus) selalu "melewati" batas TF kasar (D/W/MN) → refetch sia-sia tiap switch.
-  const atLiveEdge = a && a.length && (a[a.length-1].timestamp + dur > Date.now() - dur);
+  // Batas bar lewat cursorAtNewest/barEndAt; `dur` tinggal dipakai sebagai TOLERANSI slack "dekat
+  // tepi live". Untuk MN, DUR salah s/d 58 jam — cukup untuk memicu refetch sia-sia tiap ganti TF
+  // atau, sebaliknya, melewatkan refetch yang memang perlu.
+  const lastEnd = (a && a.length) ? cursorAtNewest(tf, a) : null;
+  const atLiveEdge = lastEnd != null && (lastEnd > Date.now() - dur);
   const needFetch = !a || !a.length
-      || T < a[0].timestamp + dur
-      || (T > a[a.length-1].timestamp + dur && !atLiveEdge);
+      || T < barEndAt(tf, 0, a)
+      || (T > lastEnd && !atLiveEdge);
   let loadTok=null;
   if(needFetch){
     loadTok=chartLoad.show(inst);                // overlay lunar — hanya bila benar-benar menarik data (switch dari cache tetap instan)

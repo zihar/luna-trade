@@ -13,7 +13,7 @@ function pushFormingCandle(){
   if(!live || marketClosed()) return;
   const last=currentCandle(); if(!last) return;   // candle terakhir yg DITAMPILKAN (sinkron dgn render → anti-gap)
   const mid=liveMid(); if(mid==null) return;
-  const dur=DUR[currentTF], now=Date.now();
+  const now=Date.now();
   // Timestamp periode berjalan: utamakan candle incomplete OANDA (formingSeed) — OTORITATIF
   // utk boundary non-grid (D/W/H4 align 18:00 NY + gap akhir pekan). Grid tetap
   // last.timestamp+dur cuma benar utk TF ≤ H1 (kontinu tiap jam) → dipakai sbg fallback.
@@ -22,14 +22,14 @@ function pushFormingCandle(){
   const seed = (formingSeed && formingSeed.tf===currentTF && formingSeed.inst===inst
                 && formingSeed.candle.timestamp>last.timestamp) ? formingSeed.candle : null;
   // open = close candle sebelumnya (jalur grid, tak ada gap harga) / open OANDA (jalur seed).
-  const openTs = seed ? seed.timestamp : last.timestamp+dur;
+  const openTs = seed ? seed.timestamp : stepBarTs(currentTF, last.timestamp, 1);
   if(now<openTs) return;                            // periode forming belum mulai
   // Periode forming sudah lewat sepenuhnya = data ketinggalan (mis. sesudah exit Bar Replay:
   // last=candle basi, harga live sudah jauh). JANGAN sintesis forming di openTs lama — open=last.close
   // (basi) → close=mid (kini) akan jadi SATU bar raksasa. Jadwalkan roll (tarik candle complete)
   // lalu keluar; forming digambar normal setelah data catch-up. Hanya jalur grid: dgn seed
   // otoritatif, openTs pasti = periode kini (risiko bar-raksasa tak ada).
-  if(!seed && now>=openTs+dur){ scheduleRollRefresh(); return; }
+  if(!seed && now>=stepBarTs(currentTF, openTs, 1)){ scheduleRollRefresh(); return; }
   // Jalur seed: server punya candle TUTUP yang belum kita muat (mis. sesudah tab lama idle —
   // timer di-throttle/freeze → tfData ketinggalan, sementara seed sudah di periode kini).
   // Menggambar forming di openTs itu MELOMPATI periode di antaranya, dan klinecharts

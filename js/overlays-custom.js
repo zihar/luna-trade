@@ -377,7 +377,7 @@ function fmtDur(ms){
 // jumlah bar antara 2 timestamp = selisih indeks candle di data (akurat thd gap weekend)
 function barsBetween(t0,t1){
   const arr=tfData[currentTF];
-  if(!arr||!arr.length) return Math.round(Math.abs(t1-t0)/DUR[currentTF]);
+  if(!arr||!arr.length) return Math.round(barStepsFrom(currentTF, Math.min(t0,t1), Math.max(t0,t1)));
   const bs=(t)=>{let a=0,b=arr.length;while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<t) a=m+1; else b=m;} return a;};
   return Math.abs(bs(Math.max(t0,t1))-bs(Math.min(t0,t1)));
 }
@@ -409,7 +409,9 @@ klinecharts.registerOverlay({
     const t0=tsOf(overlay.points[0]), t1=tsOf(overlay.points[1]);
     if(t0!=null&&t1!=null){
       const bars=barsBetween(t0,t1);
-      const label=bars+' bar · '+fmtDur(bars*DUR[currentTF]);
+      // Durasi = rentang NYATA antar kedua titik, bukan bars × DUR: untuk MN yang panjang barnya
+      // 28–31 hari, mengalikan rata-rata 30,44 hari memberi angka yang tak pernah benar.
+      const label=bars+' bar · '+fmtDur(Math.abs(t1-t0));
       const cx=(a.x+b.x)/2, cy=Math.max(a.y,b.y)+16, w=label.length*6.4+14;
       figs.push({type:'rect',attrs:{x:cx-w/2,y:cy-9,width:w,height:18},styles:{style:'fill',color:'#4a71ff'}});
       figs.push({type:'text',attrs:{x:cx,y:cy,text:label,align:'center',baseline:'middle'},styles:{color:'#fff',size:11}});

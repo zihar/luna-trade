@@ -34,7 +34,7 @@ function restoreDraws(){
 }
 function buildDrawsFromArray(arr){
   if(!Array.isArray(arr)||!arr.length) return;
-  const a=revealed(currentTF), li=a.length-1, lt=li>=0?a[li].timestamp:null, dur=DUR[currentTF];
+  const a=revealed(currentTF), li=a.length-1, lt=li>=0?a[li].timestamp:null;
   const prev=suppressDrawSave; suppressDrawSave=true;
   arr.forEach(d=>{ try{
     if(!PERSIST_DRAW[d.name]||!Array.isArray(d.points)||!d.points.length) return;
@@ -43,7 +43,9 @@ function buildDrawsFromArray(arr){
       if(pt.vt==null) return {value:pt.value};
       if(subBar(d.name)){ const fi=tsToFracIndex(pt.vt);   // tool sub-bar: SELALU dataIndex pecahan (presisi)
         return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
-      return (lt!=null && pt.vt>lt) ? {dataIndex: li+(pt.vt-lt)/dur, value:pt.value}   // BAR_ANCHOR: future → dataIndex
+      // BAR_ANCHOR: future → dataIndex. Lewat tsToFracIndex (bukan (vt-lt)/DUR sendiri) supaya
+      // rumus future hidup di SATU tempat & ikut benar untuk MN yang panjang barnya tak seragam.
+      return (lt!=null && pt.vt>lt) ? {dataIndex: tsToFracIndex(pt.vt), value:pt.value}
         : {timestamp:pt.vt, value:pt.value};
     });
     const base={name:d.name, points:pts};

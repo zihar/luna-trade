@@ -14,7 +14,7 @@ async function evalFills(toT){
       const fdur=DUR[fineTF], acc=[];
       let lo=0,h=arr.length; while(lo<h){const m=(lo+h)>>1; if(arr[m].timestamp<=toT) lo=m+1; else h=m;}
       for(let i=lo-1;i>=0;i--){                            // bar kasar beririsan (from,toT] — telusuri mundur
-        const bOpen=arr[i].timestamp, bEnd=(i+1<arr.length?arr[i+1].timestamp:bOpen+DUR[currentTF]);
+        const bOpen=arr[i].timestamp, bEnd=barEndAt(currentTF,i,arr);
         if(bEnd<=from) break;                               // sudah sepenuhnya sebelum frontier → stop
         const win=await ensureFineWindow(fineTF,bOpen,bEnd);
         if(win && win.length){ for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push(b); } }
@@ -23,8 +23,9 @@ async function evalFills(toT){
       acc.sort((a,b)=>a.timestamp-b.timestamp); subs=acc;
     }
     if(subs==null){                                         // fallback: bar currentTF sendiri (≤M5 / fetch gagal)
-      subs=[]; const d=DUR[currentTF];
-      for(const b of (arr||[])){ const c=b.timestamp+d; if(c>from && c<=toT) subs.push(b); }
+      subs=[];
+      const src=arr||[];
+      for(let i=0;i<src.length;i++){ const c=barEndAt(currentTF,i,src); if(c>from && c<=toT) subs.push(src[i]); }
     }
     for(const b of subs){ checkPending(b); checkTrade(b); checkAlerts(b); }
   }

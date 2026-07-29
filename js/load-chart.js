@@ -89,7 +89,7 @@ async function loadInit(latest){
     tfData[currentTF]=c;
   }catch(e){ suppressDrawSave=false; chartLoad.hide(loadTok); setStatus('Failed to load: '+e.message,true); return; }
   const a=tfData[currentTF];
-  T = a[a.length-1].timestamp + DUR[currentTF];
+  T = cursorAtNewest(currentTF, a);
   lastLen=-1;
   setStatus(`Loaded ${currentTF}. Next/Play to advance (auto-extend forward). Change TF above the chart.`);
   render(true);

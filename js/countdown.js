@@ -17,9 +17,14 @@ function fmtCountdown(ms){
 // tutup candle TF aktif = open candle terakhir + durasi; lompati boundary yg sudah lewat
 // (mis. data live belum sempat fetch candle baru) agar hitung mundur tak nyangkut di 00:00.
 function nextCandleEnd(){
-  const c=currentCandle(); if(!c) return null;
-  const dur=DUR[currentTF]; let end=c.timestamp+dur, now=Date.now();
-  while(end<=now) end+=dur;
+  const a=revealed(currentTF); if(!a.length) return null;
+  const arr=tfData[currentTF]||a;
+  // revealed() adalah PREFIKS arr → indeks bar closed terakhir sama di keduanya.
+  let end=barEndAt(currentTF, a.length-1, arr), now=Date.now();
+  // `end` sekaligus open bar berikutnya, jadi melangkah dari situ memberi tutup bar sesudahnya.
+  // Dulu di sini `end+=dur` dengan DUR.MN = 30,44 hari: pada 31 Jul 07:33Z batas palsu terlewat
+  // padahal bar Juli masih terbuka 13 jam, dan countdown melompat ke 30 Agustus.
+  while(end<=now) end=stepBarTs(currentTF, end, 1);
   return end;
 }
 // pasar dianggap tutup bila tick harga simbol aktif basi (OANDA bekukan waktu
@@ -61,7 +66,7 @@ function updateAxisTime(e){
   const lastIdx=dl.length-1;
   if(di<=lastIdx+0.5){ el.style.display='none'; return; }  // di atas bar nyata → klinecharts sudah menandai
   const off=Math.round(di-lastIdx);                         // berapa bar ke depan
-  const ts=dl[lastIdx].timestamp + off*DUR[currentTF];
+  const ts=stepBarTs(currentTF, dl[lastIdx].timestamp, off);
   el.textContent=crosshairDate(ts);
   el.style.left=x+'px';
   // top-align ke atas band sumbu-X — sama persis dgn pill crosshair klinecharts
