@@ -1,9 +1,21 @@
-# Gerbang otomatis untuk tiap PR ke main.
+# Gerbang otomatis untuk PR ke main DAN untuk main itu sendiri — dengan kedalaman berbeda.
 #
-# Kenapa ini ada: sampai sekarang SELURUH verifikasi repo ini berjalan manual di laptop, sementara
-# `main` = produksi (auto-deploy ≤1 menit, tanpa build step). Satu PR yang lupa dijalankan suite-nya
-# langsung sampai ke pengguna. Setelah pemecahan Fase 2 taruhannya naik: 51 modul JS yang dimuat
-# berurutan, dan mode kegagalan khasnya SENYAP (file tak termuat → fitur mati tanpa error).
+# Kenapa ini ada: sampai 2026-07-28 SELURUH verifikasi repo ini berjalan manual di laptop. Setelah
+# pemecahan Fase 2 taruhannya naik: 51 modul JS yang dimuat berurutan, dan mode kegagalan khasnya
+# SENYAP (file tak termuat → fitur mati tanpa error).
+#
+# Kenapa dua kedalaman (2026-07-29): sejak deploy jadi manual lewat workflow Release, merge ke `main`
+# TIDAK lagi berarti sampai ke pengguna. Itu memindahkan tempat gerbang penuh berada:
+#
+#   PR ke main   → `go` + SMOKE saja (22 test, 1 runner, ~1 mnt). Cukup untuk menangkap kelas bug
+#                  yang paling mahal & paling senyap: modul tak termuat, wilayah UI tak terbangun,
+#                  tabrakan nama top-level (tests/smoke/module-hygiene + boot-integrity).
+#   push ke main → SUITE PENUH 3 shard (~5 mnt). INILAH GERBANG RILIS: workflow Release menolak
+#                  mempromosikan `main` yang check-nya belum hijau.
+#
+# Konsekuensi yang sudah diterima: PR yang menyentuh drawing/chart tak diverifikasi penuh sebelum
+# merge — ketahuan ~5 menit SESUDAH merge. Aman karena `main` boleh merah sebentar tanpa sampai ke
+# pengguna. Rancangan lengkap: docs/superpowers/specs/2026-07-29-release-gate-manual-deploy-design.md
 #
 # Gerbangnya sengaja `--project=hermetic`, bukan `npm test` telanjang: `npm test` ikut menjalankan
 # project `live` yang menembak server Go di :8765 (tak dinyalakan di CI) → merah environmental yang
@@ -20,10 +32,14 @@ on:
 # PR yang di-push berkali-kali: batalkan run lama, sisakan yang terbaru.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # HANYA untuk PR. Run push-to-main tak boleh dibatalkan: ia adalah gerbang rilis, dan run yang
+  # dibatalkan meninggalkan check non-success yang menempel pada SHA itu selamanya.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Apakah PR ini bisa mempengaruhi suite hermetik? Arah amannya SENGAJA dibalik: daftar di bawah
+  # Menentukan DUA hal: apakah e2e perlu jalan sama sekali, dan seberapa dalam.
+  #
+  # Penyaring cakupan (hanya untuk pull_request): arah amannya SENGAJA dibalik: daftar di bawah
   # adalah ALLOW-LIST hal yang MUSTAHIL berpengaruh, dan apa pun di luar itu → e2e jalan. Jadi file
   # jenis baru (mis. folder aset baru) otomatis dianggap berpengaruh, bukan diam-diam dilewati.
   #
@@ -31,14 +47,17 @@ jobs:
   # Go sama sekali — halaman dilayani `tests/static-server.js` dan seluruh `/api` distub
   # (tests/fixtures/api.js). Perubahan Go tetap dijaga job `go`.
   #
-  # Hanya berlaku untuk pull_request. Push ke `main` SELALU menjalankan e2e: `main` = produksi, dan
-  # di situ yang diverifikasi bukan "apa yang berubah" tapi "kondisi main sekarang".
+  # Push ke `main` SELALU menjalankan suite penuh: di situ yang diverifikasi bukan "apa yang
+  # berubah" tapi "kondisi main sekarang" — dan itu yang dibaca workflow Release.
   changes:
     name: Cakupan yang terdampak
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       web: ${{ steps.filter.outputs.web }}
+      shards: ${{ steps.filter.outputs.shards }}
+      total: ${{ steps.filter.outputs.total }}
+      scope: ${{ steps.filter.outputs.scope }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,9 +66,21 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "event=${{ github.event_name }} → e2e selalu jalan"
-            echo "web=true" >> "$GITHUB_OUTPUT"; exit 0
+            echo "event=${{ github.event_name }} → suite PENUH, 3 shard (gerbang rilis)"
+            {
+              echo "web=true"
+              echo "shards=[1,2,3]"
+              echo "total=3"
+              echo "scope="          # kosong = seluruh suite
+            } >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # PR: smoke saja, satu runner.
+          {
+            echo "shards=[1]"
+            echo "total=1"
+            echo "scope=tests/smoke"
+          } >> "$GITHUB_OUTPUT"
           files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
           echo "Berubah:"; echo "$files" | sed 's/^/  /'
           # Sisa = file yang TIDAK ada di allow-list.
@@ -59,6 +90,7 @@ jobs:
             echo "web=false" >> "$GITHUB_OUTPUT"
           else
             echo "→ ada yang bisa berpengaruh:"; printf '%s\n' "$rest" | sed 's/^/    /'
+            echo "→ PR: SMOKE saja (22 test, ~1 mnt). Suite penuh menyusul di push ke main."
             echo "web=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -77,18 +109,43 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  # Penjaga untuk MEKANISME RILIS itu sendiri (bukan untuk aplikasi).
+  #
+  # Kenapa perlu job sendiri: logika gerbang rilis hidup di tempat yang tak tersentuh suite mana
+  # pun — blok `run:` di release.yml dan penjaga di deploy/luna-deploy.sh, yang cuma benar-benar
+  # jalan di runner GitHub & di EC2 sebagai root. Mode kegagalannya juga yang paling mahal di repo
+  # ini: skrip deploy yang salah bikin produksi BOLAK-BALIK antara dua commit tiap menit.
+  #
+  # Kedua uji ini MENGEKSTRAK kode dari file aslinya (blok run: dari YAML, prefiks skrip dari
+  # luna-deploy.sh) lalu menjalankannya atas fixture & repo git sandbox — jadi yang lulus adalah
+  # kode yang benar-benar dikirim, bukan salinan yang bisa menyimpang.
+  #
+  # Sengaja TIDAK masuk scripts/required-checks.txt: gerbang rilis tetap dua check seperti yang
+  # diputuskan. Job ini tetap bergigi — scripts/merge-pr.sh menolak PR dengan check merah apa pun.
+  release-gate-tests:
+    name: Gerbang rilis — uji penjaga
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: ruby scripts/tests/release-gate.rb
+      - run: ruby scripts/tests/deploy-guards.rb
+
   e2e:
-    # DIBAGI 3 RUNNER, bukan diperkecil cakupannya. Alasannya terukur: run pertama CI memakai 1.006
-    # worker-detik untuk 228 test (rata-rata 4,4s) dan efisiensi paralelnya 99% pada 2 worker —
+    # Cakupan & jumlah runner datang dari job `changes` — satu definisi job untuk kedua kedalaman,
+    # supaya langkah setup (npm ci, playwright install) tak pernah menyimpang antara PR dan main.
+    #
+    # PENUH DIBAGI 3 RUNNER, bukan diperkecil cakupannya. Alasannya terukur: run pertama CI memakai
+    # 1.006 worker-detik untuk 228 test (rata-rata 4,4s) dan efisiensi paralelnya 99% pada 2 worker —
     # artinya kedua core runner sudah jenuh, jadi menambah `workers` cuma membagi core yang sama.
     # Satu-satunya cara memperpendek wall-clock tanpa mengurangi cakupan adalah menambah MESIN.
     #
-    # Kenapa TIDAK "hanya test yang berubah": 735 deklarasi global dipakai bersama & setiap page
-    # load mengeksekusi ke-51 modul, jadi satu baris di util.js/state.js bisa menjatuhkan test mana
-    # pun. Tak ada dependency graph yang bisa menurunkan subset yang aman — pemetaan modul→spec akan
-    # jadi tebakan, dan mode kegagalannya SENYAP (suite hijau, fitur mati). Itu justru kelas bug
-    # yang seluruh penjaga di repo ini dibangun untuk menangkap.
-    name: E2E hermetik ${{ matrix.shard }}/3
+    # Kenapa TIDAK "hanya test yang berubah" (bahkan di PR): 735 deklarasi global dipakai bersama &
+    # setiap page load mengeksekusi ke-51 modul, jadi satu baris di util.js/state.js bisa
+    # menjatuhkan test mana pun. Tak ada dependency graph yang bisa menurunkan subset yang aman.
+    # Yang dipilih di PR karena itu bukan subset by-diff (tebakan), tapi subset TETAP yang isinya
+    # justru para penjaga integritas pemuatan modul.
+    name: E2E hermetik ${{ matrix.shard }}/${{ needs.changes.outputs.total }}
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
@@ -96,7 +153,7 @@ jobs:
     strategy:
       fail-fast: false   # shard lain tetap jalan → satu run memberi gambaran utuh, bukan separuh
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(needs.changes.outputs.shards) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -106,7 +163,7 @@ jobs:
       - run: npm ci
       # Hanya chromium: kedua project memakai devices['Desktop Chrome'].
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test --project=hermetic --shard=${{ matrix.shard }}/3
+      - run: npx playwright test ${{ needs.changes.outputs.scope }} --project=hermetic --shard=${{ matrix.shard }}/${{ needs.changes.outputs.total }}
 
       # Gagal itu justru saat butuh bukti: trace & screenshot sudah diaktifkan
       # di playwright.config.js (`trace: retain-on-failure`). Nama artefak dibedakan per shard —
@@ -122,10 +179,13 @@ jobs:
 
   # Satu check yang SELALU melapor, apa pun yang terjadi pada shard di atas.
   #
-  # Ini bukan hiasan: job yang di-skip lewat `if:` tak menghasilkan status sendiri, jadi kalau nanti
-  # branch protection dipasang ke nama shard ("E2E hermetik 1/3", …), PR Go-only akan tersangkut
-  # menunggu status yang tak akan pernah datang. Jadikan job INI yang required (bersama `go`) —
-  # namanya juga stabil, tak ikut berubah kalau jumlah shard diubah.
+  # Ini bukan hiasan, dan sekarang dua hal bergantung padanya:
+  #   1. Job yang di-skip lewat `if:` tak menghasilkan status sendiri, jadi kalau nanti branch
+  #      protection dipasang ke nama shard ("E2E hermetik 1/3", …), PR Go-only akan tersangkut
+  #      menunggu status yang tak akan pernah datang. Jadikan job INI yang required (bersama `go`).
+  #   2. Workflow Release memeriksa nama check ini pada SHA `main`. Nama shard ikut berubah bersama
+  #      jumlah shard (1/1 di PR, 1/3 di main) — nama ini tidak. Daftar kanonik nama check wajib:
+  #      scripts/required-checks.txt
   e2e-gate:
     name: E2E gate
     needs: [changes, e2e]
@@ -135,8 +195,9 @@ jobs:
     steps:
       - run: |
           hasil="${{ needs.e2e.result }}"
+          lingkup="${{ needs.changes.outputs.scope }}"
           case "$hasil" in
-            success) echo "e2e lulus" ;;
+            success) echo "e2e lulus (${lingkup:-suite penuh})" ;;
             skipped) echo "e2e dilewati — perubahan Go/docs-only (lihat job 'Cakupan yang terdampak')" ;;
             *)       echo "e2e: $hasil"; exit 1 ;;
           esac

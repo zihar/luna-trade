@@ -1,0 +1,131 @@
+# Go-live Luna Trade: promosikan `main` → `release`. Dipicu MANUAL (tombol Run workflow).
+#
+# Kenapa ada (2026-07-29): sebelumnya EC2 poll `origin/main` tiap menit, jadi merge = deploy dan
+# tak ada tempat untuk "sudah di main, belum dirilis". Sekarang yang di-deploy adalah ref `release`,
+# dan hanya workflow ini (atau rollback manual) yang memindahkannya. Efeknya dua:
+#   - beberapa PR bisa dibatch jadi satu go-live;
+#   - `main` boleh merah sebentar tanpa sampai ke pengguna — itulah yang membuat PR cukup diverifikasi
+#     smoke saja (lihat ci.yml & docs/superpowers/specs/2026-07-29-release-gate-manual-deploy-design.md).
+#
+# Gerbangnya: check wajib pada SHA `main` harus `success`. Bisa dipaksa lewat input `force`, tapi
+# pemaksaannya tercatat di step summary — bukan bypass diam-diam.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Paksa rilis walau check main belum hijau'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # push ke ref `release`
+  checks: read      # baca hasil check-run pada SHA main
+
+# Dua rilis paralel akan berlomba men-push ref yang sama. Jangan dibatalkan, dijejerkan.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Promosikan main → release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0   # butuh riwayat untuk daftar commit release..main
+
+      - id: sha
+        run: |
+          set -euo pipefail
+          # SHA dipatok SEKALI di sini dan dipakai untuk periksa-check MAUPUN push. Kalau `main`
+          # bergerak selagi workflow jalan, yang dirilis tetap commit yang check-nya diperiksa.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Periksa check wajib pada SHA main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          # per_page=100 tanpa --paginate: `gh api --paginate` menyambung beberapa objek JSON jadi
+          # aliran yang tak bisa dibaca jq sebagai satu dokumen. Repo ini punya <10 check-run per
+          # commit, jadi satu halaman cukup — kalau suatu saat tidak, ini akan terlihat sebagai
+          # check wajib "TIDAK-ADA", bukan lolos diam-diam.
+          gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" > /tmp/runs.json
+
+          echo "== check-run pada ${SHA:0:8}"
+          jq -r '.check_runs[] | "  \(.name): \(.status)/\(.conclusion // "-")"' /tmp/runs.json
+
+          gagal=0
+          while IFS= read -r nama; do
+            [ -z "$nama" ] && continue
+            case "$nama" in \#*) continue ;; esac
+            # Re-run menghasilkan beberapa check-run bernama sama → ambil yang TERBARU.
+            hasil=$(jq -r --arg n "$nama" '
+              [.check_runs[] | select(.name == $n)]
+              | sort_by(.started_at) | last
+              | if . == null then "TIDAK-ADA" else "\(.status)/\(.conclusion // "-")" end
+            ' /tmp/runs.json)
+            case "$hasil" in
+              completed/success) echo "OK    $nama" ;;
+              TIDAK-ADA)        echo "TOLAK $nama → belum melapor sama sekali" >&2; gagal=1 ;;
+              in_progress/*|queued/*|pending/*)
+                                echo "TOLAK $nama → masih berjalan ('belum tahu' bukan 'aman')" >&2; gagal=1 ;;
+              *)                echo "TOLAK $nama → $hasil" >&2; gagal=1 ;;
+            esac
+          done < scripts/required-checks.txt
+
+          if [ "$gagal" != 0 ]; then
+            if [ "$FORCE" = "true" ]; then
+              echo
+              echo "force=true → dilanjutkan MESKIPUN check di atas tidak hijau."
+              echo "> ⚠️ **Dipaksa** (\`force=true\`): check wajib pada \`${SHA:0:8}\` TIDAK hijau." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo
+              echo "Rilis dibatalkan. Perbaiki main lalu ulangi, atau jalankan lagi dengan force=true." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Catatan rilis
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Rilis \`${SHA:0:8}\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # `release` belum ada pada rilis pertama (dan selama jendela transisi).
+          if git ls-remote --exit-code --heads origin release >/dev/null 2>&1; then
+            git fetch --quiet origin release
+            if [ "$(git rev-parse origin/release)" = "$SHA" ]; then
+              echo "Sudah rilis — origin/release tepat di ${SHA:0:8}." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Commit yang akan sampai ke pengguna:"
+            git log --no-merges --format='- %s (%h)' "origin/release..$SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_Rilis pertama ke ref \`release\`._" >> "$GITHUB_STEP_SUMMARY"
+            git log -1 --format='- %s (%h)' "$SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Push ke ref release
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # TANPA `-f`, disengaja: Git sendiri menolak push yang bukan fast-forward, jadi jalur
+          # normal MUSTAHIL memundurkan produksi. Rollback adalah tindakan manual yang eksplisit:
+          #   git push -f origin <sha>:release
+          git push origin "$SHA:refs/heads/release"
+          echo "release → ${SHA:0:8}. EC2 menariknya ≤1 menit (luna-deploy.timer)."
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "EC2 menariknya ≤1 menit (\`luna-deploy.timer\`)." >> "$GITHUB_STEP_SUMMARY"
