@@ -8,7 +8,10 @@ set -euo pipefail
 
 RUNTIME=/opt/bar-replay
 REPO="$RUNTIME/repo"
-BRANCH=main
+# Ref yang di-deploy = `release`, BUKAN `main` (2026-07-29). Merge ke main tak lagi berarti go-live;
+# yang memindahkan `release` hanyalah workflow Release (tombol manual) atau rollback manual.
+# Rancangan: docs/superpowers/specs/2026-07-29-release-gate-manual-deploy-design.md
+BRANCH=release
 GO=/usr/local/go/bin/go
 
 export HOME=/root   # GOCACHE/GOMODCACHE default (build cache persisten antar-run)
@@ -22,6 +25,25 @@ export HOME=/root   # GOCACHE/GOMODCACHE default (build cache persisten antar-ru
 
 cd "$REPO"
 
+ts() { date -u +%FT%TZ; }
+
+# PENJAGA (a): ref `release` belum ada — jendela transisi 2026-07-29, atau instance baru sebelum
+# rilis pertama. Keluar 0, JANGAN gagal: `git fetch` pada ref yang tak ada keluar dengan kode 128,
+# dan di bawah `set -euo pipefail` itu membuat luna-deploy.service gagal tiap menit.
+#
+# ls-remote dipakai karena ia MEMBEDAKAN dua hal yang wajib dibedakan: "ref tak ada" (rc=2) vs
+# "jaringan/SSH bermasalah" (rc lain). Yang kedua tak boleh diam-diam dianggap normal — deploy yang
+# berhenti SENYAP adalah mode kegagalan terburuk di sini (lihat catatan SSH port 22 di atas).
+set +e
+git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
+rc=$?
+set -e
+if [ "$rc" -eq 2 ]; then
+	echo "[$(ts)] origin/$BRANCH belum ada — tak ada yang di-deploy (tunggu workflow Release)."
+	exit 0
+fi
+[ "$rc" -eq 0 ] || { echo "[$(ts)] ls-remote origin/$BRANCH gagal (rc=$rc) — jaringan/SSH?"; exit "$rc"; }
+
 git fetch --quiet origin "$BRANCH"
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH")
@@ -29,7 +51,36 @@ REMOTE=$(git rev-parse "origin/$BRANCH")
 # Tidak ada commit baru → diam (tick murah, sub-detik).
 [ "$LOCAL" = "$REMOTE" ] && exit 0
 
-ts() { date -u +%FT%TZ; }
+# PENJAGA (b): tolak MUNDUR ke commit yang skrip deploy-nya tak menunjuk "$BRANCH".
+#
+# Skrip ini men-self-update di AKHIR run (baris terakhir), jadi yang jalan pada satu tick selalu
+# salinan dari run SEBELUMNYA. Kalau `release` tertinggal dari commit yang sedang jalan DAN commit
+# tujuan itu masih `BRANCH=main`, urutannya jadi: deploy kode lama + pasang skrip lama → tick
+# berikutnya skrip lama men-deploy `main` lagi + pasang skrip baru → BOLAK-BALIK tanpa henti.
+#
+# Perhatikan apa yang TIDAK ditolak: mundur ke commit yang skripnya sudah `BRANCH=release`. Itu
+# jalur rollback resmi (`git push -f origin <sha>:release`) dan ia tidak berosilasi. Menolak semua
+# langkah mundur akan ikut memblokir rollback.
+#
+# TANPA pipe ke grep, disengaja. `git show … | grep -qx` akan BENAR hari ini tapi hanya karena
+# kebetulan ukuran: grep -q keluar begitu ketemu (baris `BRANCH=` ada di awal file), dan di bawah
+# `set -o pipefail` penulis yang kena SIGPIPE membuat pipeline mengembalikan 141 — yaitu "tidak
+# cocok" → rollback yang sah TERTOLAK. Itu tak terjadi selama file masih masuk buffer pipe 64KB
+# (terukur: 0/200 percobaan pada 6KB, 200/200 pada 227KB). Skrip ini 7KB. Jadi bentuk berpipe adalah
+# bom waktu yang meledak ke arah yang salah kalau file tumbuh, dan gagalnya SENYAP. Cocokkan di
+# dalam bash saja supaya tak bergantung pada kebetulan itu.
+if git merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
+	skrip_tujuan=$(git show "$REMOTE:deploy/luna-deploy.sh" 2>/dev/null || true)
+	if case $'\n'"$skrip_tujuan"$'\n' in *$'\n'"BRANCH=$BRANCH"$'\n'*) true ;; *) false ;; esac; then
+		echo "[$(ts)] rollback disengaja: ${LOCAL:0:8} -> ${REMOTE:0:8} (mundur)"
+	else
+		echo "[$(ts)] TOLAK mundur ke ${REMOTE:0:8}: skrip deploy di commit itu tak menunjuk '$BRANCH'," \
+			"jadi men-deploy-nya akan bolak-balik. Perbaiki origin/$BRANCH, atau jalankan ulang" \
+			"deploy/setup-luna-autodeploy.sh di instance."
+		exit 1
+	fi
+fi
+
 echo "[$(ts)] deploy: ${LOCAL:0:8} -> ${REMOTE:0:8}"
 
 # FF hard ke remote (deploy target read-only → buang perubahan lokal liar).

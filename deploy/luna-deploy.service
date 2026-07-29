@@ -1,5 +1,5 @@
 [Unit]
-Description=Luna Trade auto-deploy (pull origin/main, build arm64, restart bar-replay)
+Description=Luna Trade auto-deploy (pull origin/release, build arm64, restart bar-replay)
 After=network-online.target
 Wants=network-online.target
 

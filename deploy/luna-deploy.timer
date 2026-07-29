@@ -1,5 +1,5 @@
 [Unit]
-Description=Cek origin/main tiap 1 menit lalu deploy Luna Trade kalau ada commit baru
+Description=Cek origin/release tiap 1 menit lalu deploy Luna Trade kalau ada commit baru
 
 [Timer]
 # Tiap menit pada detik :00. Build hanya jalan saat SHA remote != lokal,
