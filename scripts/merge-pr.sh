@@ -28,12 +28,25 @@ read -r pr_state merge_state is_draft <<<"$state"
 [ "$pr_state" = "OPEN" ] || { echo "PR #$pr statusnya $pr_state — tak ada yang di-merge." >&2; exit 1; }
 [ "$is_draft" = "false" ] || { echo "PR #$pr masih draft." >&2; exit 1; }
 
-# Daftar wajib didefinisikan DI SINI, bukan diambil dari GitHub. Sebabnya konkret: tanpa branch
+# Daftar wajib dibaca dari FILE DI REPO, bukan dari GitHub. Sebabnya konkret: tanpa branch
 # protection (403 di repo private tanpa Pro) GitHub melaporkan NOL required check, jadi
 # `gh pr checks --required` selalu gagal — skrip yang mengandalkannya takkan pernah mau merge apa
 # pun, bahkan saat semua hijau. Ini ketemu saat menguji skrip ini pada PR-nya sendiri.
-# Kalau nanti branch protection bisa dipasang, samakan daftar ini dengan required check di sana.
-WAJIB=("Go — build, vet, test" "E2E gate")
+#
+# File itu dipakai bareng .github/workflows/release.yml (gerbang go-live), supaya menambah check
+# wajib tak diam-diam cuma berlaku di satu dari dua gerbang.
+#
+# while-read, bukan `mapfile`: bash bawaan macOS masih 3.2 dan tak punya mapfile — skrip ini
+# dijalankan dari laptop.
+CHECKS_FILE="$(cd "$(dirname "$0")" && pwd)/required-checks.txt"
+[ -r "$CHECKS_FILE" ] || { echo "tak bisa baca $CHECKS_FILE" >&2; exit 1; }
+WAJIB=()
+while IFS= read -r baris || [ -n "$baris" ]; do
+  [ -z "$baris" ] && continue
+  case "$baris" in \#*) continue ;; esac
+  WAJIB+=("$baris")
+done < "$CHECKS_FILE"
+[ "${#WAJIB[@]}" -gt 0 ] || { echo "$CHECKS_FILE kosong — tak ada check wajib yang bisa diperiksa." >&2; exit 1; }
 
 echo "== check PR #$pr"
 checks=$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || echo '[]')

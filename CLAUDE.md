@@ -29,13 +29,30 @@ masalah yang sudah terjadi: branch lama mengendap → main jalan → konflik men
    sama-sama balas 403), jadi platform hanya memberi tahu, tak menahan. `scripts/merge-pr.sh`
    menolak PR yang checknya merah/pending dan PR yang **ketinggalan dari main** — yang kedua bukan
    formalitas: PR #151 & #152 masing-masing hijau di basis berbeda dan gabungannya belum pernah
-   diuji siapa pun. Kalau suatu saat repo jadi public atau berlangganan Pro, pasang branch
-   protection (required: `Go — build, vet, test` + `E2E gate`) dan skrip ini jadi sekadar
-   kenyamanan.
+   diuji siapa pun. Daftar check wajibnya ada di `scripts/required-checks.txt` (satu file, dibaca
+   juga oleh workflow Release). Kalau suatu saat repo jadi public atau berlangganan Pro, pasang
+   branch protection dengan daftar yang sama dan skrip ini jadi sekadar kenyamanan.
 7. **Kalau sebuah branch terlanjur stale + konflik berat:** rebase ke main & selesaikan;
    bila terlalu jauh / tercampur, **port ulang hunk-nya secara selektif** ke main
    terkini (jangan merge buta — bisa menimpa perubahan baru main), lalu **pecah** jadi
    PR-PR kecil. Ini fallback mahal, bukan pencegahan.
+
+## Rilis & deploy (go-live MANUAL sejak 2026-07-29)
+
+**Merge ke `main` TIDAK lagi berarti sampai ke pengguna.** Yang di-deploy EC2 adalah ref
+`release`; `main` adalah "sudah diterima, belum dirilis".
+
+- **Go-live:** GitHub → Actions → **Release** → *Run workflow*. Ia memeriksa check wajib
+  (`scripts/required-checks.txt`) pada SHA `main`, menolak kalau belum hijau (bisa dipaksa
+  lewat input `force`, tercatat di summary), lalu `git push origin main:release` **tanpa
+  `-f`**. EC2 menariknya ≤1 menit.
+- **Karena itu CI punya dua kedalaman:** PR = `go` + **smoke** (~1 mnt); push ke `main` =
+  suite penuh 3 shard (~5 mnt) — **itulah gerbang rilis**. Konsekuensi yang diterima: PR
+  yang menyentuh drawing/chart baru diverifikasi penuh SESUDAH merge. Aman karena `main`
+  merah tak sampai ke pengguna.
+- **Rollback:** `git push -f origin <sha>:release`.
+- Rancangan + jebakan self-update skrip deploy:
+  `docs/superpowers/specs/2026-07-29-release-gate-manual-deploy-design.md`.
 
 ## Akar masalah struktural: `index.html` monolitik
 
@@ -57,6 +74,9 @@ di atas.
   menambah test — ada 4 jebakan canvas yang sudah ditangani helper (jeda klik ~400ms,
   sumbu harga di dalam `#chart`, titik overlay tak selalu di atas bentuknya, jumlah titik
   mengembang setelah objek jadi). Temuan yang masih merah: `docs/e2e-drawing-findings.md`.
+- **Sebelum push, cukup smoke:** `npx playwright test tests/smoke --project=hermetic`
+  (22 test, ~40s lokal) — itu juga yang dijalankan CI di PR. Suite penuh diserahkan ke CI
+  saat push ke `main`; jangan bakar 5–7 menit lokal untuk sesuatu yang sudah otomatis.
 - Sisanya verifikasi manual via browser. Server lokal:
   `PORT=8765 ./luna-trade` (butuh `.env`: `OANDA_TOKEN`, dll). Serve dari disk (no-cache),
   jadi edit `index.html` langsung tampil saat reload.

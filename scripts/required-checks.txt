@@ -1,0 +1,14 @@
+# Daftar KANONIK nama check yang wajib hijau. Satu nama per baris, harus SAMA PERSIS dengan
+# `name:` job di .github/workflows/ci.yml (termasuk tanda em-dash "—", bukan hubung "-").
+#
+# Kenapa file terpisah: dua tempat membacanya dan keduanya menjaga hal berbeda —
+#   scripts/merge-pr.sh          → menahan merge PR yang checknya belum hijau
+#   .github/workflows/release.yml → menahan promosi `main` ke `release` (go-live)
+# Kalau daftarnya diduplikasi di dua tempat, menambah check wajib yang baru akan diam-diam
+# hanya berlaku di satu gerbang. Kalau nanti branch protection bisa dipasang (butuh repo public
+# atau GitHub Pro), samakan required check di sana dengan daftar ini.
+#
+# CATATAN: yang didaftar adalah "E2E gate", BUKAN nama per-shard ("E2E hermetik 1/3"). Nama shard
+# ikut berubah bersama jumlah shard & kedalaman suite; nama gate tidak.
+Go — build, vet, test
+E2E gate
