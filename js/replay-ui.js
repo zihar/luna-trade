@@ -54,7 +54,7 @@ function exitReplay(){
   setPickCut(false);
   setReplayUI(false);
   const arr=tfData[currentTF];
-  if(arr&&arr.length) T=arr[arr.length-1].timestamp+DUR[currentTF];   // lompat ke bar terbaru
+  if(arr&&arr.length) T=cursorAtNewest(currentTF,arr);   // lompat ke bar terbaru
   lastLen=-1; render(true);
   startLive();                       // kembali realtime (default)
   setStatus('');

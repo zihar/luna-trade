@@ -55,7 +55,7 @@ async function liveRefresh(){
   const tf=currentTF, arr=tfData[tf];
   if(!arr||!arr.length) return;
   const oldLast = arr[arr.length-1].timestamp;
-  const atEdge  = T >= oldLast + DUR[tf];   // cursor menempel di candle terakhir → ikut maju
+  const atEdge  = T >= stepBarTs(tf, oldLast, 1);   // cursor menempel di candle terakhir → ikut maju
   await autoExtend(tf);
   if(tf!==currentTF) return;                 // TF keburu diganti saat fetch
   const a=tfData[tf];
@@ -63,7 +63,7 @@ async function liveRefresh(){
   if(!fresh.length) return;                  // belum ada candle baru yang close
   if(atEdge){
     fresh.forEach(c=>onNewBar(c));             // cek pending + SL/TP pada candle baru
-    T = a[a.length-1].timestamp + DUR[tf];
+    T = cursorAtNewest(tf, a);
     render();                                  // incremental (updateData): candle baru di-append TANPA applyNewData.
   }                                            //   applyNewData menyentak viewport ke bar terakhir → hilang posisi scroll/zoom
                                                //   user (mis. sedang lihat histori). updateData mempertahankannya.

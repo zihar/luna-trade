@@ -35,7 +35,7 @@ function expandPosition(o){
   // sisi kanan = 15 bar ke kanan; bila melewati candle terakhir → pakai dataIndex (area future, tak ter-clamp)
   const li=revealed(currentTF).length-1; let fL=fidxOf(p0); if(!isFinite(fL)) fL=li;
   const Lxa=(p0.timestamp!=null||p0.dataIndex!=null)?keyOf(p0):{dataIndex:fL};
-  const Rxa=(fL+15>li)?{dataIndex:fL+15}:{timestamp:tsOf(p0)+15*DUR[currentTF]};
+  const Rxa=(fL+15>li)?{dataIndex:fL+15}:{timestamp:stepBarTs(currentTF, tsOf(p0), 15)};
   try{ chart.overrideOverlay({ id:o.id, points:[
     Object.assign({value:entry},Lxa), Object.assign({value:tp},Rxa), Object.assign({value:sl},Rxa),
     Object.assign({value:tp},Lxa),    Object.assign({value:sl},Lxa),  Object.assign({value:entry},Rxa) ] }); }

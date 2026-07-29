@@ -111,13 +111,15 @@ function currencyFlag(cur){
 // jadi TAK bisa sekadar floor(t/DUR); bar terakhir mencakup [lt, lt+dur). Future (t>=lt+dur):
 // proyeksi per-periode DUR. kind 'c' pakai timestamp candle (tsToPx=pusat bar), 'f' pakai
 // offset periode (idxToPx pusat bar future), 't' = sebelum data (jarang, off-screen).
-function newsBucket(t,a,li,lt,dur){
+// `tf` (bukan durasi jadi): batas & offset bar future dihitung per-TF supaya MN — yang panjang
+// barnya 28–31 hari — tak memakai rata-rata 30,44 hari dan menaruh event di bar yang salah.
+function newsBucket(t,a,li,lt,tf){
   if(t < a[0].timestamp) return {key:'t'+t, kind:'t', ref:t};
   let lo=0,h=li,i=0;
   while(lo<=h){ const m=(lo+h)>>1; if(a[m].timestamp<=t){ i=m; lo=m+1; } else h=m-1; }
   if(i<li) return {key:'c'+a[i].timestamp, kind:'c', ref:a[i].timestamp};
-  if(t < lt+dur) return {key:'c'+lt, kind:'c', ref:lt};
-  const off=Math.floor((t-lt)/dur); return {key:'f'+off, kind:'f', ref:off};
+  if(t < stepBarTs(tf, lt, 1)) return {key:'c'+lt, kind:'c', ref:lt};
+  const off=Math.floor(barStepsFrom(tf, lt, t)); return {key:'f'+off, kind:'f', ref:off};
 }
 // Rebuild seluruh tick dari newsState.releases. Event mendatang terdekat (wall-clock now)
 // dapat kelas .is-next (glow). Timestamp rusak → di-skip (defensif).
@@ -132,10 +134,10 @@ function renderNewsMarkers(){
   // Monthly) di mana banyak event beda-jam berbagi satu candle. Badge = highest-impact anggota;
   // count badge bila >1. Tanpa data candle (chart belum siap) → fallback grup jam-exact.
   const a=(typeof revealed==='function')?revealed(currentTF):[];
-  const hasBars=!!(a&&a.length); const li=hasBars?a.length-1:0, lt=hasBars?a[li].timestamp:0, dur=DUR[currentTF];
+  const hasBars=!!(a&&a.length); const li=hasBars?a.length-1:0, lt=hasBars?a[li].timestamp:0;
   const groups=new Map();   // bucketKey → [idx release]
   rels.forEach((r,i)=>{ const t=Date.parse(r.time); if(isNaN(t)) return;
-    const key=hasBars?newsBucket(t,a,li,lt,dur).key:('x'+r.time);
+    const key=hasBars?newsBucket(t,a,li,lt,currentTF).key:('x'+r.time);
     if(!groups.has(key)) groups.set(key, []); groups.get(key).push(i); });
   // Urutkan anggota tiap grup by waktu naik → popup berjajar kronologis.
   for(const idxs of groups.values()) idxs.sort((x,y)=>Date.parse(rels[x].time)-Date.parse(rels[y].time));
@@ -165,14 +167,14 @@ function repositionNewsMarkers(){
   const layer=_newsLayer; if(!layer || layer.style.display==='none') return;
   const a=(typeof revealed==='function')?revealed(currentTF):null;
   if(!a||!a.length) return;
-  const li=a.length-1, lt=a[li].timestamp, dur=DUR[currentTF];
+  const li=a.length-1, lt=a[li].timestamp;
   let W=$('#chart').clientWidth||0;
   try{ const sz=chart.getSize('candle_pane','main'); if(sz&&sz.width) W=sz.width; }catch(e){}   // batas kanan = area plot (tanpa sumbu harga)
   const rels=(newsState&&newsState.releases)||[];
   layer.querySelectorAll('.nmk').forEach(el=>{
     const t=Date.parse(el.dataset.time||'');
     if(isNaN(t)){ el.style.display='none'; return; }
-    const b=newsBucket(t,a,li,lt,dur);   // pusat bar candle: 'c'→tsToPx(ts candle), 'f'→idxToPx(bar future)
+    const b=newsBucket(t,a,li,lt,currentTF);   // pusat bar candle: 'c'→tsToPx(ts candle), 'f'→idxToPx(bar future)
     let x = b.kind==='f' ? idxToPx(li+b.ref) : tsToPx(b.ref);
     if(x==null || x<0 || x>W){ el.style.display='none'; return; }
     el.style.display=''; el.style.left=x+'px';

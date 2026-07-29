@@ -11,11 +11,24 @@ function nyTime(ms){
 // hari berikutnya). Konvensi trading-day: candle dinamai per hari TUTUP-nya (buka + durasi), bukan hari buka.
 // Contoh: sesi buka 17 Feb 18:00 (tutup 18 Feb 18:00) dilabeli "18 Feb". Hanya untuk D (W/MN tak diubah).
 const CLOSE_LABEL_TF={D:1};
-function labelTs(ms){ return CLOSE_LABEL_TF[currentTF] ? ms + DUR[currentTF] : ms; }
+// MN butuh penawarnya sendiri: OANDA menandai bar bulanan dengan waktu BUKA-nya, yaitu 17:00 NY di
+// hari TERAKHIR bulan sebelumnya — jadi tanpa pergeseran, bar Juli dilabeli "30 Jun". Menggeser
+// sebesar DUR.MN tidak bisa dipakai (30,44 hari bisa mendarat di bulan yang salah untuk Februari);
+// +12 jam sudah cukup mendarat di hari ke-1 bulan dagang, apa pun keadaan DST-nya.
+function labelTs(ms){
+  if(currentTF==='MN') return ms + 12*3600000;
+  return CLOSE_LABEL_TF[currentTF] ? ms + DUR[currentTF] : ms;
+}
 // label tanggal crosshair sumbu-X: "Tue 30 Jun '26 10:00" (ada hari) — hormati timezone chart.
 // TF Daily ke atas (D/W/MN): tanpa jam → cukup hari + tanggal ("Tue 30 Jun '26"), krn 1 bar = ≥1 hari.
 function crosshairDate(ms){
   try{
+    // MN: satu bar = satu bulan penuh, jadi hari & jam tak punya arti — "Jul '26", seperti TV.
+    if(currentTF==='MN'){
+      const p=new Intl.DateTimeFormat('en-GB',{timeZone:chartTZ,month:'short',year:'2-digit'}).formatToParts(new Date(labelTs(ms)));
+      const g=t=>{const x=p.find(o=>o.type===t);return x?x.value:'';};
+      return `${g('month')} '${g('year')}`;
+    }
     const dayOnly = DUR[currentTF] >= DUR.D;
     const opt={timeZone:chartTZ,weekday:'short',day:'2-digit',month:'short',year:'2-digit'};
     if(!dayOnly){ opt.hour='2-digit'; opt.minute='2-digit'; opt.hour12=false; }
@@ -41,10 +54,13 @@ function chartFormatDate(_dtf, timestamp, format, type){
   return (type===2 || type==='xAxis') ? axisTickDate(timestamp, format) : crosshairDate(timestamp);
 }
 // candle terungkap = yang sudah CLOSED pada cursor T (anti-lookahead), via binary search
+// Batas tutup lewat barEndAt (bukan timestamp+DUR): untuk MN, DUR salah 13j–58j tergantung bulan,
+// dan di sini itu berarti bar bulanan telat/kecepatan terungkap di Bar Replay. barEndAt tetap
+// monoton naik, jadi binary search di bawah tetap sah.
 function revealed(tf){
   const arr=tfData[tf]; if(!arr) return [];
-  const d=DUR[tf]; let lo=0,h=arr.length;
-  while(lo<h){ const m=(lo+h)>>1; if(arr[m].timestamp+d<=T) lo=m+1; else h=m; }
+  let lo=0,h=arr.length;
+  while(lo<h){ const m=(lo+h)>>1; if(barEndAt(tf,m,arr)<=T) lo=m+1; else h=m; }
   return arr.slice(0,lo);
 }
 function currentCandle(){ const a=revealed(currentTF); return a.length?a[a.length-1]:null; }
@@ -110,7 +126,7 @@ function fracAnchorFromPx(x){
 function fidxToTs(idx){
   const a=revealed(currentTF); if(!a.length||idx==null) return null;
   const li=a.length-1;
-  if(idx>=li) return Math.round(a[li].timestamp + (idx-li)*DUR[currentTF]);
+  if(idx>=li) return Math.round(tsAfterSteps(currentTF, a[li].timestamp, idx-li));
   if(idx<=0) return a[0].timestamp;
   const i=Math.floor(idx), f=idx-i, t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
   return Math.round(t0 + f*(t1-t0));
@@ -120,7 +136,7 @@ function fidxToTs(idx){
 function tsToFracIndex(vt){
   const a=revealed(currentTF); if(!a.length||vt==null) return null;
   const li=a.length-1, lt=a[li].timestamp;
-  if(vt>=lt) return li + (vt-lt)/DUR[currentTF];
+  if(vt>=lt) return li + barStepsFrom(currentTF, lt, vt);
   if(vt<=a[0].timestamp) return 0;
   let lo=0,hi=li; while(lo<hi){ const m=(lo+hi)>>1; if(a[m].timestamp<vt) lo=m+1; else hi=m; }
   const i=Math.max(0,lo-1), t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
@@ -159,7 +175,7 @@ function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].l
 function magnetSnap(time, value, px, py){
   const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
-  const i=Math.max(0,a-1), barOpen=arr[i].timestamp, barEnd=barOpen+DUR[cur];
+  const i=Math.max(0,a-1), barOpen=arr[i].timestamp, barEnd=barEndAt(cur,i,arr);
   const ftf=finestLoadedTF();
   const src=(DUR[ftf]<DUR[cur]&&tfData[ftf])?tfData[ftf]:arr;
   let best=null, bestD=Infinity;
@@ -180,7 +196,7 @@ function barRangeContaining(tf, ts){    // batas [open,end) bar TF `tf` yang mem
   const arr=tfData[tf]; if(!arr||!arr.length||ts==null) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=ts) a=m+1; else b=m;}
   const i=Math.max(0,a-1), open=arr[i].timestamp;
-  const end=(i+1<arr.length)?arr[i+1].timestamp:open+DUR[tf];
+  const end=barEndAt(tf,i,arr);
   return {open,end};
 }
 async function ensureM5Window(open,end){

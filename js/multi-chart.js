@@ -78,16 +78,19 @@ function makeSecondary(slot){
       this.lastEl.textContent=mid.toFixed(decimalsFor(this.sym));
       if(!this.data.length) return;
       const last=this.data[this.data.length-1];
-      const dur=DUR[this.tf], now=Date.now();
+      const now=Date.now();
+      // Batas periode lewat stepBarTs, bukan +DUR: untuk MN, DUR (30,44 hari rata-rata) bisa
+      // menyatakan periode sudah/belum lewat padahal sebaliknya — selisihnya s/d 58 jam.
+      const lastEnd=stepBarTs(this.tf, last.timestamp, 1);
       // dua kemungkinan: (a) candle terakhir di data = periode BERJALAN (now masih di
       // dalamnya, mis. OANDA sudah kirim candle ini / skew jam) → update DI TEMPAT, seed
       // dari OHLC-nya; (b) candle terakhir = periode LAMPAU → forming = bar baru sesudahnya.
       let openTs, sOpen, sHi, sLo;
-      if(now < last.timestamp+dur){
+      if(now < lastEnd){
         openTs=last.timestamp; sOpen=last.open; sHi=last.high; sLo=last.low;     // (a)
       } else {
-        openTs=last.timestamp+dur; sOpen=last.close; sHi=last.close; sLo=last.close;  // (b)
-        if(now>=openTs+dur) this.scheduleRoll();    // periode forming pun sudah lewat → tarik candle baru
+        openTs=lastEnd; sOpen=last.close; sHi=last.close; sLo=last.close;  // (b)
+        if(now>=stepBarTs(this.tf, openTs, 1)) this.scheduleRoll();    // periode forming pun sudah lewat → tarik candle baru
       }
       if(!this.forming || this.forming.timestamp!==openTs){
         this.forming={timestamp:openTs,open:sOpen,high:Math.max(sHi,mid),low:Math.min(sLo,mid),close:mid,volume:0};

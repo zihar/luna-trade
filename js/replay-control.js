@@ -2,13 +2,15 @@
 async function step(d){
   if(T==null) return;
   if(!replayMode){ stopLive(); setReplayUI(true); }   // stepping = masuk mode Bar Replay
-  const arr=tfData[currentTF], dur=DUR[currentTF];
+  const arr=tfData[currentTF];
+  // Batas tutup lewat barEndAt (bukan +DUR): untuk MN, DUR salah 13j–58j tergantung bulan, dan di
+  // sini itu berarti satu langkah replay mendarat di tengah bar, bukan di tutupnya.
   let lo=0,h=arr.length;
-  while(lo<h){ const m=(lo+h)>>1; if(arr[m].timestamp+dur<=T) lo=m+1; else h=m; }
+  while(lo<h){ const m=(lo+h)>>1; if(barEndAt(currentTF,m,arr)<=T) lo=m+1; else h=m; }
   const idx=lo-1;
   if(d>0){
     if(idx+1>=arr.length){ autoExtend(currentTF); pauseIfNoData(); return; }
-    const ni=idx+1; T=arr[ni].timestamp+dur;
+    const ni=idx+1; T=barEndAt(currentTF,ni,arr);
     await evalFills(T);   // fill SL/TP/pending & alert intra-bar (sub-bar halus s/d T)
     if(arr.length-ni<30) autoExtend(currentTF);
   }else{

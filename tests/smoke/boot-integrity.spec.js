@@ -66,6 +66,7 @@ const SENTINEL = {
   'overlays-custom.js': 'arrowMarkFigures',
   'chart-styles.js': 'AXIS_FONT',
   'ny-time.js': 'nyParts',
+  'bar-time.js': 'barEndAt',
   'click-guard.js': 'DBLCLICK_SLOP_PX',
   'price-scale.js': 'attachPriceScale',
 
