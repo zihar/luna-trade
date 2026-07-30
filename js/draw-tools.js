@@ -183,6 +183,9 @@ function delHooks(){ return {
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
     if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
+    // measure (ephemeral): id-nya dipegang di sini, BUKAN saat di-arm — supaya Esc selama menggambar
+    // tetap jatuh ke cancelInProgressDraw() seperti tool lain (lihat js/measure.js).
+    if(o && o.name==='measure') measureId=o.id;
     inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
   onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
     const o=e.overlay; selectedId=o&&o.id;
@@ -238,6 +241,7 @@ function instantDropPoint(name){
 }
 function createDraw(name,btn,extra,instant){
   track('draw',{tool:name});
+  try{ clearMeasure(); }catch(_){}   // gestur baru → hasil ukur sebelumnya tak relevan (js/measure.js)
   try{
     pendingClicks=[];
     if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }   // mau gambar baru → tampilkan lagi

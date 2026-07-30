@@ -30,6 +30,7 @@ const { TOOL_SPEC, tolX, TOL_Y_PX } = require('../helpers/spec');
 const DRAG_SKIP = {
   longPosition: 'drag-nya jalur sendiri (handle SL/TP + panel edit posisi via showPosPopup), bukan drag titik overlay biasa',
   shortPosition: 'idem longPosition',
+  measure: 'ephemeral & tanpa hit-test (needDefaultPointFigure:false): objeknya sengaja tak bisa digenggam — mousedown berikutnya justru MEMBUANGnya (jalur keluar), jadi tak ada drag untuk diukur',
 };
 // Tool yang tak punya "badan" terpisah dari handle titiknya: figure-nya begitu kecil sehingga
 // SEMUA pixel yang bisa di-hover berada dalam radius handle (terukur lewat probe: tak ada satu
@@ -197,10 +198,10 @@ test.describe('drag setelah objek jadi — badan', () => {
 test.describe('cakupan drag', () => {
   test('daftar pengecualian tetap eksplisit & beralasan', async () => {
     // Bukan assertion perilaku — penjaga agar pengecualian tak diam-diam bertambah.
-    expect(Object.keys(DRAG_SKIP).sort()).toEqual(['longPosition', 'shortPosition']);
+    expect(Object.keys(DRAG_SKIP).sort()).toEqual(['longPosition', 'measure', 'shortPosition']);
     expect(Object.keys(BODY_SKIP).sort()).toEqual(['arrowMarkDown', 'arrowMarkUp', 'text']);
-    expect(DRAGGABLE.length, 'tool yang diuji drag titik').toBe(TOOL_SPEC.length - 2);
-    expect(BODY_DRAGGABLE.length, 'tool yang diuji drag badan').toBe(TOOL_SPEC.length - 5);
+    expect(DRAGGABLE.length, 'tool yang diuji drag titik').toBe(TOOL_SPEC.length - 3);
+    expect(BODY_DRAGGABLE.length, 'tool yang diuji drag badan').toBe(TOOL_SPEC.length - 6);
     console.log(`  drag titik: ${DRAGGABLE.length} tool · drag badan: ${BODY_DRAGGABLE.length} tool`);
   });
 });

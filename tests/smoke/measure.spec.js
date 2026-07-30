@@ -9,6 +9,19 @@
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
+const { overlays } = require('../helpers/draw');
+const { chartRect } = require('../helpers/chart');
+
+/** Arm measure lewat hotkey, lalu selesaikan 2 klik (jeda 400ms — jebakan klik canvas, tests/README.md). */
+async function drawMeasure(page, rect) {
+  await page.mouse.move(rect.x + rect.width * 0.4, rect.y + rect.height * 0.5, { steps: 4 });
+  await page.keyboard.press('Alt+M');
+  await page.waitForFunction(() => inProgressId != null, null, { timeout: 3000 });
+  await page.mouse.click(rect.x + rect.width * 0.4, rect.y + rect.height * 0.55);
+  await page.waitForTimeout(400);
+  await page.mouse.click(rect.x + rect.width * 0.6, rect.y + rect.height * 0.35);
+  await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+}
 
 test.describe('measure: statistik & format', () => {
   test('Δprice bertanda, %, pips, bar plural, durasi', async ({ page }) => {
@@ -72,6 +85,70 @@ test.describe('measure: statistik & format', () => {
       fmtDur(2 * 864e5 + 4 * 36e5), // 2d 4h
     ]);
     expect(d).toEqual(['45m', '3h 45m', '2d 4h']);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('measure: jalur rail & siklus hidup ephemeral', () => {
+  test('Alt+M → 2 klik → measure ada; Esc membuangnya', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+
+    await page.mouse.move(rect.x + rect.width * 0.4, rect.y + rect.height * 0.5, { steps: 4 });
+    await page.keyboard.press('Alt+M');
+    await page.waitForFunction(() => inProgressId != null, null, { timeout: 3000 });
+    expect(await page.evaluate(() => chart.getOverlayById(inProgressId).name)).toBe('measure');
+
+    await page.mouse.click(rect.x + rect.width * 0.4, rect.y + rect.height * 0.55);
+    await page.waitForTimeout(400);
+    await page.mouse.click(rect.x + rect.width * 0.6, rect.y + rect.height * 0.35);
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+
+    expect(await page.evaluate(() => measureId), 'measureId dicatat setelah objek jadi').not.toBeNull();
+    expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(true);
+
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => measureId), 'Esc membuang measure').toBeNull();
+    expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(false);
+    assertNoPageErrors(page);
+  });
+
+  test('measure tak ikut tersimpan & tak mencemari undo', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawMeasure(page, rect);
+    await page.waitForTimeout(500); // lewati debounce saveDraws (350ms)
+
+    expect(await page.evaluate(() => Object.keys(PERSIST_DRAW)), 'measure tak boleh persist').not.toContain('measure');
+    expect(await page.evaluate(() => serializeDraws().some((d) => d.name === 'measure'))).toBe(false);
+    expect(await page.evaluate(() => drawUndo.length), 'tak ada langkah undo kosong').toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  test('klik berikutnya di chart membuang measure', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawMeasure(page, rect);
+    await page.waitForTimeout(400);
+
+    await page.mouse.click(rect.x + rect.width * 0.75, rect.y + rect.height * 0.6);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => measureId), 'klik lain membuang measure').toBeNull();
+    expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(false);
+    assertNoPageErrors(page);
+  });
+
+  test('ganti TF membuang measure', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawMeasure(page, rect);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => measureId)).not.toBeNull();
+
+    await page.evaluate(() => switchTF('H1'));
+    await page.waitForFunction(() => currentTF === 'H1', null, { timeout: 8000 });
+    expect(await page.evaluate(() => measureId), 'ganti TF membuang measure').toBeNull();
+    expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(false);
     assertNoPageErrors(page);
   });
 });

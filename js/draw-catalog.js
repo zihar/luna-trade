@@ -37,6 +37,11 @@ const DRAW_GROUPS=[
     {name:'shortPosition', pos:'short', title:'Short Position', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h16"/><path d="M12 6.5V18"/><path d="M7 13 12 18l5-5"/></svg>'},
     {name:'dateRange', title:'Date Range', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 5 V19 M18 5 V19 M9 12 h6 M9 12 l2 -2 M9 12 l2 2 M15 12 l-2 -2 M15 12 l-2 2"/></svg>'},
   ]},
+  // Measure (ruler): alat ukur EPHEMERAL — dapat baris rail sendiri, bukan numpang di grup
+  // Positions, supaya memakainya tak mengubah arti tombol grup itu (lastToolOf).
+  {key:'measure', title:'Measure', tools:[
+    {name:'measure', sc:'M', title:'Measure', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9h18v6H3z"/><path d="M7 9v3M11 9v3M15 9v3M19 9v3"/></svg>'},
+  ]},
   {key:'text', title:'Text', tools:[
     {name:'text', sc:'X', title:'Text', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 6 h14 M12 6 V19"/></svg>'},
     {name:'callout', title:'Callout', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 16l-2 4 6-4"/></svg>'},

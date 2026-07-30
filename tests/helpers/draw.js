@@ -226,7 +226,10 @@ async function measureParity(page, name, opts = {}) {
   const textCommitted = spec.autoEditor ? await commitTextEditor(page) : false;
 
   // Deselect + jauhkan pointer supaya handle bulat (hover/selected) tak ikut ter-foto.
-  await page.keyboard.press('Escape');
+  // Tool EPHEMERAL (measure) dilewati: Escape adalah salah satu jalur KELUAR-nya (ia membuang
+  // objeknya), dan ia memang tak punya handle titik yang perlu disembunyikan
+  // (needDefaultPointFigure:false). Menekan Escape di sini akan mengukur objek yang sudah tak ada.
+  if (!spec.ephemeral) await page.keyboard.press('Escape');
   await page.mouse.move(rect.x + 8, rect.y + 8, { steps: 2 });
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
@@ -302,7 +305,7 @@ async function drawTool(page, name, opts = {}) {
   }
   await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
   if (spec.autoEditor) await commitTextEditor(page, opts.text || 'E2E');
-  await page.keyboard.press('Escape');
+  if (!spec.ephemeral) await page.keyboard.press('Escape');   // Esc membuang tool ephemeral (measure)
   await page.mouse.move(rect.x + 8, rect.y + 8, { steps: 2 });
   const objs = await overlays(page);
   return { obj: objs[objs.length - 1] || null, targets, rect };

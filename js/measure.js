@@ -31,3 +31,60 @@ function fmtMeasure(st){
   const barTxt = st.bars===1 ? '1 bar' : st.bars+' bars';
   return [priceTxt+' ('+pctTxt+')'+pipTxt, barTxt+' · '+fmtDur(st.ms)];
 }
+
+// ---- state ephemeral: hanya SATU hasil ukur hidup pada satu waktu ----
+// measureId diisi HANYA di onDrawEnd (js/draw-tools.js). Konsekuensinya, saat measure masih
+// digambar ia masih null → Esc jatuh ke cancelInProgressDraw() seperti tool lain, bukan termakan
+// clearMeasure().
+let measureId=null;
+function clearMeasure(){
+  if(measureId==null) return;
+  try{ chart.removeOverlay(measureId); }catch(_){}
+  measureId=null;
+}
+
+// Warna = ARAH (naik/turun), bukan preferensi per-objek → measure sengaja TAK masuk DRAW_DEFAULT,
+// jadi ia tak punya modal Style/Text. Palet sama dgn long/shortPosition.
+const MEAS_UP=POS_GREEN, MEAS_DN=POS_RED;
+// needDefaultPointFigure:false → tanpa handle titik & tanpa hit-test. Ini SENGAJA, dan bukan
+// pengulangan Temuan 3 (simpleAnnotation/simpleTag ditarik karena tak terjangkau, lihat
+// docs/e2e-drawing-findings.md): objek itu PERSIST sehingga tak-terjangkau = nyangkut selamanya,
+// sedangkan measure tak pernah tersimpan dan punya empat jalur keluar otomatis (Esc, klik lain,
+// arm tool lain, ganti TF/instrumen).
+klinecharts.registerOverlay({
+  name:'measure', totalStep:3, needDefaultPointFigure:false,
+  createPointFigures:({overlay,coordinates})=>{
+    if(coordinates.length<2) return [];
+    const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1];
+    if(!a||!b||a.x==null||b.x==null||!isFinite(a.x)||!isFinite(b.x)) return [];
+    const v0=overlay.points[0]&&overlay.points[0].value, v1=overlay.points[1]&&overlay.points[1].value;
+    const up = (v1!=null&&v0!=null) ? v1>=v0 : b.y<=a.y;
+    const col = up?MEAS_UP:MEAS_DN;
+    const xL=Math.min(a.x,b.x), xR=Math.max(a.x,b.x), yT=Math.min(a.y,b.y), yB=Math.max(a.y,b.y);
+    const figs=[{type:'rect', attrs:{x:xL, y:yT, width:Math.max(1,xR-xL), height:Math.max(1,yB-yT)},
+      styles:{style:'stroke_fill', color:col+alphaHex(12), borderColor:col, borderSize:1}}];
+    // panah vertikal di tengah kotak → arah gerak terbaca sebelum angkanya dibaca
+    const xc=(a.x+b.x)/2, dir=(b.y>=a.y)?1:-1, hs=6;
+    figs.push({type:'line', attrs:{coordinates:[{x:xc,y:a.y},{x:xc,y:b.y}]}, styles:{color:col,size:2}});
+    figs.push({type:'line', attrs:{coordinates:[{x:xc-hs,y:b.y-dir*hs},{x:xc,y:b.y}]}, styles:{color:col,size:2}});
+    figs.push({type:'line', attrs:{coordinates:[{x:xc+hs,y:b.y-dir*hs},{x:xc,y:b.y}]}, styles:{color:col,size:2}});
+    const lines=fmtMeasure(measureStats(overlay.points[0], overlay.points[1]));
+    if(lines){
+      // pill di sisi LUAR kotak (atas bila naik, bawah bila turun) → tak menutup candle yg diukur
+      const w=Math.max(lines[0].length, lines[1].length)*6.4+16, h=34;
+      const py = up ? yT-h-6 : yB+6;
+      figs.push({type:'rect', attrs:{x:xc-w/2, y:py, width:w, height:h}, styles:{style:'fill', color:col}});
+      figs.push({type:'text', attrs:{x:xc, y:py+11, text:lines[0], align:'center', baseline:'middle'},
+        styles:{color:'#fff', size:11}});
+      figs.push({type:'text', attrs:{x:xc, y:py+24, text:lines[1], align:'center', baseline:'middle'},
+        styles:{color:'#fff', size:11}});
+    }
+    return figs;
+  }
+});
+
+// Hasil ukur yang SUDAH jadi dibuang oleh mousedown berikutnya di chart. Listener ini sengaja TIDAK
+// stopPropagation: klik itu harus tetap sampai ke chart & tool lain. Saat klik ke-2 jalur rail,
+// measureId masih null (baru diisi di onDrawEnd) → klik penyelesai tak membuang dirinya sendiri.
+$('#chart').addEventListener('mousedown',(e)=>{ if(!e.shiftKey) clearMeasure(); });
+

@@ -27,6 +27,7 @@ function reanchorFuturePoints(snap){
 }
 async function switchTF(tf){
   track('timeframe',{tf});
+  try{ clearMeasure(); }catch(_){}   // titik ukur ber-anchor indeks TF lama → tak bermakna di TF baru
   if(T==null){ currentTF=tf; localStorage.setItem('br_tf',tf); highlightTF(); setStatus('Load first.'); return; }
   // (re)fetch bila belum ada ATAU cache tak mencakup kursor T: T sebelum bar pertama →
   // revealed() kosong (chart blank); T melewati bar terakhir → cache basi, bar depan hilang.
