@@ -35,3 +35,6 @@ report/
 
 # Skrip Pine (TradingView) milik pemilik repo — bukan bagian aplikasi.
 mml.pine
+
+# Scratchpad kerja lokal (log run, patch sementara, backup) — bukan sumber
+scratchpad/
