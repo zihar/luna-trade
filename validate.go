@@ -25,15 +25,15 @@ type orderInput struct {
 func validateOrder(cfg Config, raw []byte) (OrderRequest, error) {
 	var in orderInput
 	if err := json.Unmarshal(raw, &in); err != nil {
-		return OrderRequest{}, fmt.Errorf("body tidak valid: %v", err)
+		return OrderRequest{}, fmt.Errorf("Invalid request body: %v", err)
 	}
 
 	inst := strings.TrimSpace(in.Instrument)
 	if inst == "" {
-		return OrderRequest{}, fmt.Errorf("instrument wajib")
+		return OrderRequest{}, fmt.Errorf("Instrument is required.")
 	}
 	if !instrumentAllowed(cfg, inst) {
-		return OrderRequest{}, fmt.Errorf("instrument %q tidak diizinkan (cek WHITELIST_INSTRUMENTS)", inst)
+		return OrderRequest{}, fmt.Errorf("Instrument %q isn't allowed.", inst)
 	}
 
 	var side Side
@@ -43,7 +43,7 @@ func validateOrder(cfg Config, raw []byte) (OrderRequest, error) {
 	case "sell":
 		side = Sell
 	default:
-		return OrderRequest{}, fmt.Errorf("side harus buy/sell")
+		return OrderRequest{}, fmt.Errorf("Side must be buy or sell.")
 	}
 
 	var typ OrderType
@@ -55,27 +55,27 @@ func validateOrder(cfg Config, raw []byte) (OrderRequest, error) {
 	case "stop":
 		typ = Stop
 	default:
-		return OrderRequest{}, fmt.Errorf("type harus market/limit/stop")
+		return OrderRequest{}, fmt.Errorf("Type must be market, limit, or stop.")
 	}
 
 	if in.Units <= 0 {
-		return OrderRequest{}, fmt.Errorf("units harus > 0")
+		return OrderRequest{}, fmt.Errorf("Units must be greater than 0.")
 	}
 	if in.Units > cfg.MaxOrderUnits {
-		return OrderRequest{}, fmt.Errorf("units %.0f melebihi cap %.0f (MAX_ORDER_UNITS)", in.Units, cfg.MaxOrderUnits)
+		return OrderRequest{}, fmt.Errorf("Units %.0f exceed the %.0f cap.", in.Units, cfg.MaxOrderUnits)
 	}
 
 	if typ != Market && (in.Price == nil || *in.Price <= 0) {
-		return OrderRequest{}, fmt.Errorf("price wajib & > 0 untuk order %s", typ)
+		return OrderRequest{}, fmt.Errorf("Price is required and must be greater than 0 for a %s order.", typ)
 	}
 	if in.SL != nil && *in.SL <= 0 {
-		return OrderRequest{}, fmt.Errorf("sl harus > 0")
+		return OrderRequest{}, fmt.Errorf("Stop Loss must be greater than 0.")
 	}
 	if in.TP != nil && *in.TP <= 0 {
-		return OrderRequest{}, fmt.Errorf("tp harus > 0")
+		return OrderRequest{}, fmt.Errorf("Take Profit must be greater than 0.")
 	}
 	if in.Trail != nil && *in.Trail <= 0 {
-		return OrderRequest{}, fmt.Errorf("trail harus > 0")
+		return OrderRequest{}, fmt.Errorf("Trailing distance must be greater than 0.")
 	}
 
 	return OrderRequest{

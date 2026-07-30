@@ -5,17 +5,19 @@ let paperLines={};   // posId -> {entry,sl,tp}  (id overlay garis)
 let posDom={};       // posId -> {entry,sl,tp}  (elemen DOM)
 let posLayerEl=null;
 function posById(id){ return currentPositions().find(x=>x.id===id); }
-// Sumber posisi on-chart terpadu: Live → SP.positions; Replay → trade (dibungkus jadi posisi).
-const REPLAY_ID = -1;
-function replayPos(){
-  if(!trade) return null;
-  const cur=currentCandle(), price=cur?cur.close:trade.entry, units=trade.units||0;
-  return { id:REPLAY_ID, src:'replay', instrument:trade.instrument||inst,
-    dir:trade.dir, units, entry:trade.entry, price, sl:trade.sl, tp:trade.tp,
-    unrealizedPl: pnlUsd(trade.dir,trade.entry,price,units),
-    margin: units*trade.entry*quoteToUsd(trade.entry)/100 };
+// Sumber posisi on-chart terpadu: Live → SP.positions; Replay → trades (dibungkus jadi posisi).
+// id replay NEGATIF (-1,-2,…); id Live berasal dari rowid SQLite → selalu ≥1, jadi tandanya
+// cukup sebagai diskriminator (menggantikan sentinel REPLAY_ID lama).
+function isReplayId(id){ return id<0; }
+function tradeById(id){ return trades.find(t=>t.id===id)||null; }
+function replayPosView(t){
+  const cur=currentCandle(), mid=cur?cur.close:t.entry, price=replayMarkPx(t.dir,mid), units=t.units||0;
+  return { id:t.id, no:t.no, src:'replay', instrument:t.instrument||inst,
+    dir:t.dir, units, entry:t.entry, price, sl:t.sl, tp:t.tp,
+    unrealizedPl: pnlUsd(t.dir,t.entry,price,units),
+    margin: units*t.entry*quoteToUsd(t.entry)/100 };
 }
-function currentPositions(){ if(spActive()) return SP.positions||[]; const rp=replayPos(); return rp?[rp]:[]; }
+function currentPositions(){ return spActive() ? (SP.positions||[]) : trades.map(replayPosView); }
 function posPnlStr(v){ return (v>=0?'+':'-')+'$'+Math.abs(+v||0).toFixed(2); }
 function posLayer(){
   const host=document.getElementById('chart');
@@ -98,7 +100,9 @@ function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
   posConfirmEl.classList.add('show');
 }
 function confirmClosePos(id,anchor){
-  if(id===REPLAY_ID){ miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle(); if(c) closeTrade(c.close,c.timestamp); drawPaperLines(); },null,anchor); return; }
+  if(isReplayId(id)){ const t=tradeById(id); if(!t) return;
+    miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle();
+      if(c) closeTrade(id, replayMarkPx(t.dir,c.close), c.timestamp); drawPaperLines(); },null,anchor); return; }
   miniConfirm(`Close position #${id}?`,'Close',()=>spClose(id),null,anchor);
 }
 // ---- drag SL/TP di view-mode: preview saat digeser, konfirmasi saat dilepas ----
@@ -111,7 +115,11 @@ function previewPosLevel(id,kind,v){
 }
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
-  if(id===REPLAY_ID){ if(!trade) return; trade[kind]=+v; if(kind==='sl') recalcRisk();
+  if(isReplayId(id)){ const t=tradeById(id); if(!t) return;
+    const ba=curBidAsk();
+    const bad = ba ? validateSLTPReplay(t.dir, kind==='sl'?+v:t.sl, kind==='tp'?+v:t.tp, ba.bid, ba.ask) : null;
+    if(bad){ toast(bad,'error'); drawPaperLines(); return; }   // cermin 400 dari /api/position/sltp
+    t[kind]=+v; if(kind==='sl') recalcRisk(t);
     toast(kind.toUpperCase()+' updated','success'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -192,13 +200,13 @@ function clearPaperLines(){ Object.values(paperLines).forEach(rec=>['entry','sl'
 function posLevel(p,kind,draggable){
   const value = kind==='entry'?p.entry : kind==='sl'?p.sl : p.tp;
   if(kind==='entry'){
-    // Entry: klik → editor. Drag hanya untuk trade replay (p.id===REPLAY_ID) → geser
+    // Entry: klik → editor. Drag hanya untuk posisi replay (id negatif) → geser
     // entry trade secara live tanpa konfirmasi (meniru perilaku lama tradeLevel entry).
     return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable, extendData:posExtend(p,kind),
       onClick:()=>{ openPositionEditor(p.id); return false; },
-      onPressedMoving:(e)=>{ if(p.id!==REPLAY_ID||!trade) return false;
+      onPressedMoving:(e)=>{ const t=tradeById(p.id); if(!t) return false;
         const v=e.overlay.points[0]&&e.overlay.points[0].value; if(v==null) return false;
-        trade.entry=v; try{renderPosDom(posById(p.id));}catch(_){} updateOpenTradeBox(); return false; },
+        t.entry=v; try{renderPosDom(posById(p.id));}catch(_){} updateOpenTradeBox(); return false; },
     });
   }
   return chart.createOverlay({ name:'tradeLevel', points:[{value}], lock:!draggable,
@@ -222,7 +230,7 @@ function drawPaperLines(){
     const rec=paperLines[p.id]||(paperLines[p.id]={entry:null,sl:null,tp:null});
     // entry (garis biru + pill P&L live di DOM)
     if(rec.entry) try{chart.overrideOverlay({id:rec.entry, points:[{value:p.entry}], extendData:posExtend(p,'entry')});}catch(e){}
-    else rec.entry=posLevel(p,'entry', p.id===REPLAY_ID);   // entry replay bisa di-drag; entry live tidak
+    else rec.entry=posLevel(p,'entry', isReplayId(p.id));   // entry replay bisa di-drag; entry live tidak
     // posisi yg sedang diedit: garis SL/TP staged dikelola panel/drag → jangan disentuh; segarkan panel + node DOM
     if(editingPosId===p.id){ if(editPos){ editPos.price=+p.price; renderPosEdit(); } renderPosDom(p); return; }
     // lainnya: garis SL/TP = state server. Garis BISA digeser langsung (ala TradingView):
@@ -333,7 +341,12 @@ function renderPosEdit(skipPriceInputs){
 }
 function commitPosSLTP(){
   if(!editPos) return;
-  if(editPos.id===REPLAY_ID){ if(trade){ trade.sl=editPos.slOn?+editPos.sl:null; trade.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(); }
+  if(isReplayId(editPos.id)){ const t=tradeById(editPos.id); if(!t){ closePositionEditor(); return; }
+    const nsl=editPos.slOn?+editPos.sl:null, ntp=editPos.tpOn?+editPos.tp:null;
+    const ba=curBidAsk();
+    const bad = ba ? validateSLTPReplay(t.dir,nsl,ntp,ba.bid,ba.ask) : null;
+    if(bad){ toast(bad,'error'); return; }
+    t.sl=nsl; t.tp=ntp; recalcRisk(t);
     toast('SL/TP updated','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -358,24 +371,37 @@ function openPositionEditor(id){
   posEditEl.style.left=Math.max(8,x)+'px'; posEditEl.style.top=Math.max(8,y)+'px';
   posEditEl.classList.add('show'); renderPosEdit(); renderPosDom(p);
 }
-function recalcRisk(){
-  if(!trade) return;
+function recalcRisk(t){
+  if(!t) return;
   // lot tetap (sizing berbasis lot ala TradeLocker) — geser SL hanya ubah jarak risiko/$ & R, bukan ukuran lot
-  if(trade.sl!=null) trade.risk=Math.abs(trade.entry-trade.sl)||trade.risk;
+  if(t.sl!=null) t.risk=Math.abs(t.entry-t.sl)||t.risk;
 }
-function checkTrade(c){
-  if(!trade) return;
-  if(trade.time!=null && c.timestamp < trade.time) return;   // jangan evaluasi bar SEBELUM entry (mis. re-tread Prev) → cegah spurious close / journal durasi-negatif
-  let exit=null;
-  if(trade.dir==='long'){ if(trade.sl!=null && c.low<=trade.sl) exit=trade.sl; else if(trade.tp!=null && c.high>=trade.tp) exit=trade.tp; }
-  else{ if(trade.sl!=null && c.high>=trade.sl) exit=trade.sl; else if(trade.tp!=null && c.low<=trade.tp) exit=trade.tp; }
-  if(exit!==null){ closeTrade(exit,c.timestamp); return; }
-  // trailing stop: rapatkan SL ke arah profit utk bar berikutnya (pakai ekstrem bar yang sudah close)
-  if(trade.trail>0 && trade.sl!=null){
-    const ns = trade.dir==='long' ? c.high-trade.trail : c.low+trade.trail;
-    const better = trade.dir==='long' ? ns>trade.sl : ns<trade.sl;
-    if(better){ trade.sl=ns; moveLine(trade.lineSL,trade.sl); }
-  }
+function checkTrades(c, close){
+  if(!trades.length) return;
+  const h=synthHalfSpread();
+  trades.slice().forEach(t=>{
+    // Grace pasca-entry (padanan grace 2 detik di paper_monitor.go): sub-bar yang tutup pada atau
+    // sebelum momen entry tak boleh mengeksekusi SL/TP — harga yang sudah terjadi sebelum tombol
+    // Buy ditekan bukan milik posisi ini.
+    if(t.fillFrom!=null && close!=null && close<=t.fillFrom) return;
+    // low/high candle adalah MID → seri bid = mid-½s, seri ask = mid+½s (cermin paper_monitor.go:
+    // long dinilai di bid, short di ask). Harga exit = level SL/TP itu sendiri.
+    let exit=null;
+    if(t.dir==='long'){
+      if(t.sl!=null && c.low-h<=t.sl) exit=t.sl;
+      else if(t.tp!=null && c.high-h>=t.tp) exit=t.tp;
+    } else {
+      if(t.sl!=null && c.high+h>=t.sl) exit=t.sl;
+      else if(t.tp!=null && c.low+h<=t.tp) exit=t.tp;
+    }
+    if(exit!==null){ closeTrade(t.id,exit,c.timestamp); return; }
+    if(t.trail>0 && t.sl!=null){
+      const ns = t.dir==='long' ? (c.high-h)-t.trail : (c.low+h)+t.trail;
+      const better = t.dir==='long' ? ns>t.sl : ns<t.sl;
+      if(better) t.sl=ns;
+    }
+  });
 }
-// dipanggil tiap bar baru terungkap: cek pending dulu (bisa tereksekusi), lalu SL/TP, lalu alert
-function onNewBar(c){ checkPending(c); checkTrade(c); checkAlerts(c); }
+// dipanggil tiap bar baru terungkap (juga dari jalur LIVE, js/live-refresh.js — di sana
+// `trades` selalu kosong sehingga dua cek pertama no-op dan hanya checkAlerts yang bekerja).
+function onNewBar(c){ const close=stepBarTs(currentTF,c.timestamp,1); checkPending(c,close); checkTrades(c,close); checkAlerts(c); }

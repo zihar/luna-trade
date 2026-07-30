@@ -424,7 +424,7 @@ func (s *Store) UpdatePaperSLTP(userID, id int64, sl, tp *float64) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return errors.New("posisi tidak ditemukan atau sudah ditutup")
+		return errors.New("Position not found or already closed.")
 	}
 	return nil
 }
@@ -478,7 +478,7 @@ func (s *Store) ClosePaperTrade(userID, id int64, exit, pnlCcy float64, exitTime
 		return 0, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return 0, errors.New("posisi tidak ditemukan atau sudah ditutup")
+		return 0, errors.New("Position not found or already closed.")
 	}
 	if _, err = tx.Exec(`UPDATE paper_accounts SET balance=balance+? WHERE user_id=?`, pnlCcy, userID); err != nil {
 		return 0, err

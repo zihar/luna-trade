@@ -69,7 +69,9 @@ function suggestLotsFromRisk(){
   const u=unitsFromRisk(bal,rp,cur.close,cur.close-slp*pip);
   return u/unitsPer();
 }
-function refreshLotSuggestion(){ if(lotsManual||trade||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
+// saran lot dari Risk% terus berjalan meski ada posisi terbuka — tiket berikutnya tetap perlu
+// disarankan ukurannya (cermin Live). Hanya `lotsManual` & toggle Risk yang menghentikannya.
+function refreshLotSuggestion(){ if(lotsManual||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
 // harga dgn pemisah ribuan (ala TradeLocker): 4,117.74 / 1.14088
 function fmtPx(p){ if(p==null||isNaN(p)) return '—';
   return (+p).toLocaleString('en-US',{minimumFractionDigits:priceDecimals(),maximumFractionDigits:priceDecimals()}); }

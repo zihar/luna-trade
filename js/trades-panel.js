@@ -12,7 +12,7 @@ function emptyRow(span,title,hint,icon){ return `<tr><td class="tp-empty" colspa
 function renderTrades(){
   if(spActive()){ spRenderTrades(); return; }   // posisi/closed live = server
   // jumlah di tab
-  $('#tpNPos').textContent  = trade?1:0;
+  $('#tpNPos').textContent  = trades.length;
   $('#tpNPend').textContent = pending?1:0;
   // aktifkan tab + pane
   document.querySelectorAll('#tpTabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===activeTradeTab));
@@ -25,21 +25,23 @@ function renderTrades(){
   const sym=dispSym(inst);
   const cur=currentCandle();
   if(activeTradeTab==='positions'){
-    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Stop Loss','Take Profit','Margin','Profit & Loss','Actions']);
-    if(!trade){ body.innerHTML=emptyRow(9,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
-    const mkt=cur?cur.close:trade.entry;
-    const pl=pnlUsd(trade.dir,trade.entry,mkt,trade.units||0);
-    const margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100;
-    body.innerHTML=`<tr>
+    // header identik Live (spRenderTrades): 8 kolom, SL & TP digabung satu sel
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','SL / TP','Margin','Profit & Loss','Actions']);
+    if(!trades.length){ body.innerHTML=emptyRow(8,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
+    body.innerHTML=trades.map(t=>{
+      const mkt=cur?replayMarkPx(t.dir,cur.close):t.entry;
+      const pl=pnlUsd(t.dir,t.entry,mkt,t.units||0);
+      const margin=(t.units||0)*t.entry*quoteToUsd(t.entry)/100;
+      return `<tr>
       <td><b>${sym}</b></td>
-      <td class="${sideCls(trade.dir)}">${sideTxt(trade.dir)}</td>
-      <td>${lotLabel(trade.units||0)}</td>
-      <td>${fmt(trade.entry)} / ${fmt(mkt)}</td>
-      <td>${fmt(trade.sl)}</td>
-      <td>${fmt(trade.tp)}</td>
+      <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}</td>
+      <td>${lotLabel(t.units||0)}</td>
+      <td>${fmt(t.entry)} / ${fmt(mkt)}</td>
+      <td><span class="t-neg">${t.sl!=null?fmt(t.sl):'—'}</span> / <span class="t-pos">${t.tp!=null?fmt(t.tp):'—'}</span></td>
       <td>${usdFmt(margin)}</td>
       <td class="${pl>=0?'t-pos':'t-neg'}">${pl>=0?'+':''}${usdFmt(pl)}</td>
-      <td class="t-act"><button data-act="close">Close</button></td></tr>`;
+      <td class="t-act"><button data-act="close" data-id="${t.id}">Close</button></td></tr>`;
+    }).join('');
   } else if(activeTradeTab==='pending'){
     head.innerHTML=thRow(['Instrument','Side','Type','Entry','Stop Loss','Take Profit','Size','Actions']);
     if(!pending){ body.innerHTML=emptyRow(8,'No pending orders','Switch the order ticket to Pending to place one away from price.'); return; }
@@ -74,11 +76,11 @@ document.querySelectorAll('#tpTabs button').forEach(b=>b.onclick=()=>{
   if($('#bottompanel').classList.contains('collapsed')) toggleTrades();   // buka kalau ke-collapse
   renderTrades();
 });
-// aksi per baris (Close / Close ½ / Cancel)
+// aksi per baris (Close / Cancel)
 $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-act]'); if(!b) return;
   const a=b.dataset.act;
-  if(a==='close') broker.closeMarket();
-  else if(a==='partial') partialClose(0.5);
+  if(a==='close'){ const t=trades.find(x=>x.id===+b.dataset.id), c=currentCandle();
+    if(t&&c) closeTrade(t.id, replayMarkPx(t.dir,c.close), c.timestamp); }
   else if(a==='cancel') cancelPending();
 });
 // aksi tutup posisi akun live (server) per baris
@@ -87,9 +89,8 @@ function saveJournal(){ localStorage.setItem('br_journal',JSON.stringify(journal
 function loadJournal(){ try{journal=JSON.parse(localStorage.getItem('br_journal'))||[]}catch(e){journal=[]} }
 $('#resetBtn').onclick=()=>{ if(spActive()){ setStatus("Reset only applies in Bar Replay — live accounts can't be cleared.",true); return; } if(confirm('Delete all trade history?')){ journal=[]; resetTrade(); saveJournal(); renderStats(); renderTrades(); } };
 function resetTrade(){
-  if(trade){['lineEntry','lineSL','lineTP'].forEach(k=>{if(trade[k]){try{chart.removeOverlay(trade[k]);}catch(e){}}});}
   clearPendingLines(); pending=null;
-  trade=null;
-  try{ drawPaperLines(); }catch(e){}   // bersihkan garis/pill on-chart trade replay
+  trades=[]; replaySeq=0;
+  try{ drawPaperLines(); }catch(e){}   // bersihkan garis/pill on-chart posisi replay
 }
 

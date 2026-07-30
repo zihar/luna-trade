@@ -33,7 +33,7 @@ function drawEquity(){
   ctx.clearRect(0,0,w,h);
   const recs=journal.filter(t=>t.balanceAfter!=null);
   if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px '+getCSS('--font-num');
-    ctx.fillText('Belum ada trade selesai (mode $).',8,h/2); return; }
+    ctx.fillText('No closed trades yet ($ mode).',8,h/2); return; }
   const start=recs[0].balanceAfter-(recs[0].pnlCcy||0);
   const pts=[start,...recs.map(r=>r.balanceAfter)];
   const mn=Math.min(...pts), mx=Math.max(...pts), rng=(mx-mn)||1;
@@ -51,14 +51,14 @@ function getCSS(v){ return getComputedStyle(document.body).getPropertyValue(v).t
 function renderAcct(){
   if(spActive()){ spRenderAcct(); return; }   // akun live = server
   const bal=+$('#balance').value||0;
-  let openPnl=0;
-  if(trade){ const cur=currentCandle(); if(cur) openPnl=pnlUsd(trade.dir,trade.entry,cur.close,trade.units||0); }
+  let openPnl=0; { const cur=currentCandle();
+    if(cur) trades.forEach(t=>{ openPnl+=pnlUsd(t.dir,t.entry,replayMarkPx(t.dir,cur.close),t.units||0); }); }
   const eq=bal+openPnl;
   const usd=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   $('#acBal').textContent=usd(bal);
   const o=$('#acOpen'); o.textContent=(openPnl>=0?'+':'-')+usd(Math.abs(openPnl)); o.className=openPnl>=0?'pos':'neg';
   $('#acEq').textContent=usd(eq);
-  let margin=0; if(trade){ margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100; }   // leverage 100
+  let margin=0; trades.forEach(t=>{ margin+=(t.units||0)*t.entry*quoteToUsd(t.entry)/100; });   // leverage 100
   const m=$('#acMargin'); if(m) m.textContent=usd(margin);
   const fm=$('#acFree'); if(fm) fm.textContent=usd(eq-margin);
 }

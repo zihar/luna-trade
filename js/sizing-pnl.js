@@ -42,23 +42,47 @@ function pnlUsd(dir,entry,exit,units){
   const mul = dir==='long'?1:-1;
   return (exit-entry)*mul*units*quoteToUsd(exit);
 }
+// Spread sintetis Bar Replay. Live memakai bid/ask sungguhan dari Hub; replay tak punya tick,
+// jadi ia diturunkan dari candle dengan lebar yang SAMA seperti curBidAsk (js/render.js) —
+// satu sumber angka supaya entry, valuasi, dan pemicu SL/TP tak pernah memakai spread berbeda.
+function synthHalfSpread(){ return (+$('#pipSize').value||instSpec().pip)*1.6/2; }
+// Harga mark/exit: long dinilai di bid, short di ask (cermin markPrice di paper.go).
+// Akibatnya posisi baru langsung minus sebesar spread — sama seperti akun Live.
+function replayMarkPx(dir, mid){ const h=synthHalfSpread(); return dir==='long' ? mid-h : mid+h; }
+// Cermin sltpError (paper.go): tolak SL/TP yang sudah di dalam spread supaya posisi tak
+// langsung stop-out. Short dinilai di ask, long di bid. Kalimatnya HARUS sama dengan versi
+// Go — keduanya dipin test (paper_sltp_test.go & tests/trading/replay-live-parity.spec.js).
+// Kembalikan pesan error, atau null bila valid / harga belum tersedia.
+function validateSLTPReplay(dir, sl, tp, bid, ask){
+  if(!(bid>0) || !(ask>0)) return null;
+  if(dir==='short'){
+    if(sl!=null && sl<=ask) return 'Stop Loss is inside the spread — place it above the Ask price.';
+    if(tp!=null && tp>=ask) return 'Take Profit is inside the spread — place it below the Ask price.';
+    return null;
+  }
+  if(sl!=null && sl>=bid) return 'Stop Loss is inside the spread — place it below the Bid price.';
+  if(tp!=null && tp<=bid) return 'Take Profit is inside the spread — place it above the Bid price.';
+  return null;
+}
 function lotLabel(units){
   if(inst.includes('BTC')) return units.toFixed(4)+' BTC';
   if(inst.includes('XAU')||inst.includes('XAG')) return (units/100).toFixed(2)+' lot';
   return (units/100000).toFixed(2)+' lot';
 }
-// readout ukuran posisi: pakai trade aktif kalau ada, kalau tidak → preview dari input
+// readout ukuran posisi: SELALU preview dari input tiket (sama seperti Live, yang tak pernah
+// membaca posisi terbuka di sini) — posisi yang sudah jalan punya pill P&L-nya sendiri di chart.
+// Dengan banyak posisi terbuka, membaca trades[0] juga sudah tak punya arti: satu posisi
+// sembarang bukan wakil tiket yang sedang disiapkan pengguna.
 function renderSizing(){
   const box=$('#sizingBox'); if(!box) return;
-  const bal=+$('#balance').value||0, rp=+$('#riskPct').value||0;
-  let entry,sl,tp,dir;
-  if(trade){ entry=trade.entry; sl=trade.sl; tp=trade.tp; dir=trade.dir; }
-  else{
-    const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
-    const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rr=rrVal();
-    entry=cur.close; dir='long'; sl=entry-slp*pip; tp=entry+slp*pip*rr;
-  }
-  const units = trade ? (trade.units||0) : currentLots()*unitsPer();   // sizing berbasis lot
+  const bal=+$('#balance').value||0;
+  const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rrp=rrVal();
+  const dir=orderDir, ba=curBidAsk();
+  const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // masuk di bid/ask, cermin openTrade
+  const sl = dir==='long' ? entry-slp*pip : entry+slp*pip;
+  const tp = dir==='long' ? entry+slp*pip*rrp : entry-slp*pip*rrp;
+  const units = currentLots()*unitsPer();   // sizing berbasis lot
   const riskUsd=Math.abs(pnlUsd(dir,entry,sl,units));
   const rewUsd=Math.abs(pnlUsd(dir,entry,tp,units));
   const rr = Math.abs(entry-sl)>0 ? Math.abs(tp-entry)/Math.abs(entry-sl) : 0;
@@ -67,25 +91,33 @@ function renderSizing(){
     `<span>Size: <b>${lotLabel(units)}</b> · ${Math.round(units).toLocaleString('en-US')} u</span>`+
     `<span>Risk: <b class="neg">$${riskUsd.toFixed(2)}</b> (${pctRisk.toFixed(2)}%)</span>`+
     `<span>Reward: <b class="pos">$${rewUsd.toFixed(2)}</b></span>`+
-    `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`+
-    (trade?'':`<span style="opacity:.7">(preview — entry = current price, dir long)</span>`);
+    `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`;
 }
 
 // ===================== trade (drag garis) =====================
 function openTrade(dir){
-  if(T==null||trade) return;
+  if(T==null) return;   // banyak posisi diizinkan (cermin Live: tiap order = posisi baru)
   const cur=currentCandle(); if(!cur) return;
-  track('order',{dir,inst});
+  const units=currentLots()*unitsPer();
+  if(!(units>0)){ setStatus('Lot must be greater than 0.',true); return; }   // kalimat identik ServerPaperBroker
   const ba=curBidAsk();
   const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // eksekusi di bid (sell) / ask (buy)
-  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal();
-  const dist=slp*pip;
-  const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
-  const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
-  const tp = tpOn ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
-  trade={dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
-         trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
-         instrument:inst, time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal();
+  const dist=slp*pip, dec=priceDecimals();
+  // slp>0 wajib: tanpa guard ini SL/TP jatuh TEPAT di entry lalu kena instan (cermin ServerPaperBroker).
+  let sl=null, tp=null;
+  if(slp>0){
+    if($('#slOn').checked) sl=+(dir==='long'?entry-dist:entry+dist).toFixed(dec);
+    if($('#tpOn').checked) tp=+(dir==='long'?entry+dist*rr:entry-dist*rr).toFixed(dec);
+  }
+  const bad = ba ? validateSLTPReplay(dir,sl,tp,ba.bid,ba.ask) : null;
+  if(bad){ toast(bad,'error'); return; }   // cermin 400 dari /api/order
+  track('order',{dir,inst});
+  const no=++replaySeq;
+  trades.push({id:-no,no,dir,entry,sl,tp,risk:dist,units,
+               trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
+               instrument:inst, time:T, fillFrom:T});
+  toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+dispSym(inst)+' @ '+fmtFor(inst,entry),'success');
   clearDraftLines(); drawPaperLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)

@@ -91,6 +91,7 @@ tests/
                           31 presisi drag · 40 modal/teks · 50 rail · 60 magnet/TF
                           70 reticle
   chart/                  perilaku data chart (live/forming candle) — bukan drawing
+  trading/                semantik order & posisi (parity replay↔Live) — bukan drawing
   smoke/areas.spec.js     1 test tipis per area non-drawing
   integration/            @integration (butuh server Go)
   build-gallery.js        globalTeardown → report/gallery.html
