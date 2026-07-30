@@ -88,3 +88,47 @@ klinecharts.registerOverlay({
 // measureId masih null (baru diisi di onDrawEnd) → klik penyelesai tak membuang dirinya sendiri.
 $('#chart').addEventListener('mousedown',(e)=>{ if(!e.shiftKey) clearMeasure(); });
 
+
+// ---- Shift + tekan-geser-lepas: ukur kilat tanpa menyentuh rail ----
+// mousedown dipasang di fase CAPTURE lalu stopPropagation → handler klinecharts (terpasang di
+// canvas, fase bubble) tak pernah melihatnya, jadi chart TIDAK nge-pan. Trik & alasan yang sama
+// dipakai Shift+wheel untuk skala harga (js/price-scale.js).
+// mousemove/mouseup dipasang di WINDOW, bukan #chart: kalau tombol dilepas di luar chart, mouseup
+// pada #chart tak pernah datang dan overlay akan nyangkut.
+(function attachMeasureDrag(){
+  const el=$('#chart'); if(!el) return;
+  let dragging=false;
+  function ptFromEvent(e){
+    const r=el.getBoundingClientRect();
+    const px=e.clientX-r.left, py=e.clientY-r.top;
+    const xa=fracAnchorFromPx(px);
+    let v=pxToValue(py);
+    if(!xa || v==null) return null;
+    // magnet dihormati di jalur ini juga — kalau tidak, dua pintu masuk bisa memberi angka
+    // berbeda untuk gestur yang sama.
+    if(magnetOn){ const t=tsOf(xa);
+      if(t!=null){ const s=magnetSnap(t, v, px, py); if(s) v=s.value; } }
+    return Object.assign({value:v}, xa);
+  }
+  el.addEventListener('mousedown',(e)=>{
+    if(!e.shiftKey || e.button!==0) return;
+    if(inProgressId || eraserOn) return;                 // sedang menggambar / mode hapus → jangan rebut
+    const tgt=e.target; if(!tgt || tgt.tagName!=='CANVAS') return;
+    const p=ptFromEvent(e); if(!p) return;
+    e.preventDefault(); e.stopPropagation();
+    clearMeasure();
+    // lock:true → objek tak bisa dipilih/digeser; ia hanya hidup selama gestur ini
+    try{ measureId=chart.createOverlay({name:'measure', points:[p,p], lock:true}); }catch(_){ measureId=null; }
+    dragging=(measureId!=null);
+  },{capture:true});
+  window.addEventListener('mousemove',(e)=>{
+    if(!dragging || measureId==null) return;
+    const p=ptFromEvent(e); if(!p) return;
+    try{ const o=chart.getOverlayById(measureId);
+      if(o&&o.points&&o.points.length) chart.overrideOverlay({id:measureId, points:[o.points[0], p]});
+    }catch(_){}
+  },{capture:true});
+  const stop=()=>{ if(!dragging) return; dragging=false; clearMeasure(); };
+  window.addEventListener('mouseup', stop, {capture:true});
+  window.addEventListener('blur', stop);
+})();

@@ -10,7 +10,7 @@
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { overlays } = require('../helpers/draw');
-const { chartRect } = require('../helpers/chart');
+const { chartRect, barSpaceApi } = require('../helpers/chart');
 
 /** Arm measure lewat hotkey, lalu selesaikan 2 klik (jeda 400ms — jebakan klik canvas, tests/README.md). */
 async function drawMeasure(page, rect) {
@@ -149,6 +149,68 @@ test.describe('measure: jalur rail & siklus hidup ephemeral', () => {
     await page.waitForFunction(() => currentTF === 'H1', null, { timeout: 8000 });
     expect(await page.evaluate(() => measureId), 'ganti TF membuang measure').toBeNull();
     expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(false);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('measure: Shift+drag', () => {
+  /** Posisi-x candle terakhir — berubah kalau chart ikut nge-pan. */
+  const lastBarX = (page) =>
+    page.evaluate(() => {
+      const a = tfData[currentTF];
+      let c = chart.convertToPixel(
+        { timestamp: a[a.length - 1].timestamp, value: 0 },
+        { paneId: 'candle_pane', absolute: true }
+      );
+      if (Array.isArray(c)) c = c[0];
+      return c.x;
+    });
+
+  test('hidup selama menggeser, hilang saat dilepas, dan chart TIDAK nge-pan', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+
+    const bsBefore = await barSpaceApi(page);
+    const xBefore = await lastBarX(page);
+
+    await page.keyboard.down('Shift');
+    await page.mouse.move(rect.x + rect.width * 0.35, rect.y + rect.height * 0.6, { steps: 4 });
+    await page.mouse.down();
+    await page.mouse.move(rect.x + rect.width * 0.6, rect.y + rect.height * 0.35, { steps: 8 });
+
+    expect(await page.evaluate(() => measureId), 'measure hidup selama menggeser').not.toBeNull();
+    expect(await page.evaluate(() => chart.getOverlayById(measureId).points.length), 'dua titik').toBe(2);
+    // titik ke-2 mengikuti kursor: harganya harus BEDA dari titik ke-1 (kursor naik 25% tinggi chart)
+    const beda = await page.evaluate(() => {
+      const p = chart.getOverlayById(measureId).points;
+      return Math.abs(p[1].value - p[0].value);
+    });
+    expect(beda, 'titik ke-2 mengikuti kursor').toBeGreaterThan(0);
+
+    await page.mouse.up();
+    await page.keyboard.up('Shift');
+
+    expect(await page.evaluate(() => measureId), 'dilepas → hilang').toBeNull();
+    expect((await overlays(page)).some((o) => o.name === 'measure')).toBe(false);
+
+    expect(await barSpaceApi(page), 'barSpace tak berubah').toBe(bsBefore);
+    expect(Math.abs((await lastBarX(page)) - xBefore), 'chart tak boleh ikut nge-pan').toBeLessThan(1);
+    assertNoPageErrors(page);
+  });
+
+  test('drag TANPA Shift tetap nge-pan chart seperti biasa', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const xBefore = await lastBarX(page);
+
+    await page.mouse.move(rect.x + rect.width * 0.6, rect.y + rect.height * 0.5, { steps: 4 });
+    await page.mouse.down();
+    await page.mouse.move(rect.x + rect.width * 0.35, rect.y + rect.height * 0.5, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    expect(Math.abs((await lastBarX(page)) - xBefore), 'pan biasa harus tetap jalan').toBeGreaterThan(20);
+    expect(await page.evaluate(() => measureId), 'drag biasa tak membuat measure').toBeNull();
     assertNoPageErrors(page);
   });
 });
