@@ -1,9 +1,0 @@
-2026/07/30 13:46:48 Store SQLite siap → luna.db
-2026/07/30 13:46:48 news: warm cache calendar dari snapshot (fetchedAt=2026-07-30T04:44:07Z)
-2026/07/30 13:46:48 news: warm cache headlines dari snapshot (fetchedAt=2026-07-30T04:51:31Z)
-2026/07/30 13:46:48 Connector aktif: oanda (live trading: false, stream: 34 instrumen)
-2026/07/30 13:46:48 pricing hub: upstream START (34 instrumen)
-2026/07/30 13:46:48 Luna Trade (OANDA practice) → http://localhost:8765
-2026/07/30 13:46:48 paper monitor: SL/TP server-side aktif
-2026/07/30 13:46:48 alert monitor: price alert server-side aktif
-2026/07/30 13:46:49 pricing stream putus (ticks=0, err=Get "https://stream-fxpractice.oanda.com/v3/accounts/101-003-39451701-001/pricing/stream?instruments=EUR_USD%2CGBP_USD%2CUSD_JPY%2CUSD_CHF%2CUSD_CAD%2CAUD_USD%2CNZD_USD%2CGBP_JPY%2CEUR_JPY%2CEUR_GBP%2CAUD_JPY%2CEUR_AUD%2CGBP_AUD%2CXAU_USD%2CXAG_USD%2CWTICO_USD%2CBCO_USD%2CNATGAS_USD%2CSPX500_USD%2CNAS100_USD%2CUS30_USD%2CUS2000_USD%2CDE30_EUR%2CUK100_GBP%2CFR40_EUR%2CEU50_EUR%2CJP225_USD%2CAU200_AUD%2CHK33_HKD%2CBTC_USD%2CETH_USD%2CLTC_USD%2CBCH_USD%2CUSD_SEK": read tcp 10.0.54.38:53702->139.255.196.196:443: read: connection reset by peer) — reconnect dalam 1s
