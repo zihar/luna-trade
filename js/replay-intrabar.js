@@ -41,10 +41,17 @@ function placePending(dir){
   const cur=currentCandle(); if(!cur) return;
   const entry=+$('#pendEntry').value;
   if(!entry){ setStatus('Enter the pending Entry price first.',true); return; }
-  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal(), dist=slp*pip;
-  const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
-  const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
-  const tp = tpOn ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal();
+  const dist=slp*pip, dec=priceDecimals();
+  let sl=null, tp=null;
+  if(slp>0){
+    if($('#slOn').checked) sl=+(dir==='long'?entry-dist:entry+dist).toFixed(dec);
+    if($('#tpOn').checked) tp=+(dir==='long'?entry+dist*rr:entry-dist*rr).toFixed(dec);
+  }
+  // Acuan validasi pending = harga ENTRY pending-nya sendiri, bukan harga pasar: SL/TP harus
+  // di sisi yang benar relatif entry. (Live tak punya pending, jadi tak ada cermin langsung.)
+  const bad=validateSLTPReplay(dir,sl,tp,entry,entry);
+  if(bad){ toast(bad,'error'); return; }
   const type = dir==='long' ? (entry<cur.close?'limit':'stop') : (entry>cur.close?'limit':'stop');
   pending={dir,type,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
            trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
@@ -88,6 +95,7 @@ function closeTrade(id,exit,time){
   $('#balance').value=bal.toFixed(2); localStorage.setItem('br_balance',bal.toFixed(2));
   journal.push({time:t.time,exitTime:time,dir:t.dir,entry:t.entry,exit,r,units,pnlCcy,balanceAfter:bal});
   trades.splice(i,1);
+  toast('Closed #'+t.no+'  '+((pnlCcy>=0?'+':'')+usdFmt(pnlCcy)), pnlCcy>=0?'success':'info');   // format identik spClose
   saveJournal(); renderStats(); renderJournal(); updateOpenTradeBox(); renderAcct();
   try{ drawPaperLines(); }catch(e){}   // bersihkan garis/pill on-chart di semua jalur close
 }

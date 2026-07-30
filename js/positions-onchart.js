@@ -115,7 +115,11 @@ function previewPosLevel(id,kind,v){
 }
 function savePosLevel(id,kind,v){
   const p=posById(id); if(!p) return;
-  if(isReplayId(id)){ const t=tradeById(id); if(!t) return; t[kind]=+v; if(kind==='sl') recalcRisk(t);
+  if(isReplayId(id)){ const t=tradeById(id); if(!t) return;
+    const ba=curBidAsk();
+    const bad = ba ? validateSLTPReplay(t.dir, kind==='sl'?+v:t.sl, kind==='tp'?+v:t.tp, ba.bid, ba.ask) : null;
+    if(bad){ toast(bad,'error'); drawPaperLines(); return; }   // cermin 400 dari /api/position/sltp
+    t[kind]=+v; if(kind==='sl') recalcRisk(t);
     toast(kind.toUpperCase()+' updated','success'); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id, sl: kind==='sl'?+v:(p.sl!=null?+p.sl:null), tp: kind==='tp'?+v:(p.tp!=null?+p.tp:null) };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -337,8 +341,12 @@ function renderPosEdit(skipPriceInputs){
 }
 function commitPosSLTP(){
   if(!editPos) return;
-  if(isReplayId(editPos.id)){ const t=tradeById(editPos.id);
-    if(t){ t.sl=editPos.slOn?+editPos.sl:null; t.tp=editPos.tpOn?+editPos.tp:null; recalcRisk(t); }
+  if(isReplayId(editPos.id)){ const t=tradeById(editPos.id); if(!t){ closePositionEditor(); return; }
+    const nsl=editPos.slOn?+editPos.sl:null, ntp=editPos.tpOn?+editPos.tp:null;
+    const ba=curBidAsk();
+    const bad = ba ? validateSLTPReplay(t.dir,nsl,ntp,ba.bid,ba.ask) : null;
+    if(bad){ toast(bad,'error'); return; }
+    t.sl=nsl; t.tp=ntp; recalcRisk(t);
     toast('SL/TP updated','success'); closePositionEditor(); drawPaperLines(); updateOpenTradeBox(); return; }
   const body={ id:editPos.id, sl: editPos.slOn?editPos.sl:null, tp: editPos.tpOn?editPos.tp:null };
   fetch('/api/position/sltp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})

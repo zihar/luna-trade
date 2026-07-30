@@ -49,6 +49,21 @@ function synthHalfSpread(){ return (+$('#pipSize').value||instSpec().pip)*1.6/2;
 // Harga mark/exit: long dinilai di bid, short di ask (cermin markPrice di paper.go).
 // Akibatnya posisi baru langsung minus sebesar spread — sama seperti akun Live.
 function replayMarkPx(dir, mid){ const h=synthHalfSpread(); return dir==='long' ? mid-h : mid+h; }
+// Cermin sltpError (paper.go): tolak SL/TP yang sudah di dalam spread supaya posisi tak
+// langsung stop-out. Short dinilai di ask, long di bid. Kalimatnya HARUS sama dengan versi
+// Go — keduanya dipin test (paper_sltp_test.go & tests/trading/replay-live-parity.spec.js).
+// Kembalikan pesan error, atau null bila valid / harga belum tersedia.
+function validateSLTPReplay(dir, sl, tp, bid, ask){
+  if(!(bid>0) || !(ask>0)) return null;
+  if(dir==='short'){
+    if(sl!=null && sl<=ask) return 'Stop Loss is inside the spread — place it above the Ask price.';
+    if(tp!=null && tp>=ask) return 'Take Profit is inside the spread — place it below the Ask price.';
+    return null;
+  }
+  if(sl!=null && sl>=bid) return 'Stop Loss is inside the spread — place it below the Bid price.';
+  if(tp!=null && tp<=bid) return 'Take Profit is inside the spread — place it above the Bid price.';
+  return null;
+}
 function lotLabel(units){
   if(inst.includes('BTC')) return units.toFixed(4)+' BTC';
   if(inst.includes('XAU')||inst.includes('XAG')) return (units/100).toFixed(2)+' lot';
@@ -82,17 +97,26 @@ function renderSizing(){
 function openTrade(dir){
   if(T==null) return;   // banyak posisi diizinkan (cermin Live: tiap order = posisi baru)
   const cur=currentCandle(); if(!cur) return;
-  track('order',{dir,inst});
+  const units=currentLots()*unitsPer();
+  if(!(units>0)){ setStatus('Lot must be greater than 0.',true); return; }   // kalimat identik ServerPaperBroker
   const ba=curBidAsk();
   const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // eksekusi di bid (sell) / ask (buy)
-  const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal();
-  const dist=slp*pip;
-  const sl = $('#slOn').checked ? (dir==='long'?entry-dist:entry+dist) : null;
-  const tp = $('#tpOn').checked ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal();
+  const dist=slp*pip, dec=priceDecimals();
+  // slp>0 wajib: tanpa guard ini SL/TP jatuh TEPAT di entry lalu kena instan (cermin ServerPaperBroker).
+  let sl=null, tp=null;
+  if(slp>0){
+    if($('#slOn').checked) sl=+(dir==='long'?entry-dist:entry+dist).toFixed(dec);
+    if($('#tpOn').checked) tp=+(dir==='long'?entry+dist*rr:entry-dist*rr).toFixed(dec);
+  }
+  const bad = ba ? validateSLTPReplay(dir,sl,tp,ba.bid,ba.ask) : null;
+  if(bad){ toast(bad,'error'); return; }   // cermin 400 dari /api/order
+  track('order',{dir,inst});
   const no=++replaySeq;
-  trades.push({id:-no,no,dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
+  trades.push({id:-no,no,dir,entry,sl,tp,risk:dist,units,
                trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
-               instrument:inst, time:cur.timestamp, fillFrom:cur.timestamp});
+               instrument:inst, time:T, fillFrom:T});
+  toast((dir==='long'?'BUY':'SELL')+' '+lotLabel(units)+' '+dispSym(inst)+' @ '+fmtFor(inst,entry),'success');
   clearDraftLines(); drawPaperLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)

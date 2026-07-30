@@ -93,3 +93,93 @@ test('pemicu SL memakai bid untuk long (bukan low mid)', async ({ page }) => {
 
   assertNoPageErrors(page);
 });
+
+test('SL ON dengan ticks 0 → posisi terbuka TANPA SL (bukan SL di entry)', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  // Order panel & op2 tersembunyi by default (lihat setTicket() di atas) → buka dulu.
+  if (await page.evaluate(() => getComputedStyle(document.getElementById('orderpanel')).display === 'none')) {
+    await page.click('#toggleOrder');
+  }
+  await page.click('#op2Expand');
+  await page.fill('#lotInput', '0.10');
+  if (!(await page.isChecked('#slOn'))) await page.click('#slCard');
+  await page.fill('#slPips', '0');
+  await page.click('#execBtn');
+
+  const t = await page.evaluate(() => trades[0]);
+  expect(t, 'posisi harus terbuka').toBeTruthy();
+  expect(t.sl, 'SL tak boleh diletakkan di entry').toBeNull();
+});
+
+test('SL/TP dibulatkan ke desimal instrumen', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  await setTicket(page, { slTicks: '37', tpTicks: '91' });
+  await page.click('#execBtn');
+
+  const r = await page.evaluate(() => {
+    const t = trades[0], d = priceDecimals();
+    return { sl: t.sl, tp: t.tp, slR: +t.sl.toFixed(d), tpR: +t.tp.toFixed(d) };
+  });
+  expect(r.sl).toBe(r.slR);
+  expect(r.tp).toBe(r.tpR);
+});
+
+test('SL di dalam spread ditolak dengan pesan yang sama seperti Live', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  await setTicket(page, { tp: false });
+
+  // Arah default tiket = sell. Untuk sell, "di dalam spread" berarti SL <= ask.
+  await page.evaluate(() => { window.__badSL = curBidAsk().ask - synthHalfSpread() / 2; });
+  const msg = await page.evaluate(() =>
+    validateSLTPReplay('short', window.__badSL, null, curBidAsk().bid, curBidAsk().ask)
+  );
+  expect(msg).toBe('Stop Loss is inside the spread — place it above the Ask price.');
+
+  // Jalur nyata: ubah SL posisi terbuka ke dalam spread → toast error & nilai lama bertahan.
+  await page.click('#execBtn');
+  const before = await page.evaluate(() => trades[0].sl);
+  await page.evaluate(() => savePosLevel(trades[0].id, 'sl', window.__badSL));
+  await expect(page.locator('#toast')).toHaveClass(/\bt-error\b/);
+  await expect(page.locator('#toast .toast-msg')).toHaveText(
+    'Stop Loss is inside the spread — place it above the Ask price.'
+  );
+  expect(await page.evaluate(() => trades[0].sl), 'SL lama harus bertahan').toBeCloseTo(before, 10);
+});
+
+test('lot 0 ditolak dengan pesan yang sama seperti Live', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  // Order panel & op2 tersembunyi by default (lihat setTicket() di atas) → buka dulu.
+  if (await page.evaluate(() => getComputedStyle(document.getElementById('orderpanel')).display === 'none')) {
+    await page.click('#toggleOrder');
+  }
+  await page.click('#op2Expand');
+  await page.fill('#lotInput', '0');
+  await page.click('#execBtn');
+
+  expect(await page.evaluate(() => trades.length)).toBe(0);
+  // setStatus(msg, true) tak menulis ke elemen mana pun — ia memanggil toast(msg,'error')
+  // (js/load-chart.js). Jadi yang diperiksa toast-nya, bukan bilah status.
+  await expect(page.locator('#toast')).toHaveClass(/\bt-error\b/);
+  await expect(page.locator('#toast .toast-msg')).toHaveText('Lot must be greater than 0.');
+});
+
+test('toast buka & tutup memakai format Live', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  // Panel Trades collapsed by default → buka dulu supaya tombol Close di #tpBody "visible".
+  if (await page.evaluate(() => document.getElementById('bottompanel').classList.contains('collapsed'))) {
+    await page.click('#toggleTrades');
+  }
+  await setTicket(page);
+  await page.click('#execBtn');
+
+  await expect(page.locator('#toast')).toHaveClass(/\bt-success\b/);
+  await expect(page.locator('#toast .toast-msg')).toHaveText(/^SELL 0\.10 lot .+ @ /);
+
+  await page.click('#tpBody button[data-act="close"]');
+  await expect(page.locator('#toast .toast-msg')).toHaveText(/^Closed #1 {2}[-+]\$/);
+});
