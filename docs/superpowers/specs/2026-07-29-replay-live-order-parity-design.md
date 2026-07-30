@@ -1,5 +1,7 @@
 # Spec: Menyamakan semantik order Bar Replay dengan Live
 
+Status: **TERIMPLEMENTASI** (2026-07-30) — 14 butir beda ditutup semua; verifikasi di
+`tests/smoke/replay-order.spec.js` & `tests/trading/replay-live-parity.spec.js`.
 Tanggal: 2026-07-29
 Berkas terdampak: `js/state.js`, `js/sizing-pnl.js`, `js/replay-intrabar.js`,
 `js/positions-onchart.js`, `js/trades-panel.js`, `js/broker-paper.js`, `js/render.js`,
