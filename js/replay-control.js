@@ -15,7 +15,7 @@ async function step(d){
     if(arr.length-ni<30) autoExtend(currentTF);
   }else{
     if(idx<=0) return;
-    T=arr[idx-1].timestamp+dur;
+    T=barEndAt(currentTF,idx-1,arr);   // tutup bar sebelumnya — cermin cabang maju; `+DUR` meleset di MN
     fillT=T;   // mundur → turunkan frontier ke cursor baru: order/alert yg dibuat/diedit di sini ikut dievaluasi saat maju lagi (bukan ter-skip)
   }
   replayPartial=null;   // Step = 1 bar penuh → T re-align ke boundary, forming bar tak berlaku
