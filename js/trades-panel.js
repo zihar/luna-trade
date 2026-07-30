@@ -25,22 +25,23 @@ function renderTrades(){
   const sym=dispSym(inst);
   const cur=currentCandle();
   if(activeTradeTab==='positions'){
-    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','Stop Loss','Take Profit','Margin','Profit & Loss','Actions']);
-    if(!trades.length){ body.innerHTML=emptyRow(9,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
-    const t0=trades[0];
-    const mkt=cur?cur.close:t0.entry;
-    const pl=pnlUsd(t0.dir,t0.entry,mkt,t0.units||0);
-    const margin=(t0.units||0)*t0.entry*quoteToUsd(t0.entry)/100;
-    body.innerHTML=`<tr>
+    // header identik Live (spRenderTrades): 8 kolom, SL & TP digabung satu sel
+    head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','SL / TP','Margin','Profit & Loss','Actions']);
+    if(!trades.length){ body.innerHTML=emptyRow(8,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
+    body.innerHTML=trades.map(t=>{
+      const mkt=cur?cur.close:t.entry;
+      const pl=pnlUsd(t.dir,t.entry,mkt,t.units||0);
+      const margin=(t.units||0)*t.entry*quoteToUsd(t.entry)/100;
+      return `<tr>
       <td><b>${sym}</b></td>
-      <td class="${sideCls(t0.dir)}">${sideTxt(t0.dir)}</td>
-      <td>${lotLabel(t0.units||0)}</td>
-      <td>${fmt(t0.entry)} / ${fmt(mkt)}</td>
-      <td>${fmt(t0.sl)}</td>
-      <td>${fmt(t0.tp)}</td>
+      <td class="${sideCls(t.dir)}">${sideTxt(t.dir)}</td>
+      <td>${lotLabel(t.units||0)}</td>
+      <td>${fmt(t.entry)} / ${fmt(mkt)}</td>
+      <td><span class="t-neg">${t.sl!=null?fmt(t.sl):'—'}</span> / <span class="t-pos">${t.tp!=null?fmt(t.tp):'—'}</span></td>
       <td>${usdFmt(margin)}</td>
       <td class="${pl>=0?'t-pos':'t-neg'}">${pl>=0?'+':''}${usdFmt(pl)}</td>
-      <td class="t-act"><button data-act="close" data-id="${t0.id}">Close</button></td></tr>`;
+      <td class="t-act"><button data-act="close" data-id="${t.id}">Close</button></td></tr>`;
+    }).join('');
   } else if(activeTradeTab==='pending'){
     head.innerHTML=thRow(['Instrument','Side','Type','Entry','Stop Loss','Take Profit','Size','Actions']);
     if(!pending){ body.innerHTML=emptyRow(8,'No pending orders','Switch the order ticket to Pending to place one away from price.'); return; }

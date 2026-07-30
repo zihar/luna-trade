@@ -36,7 +36,7 @@ async function evalFills(toT){
 function placePending(dir){
   if(T==null){ setStatus('Load first.',true); return; }
   track('pending',{dir,inst});
-  if(trades.length){ setStatus('Close position first (one position at a time).',true); return; }
+  // pending boleh berdampingan dengan posisi terbuka (cermin Live); tetap satu slot pending saja.
   if(pending){ setStatus("There's already a pending — cancel it first.",true); return; }
   const cur=currentCandle(); if(!cur) return;
   const entry=+$('#pendEntry').value;
@@ -65,7 +65,7 @@ function drawPendingLines(){
 function clearPendingLines(){ if(!pending) return; ['lineEntry','lineSL','lineTP'].forEach(k=>{ if(pending[k]){ try{chart.removeOverlay(pending[k]);}catch(e){} }}); }
 function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending cancelled.'); }
 function checkPending(c, close){
-  if(!pending || trades.length) return;                          // guard 1-posisi masih berlaku; dilepas di Task 3
+  if(!pending) return;
   if(pending.fillFrom!=null && c.timestamp < pending.fillFrom) return;   // jangan isi dari bar SEBELUM pending dibuat (re-tread Prev)
   if(!(c.low<=pending.entry && pending.entry<=c.high)) return;   // belum tersentuh
   clearPendingLines();

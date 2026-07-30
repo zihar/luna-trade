@@ -73,7 +73,7 @@ function renderSizing(){
 
 // ===================== trade (drag garis) =====================
 function openTrade(dir){
-  if(T==null||trades.length) return;   // guard 1-posisi masih berlaku; dilepas di Task 3
+  if(T==null) return;   // banyak posisi diizinkan (cermin Live: tiap order = posisi baru)
   const cur=currentCandle(); if(!cur) return;
   track('order',{dir,inst});
   const ba=curBidAsk();
