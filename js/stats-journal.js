@@ -33,7 +33,7 @@ function drawEquity(){
   ctx.clearRect(0,0,w,h);
   const recs=journal.filter(t=>t.balanceAfter!=null);
   if(!recs.length){ ctx.fillStyle=getCSS('--muted'); ctx.font='11px '+getCSS('--font-num');
-    ctx.fillText('Belum ada trade selesai (mode $).',8,h/2); return; }
+    ctx.fillText('No closed trades yet ($ mode).',8,h/2); return; }
   const start=recs[0].balanceAfter-(recs[0].pnlCcy||0);
   const pts=[start,...recs.map(r=>r.balanceAfter)];
   const mn=Math.min(...pts), mx=Math.max(...pts), rng=(mx-mn)||1;

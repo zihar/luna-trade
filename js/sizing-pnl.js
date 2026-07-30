@@ -69,18 +69,20 @@ function lotLabel(units){
   if(inst.includes('XAU')||inst.includes('XAG')) return (units/100).toFixed(2)+' lot';
   return (units/100000).toFixed(2)+' lot';
 }
-// readout ukuran posisi: pakai trade aktif kalau ada, kalau tidak → preview dari input
+// readout ukuran posisi: SELALU preview dari input tiket (sama seperti Live, yang tak pernah
+// membaca posisi terbuka di sini) — posisi yang sudah jalan punya pill P&L-nya sendiri di chart.
+// Dengan banyak posisi terbuka, membaca trades[0] juga sudah tak punya arti: satu posisi
+// sembarang bukan wakil tiket yang sedang disiapkan pengguna.
 function renderSizing(){
   const box=$('#sizingBox'); if(!box) return;
-  const bal=+$('#balance').value||0, rp=+$('#riskPct').value||0;
-  let entry,sl,tp,dir;
-  if(trades.length){ const t0=trades[0]; entry=t0.entry; sl=t0.sl; tp=t0.tp; dir=t0.dir; }
-  else{
-    const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
-    const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rr=rrVal();
-    entry=cur.close; dir='long'; sl=entry-slp*pip; tp=entry+slp*pip*rr;
-  }
-  const units = trades.length ? (trades[0].units||0) : currentLots()*unitsPer();   // sizing berbasis lot
+  const bal=+$('#balance').value||0;
+  const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
+  const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rrp=rrVal();
+  const dir=orderDir, ba=curBidAsk();
+  const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // masuk di bid/ask, cermin openTrade
+  const sl = dir==='long' ? entry-slp*pip : entry+slp*pip;
+  const tp = dir==='long' ? entry+slp*pip*rrp : entry-slp*pip*rrp;
+  const units = currentLots()*unitsPer();   // sizing berbasis lot
   const riskUsd=Math.abs(pnlUsd(dir,entry,sl,units));
   const rewUsd=Math.abs(pnlUsd(dir,entry,tp,units));
   const rr = Math.abs(entry-sl)>0 ? Math.abs(tp-entry)/Math.abs(entry-sl) : 0;
@@ -89,8 +91,7 @@ function renderSizing(){
     `<span>Size: <b>${lotLabel(units)}</b> · ${Math.round(units).toLocaleString('en-US')} u</span>`+
     `<span>Risk: <b class="neg">$${riskUsd.toFixed(2)}</b> (${pctRisk.toFixed(2)}%)</span>`+
     `<span>Reward: <b class="pos">$${rewUsd.toFixed(2)}</b></span>`+
-    `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`+
-    (trades.length?'':`<span style="opacity:.7">(preview — entry = current price, dir long)</span>`);
+    `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`;
 }
 
 // ===================== trade (drag garis) =====================

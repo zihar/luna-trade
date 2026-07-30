@@ -244,3 +244,30 @@ test('grace: pending yang terisi tak langsung ter-stop-out di sub-bar pengisinya
 
   assertNoPageErrors(page);
 });
+
+test('draft SL/TP tetap tampil saat sudah ada posisi (spt Live)', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  await setTicket(page);
+  await page.click('#execBtn');
+
+  // Sentuh tiket supaya renderOrderPanel → drawDraftLines berjalan setelah posisi terbuka.
+  await page.fill('#slPips', '120');
+  await expect(page.locator('#posLayer .pos-node.draft.sl')).toHaveCount(1);
+  await expect(page.locator('#posLayer .pos-node.draft.tp')).toHaveCount(1);
+
+  assertNoPageErrors(page);
+});
+
+test('sizing box selalu preview tiket, bukan angka posisi terbuka', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+  await setTicket(page, { lots: '0.10' });
+  await page.click('#execBtn');
+
+  await page.fill('#lotInput', '0.50');
+  // Ukuran di sizing box mengikuti tiket (0.50), bukan posisi yang terbuka (0.10).
+  await expect(page.locator('#sizingBox')).toContainText('0.50 lot');
+
+  assertNoPageErrors(page);
+});
