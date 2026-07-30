@@ -380,7 +380,10 @@ function checkTrades(c, close){
   if(!trades.length) return;
   const h=synthHalfSpread();
   trades.slice().forEach(t=>{
-    if(t.fillFrom!=null && c.timestamp < t.fillFrom) return;
+    // Grace pasca-entry (padanan grace 2 detik di paper_monitor.go): sub-bar yang tutup pada atau
+    // sebelum momen entry tak boleh mengeksekusi SL/TP — harga yang sudah terjadi sebelum tombol
+    // Buy ditekan bukan milik posisi ini.
+    if(t.fillFrom!=null && close!=null && close<=t.fillFrom) return;
     // low/high candle adalah MID → seri bid = mid-½s, seri ask = mid+½s (cermin paper_monitor.go:
     // long dinilai di bid, short di ask). Harga exit = level SL/TP itu sendiri.
     let exit=null;

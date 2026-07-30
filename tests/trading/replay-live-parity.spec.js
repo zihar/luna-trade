@@ -183,3 +183,64 @@ test('toast buka & tutup memakai format Live', async ({ page }) => {
   await page.click('#tpBody button[data-act="close"]');
   await expect(page.locator('#toast .toast-msg')).toHaveText(/^Closed #1 {2}[-+]\$/);
 });
+
+test('grace: Prev lalu Next tak mengeksekusi SL dari harga PRA-entry', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+
+  // Pasang posisi long ber-SL di bawah low bar TERAKHIR yang sudah terungkap. Bar itu sudah
+  // lewat sebelum entry, jadi SL tak boleh kena. Prev menurunkan frontier fillT dan Next
+  // mengevaluasi ulang bar itu — tanpa guard grace sama sekali, hasilnya stop-out palsu.
+  //
+  // Catatan jujur: test ini sudah hijau dengan guard LAMA (`c.timestamp < fillFrom`) juga —
+  // untuk entry yang fillFrom-nya sejajar batas bar, guard lama & baru menyaring sub-bar yang
+  // sama. Yang benar-benar membedakan keduanya ada di test pending di bawah. Yang dijaga di
+  // sini adalah jalur Prev→Next secara utuh: frontier fillT, re-tread, dan keberadaan guard.
+  await page.evaluate(() => {
+    const c = currentCandle(), half = synthHalfSpread();
+    trades.length = 0;
+    trades.push({ id: -50, no: 50, dir: 'long', entry: c.close, sl: c.low - half - 5 * pipOf(inst),
+      tp: null, risk: 1, units: 1000, trail: 0, instrument: inst, time: T, fillFrom: T });
+  });
+
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(300);
+
+  expect(await page.evaluate(() => trades.length), 'posisi ter-stop-out oleh harga pra-entry').toBe(1);
+  expect(await page.evaluate(() => journal.length)).toBe(0);
+
+  assertNoPageErrors(page);
+});
+
+test('grace: pending yang terisi tak langsung ter-stop-out di sub-bar pengisinya', async ({ page }) => {
+  await gotoApp(page);
+  await enterReplay(page);
+
+  // Cursor fixture mendarat di bar TERAKHIR, jadi tak ada "bar berikutnya" untuk diisi — mundur
+  // satu bar dulu supaya Next punya bar yang belum terungkap.
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(300);
+
+  // Pending limit di dalam rentang bar berikutnya, dengan SL yang JUGA di dalam rentang bar itu.
+  // Fill dan SL berada di sub-bar yang sama → dengan grace, SL baru dievaluasi sub-bar berikutnya.
+  const setup = await page.evaluate(() => {
+    const arr = tfData[currentTF];
+    let lo = 0, h = arr.length;
+    while (lo < h) { const m = (lo + h) >> 1; if (barEndAt(currentTF, m, arr) <= T) lo = m + 1; else h = m; }
+    const next = arr[lo];
+    trades.length = 0;
+    pending = { dir: 'long', type: 'limit', entry: (next.high + next.low) / 2, sl: next.low - synthHalfSpread(),
+      tp: null, risk: 1, units: 1000, trail: 0, time: T, fillFrom: T, lineEntry: null, lineSL: null, lineTP: null };
+    return { entry: pending.entry };
+  });
+  expect(setup.entry).toBeGreaterThan(0);
+
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(400);
+
+  expect(await page.evaluate(() => trades.length), 'pending harus terisi').toBe(1);
+  expect(await page.evaluate(() => journal.length), 'tak boleh langsung tertutup di sub-bar yang sama').toBe(0);
+
+  assertNoPageErrors(page);
+});

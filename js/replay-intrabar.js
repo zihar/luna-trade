@@ -17,17 +17,20 @@ async function evalFills(toT){
         const bOpen=arr[i].timestamp, bEnd=barEndAt(currentTF,i,arr);
         if(bEnd<=from) break;                               // sudah sepenuhnya sebelum frontier → stop
         const win=await ensureFineWindow(fineTF,bOpen,bEnd);
-        if(win && win.length){ for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push(b); } }
-        else if(bEnd>from && bEnd<=toT) acc.push(arr[i]);   // fetch sub-bar gagal → fallback bar kasar (tutup penuh ≤ toT, tanpa lookahead) drpd drop diam-diam
+        if(win && win.length){ for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push({b,close:c}); } }
+        else if(bEnd>from && bEnd<=toT) acc.push({b:arr[i],close:bEnd});   // fetch sub-bar gagal → fallback bar kasar (tutup penuh ≤ toT, tanpa lookahead) drpd drop diam-diam
       }
-      acc.sort((a,b)=>a.timestamp-b.timestamp); subs=acc;
+      acc.sort((x,y)=>x.b.timestamp-y.b.timestamp); subs=acc;
     }
     if(subs==null){                                         // fallback: bar currentTF sendiri (≤M5 / fetch gagal)
       subs=[];
       const src=arr||[];
-      for(let i=0;i<src.length;i++){ const c=barEndAt(currentTF,i,src); if(c>from && c<=toT) subs.push(src[i]); }
+      for(let i=0;i<src.length;i++){ const c=barEndAt(currentTF,i,src); if(c>from && c<=toT) subs.push({b:src[i],close:c}); }
     }
-    for(const b of subs){ checkPending(b,b.timestamp); checkTrades(b,b.timestamp); checkAlerts(b); }
+    // Waktu TUTUP sub-bar diteruskan: itu satuan yang dipakai guard grace (fillFrom). Memakai
+    // timestamp BUKA seperti dulu membuat sub-bar yang MEMUAT momen entry ikut dievaluasi —
+    // itu sumber stop-out palsu setelah Prev→Next.
+    for(const s of subs){ checkPending(s.b,s.close); checkTrades(s.b,s.close); checkAlerts(s.b); }
   }
   if(toT>fillT) fillT=toT;                                  // frontier hanya-maju (anti dobel-fire saat konkuren)
 }
@@ -73,13 +76,14 @@ function clearPendingLines(){ if(!pending) return; ['lineEntry','lineSL','lineTP
 function cancelPending(){ if(!pending) return; clearPendingLines(); pending=null; updateOpenTradeBox(); setStatus('Pending cancelled.'); }
 function checkPending(c, close){
   if(!pending) return;
-  if(pending.fillFrom!=null && c.timestamp < pending.fillFrom) return;   // jangan isi dari bar SEBELUM pending dibuat (re-tread Prev)
+  if(pending.fillFrom!=null && close!=null && close<=pending.fillFrom) return;   // jangan isi dari sub-bar yang sudah tutup sebelum pending dibuat (re-tread Prev)
   if(!(c.low<=pending.entry && pending.entry<=c.high)) return;   // belum tersentuh
   clearPendingLines();
+  const at = close!=null?close:c.timestamp;
   const no=++replaySeq;
   trades.push({id:-no,no,dir:pending.dir,entry:pending.entry,sl:pending.sl,tp:pending.tp,
     risk:pending.risk,units:pending.units,trail:pending.trail,instrument:inst,
-    time:c.timestamp,fillFrom:c.timestamp});
+    time:at,fillFrom:at});   // fillFrom = tutup sub-bar pengisi → SL/TP dievaluasi mulai sub-bar berikutnya
   const entry=pending.entry; pending=null;
   drawPaperLines(); updateOpenTradeBox();
   toast('Pending executed @ '+fmt(entry),'success');
