@@ -103,29 +103,39 @@ func markPrice(inst, dir string) (float64, bool) {
 	return t.Ask, t.Ask > 0
 }
 
-// validateSLTP menolak SL/TP yang sudah di dalam spread (short dinilai di ask, long di
-// bid) agar posisi tak langsung stop-out. nil = valid (atau harga belum tersedia).
+// sltpError menolak SL/TP yang sudah di dalam spread (short dinilai di ask, long di bid)
+// agar posisi tak langsung stop-out. Murni: harga di-inject supaya bisa diuji tanpa Hub,
+// dan supaya kalimatnya bisa dipin test (paper_sltp_test.go). bid/ask <= 0 = harga belum
+// tersedia → jangan tolak apa pun.
+func sltpError(dir string, sl, tp *float64, bid, ask float64) error {
+	if bid <= 0 || ask <= 0 {
+		return nil
+	}
+	if dir == "short" {
+		if sl != nil && *sl <= ask {
+			return errors.New("Stop Loss is inside the spread — place it above the Ask price.")
+		}
+		if tp != nil && *tp >= ask {
+			return errors.New("Take Profit is inside the spread — place it below the Ask price.")
+		}
+		return nil
+	}
+	if sl != nil && *sl >= bid {
+		return errors.New("Stop Loss is inside the spread — place it below the Bid price.")
+	}
+	if tp != nil && *tp <= bid {
+		return errors.New("Take Profit is inside the spread — place it above the Bid price.")
+	}
+	return nil
+}
+
+// validateSLTP = sltpError dengan harga dari Hub. nil = valid (atau harga belum tersedia).
 func validateSLTP(inst Instrument, dir string, sl, tp *float64) error {
 	tick, ok := hub.Last(inst)
 	if !ok {
 		return nil
 	}
-	if dir == "short" {
-		if sl != nil && *sl <= tick.Ask {
-			return errors.New("Stop Loss di dalam spread — taruh di atas harga Ask")
-		}
-		if tp != nil && *tp >= tick.Ask {
-			return errors.New("Take Profit di dalam spread — taruh di bawah harga Ask")
-		}
-	} else {
-		if sl != nil && *sl >= tick.Bid {
-			return errors.New("Stop Loss di dalam spread — taruh di bawah harga Bid")
-		}
-		if tp != nil && *tp <= tick.Bid {
-			return errors.New("Take Profit di dalam spread — taruh di atas harga Bid")
-		}
-	}
-	return nil
+	return sltpError(dir, sl, tp, tick.Bid, tick.Ask)
 }
 
 // POST /api/position/sltp → ubah SL/TP posisi paper terbuka milik user.
@@ -137,20 +147,20 @@ func handlePaperModify(w http.ResponseWriter, r *http.Request) {
 		TP *float64 `json:"tp"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, "gagal baca body")
+		writeErr(w, http.StatusBadRequest, "Could not read the request body.")
 		return
 	}
 	if req.ID == 0 {
-		writeErr(w, http.StatusBadRequest, "id posisi wajib")
+		writeErr(w, http.StatusBadRequest, "Position id is required.")
 		return
 	}
 	pos, err := store.GetPaperTrade(uid, req.ID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "gagal baca posisi")
+		writeErr(w, http.StatusInternalServerError, "Could not load the position.")
 		return
 	}
 	if pos == nil {
-		writeErr(w, http.StatusNotFound, "posisi tidak ditemukan atau sudah ditutup")
+		writeErr(w, http.StatusNotFound, "Position not found or already closed.")
 		return
 	}
 	if err := validateSLTP(Instrument(pos.Instrument), pos.Dir, req.SL, req.TP); err != nil {
@@ -236,7 +246,7 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<16))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "gagal baca body")
+		writeErr(w, http.StatusBadRequest, "Could not read the request body.")
 		return
 	}
 	req, err := validateOrder(cfg, raw)
@@ -249,12 +259,12 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Type != Market {
-		writeErr(w, http.StatusBadRequest, "paper saat ini hanya mendukung market order")
+		writeErr(w, http.StatusBadRequest, "Paper accounts support market orders only.")
 		return
 	}
 	entry, ok := entryPrice(string(req.Instrument), req.Side)
 	if !ok {
-		writeErr(w, http.StatusServiceUnavailable, "harga belum tersedia — tunggu stream harga aktif")
+		writeErr(w, http.StatusServiceUnavailable, "Price feed isn't ready yet — wait for the price stream.")
 		return
 	}
 	dir := "long"
@@ -277,7 +287,7 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			log.Printf("paper order: klaim audit gagal (lanjut tanpa dedup): %v", err)
 		case !okClaim:
-			writeErr(w, http.StatusConflict, "order dengan clientTag ini sudah diproses — cek posisi")
+			writeErr(w, http.StatusConflict, "This order was already processed — check your positions.")
 			return
 		default:
 			auditID, claimed = id, true
@@ -295,7 +305,7 @@ func handlePaperOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("paper order: buka posisi gagal: %v", err)
-		writeErr(w, http.StatusInternalServerError, "gagal membuka posisi")
+		writeErr(w, http.StatusInternalServerError, "Could not open the position.")
 		return
 	}
 	writeJSON(w, http.StatusOK, paperPositionView{
@@ -317,21 +327,21 @@ func handlePaperClose(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
 	var in closeInput
 	if err := decodeJSON(r, &in); err != nil || in.ID <= 0 {
-		writeErr(w, http.StatusBadRequest, "id posisi wajib")
+		writeErr(w, http.StatusBadRequest, "Position id is required.")
 		return
 	}
 	t, err := store.GetPaperTrade(uid, in.ID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "gagal baca posisi")
+		writeErr(w, http.StatusInternalServerError, "Could not load the position.")
 		return
 	}
 	if t == nil {
-		writeErr(w, http.StatusNotFound, "posisi tidak ditemukan atau sudah ditutup")
+		writeErr(w, http.StatusNotFound, "Position not found or already closed.")
 		return
 	}
 	exit, ok := markPrice(t.Instrument, t.Dir)
 	if !ok {
-		writeErr(w, http.StatusServiceUnavailable, "harga belum tersedia — tunggu stream harga aktif")
+		writeErr(w, http.StatusServiceUnavailable, "Price feed isn't ready yet — wait for the price stream.")
 		return
 	}
 	pnl := pnlUSD(t.Instrument, t.Dir, t.Entry, exit, t.Units)
