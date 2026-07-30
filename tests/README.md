@@ -149,6 +149,10 @@ di `DRAG_SKIP` (`31-drag-precision.spec.js`): tanpa `needDefaultPointFigure` ia 
 jadi tak ada yang bisa digenggam untuk di-drag. Jangan menulis assertion yang menganggap objeknya
 masih hidup setelah gestur lain.
 
+Tambahan 3: **keep drawing mode default MATI** (`keepDrawOn`, tombol `#keepDrawBtn`). Banyak test
+menunggu `inProgressId == null` setelah objek jadi; itu benar HANYA saat toggle mati. Kalau sebuah
+test menyalakannya, matikan lagi sebelum memakai `drawTool()`/`measureParity()`.
+
 ## Menambah tool drawing baru
 
 Satu baris di `TOOL_SPEC` (`helpers/spec.js`) sudah cukup: seluruh aspek
