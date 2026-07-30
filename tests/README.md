@@ -141,6 +141,14 @@ Tambahan: `text` & `callout` membuka editor teks inline sendiri setelah jadi. Me
 Escape di editor `text` yang masih kosong **menghapus objeknya** (memang desainnya) — pakai
 `commitTextEditor()`.
 
+Tambahan 2: **`measure` adalah tool EPHEMERAL pertama** (`TOOL_SPEC.ephemeral`). Ia sengaja dibuang
+oleh Escape, oleh mousedown berikutnya di chart, saat tool lain di-arm, dan saat ganti TF/instrumen —
+itu fiturnya, bukan bug. Karena itu `drawTool()`/`measureParity()` melewati penekanan Escape untuk
+tool ber-flag `ephemeral` (kalau tidak, yang diukur adalah objek yang sudah tak ada), dan ia tercatat
+di `DRAG_SKIP` (`31-drag-precision.spec.js`): tanpa `needDefaultPointFigure` ia tak punya hit-test,
+jadi tak ada yang bisa digenggam untuk di-drag. Jangan menulis assertion yang menganggap objeknya
+masih hidup setelah gestur lain.
+
 ## Menambah tool drawing baru
 
 Satu baris di `TOOL_SPEC` (`helpers/spec.js`) sudah cukup: seluruh aspek

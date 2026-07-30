@@ -1,0 +1,497 @@
+
+Running 168 tests using 4 workers
+
+  ✓    2 [hermetic] › tests/drawing/00-harness.spec.js:10:3 › harness › boot: chart termuat dari fixture, tanpa error JS (4.2s)
+  ✓    3 [hermetic] › tests/drawing/00-harness.spec.js:22:3 › harness › konversi pixel↔chart bolak-balik konsisten (4.6s)
+  ✓    4 [hermetic] › tests/drawing/00-harness.spec.js:42:3 › harness › arm tool lewat rail → overlay in-progress hidup, lalu 2 klik jadi objek (5.7s)
+  ✓    1 [hermetic] › tests/drawing/00-harness.spec.js:65:3 › harness › mode cursor arrow: crosshair mati TAPI menggambar tetap jalan (6.1s)
+  ✓    5 [hermetic] › tests/drawing/10-click-timing.spec.js:46:3 › timing klik › jeda longgar (≥450ms): 2 klik menyelesaikan objek (4.3s)
+  ✘    6 [hermetic] › tests/drawing/10-click-timing.spec.js:57:3 › timing klik › klik cepat (120ms): klik ke-2 TIDAK boleh tertelan (4.6s)
+  ✓    8 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › trendline: preview == final == titik klik (4.8s)
+  ✓    9 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › rayLine: preview == final == titik klik (4.2s)
+  ambang klik: 100ms→tertelan  200ms→tertelan  300ms→tertelan  350ms→jadi  400ms→jadi  500ms→jadi  → jeda minimum yang berhasil: 350ms
+  ✓   10 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › horizontalStraightLine: preview == final == titik klik (4.1s)
+  ✓    7 [hermetic] › tests/drawing/10-click-timing.spec.js:69:3 › timing klik › ambang penelanan terdokumentasi: cari jeda minimum yang berhasil (9.3s)
+  ✓   11 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › straightLine: preview == final == titik klik (5.6s)
+  ✓   12 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › horizontalRayLine: preview == final == titik klik (5.2s)
+  ✓   13 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › verticalStraightLine: preview == final == titik klik (4.5s)
+  ✓   14 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › priceLine: preview == final == titik klik (4.6s)
+  ✓   15 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › parallelStraightLine: preview == final == titik klik (5.5s)
+  ✓   16 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › priceChannelLine: preview == final == titik klik (5.5s)
+  ✓   18 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › fibonacciLine: preview == final == titik klik (4.6s)
+  ✓   17 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › fib3: preview == final == titik klik (4.7s)
+  ✓   19 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › rect: preview == final == titik klik (4.8s)
+  ✓   20 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › circle: preview == final == titik klik (5.2s)
+  ✓   22 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › arrow: preview == final == titik klik (4.9s)
+  ✓   21 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › ellipse: preview == final == titik klik (5.0s)
+  ✓   23 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › arrowMarkUp: preview == final == titik klik (4.2s)
+  ✓   24 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › arrowMarkDown: preview == final == titik klik (4.6s)
+  ✓   25 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › longPosition: preview == final == titik klik (4.6s)
+  ✓   26 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › shortPosition: preview == final == titik klik (4.7s)
+  ✓   27 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › dateRange: preview == final == titik klik (4.9s)
+  ✓   28 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › text: preview == final == titik klik (4.7s)
+  ✓   30 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › simpleAnnotation: preview == final == titik klik (4.5s)
+  ✓   29 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › callout: preview == final == titik klik (5.4s)
+  ✓   31 [hermetic] › tests/drawing/20-parity.spec.js:89:5 › presisi menggambar — klik normal › simpleTag: preview == final == titik klik (4.4s)
+  ✓   32 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › trendline: drag titik terakhir tetap presisi (5.0s)
+  ✓   33 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › rayLine: drag titik terakhir tetap presisi (5.2s)
+  ✓   34 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › straightLine: drag titik terakhir tetap presisi (5.4s)
+  ✓   35 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › horizontalRayLine: drag titik terakhir tetap presisi (5.0s)
+  ✓   36 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › parallelStraightLine: drag titik terakhir tetap presisi (6.0s)
+  ✓   37 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › priceChannelLine: drag titik terakhir tetap presisi (6.6s)
+  ✓   38 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › fib3: drag titik terakhir tetap presisi (5.8s)
+  ✓   39 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › fibonacciLine: drag titik terakhir tetap presisi (5.6s)
+  ✓   40 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › rect: drag titik terakhir tetap presisi (6.3s)
+  ✓   41 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › circle: drag titik terakhir tetap presisi (6.5s)
+  ✓   42 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › ellipse: drag titik terakhir tetap presisi (6.7s)
+  ✓   43 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › arrow: drag titik terakhir tetap presisi (5.9s)
+  ✓   44 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › dateRange: drag titik terakhir tetap presisi (5.4s)
+  ✓   46 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › trendline: klik cepat tetap presisi (5.4s)
+  ✓   47 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › rayLine: klik cepat tetap presisi (5.3s)
+  ✓   45 [hermetic] › tests/drawing/20-parity.spec.js:109:5 › presisi menggambar — press-drag › callout: drag titik terakhir tetap presisi (6.1s)
+  ✓   48 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › straightLine: klik cepat tetap presisi (4.5s)
+  ✓   49 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › horizontalRayLine: klik cepat tetap presisi (4.6s)
+  ✘   50 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › parallelStraightLine: klik cepat tetap presisi (6.9s)
+  ✘   51 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › priceChannelLine: klik cepat tetap presisi (6.8s)
+  ✘   52 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fib3: klik cepat tetap presisi (5.5s)
+  ✓   55 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › circle: klik cepat tetap presisi (4.7s)
+  ✓   54 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › rect: klik cepat tetap presisi (5.0s)
+  ✘   53 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fibonacciLine: klik cepat tetap presisi (5.3s)
+  ✓   56 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › ellipse: klik cepat tetap presisi (4.8s)
+  ✓   57 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › arrow: klik cepat tetap presisi (4.9s)
+  ✓   58 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › dateRange: klik cepat tetap presisi (4.9s)
+  ✓   59 [hermetic] › tests/drawing/30-interaction.spec.js:16:3 › drag › drag satu titik: titik itu ikut kursor, titik lain tak bergeming (5.6s)
+  ✓   60 [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › callout: klik cepat tetap presisi (5.9s)
+  ✓   62 [hermetic] › tests/drawing/30-interaction.spec.js:53:3 › hapus › tombol Delete menghapus objek terpilih (5.2s)
+  ✓   61 [hermetic] › tests/drawing/30-interaction.spec.js:34:3 › drag › drag badan garis: semua titik bergeser sama besar (5.7s)
+  ✓   63 [hermetic] › tests/drawing/30-interaction.spec.js:66:3 › hapus › eraser: klik objek langsung menghapusnya (4.9s)
+  ✓   64 [hermetic] › tests/drawing/30-interaction.spec.js:82:3 › undo / redo › Ctrl+Z membatalkan gambar, Ctrl+Y mengembalikan (4.5s)
+  ✓   65 [hermetic] › tests/drawing/30-interaction.spec.js:98:3 › hide / show › tombol mata menyembunyikan semua gambar tanpa menghapusnya (5.2s)
+  ✓   66 [hermetic] › tests/drawing/30-interaction.spec.js:116:5 › persist setelah reload › trendline: bertahan di posisi PIXEL yang sama (6.7s)
+  ✓   68 [hermetic] › tests/drawing/30-interaction.spec.js:116:5 › persist setelah reload › horizontalStraightLine: bertahan di posisi PIXEL yang sama (6.4s)
+  ✓   69 [hermetic] › tests/drawing/30-interaction.spec.js:145:3 › batal menggambar › ESC saat menggambar: overlay in-progress dibuang, tak jadi sampah (4.4s)
+  ✓   67 [hermetic] › tests/drawing/30-interaction.spec.js:116:5 › persist setelah reload › rect: bertahan di posisi PIXEL yang sama (7.3s)
+  ✓   70 [hermetic] › tests/drawing/30-interaction.spec.js:158:3 › batal menggambar › ESC pada objek terpilih hanya men-deselect, tidak menghapus (5.6s)
+  ✓   73 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › straightLine: double-click membuka modal, tab awal Style (5.3s)
+  ✓   71 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › trendline: double-click membuka modal, tab awal Text (5.7s)
+  ✓   72 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › rayLine: double-click membuka modal, tab awal Style (5.6s)
+  ✓   74 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › horizontalStraightLine: double-click membuka modal, tab awal Style (3.9s)
+  ✓   76 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › verticalStraightLine: double-click membuka modal, tab awal Style (4.8s)
+  ✓   77 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › priceLine: double-click membuka modal, tab awal Style (4.8s)
+  ✓   75 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › horizontalRayLine: double-click membuka modal, tab awal Style (5.8s)
+  ✓   78 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › parallelStraightLine: double-click membuka modal, tab awal Style (5.8s)
+  ✓   80 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › fib3: double-click membuka modal, tab awal Style (5.2s)
+  ✓   79 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › priceChannelLine: double-click membuka modal, tab awal Style (5.7s)
+  ✓   81 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › fibonacciLine: double-click membuka modal, tab awal Style (5.8s)
+  ✓   82 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › rect: double-click membuka modal, tab awal Text (5.5s)
+  ✓   83 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › circle: double-click membuka modal, tab awal Style (5.4s)
+  ✓   84 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › ellipse: double-click membuka modal, tab awal Style (6.8s)
+  ✓   85 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › arrow: double-click membuka modal, tab awal Style (9.8s)
+  ✓   86 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › arrowMarkUp: double-click membuka modal, tab awal Style (10.5s)
+  ✓   87 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › arrowMarkDown: double-click membuka modal, tab awal Style (13.0s)
+  ✓   88 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › dateRange: double-click membuka modal, tab awal Style (12.4s)
+  ✓   89 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › text: double-click membuka modal, tab awal Text (12.5s)
+  ✓   90 [hermetic] › tests/drawing/40-modal-text.spec.js:30:5 › modal setting objek › callout: double-click membuka modal, tab awal Text (13.1s)
+  ✓   92 [hermetic] › tests/drawing/40-modal-text.spec.js:74:3 › modal setting objek › tombol Delete di modal menghapus objek (10.4s)
+  ✓   91 [hermetic] › tests/drawing/40-modal-text.spec.js:51:3 › modal setting objek › ubah warna di modal tersimpan ke objek (12.5s)
+  ✓   93 [hermetic] › tests/drawing/40-modal-text.spec.js:88:5 › objek tanpa modal › longPosition: double-click membuka popup posisi, bukan modal (9.9s)
+  ✓   94 [hermetic] › tests/drawing/40-modal-text.spec.js:88:5 › objek tanpa modal › shortPosition: double-click membuka popup posisi, bukan modal (9.0s)
+  ✓   95 [hermetic] › tests/drawing/40-modal-text.spec.js:99:5 › objek tanpa modal › simpleAnnotation: memang tak punya panel setting (11.1s)
+  ✓   96 [hermetic] › tests/drawing/40-modal-text.spec.js:99:5 › objek tanpa modal › simpleTag: memang tak punya panel setting (10.8s)
+  ✓   97 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › trendline: bisa di-hover setelah tergambar (12.6s)
+  ✓   98 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › rayLine: bisa di-hover setelah tergambar (11.6s)
+  ✓  100 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › horizontalStraightLine: bisa di-hover setelah tergambar (11.7s)
+  ✓   99 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › straightLine: bisa di-hover setelah tergambar (13.0s)
+  ✓  101 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › horizontalRayLine: bisa di-hover setelah tergambar (11.1s)
+  ✓  102 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › verticalStraightLine: bisa di-hover setelah tergambar (12.3s)
+  ✓  103 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › priceLine: bisa di-hover setelah tergambar (12.0s)
+  ✓  104 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › parallelStraightLine: bisa di-hover setelah tergambar (12.5s)
+  ✓  105 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › priceChannelLine: bisa di-hover setelah tergambar (12.5s)
+  ✓  106 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › fib3: bisa di-hover setelah tergambar (12.4s)
+  ✓  107 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › fibonacciLine: bisa di-hover setelah tergambar (12.9s)
+  ✓  108 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › rect: bisa di-hover setelah tergambar (12.2s)
+  ✓  109 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › circle: bisa di-hover setelah tergambar (13.3s)
+  ✓  110 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › ellipse: bisa di-hover setelah tergambar (12.5s)
+  ✓  111 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › arrow: bisa di-hover setelah tergambar (11.8s)
+  ✓  112 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › arrowMarkUp: bisa di-hover setelah tergambar (12.3s)
+  ✓  114 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › longPosition: bisa di-hover setelah tergambar (9.5s)
+  ✓  113 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › arrowMarkDown: bisa di-hover setelah tergambar (11.4s)
+  ✓  115 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › shortPosition: bisa di-hover setelah tergambar (6.2s)
+  ✓  116 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › dateRange: bisa di-hover setelah tergambar (5.9s)
+  ✓  117 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › text: bisa di-hover setelah tergambar (5.4s)
+  ✓  118 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › callout: bisa di-hover setelah tergambar (6.1s)
+  ✓  121 [hermetic] › tests/drawing/40-modal-text.spec.js:132:5 › teks inline › text: editor terbuka otomatis & teks tersimpan (4.3s)
+  ✘  119 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleAnnotation: bisa di-hover setelah tergambar (6.3s)
+  ✘  120 [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleTag: bisa di-hover setelah tergambar (6.0s)
+  ✓  122 [hermetic] › tests/drawing/40-modal-text.spec.js:132:5 › teks inline › callout: editor terbuka otomatis & teks tersimpan (4.2s)
+  ✓  123 [hermetic] › tests/drawing/40-modal-text.spec.js:143:3 › teks inline › text: membatalkan editor saat masih kosong MENGHAPUS objek (sesuai desain) (3.4s)
+  ✓  124 [hermetic] › tests/drawing/50-rail.spec.js:25:3 › rail › caret membuka flyout berisi seluruh tool grup itu (4.5s)
+  ✓  126 [hermetic] › tests/drawing/50-rail.spec.js:13:3 › rail › klik badan ikon = arm langsung (1-klik, tanpa buka flyout) (6.4s)
+  ✓  127 [hermetic] › tests/drawing/50-rail.spec.js:37:3 › rail › memilih tool dari flyout mengubah ikon grup jadi tool itu (sticky) (10.3s)
+  ✓  125 [hermetic] › tests/drawing/40-modal-text.spec.js:159:3 › teks inline › rect kosong: hover menawarkan "+ Add text", klik membuka editor inline (10.5s)
+  ✓  128 [hermetic] › tests/drawing/50-rail.spec.js:52:3 › favorites › bintang di flyout memunculkan tool di favorites bar & bar-nya bisa arm (7.8s)
+  ✓  129 [hermetic] › tests/drawing/50-rail.spec.js:70:3 › favorites › favorites bar bisa digeser lewat grip & posisinya tersimpan (12.1s)
+  ✓  131 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+Y meng-arm rayLine (10.6s)
+  ✓  132 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+E meng-arm straightLine (10.9s)
+  ✓  130 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+T meng-arm trendline (11.4s)
+  ✓  133 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+H meng-arm horizontalStraightLine (6.9s)
+  ✓  134 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+V meng-arm verticalStraightLine (7.4s)
+  ✓  135 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+P meng-arm priceLine (7.7s)
+  ✓  136 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+F meng-arm fib3 (7.8s)
+  ✓  137 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+R meng-arm rect (6.5s)
+  ✓  140 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+X meng-arm text (7.1s)
+  ✓  139 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+A meng-arm arrow (7.4s)
+  ✓  138 [hermetic] › tests/drawing/50-rail.spec.js:95:5 › shortcut Alt+huruf › Alt+O meng-arm circle (7.9s)
+  ✓  144 [hermetic] › tests/drawing/50-rail.spec.js:140:5 › mode cursor › arrow: crosshair mati (7.4s)
+  ✓  142 [hermetic] › tests/drawing/50-rail.spec.js:140:5 › mode cursor › cross: crosshair aktif + garis (8.2s)
+  ✓  143 [hermetic] › tests/drawing/50-rail.spec.js:140:5 › mode cursor › dot: crosshair aktif (9.0s)
+  ✓  145 [hermetic] › tests/drawing/50-rail.spec.js:140:5 › mode cursor › eraser: crosshair aktif + garis (7.5s)
+  ✓  146 [hermetic] › tests/drawing/50-rail.spec.js:157:3 › mode cursor › mengganti mode cursor membatalkan gambar yang sedang berjalan (8.3s)
+  ✓  147 [hermetic] › tests/drawing/50-rail.spec.js:173:3 › tabrakan nama tool › `arrow` ada di grup Cursor DAN Shapes — keduanya harus bisa dipakai (7.7s)
+  ✓  148 [hermetic] › tests/drawing/60-magnet-tf.spec.js:9:3 › magnet › magnet ON: titik menempel ke salah satu nilai OHLC candle terdekat (9.1s)
+  ✓  150 [hermetic] › tests/drawing/60-magnet-tf.spec.js:71:3 › magnet › magnet di-toggle saat menggambar → mode overlay in-progress ikut berubah (8.8s)
+  ✓  149 [hermetic] › tests/drawing/60-magnet-tf.spec.js:45:3 › magnet › magnet ON: preview juga sudah menempel (mode strong_magnet), bukan cuma hasil akhir (9.3s)
+  ✓  153 [hermetic] › tests/drawing/70-reticle.spec.js:28:5 › reticle preview › trendline: dot mendarat tepat di kursor (bukan di pusat bar) (5.0s)
+  ✓  152 [hermetic] › tests/drawing/60-magnet-tf.spec.js:138:3 › area future › titik di kanan bar terakhir tak "kelempar" ke tepi kiri (5.6s)
+  ✓  151 [hermetic] › tests/drawing/60-magnet-tf.spec.js:88:3 › ganti timeframe › objek tetap di harga & waktu yang sama setelah TF diganti (7.1s)
+  ✘  141 [hermetic] › tests/drawing/50-rail.spec.js:116:3 › shortcut Alt+huruf › instant-drop tak boleh memakai posisi kursor BASI saat pointer di luar chart (10.2s)
+  ✓  156 [hermetic] › tests/smoke/areas.spec.js:12:1 › watchlist: baris terbangun & klik baris mengganti instrumen chart (3.8s)
+  ✓  154 [hermetic] › tests/drawing/70-reticle.spec.js:28:5 › reticle preview › rect: dot mendarat tepat di kursor (bukan di pusat bar) (4.6s)
+  ✓  155 [hermetic] › tests/drawing/70-reticle.spec.js:28:5 › reticle preview › rayLine: dot mendarat tepat di kursor (bukan di pusat bar) (4.3s)
+  ✓  157 [hermetic] › tests/smoke/areas.spec.js:36:1 › timeframe: tombol bar + dropdown semua TF (4.1s)
+  ✓  158 [hermetic] › tests/smoke/areas.spec.js:52:1 › chart type: bisa berganti tipe render (4.2s)
+  ✓  159 [hermetic] › tests/smoke/areas.spec.js:67:1 › indikator: bisa ditambahkan & muncul di legend (4.5s)
+  ✓  160 [hermetic] › tests/smoke/areas.spec.js:82:1 › bar replay: masuk, maju satu bar, keluar (5.3s)
+  ✓  161 [hermetic] › tests/smoke/areas.spec.js:97:1 › news: panel kalender memuat fixture & kartu bias tampil (3.8s)
+  ✓  162 [hermetic] › tests/smoke/areas.spec.js:106:1 › price alerts: dialog membuat alert lewat server (stub) & muncul di panel (3.8s)
+  ✓  163 [hermetic] › tests/smoke/areas.spec.js:121:1 › paper trading: market order lewat panel → posisi muncul (4.1s)
+  ✓  164 [hermetic] › tests/smoke/areas.spec.js:139:1 › instrumen: DXY & saham ada di daftar dengan gating tradeable (4.1s)
+  ✓  165 [hermetic] › tests/smoke/areas.spec.js:149:1 › tema: toggle light/dark mengubah kelas body & style chart (4.7s)
+  ✓  166 [hermetic] › tests/smoke/areas.spec.js:160:1 › data: chart memuat tepat jumlah bar fixture (stub benar-benar dipakai) (4.6s)
+  ✘  167 [integration] › tests/integration/server.spec.js:17:3 › @integration server asli › login + bentuk respons /api/* cocok dengan yang distub (630ms)
+  ✘  168 [integration] › tests/integration/server.spec.js:54:3 › @integration server asli › chart benar-benar memuat candle dari server & drawing bisa digambar (965ms)
+
+galeri: 0 kartu (0 gagal) → report/gallery.html
+
+
+  1) [hermetic] › tests/drawing/10-click-timing.spec.js:57:3 › timing klik › klik cepat (120ms): klik ke-2 TIDAK boleh tertelan 
+
+    Error: objek harus selesai walau dua klik berjeda 120ms
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      64 |     // Bukti bahwa browser MEMANG mengirim dua klik normal (bukan dblclick browser):
+      65 |     expect(r.domClicks, 'DOM #chart harus menerima dua click detail=1').toEqual([1, 1]);
+    > 66 |     expect(r.finished, 'objek harus selesai walau dua klik berjeda 120ms').toBe(true);
+         |                                                                            ^
+      67 |   });
+      68 |
+      69 |   test('ambang penelanan terdokumentasi: cari jeda minimum yang berhasil', async ({ page }) => {
+        at /Users/zihar/Projects/luna-trade/tests/drawing/10-click-timing.spec.js:66:76
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-10-click-timing-ti-7980e-k-ke-2-TIDAK-boleh-tertelan-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-10-click-timing-ti-7980e-k-ke-2-TIDAK-boleh-tertelan-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-10-click-timing-ti-7980e-k-ke-2-TIDAK-boleh-tertelan-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-10-click-timing-ti-7980e-k-ke-2-TIDAK-boleh-tertelan-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › parallelStraightLine: klik cepat tetap presisi 
+
+    Error: parallelStraightLine tak selesai saat diklik cepat (klik tertelan)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      128 |       const { r, tx } = await runAndRecord(page, spec, 'fast', 'jeda antar klik 120ms');
+      129 |
+    > 130 |       expect(r.completed, `${spec.name} tak selesai saat diklik cepat (klik tertelan)`).toBe(true);
+          |                                                                                         ^
+      131 |       expectDeltas(r.deltaLanding, spec, tx, 'landing (klik cepat)');
+      132 |     });
+      133 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/20-parity.spec.js:130:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--4a776-ne-klik-cepat-tetap-presisi-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-20-parity-presisi--4a776-ne-klik-cepat-tetap-presisi-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--4a776-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-20-parity-presisi--4a776-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › priceChannelLine: klik cepat tetap presisi 
+
+    Error: priceChannelLine tak selesai saat diklik cepat (klik tertelan)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      128 |       const { r, tx } = await runAndRecord(page, spec, 'fast', 'jeda antar klik 120ms');
+      129 |
+    > 130 |       expect(r.completed, `${spec.name} tak selesai saat diklik cepat (klik tertelan)`).toBe(true);
+          |                                                                                         ^
+      131 |       expectDeltas(r.deltaLanding, spec, tx, 'landing (klik cepat)');
+      132 |     });
+      133 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/20-parity.spec.js:130:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--6e0af-ne-klik-cepat-tetap-presisi-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-20-parity-presisi--6e0af-ne-klik-cepat-tetap-presisi-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--6e0af-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-20-parity-presisi--6e0af-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fib3: klik cepat tetap presisi 
+
+    Error: fib3 tak selesai saat diklik cepat (klik tertelan)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      128 |       const { r, tx } = await runAndRecord(page, spec, 'fast', 'jeda antar klik 120ms');
+      129 |
+    > 130 |       expect(r.completed, `${spec.name} tak selesai saat diklik cepat (klik tertelan)`).toBe(true);
+          |                                                                                         ^
+      131 |       expectDeltas(r.deltaLanding, spec, tx, 'landing (klik cepat)');
+      132 |     });
+      133 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/20-parity.spec.js:130:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--adc3c-b3-klik-cepat-tetap-presisi-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-20-parity-presisi--adc3c-b3-klik-cepat-tetap-presisi-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--adc3c-b3-klik-cepat-tetap-presisi-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-20-parity-presisi--adc3c-b3-klik-cepat-tetap-presisi-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fibonacciLine: klik cepat tetap presisi 
+
+    Error: fibonacciLine tak selesai saat diklik cepat (klik tertelan)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      128 |       const { r, tx } = await runAndRecord(page, spec, 'fast', 'jeda antar klik 120ms');
+      129 |
+    > 130 |       expect(r.completed, `${spec.name} tak selesai saat diklik cepat (klik tertelan)`).toBe(true);
+          |                                                                                         ^
+      131 |       expectDeltas(r.deltaLanding, spec, tx, 'landing (klik cepat)');
+      132 |     });
+      133 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/20-parity.spec.js:130:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--87b57-ne-klik-cepat-tetap-presisi-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-20-parity-presisi--87b57-ne-klik-cepat-tetap-presisi-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-20-parity-presisi--87b57-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-20-parity-presisi--87b57-ne-klik-cepat-tetap-presisi-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleAnnotation: bisa di-hover setelah tergambar 
+
+    Error: simpleAnnotation tak bisa di-hover di titik mana pun → tak bisa dipilih/dihapus/di-setting lewat klik
+
+    expect(received).toBeTruthy()
+
+    Received: null
+
+      121 |       expect(obj, 'objek harus terbentuk').toBeTruthy();
+      122 |       const spot = await hoverableSpot(page, obj, rect);
+    > 123 |       expect(spot, `${spec.name} tak bisa di-hover di titik mana pun → tak bisa dipilih/dihapus/di-setting lewat klik`).toBeTruthy();
+          |                                                                                                                         ^
+      124 |       assertNoPageErrors(page);
+      125 |     });
+      126 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/40-modal-text.spec.js:123:121
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-40-modal-text-kete-c9b6d--di-hover-setelah-tergambar-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-40-modal-text-kete-c9b6d--di-hover-setelah-tergambar-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-40-modal-text-kete-c9b6d--di-hover-setelah-tergambar-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-40-modal-text-kete-c9b6d--di-hover-setelah-tergambar-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleTag: bisa di-hover setelah tergambar 
+
+    Error: simpleTag tak bisa di-hover di titik mana pun → tak bisa dipilih/dihapus/di-setting lewat klik
+
+    expect(received).toBeTruthy()
+
+    Received: null
+
+      121 |       expect(obj, 'objek harus terbentuk').toBeTruthy();
+      122 |       const spot = await hoverableSpot(page, obj, rect);
+    > 123 |       expect(spot, `${spec.name} tak bisa di-hover di titik mana pun → tak bisa dipilih/dihapus/di-setting lewat klik`).toBeTruthy();
+          |                                                                                                                         ^
+      124 |       assertNoPageErrors(page);
+      125 |     });
+      126 |   }
+        at /Users/zihar/Projects/luna-trade/tests/drawing/40-modal-text.spec.js:123:121
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-40-modal-text-kete-b2770--di-hover-setelah-tergambar-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-40-modal-text-kete-b2770--di-hover-setelah-tergambar-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-40-modal-text-kete-b2770--di-hover-setelah-tergambar-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-40-modal-text-kete-b2770--di-hover-setelah-tergambar-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [hermetic] › tests/drawing/50-rail.spec.js:116:3 › shortcut Alt+huruf › instant-drop tak boleh memakai posisi kursor BASI saat pointer di luar chart 
+
+    Error: garis tak boleh langsung jatuh saat kursor di luar chart
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 0
+    Received length: 1
+    Received array:  [{"extendData": null, "id": "overlay_1784968295575_1", "lock": false, "name": "horizontalStraightLine", "points": [{"dataIndex": 377.25, "timestamp": null, "value": 1.0905032794117648}], "visible": true}]
+
+      131 |     const objs = await overlays(page);
+      132 |     const dropped = objs.filter((o) => o.points.length > 0);
+    > 133 |     expect(dropped, 'garis tak boleh langsung jatuh saat kursor di luar chart').toHaveLength(0);
+          |                                                                                 ^
+      134 |     assertNoPageErrors(page);
+      135 |   });
+      136 | });
+        at /Users/zihar/Projects/luna-trade/tests/drawing/50-rail.spec.js:133:81
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drawing-50-rail-shortcut-A-fb19a--saat-pointer-di-luar-chart-hermetic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drawing-50-rail-shortcut-A-fb19a--saat-pointer-di-luar-chart-hermetic/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/drawing-50-rail-shortcut-A-fb19a--saat-pointer-di-luar-chart-hermetic/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/drawing-50-rail-shortcut-A-fb19a--saat-pointer-di-luar-chart-hermetic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [integration] › tests/integration/server.spec.js:17:3 › @integration server asli › login + bentuk respons /api/* cocok dengan yang distub 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:8765
+    Call log:
+      - → POST http://localhost:8765/api/auth/login
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+        - content-type: application/json
+        - content-length: 53
+
+        at apiRequestContext.post: connect ECONNREFUSED ::1:8765
+        at /Users/zihar/Projects/luna-trade/tests/integration/server.spec.js:18:33
+
+    Error Context: test-results/integration-server--integr-82beb-pi-cocok-dengan-yang-distub-integration/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/integration-server--integr-82beb-pi-cocok-dengan-yang-distub-integration/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/integration-server--integr-82beb-pi-cocok-dengan-yang-distub-integration/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [integration] › tests/integration/server.spec.js:54:3 › @integration server asli › chart benar-benar memuat candle dari server & drawing bisa digambar 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8765/
+    Call log:
+      - navigating to "http://localhost:8765/", waiting until "domcontentloaded"
+
+
+      53 |
+      54 |   test('chart benar-benar memuat candle dari server & drawing bisa digambar', async ({ page }) => {
+    > 55 |     await page.goto('/', { waitUntil: 'domcontentloaded' });
+         |                ^
+      56 |
+      57 |     // Login lewat form bila overlay auth muncul.
+      58 |     const overlay = page.locator('#authOverlay');
+        at /Users/zihar/Projects/luna-trade/tests/integration/server.spec.js:55:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integration-server--integr-1d069-erver-drawing-bisa-digambar-integration/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/integration-server--integr-1d069-erver-drawing-bisa-digambar-integration/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/integration-server--integr-1d069-erver-drawing-bisa-digambar-integration/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/integration-server--integr-1d069-erver-drawing-bisa-digambar-integration/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10 failed
+    [hermetic] › tests/drawing/10-click-timing.spec.js:57:3 › timing klik › klik cepat (120ms): klik ke-2 TIDAK boleh tertelan 
+    [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › parallelStraightLine: klik cepat tetap presisi 
+    [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › priceChannelLine: klik cepat tetap presisi 
+    [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fib3: klik cepat tetap presisi 
+    [hermetic] › tests/drawing/20-parity.spec.js:126:5 › presisi menggambar — klik cepat › fibonacciLine: klik cepat tetap presisi 
+    [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleAnnotation: bisa di-hover setelah tergambar 
+    [hermetic] › tests/drawing/40-modal-text.spec.js:118:5 › keterjangkauan objek › simpleTag: bisa di-hover setelah tergambar 
+    [hermetic] › tests/drawing/50-rail.spec.js:116:3 › shortcut Alt+huruf › instant-drop tak boleh memakai posisi kursor BASI saat pointer di luar chart 
+    [integration] › tests/integration/server.spec.js:17:3 › @integration server asli › login + bentuk respons /api/* cocok dengan yang distub 
+    [integration] › tests/integration/server.spec.js:54:3 › @integration server asli › chart benar-benar memuat candle dari server & drawing bisa digambar 
+  158 passed (5.3m)
