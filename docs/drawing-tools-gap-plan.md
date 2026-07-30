@@ -35,7 +35,7 @@ per objek, persist per instrumen (`br_draws_<inst>`, `index.html:3323`).
 
 | # | Item | Kenapa | Catatan implementasi |
 |---|------|--------|----------------------|
-| T1.1 | **Measure tool (ruler)** | Masuk 5 tool wajib; di TV juga hotkey Shift+drag. Luna nol hit `measure`/`ruler` | Mode ephemeral (bukan overlay persist): Δharga, Δ%, Δpip, jumlah bar, durasi |
+| T1.1 | ~~**Measure tool (ruler)**~~ — ✅ **SELESAI** 2026-07-31 | Masuk 5 tool wajib; di TV juga hotkey Shift+drag | `js/measure.js`: overlay ephemeral (kotak arah + pill Δharga/Δ%/Δpip/bar/durasi), grup rail "Measure" + `Alt+M`, dan `Shift`+drag. Tak masuk `PERSIST_DRAW`, tak mencemari undo. Spec: `docs/superpowers/specs/2026-07-31-measure-tool-design.md` |
 | T1.2 | **Keep drawing mode** | Tool selalu `disarmIcons()` setelah objek jadi (`index.html:3296-3302`) → gambar 5 zona = 5× klik rail | Toggle di rail + Ctrl-klik tool; rearm tool sama di `onDrawEnd` (`index.html:3147`) |
 | T1.3 | **Lock objek / lock all** | Sekarang cuma Hide-all; objek gampang kegeser saat pan | klinecharts punya properti `lock` (sudah dipakai `alertLine`, `index.html:4652`) — tinggal ekspos ke UI + persist |
 | T1.4 | **Alert dari objek gambar** | Sudah ada server price alerts + `alertLine`, tapi belum "alert dari H-line/trendline ini" | H-line trivial (harga sudah ada). Trendline butuh evaluasi harga-di-waktu di `alert_monitor.go` |

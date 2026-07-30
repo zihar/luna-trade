@@ -57,6 +57,12 @@ const TOOL_SPEC = [
   { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', persist: true },
   { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', persist: true },
 
+  // ---- Measure ----
+  // Ephemeral: tak tersimpan (persist:false), tak punya panel setting (tak ada di DRAW_DEFAULT),
+  // dan dibuang oleh Esc / klik lain / arm tool lain / ganti TF-instrumen. Flag `ephemeral`
+  // menandai itu untuk test yang mensyaratkan objek tetap hidup setelah gestur lain.
+  { name: 'measure', group: 'measure', groupTitle: 'Measure', title: 'Measure', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: null, persist: false, ephemeral: true, sc: 'M' },
+
   // ---- Text ----
   { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: 'modal', autoEditor: true, settings: 'modal', persist: true, sc: 'X' },
   { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: 'modal+inline', autoEditor: true, settings: 'modal', persist: true },

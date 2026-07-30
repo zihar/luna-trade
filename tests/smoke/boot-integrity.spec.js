@@ -102,6 +102,9 @@ const SENTINEL = {
   // Dipecah dari ekor ny-time.js: klinecharts.init memang bukan util waktu NY.
   'chart-init.js': 'chart',
 
+  // Measure tool (ruler) — modul domain baru, bukan hasil pemecahan index.html.
+  'measure.js': 'measureStats',
+
   // PR-5 — potongan 3769-4524 (756 baris) ke lima file.
   'draw-rail.js': 'setCursorMode',
   'stats-journal.js': 'renderStats',

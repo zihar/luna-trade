@@ -10,6 +10,7 @@ function applyCursorStyle(name){
   }catch(_){}
 }
 function setCursorMode(name){
+  try{ clearMeasure(); }catch(_){}   // ganti mode cursor → hasil ukur tak relevan (js/measure.js)
   cancelInProgressDraw();
   disarmIcons();
   eraserOn=(name==='eraser'); cursorMode=name; try{localStorage.setItem('br_cursor',name);}catch(_){}

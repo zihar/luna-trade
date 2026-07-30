@@ -366,13 +366,14 @@ klinecharts.registerOverlay({
 });
 
 // custom overlay: Date Range — 2 klik, kotak vertikal + label jumlah bar & durasi (ala TV)
+// Satuan Inggris (teks UI wajib Inggris — CLAUDE.md). Dipakai label dateRange & pill measure.
 function fmtDur(ms){
   const m=Math.round(ms/6e4);
   if(m<60) return m+'m';
   const h=Math.floor(m/60), mm=m%60;
-  if(h<24) return mm? h+'j '+mm+'m' : h+'j';
+  if(h<24) return mm? h+'h '+mm+'m' : h+'h';
   const d=Math.floor(h/24), hh=h%24;
-  return hh? d+'h '+hh+'j' : d+'h';
+  return hh? d+'d '+hh+'h' : d+'d';
 }
 // jumlah bar antara 2 timestamp = selisih indeks candle di data (akurat thd gap weekend)
 function barsBetween(t0,t1){

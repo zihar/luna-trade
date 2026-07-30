@@ -96,6 +96,7 @@ async function loadInit(latest){
   chartLoad.hide(loadTok);   // data ter-render → tutup overlay lunar (hanya bila panggilan terbaru)
   setReplayUI(false);   // Load → kembali ke realtime (keluar mode replay bila aktif)
   startLive();          // live = default
+  try{ clearMeasure(); }catch(_){}   // ganti instrumen → hasil ukur instrumen lama dibuang (js/measure.js)
   restoreDraws();       // munculkan kembali gambar tersimpan utk instrumen ini
   suppressDrawSave=false; clearTimeout(drawSaveTimer);
   try{ resetDrawHistory(); }catch(e){}   // history undo/redo bersifat per-instrumen → reset
