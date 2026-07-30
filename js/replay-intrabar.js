@@ -94,5 +94,5 @@ function closeTrade(id,exit,time){
 // Tutup semua posisi replay di harga pasar saat ini (cermin spCloseAll di Live).
 function closeAllReplay(){
   const c=currentCandle(); if(!c) return;
-  trades.slice().forEach(t=>closeTrade(t.id,c.close,c.timestamp));
+  trades.slice().forEach(t=>closeTrade(t.id, replayMarkPx(t.dir,c.close), c.timestamp));
 }

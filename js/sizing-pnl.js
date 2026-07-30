@@ -42,6 +42,13 @@ function pnlUsd(dir,entry,exit,units){
   const mul = dir==='long'?1:-1;
   return (exit-entry)*mul*units*quoteToUsd(exit);
 }
+// Spread sintetis Bar Replay. Live memakai bid/ask sungguhan dari Hub; replay tak punya tick,
+// jadi ia diturunkan dari candle dengan lebar yang SAMA seperti curBidAsk (js/render.js) —
+// satu sumber angka supaya entry, valuasi, dan pemicu SL/TP tak pernah memakai spread berbeda.
+function synthHalfSpread(){ return (+$('#pipSize').value||instSpec().pip)*1.6/2; }
+// Harga mark/exit: long dinilai di bid, short di ask (cermin markPrice di paper.go).
+// Akibatnya posisi baru langsung minus sebesar spread — sama seperti akun Live.
+function replayMarkPx(dir, mid){ const h=synthHalfSpread(); return dir==='long' ? mid-h : mid+h; }
 function lotLabel(units){
   if(inst.includes('BTC')) return units.toFixed(4)+' BTC';
   if(inst.includes('XAU')||inst.includes('XAG')) return (units/100).toFixed(2)+' lot';

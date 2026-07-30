@@ -11,7 +11,7 @@ function posById(id){ return currentPositions().find(x=>x.id===id); }
 function isReplayId(id){ return id<0; }
 function tradeById(id){ return trades.find(t=>t.id===id)||null; }
 function replayPosView(t){
-  const cur=currentCandle(), price=cur?cur.close:t.entry, units=t.units||0;
+  const cur=currentCandle(), mid=cur?cur.close:t.entry, price=replayMarkPx(t.dir,mid), units=t.units||0;
   return { id:t.id, no:t.no, src:'replay', instrument:t.instrument||inst,
     dir:t.dir, units, entry:t.entry, price, sl:t.sl, tp:t.tp,
     unrealizedPl: pnlUsd(t.dir,t.entry,price,units),
@@ -101,7 +101,8 @@ function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
 }
 function confirmClosePos(id,anchor){
   if(isReplayId(id)){ const t=tradeById(id); if(!t) return;
-    miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle(); if(c) closeTrade(id,c.close,c.timestamp); drawPaperLines(); },null,anchor); return; }
+    miniConfirm('Close replay position?','Close',()=>{ const c=currentCandle();
+      if(c) closeTrade(id, replayMarkPx(t.dir,c.close), c.timestamp); drawPaperLines(); },null,anchor); return; }
   miniConfirm(`Close position #${id}?`,'Close',()=>spClose(id),null,anchor);
 }
 // ---- drag SL/TP di view-mode: preview saat digeser, konfirmasi saat dilepas ----
@@ -369,15 +370,22 @@ function recalcRisk(t){
 }
 function checkTrades(c, close){
   if(!trades.length) return;
+  const h=synthHalfSpread();
   trades.slice().forEach(t=>{
-    if(t.fillFrom!=null && c.timestamp < t.fillFrom) return;   // jangan evaluasi bar sebelum entry
+    if(t.fillFrom!=null && c.timestamp < t.fillFrom) return;
+    // low/high candle adalah MID → seri bid = mid-½s, seri ask = mid+½s (cermin paper_monitor.go:
+    // long dinilai di bid, short di ask). Harga exit = level SL/TP itu sendiri.
     let exit=null;
-    if(t.dir==='long'){ if(t.sl!=null && c.low<=t.sl) exit=t.sl; else if(t.tp!=null && c.high>=t.tp) exit=t.tp; }
-    else{ if(t.sl!=null && c.high>=t.sl) exit=t.sl; else if(t.tp!=null && c.low<=t.tp) exit=t.tp; }
+    if(t.dir==='long'){
+      if(t.sl!=null && c.low-h<=t.sl) exit=t.sl;
+      else if(t.tp!=null && c.high-h>=t.tp) exit=t.tp;
+    } else {
+      if(t.sl!=null && c.high+h>=t.sl) exit=t.sl;
+      else if(t.tp!=null && c.low+h<=t.tp) exit=t.tp;
+    }
     if(exit!==null){ closeTrade(t.id,exit,c.timestamp); return; }
-    // trailing stop: rapatkan SL ke arah profit utk bar berikutnya (pakai ekstrem bar yang sudah close)
     if(t.trail>0 && t.sl!=null){
-      const ns = t.dir==='long' ? c.high-t.trail : c.low+t.trail;
+      const ns = t.dir==='long' ? (c.high-h)-t.trail : (c.low+h)+t.trail;
       const better = t.dir==='long' ? ns>t.sl : ns<t.sl;
       if(better) t.sl=ns;
     }

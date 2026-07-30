@@ -52,7 +52,7 @@ function renderAcct(){
   if(spActive()){ spRenderAcct(); return; }   // akun live = server
   const bal=+$('#balance').value||0;
   let openPnl=0; { const cur=currentCandle();
-    if(cur) trades.forEach(t=>{ openPnl+=pnlUsd(t.dir,t.entry,cur.close,t.units||0); }); }
+    if(cur) trades.forEach(t=>{ openPnl+=pnlUsd(t.dir,t.entry,replayMarkPx(t.dir,cur.close),t.units||0); }); }
   const eq=bal+openPnl;
   const usd=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   $('#acBal').textContent=usd(bal);

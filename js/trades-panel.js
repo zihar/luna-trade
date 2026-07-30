@@ -29,7 +29,7 @@ function renderTrades(){
     head.innerHTML=thRow(['Instrument','Side','Size','Entry / Market','SL / TP','Margin','Profit & Loss','Actions']);
     if(!trades.length){ body.innerHTML=emptyRow(8,'No open positions','Pick an instrument in Markets, then Buy or Sell to open one.','☾'); return; }
     body.innerHTML=trades.map(t=>{
-      const mkt=cur?cur.close:t.entry;
+      const mkt=cur?replayMarkPx(t.dir,cur.close):t.entry;
       const pl=pnlUsd(t.dir,t.entry,mkt,t.units||0);
       const margin=(t.units||0)*t.entry*quoteToUsd(t.entry)/100;
       return `<tr>
@@ -79,7 +79,8 @@ document.querySelectorAll('#tpTabs button').forEach(b=>b.onclick=()=>{
 // aksi per baris (Close / Cancel)
 $('#tpBody').addEventListener('click',e=>{ const b=e.target.closest('button[data-act]'); if(!b) return;
   const a=b.dataset.act;
-  if(a==='close'){ const c=currentCandle(); if(c) closeTrade(+b.dataset.id, c.close, c.timestamp); }
+  if(a==='close'){ const t=trades.find(x=>x.id===+b.dataset.id), c=currentCandle();
+    if(t&&c) closeTrade(t.id, replayMarkPx(t.dir,c.close), c.timestamp); }
   else if(a==='cancel') cancelPending();
 });
 // aksi tutup posisi akun live (server) per baris
