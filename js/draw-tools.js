@@ -36,6 +36,22 @@ function posRerender(o){ try{
   // rect/trendline kosong: paksa redraw saat hover/select → undangan "+ Add text" muncul/hilang seketika
   else if((o.name==='rect'||o.name==='trendline')&&o.points.length>=2&&!(o.extendData&&String(o.extendData).trim())) chart.overrideOverlay({id:o.id,points:o.points});
 }catch(_){} }
+// Keep drawing mode: setelah objek SELESAI, arm ulang tool yang sama.
+//
+// ASYNC (setTimeout 0), bukan panggilan langsung: onDrawEnd masih berada di dalam dispatch event
+// klinecharts untuk overlay yang baru selesai — membuat overlay baru di detik itu mengacak state
+// internalnya. Dua guard di dalam callback bukan hiasan: dalam jeda satu tick itu pengguna bisa
+// mematikan toggle atau meng-arm tool lain.
+//
+// `instant` TAK PERNAH diteruskan: untuk H/V, rearm ber-instant akan menjatuhkan garis lagi di
+// posisi kursor yang sama, seketika, berantai. Yang benar = tool kembali armed, garis berikutnya
+// jatuh saat pengguna mengklik.
+function rearmDraw(){
+  if(!keepDrawOn || !lastDrawTool) return;
+  const t=lastDrawTool;
+  if(t.name==='measure') return;   // ephemeral: objeknya dibuang mousedown berikutnya (js/measure.js)
+  setTimeout(()=>{ if(keepDrawOn && !inProgressId) createDraw(t.name, t.btn); }, 0);
+}
 function delHooks(){ return {
   // Preview PRESISI untuk SEMUA tool sub-bar. klinecharts men-snap titik in-progress ke pusat
   // bar (integer dataIndex + timestamp) → rubber-band tak mengikuti kursor & final "loncat".
@@ -191,7 +207,7 @@ function delHooks(){ return {
     // measure (ephemeral): id-nya dipegang di sini, BUKAN saat di-arm — supaya Esc selama menggambar
     // tetap jatuh ke cancelInProgressDraw() seperti tool lain (lihat js/measure.js).
     if(o && o.name==='measure') measureId=o.id;
-    inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); return false; },
+    inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); rearmDraw(); return false; },
   onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
     const o=e.overlay; selectedId=o&&o.id;
     // klik pada undangan "+ Add text" objek KOSONG → editor INLINE (bukan modal). Timer 220ms:
@@ -246,6 +262,11 @@ function instantDropPoint(name){
 }
 function createDraw(name,btn,extra,instant){
   track('draw',{tool:name});
+  lastDrawTool={name,btn};             // siapa yang di-rearm bila keep drawing nyala
+  // Buang gambar in-progress yang telantar sebelum memulai yang baru. Sebelum keep-drawing ini
+  // jarang terjadi (arm tool A lalu B tanpa menggambar); dengan keep-drawing "tool selalu armed"
+  // membuatnya jalur biasa — mis. Alt+H lalu Alt+H lagi.
+  if(inProgressId) try{ cancelInProgressDraw(); }catch(_){}
   try{ clearMeasure(); }catch(_){}   // gestur baru → hasil ukur sebelumnya tak relevan (js/measure.js)
   try{
     pendingClicks=[];
@@ -265,6 +286,7 @@ function createDraw(name,btn,extra,instant){
         inProgressId=null; disarmIcons();
         try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // spt jalur restore
         selectedId=id; scheduleSaveDraws();                          // pilih + persist + catat history utk undo
+        rearmDraw();                                                 // keep drawing: tool siap lagi (non-instant)
       } else { inProgressId=id; disarmIcons(); if(btn) btn.classList.add('armed');
         // sembunyikan buletan handle titik SELAMA menggambar (titik-bergerak di kursor + titik yg sudah
         // ditaruh) — dikembalikan di onDrawEnd. Kursor jadi bersih (crosshair saja) sesuai preferensi.
