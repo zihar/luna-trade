@@ -35,7 +35,7 @@ function drawDraftLines(){
   // preview SL/TP saat panel order terbuka & menyiapkan order — termasuk saat sudah ada
   // posisi lain (tambah posisi baru). Sembunyikan hanya saat panel tertutup / replay lokal / pending.
   const op=$('#orderpanel');
-  if(trade || pending || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
+  if(trades.length || pending || T==null || (op && op.style.display==='none')){ clearDraftLines(); return; }
   const cur=currentCandle(), ba=curBidAsk(); if(!cur){ clearDraftLines(); return; }
   const isSell=orderDir==='short', entry= ba?(isSell?ba.bid:ba.ask):cur.close;
   const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value||0, rr=rrVal(), dist=slp*pip, units=currentLots()*unitsPer();

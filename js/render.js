@@ -69,7 +69,7 @@ function suggestLotsFromRisk(){
   const u=unitsFromRisk(bal,rp,cur.close,cur.close-slp*pip);
   return u/unitsPer();
 }
-function refreshLotSuggestion(){ if(lotsManual||trade||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
+function refreshLotSuggestion(){ if(lotsManual||trades.length||!$('#riskOn').checked) return; const s=suggestLotsFromRisk(); if(s!=null) setLots(s); }
 // harga dgn pemisah ribuan (ala TradeLocker): 4,117.74 / 1.14088
 function fmtPx(p){ if(p==null||isNaN(p)) return '—';
   return (+p).toLocaleString('en-US',{minimumFractionDigits:priceDecimals(),maximumFractionDigits:priceDecimals()}); }

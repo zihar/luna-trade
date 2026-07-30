@@ -5,8 +5,8 @@
 const ReplayBroker = {
   mode:'replay',
   market(dir){ openTrade(dir); },
-  closeMarket(){ if(trade){ const c=currentCandle(); if(c) closeTrade(c.close,c.timestamp); } else if(pending){ cancelPending(); } },
-  hasOpen(){ return !!trade; },
+  closeMarket(){ if(trades.length) closeAllReplay(); if(pending) cancelPending(); },
+  hasOpen(){ return trades.length>0; },
 };
 // ===================== Live Paper account (server, Fase 2b) =====================
 // Saat BUKAN Bar Replay → akun aktif = saldo dummy server per-user. Order MARKET
@@ -171,7 +171,7 @@ document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
 });
 // tombol eksekusi besar (SELL/BUY 0.xx @ harga)
 $('#execBtn').onclick=()=>submitOrder(orderDir);
-$('#closeAllBtn').onclick=()=>{ if(spActive()){ spCloseAll(); return; } try{ if(trade) broker.closeMarket(); }catch(e){} try{ if(pending) cancelPending(); }catch(e){} };
+$('#closeAllBtn').onclick=()=>{ if(spActive()){ spCloseAll(); return; } try{ broker.closeMarket(); }catch(e){} };
 // tab Market | Pending
 document.querySelectorAll('#ordType button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#ordType button').forEach(x=>x.classList.toggle('on',x===b));

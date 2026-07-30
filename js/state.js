@@ -7,8 +7,9 @@ let lastLen = -1;
 let chartHasPartial = false;   // bar terakhir di chart adalah forming bar sintetis (replay) → perlu tahu utk buang/timpa
 let playing = false, playTimer = null;
 let live = false, liveTimer = null;
-let trade = null;        // {dir,entry,sl,tp,risk,units,trail,time,lineEntry,lineSL,lineTP}
-let pending = null;      // order menunggu harga tersentuh (Fase 1c)
+let trades = [];         // posisi replay TERBUKA (banyak, cermin SP.positions di Live)
+let replaySeq = 0;       // penomoran tampilan: posisi ke-n → id internal -n (id Live selalu ≥1)
+let pending = null;      // order menunggu harga tersentuh (satu slot; fitur khas replay)
 let lotsManual = false;  // true setelah user ubah lot/stepper manual → Risk% berhenti auto-isi lot
 let alerts = [];         // price alert dari server: {id,sym,price,triggeredAt,oid} (oid=id overlay chart lokal)
 let quoteCache = {};     // harga terkini per simbol utk watchlist (candle harian, fallback)

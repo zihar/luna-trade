@@ -52,13 +52,13 @@ function renderSizing(){
   const box=$('#sizingBox'); if(!box) return;
   const bal=+$('#balance').value||0, rp=+$('#riskPct').value||0;
   let entry,sl,tp,dir;
-  if(trade){ entry=trade.entry; sl=trade.sl; tp=trade.tp; dir=trade.dir; }
+  if(trades.length){ const t0=trades[0]; entry=t0.entry; sl=t0.sl; tp=t0.tp; dir=t0.dir; }
   else{
     const cur=currentCandle(); if(!cur){ box.innerHTML=''; return; }
     const pip=+$('#pipSize').value||instSpec().pip, slp=+$('#slPips').value, rr=rrVal();
     entry=cur.close; dir='long'; sl=entry-slp*pip; tp=entry+slp*pip*rr;
   }
-  const units = trade ? (trade.units||0) : currentLots()*unitsPer();   // sizing berbasis lot
+  const units = trades.length ? (trades[0].units||0) : currentLots()*unitsPer();   // sizing berbasis lot
   const riskUsd=Math.abs(pnlUsd(dir,entry,sl,units));
   const rewUsd=Math.abs(pnlUsd(dir,entry,tp,units));
   const rr = Math.abs(entry-sl)>0 ? Math.abs(tp-entry)/Math.abs(entry-sl) : 0;
@@ -68,24 +68,24 @@ function renderSizing(){
     `<span>Risk: <b class="neg">$${riskUsd.toFixed(2)}</b> (${pctRisk.toFixed(2)}%)</span>`+
     `<span>Reward: <b class="pos">$${rewUsd.toFixed(2)}</b></span>`+
     `<span>R:R <b>1:${rr.toFixed(2)}</b></span>`+
-    (trade?'':`<span style="opacity:.7">(preview — entry = current price, dir long)</span>`);
+    (trades.length?'':`<span style="opacity:.7">(preview — entry = current price, dir long)</span>`);
 }
 
 // ===================== trade (drag garis) =====================
 function openTrade(dir){
-  if(T==null||trade) return;
+  if(T==null||trades.length) return;   // guard 1-posisi masih berlaku; dilepas di Task 3
   const cur=currentCandle(); if(!cur) return;
   track('order',{dir,inst});
   const ba=curBidAsk();
   const entry = ba ? (dir==='short'?ba.bid:ba.ask) : cur.close;   // eksekusi di bid (sell) / ask (buy)
   const pip=+$('#pipSize').value, slp=+$('#slPips').value, rr=rrVal();
   const dist=slp*pip;
-  const slOn=$('#slOn').checked, tpOn=$('#tpOn').checked;
-  const sl = slOn ? (dir==='long'?entry-dist:entry+dist) : null;
-  const tp = tpOn ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
-  trade={dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
-         trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
-         instrument:inst, time:cur.timestamp,lineEntry:null,lineSL:null,lineTP:null};
+  const sl = $('#slOn').checked ? (dir==='long'?entry-dist:entry+dist) : null;
+  const tp = $('#tpOn').checked ? (dir==='long'?entry+dist*rr:entry-dist*rr) : null;
+  const no=++replaySeq;
+  trades.push({id:-no,no,dir,entry,sl,tp,risk:dist,units:currentLots()*unitsPer(),
+               trail: $('#trailOn').checked ? (+$('#trailPips').value||0)*pip : 0,
+               instrument:inst, time:cur.timestamp, fillFrom:cur.timestamp});
   clearDraftLines(); drawPaperLines(); updateOpenTradeBox(); renderAcct(); renderSizing();
 }
 // pindahkan 1 garis overlay tanpa membuat ulang (untuk trailing & drag pending)

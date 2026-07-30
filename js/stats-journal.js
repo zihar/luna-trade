@@ -51,14 +51,14 @@ function getCSS(v){ return getComputedStyle(document.body).getPropertyValue(v).t
 function renderAcct(){
   if(spActive()){ spRenderAcct(); return; }   // akun live = server
   const bal=+$('#balance').value||0;
-  let openPnl=0;
-  if(trade){ const cur=currentCandle(); if(cur) openPnl=pnlUsd(trade.dir,trade.entry,cur.close,trade.units||0); }
+  let openPnl=0; { const cur=currentCandle();
+    if(cur) trades.forEach(t=>{ openPnl+=pnlUsd(t.dir,t.entry,cur.close,t.units||0); }); }
   const eq=bal+openPnl;
   const usd=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   $('#acBal').textContent=usd(bal);
   const o=$('#acOpen'); o.textContent=(openPnl>=0?'+':'-')+usd(Math.abs(openPnl)); o.className=openPnl>=0?'pos':'neg';
   $('#acEq').textContent=usd(eq);
-  let margin=0; if(trade){ margin=(trade.units||0)*trade.entry*quoteToUsd(trade.entry)/100; }   // leverage 100
+  let margin=0; trades.forEach(t=>{ margin+=(t.units||0)*t.entry*quoteToUsd(t.entry)/100; });   // leverage 100
   const m=$('#acMargin'); if(m) m.textContent=usd(margin);
   const fm=$('#acFree'); if(fm) fm.textContent=usd(eq-margin);
 }
