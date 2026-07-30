@@ -1,5 +1,10 @@
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null, addTextTimer=null;
+// Keep drawing mode ("Stay in Drawing Mode" ala TradingView): tool tetap aktif setelah objek jadi.
+// State-nya hidup di sini (bukan di draw-rail.js) karena yang memakainya createDraw/onDrawEnd;
+// tombolnya cuma UI. Default MATI, sama seperti TV.
+let keepDrawOn = !!localStorage.getItem('br_keepdraw');
+let lastDrawTool = null;      // {name, btn} — siapa yang di-rearm setelah objek selesai
 function disarmIcons(){ document.querySelectorAll('.dtool:not(#magBtn)').forEach(x=>x.classList.remove('armed')); }
 // Batalkan gambar yang belum jadi — satu-satunya jalur batal (Esc, klik kanan, ganti cursor).
 // Membuang overlay saja tak cukup: pendingClicks, tombol rail yang 'armed', dan reticle titik

@@ -181,8 +181,20 @@ if(magnetOn) _mag.classList.add('armed');
 _mag.onclick=()=>{ magnetOn=!magnetOn; localStorage.setItem('br_magnet', magnetOn?'1':''); _mag.classList.toggle('armed', magnetOn); if(!magnetOn) try{hideMagDot();}catch(_){}
   // toggle saat sedang menggambar → sinkronkan mode overlay in-progress supaya garis preview langsung ikut/lepas snap
   if(inProgressId) try{chart.overrideOverlay({id:inProgressId, mode: magnetOn?'strong_magnet':'normal'});}catch(_){} };
-// urutan tombol bawah (atas→bawah): magnet, hide, trash
-_dt.appendChild(_mag); _dt.appendChild(_hd); _dt.appendChild(_tr);
+// toggle Keep drawing ("Stay in Drawing Mode" ala TradingView) — tool tetap aktif setelah objek jadi.
+// Ikon pensil + gembok, seperti TV. Tanpa hotkey: TV pun tak punya, dan Ctrl/⌘ di TV justru milik
+// magnet sementara (jangan dirampas).
+const KEEPDRAW_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 21l1.2-3.6L12 9.6l2.4 2.4L6.6 19.8z"/><path d="M17 4.5V3.6a1.9 1.9 0 0 1 3.8 0v.9"/><rect x="16" y="4.5" width="5.8" height="5" rx="1"/></svg>';
+const _kd=document.createElement('button'); _kd.id='keepDrawBtn'; _kd.className='dtool';
+_kd.title='Stay in drawing mode: keep the tool active after each drawing (on/off)';
+_kd.setAttribute('aria-label','Stay in drawing mode');
+_kd.innerHTML=KEEPDRAW_SVG;
+if(keepDrawOn) _kd.classList.add('armed');
+_kd.onclick=()=>{ keepDrawOn=!keepDrawOn;
+  try{ localStorage.setItem('br_keepdraw', keepDrawOn?'1':''); }catch(_){}
+  _kd.classList.toggle('armed', keepDrawOn); };
+// urutan tombol bawah (atas→bawah): magnet, keep-drawing, hide, trash — urutan TV
+_dt.appendChild(_mag); _dt.appendChild(_kd); _dt.appendChild(_hd); _dt.appendChild(_tr);
 
 // Catatan: undangan "+ Add text" MENYATU di canvas — placeholder muted di dalam rect/trendline
 // saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Untuk rect, label
