@@ -207,8 +207,10 @@ function delHooks(){ return {
     // measure (ephemeral): id-nya dipegang di sini, BUKAN saat di-arm — supaya Esc selama menggambar
     // tetap jatuh ke cancelInProgressDraw() seperti tool lain (lihat js/measure.js).
     if(o && o.name==='measure') measureId=o.id;
-    inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws(); rearmDraw(); return false; },
-  onClick:(e)=>{ if(eraserOn){ try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
+    inProgressId=null; disarmIcons(); try{hideMagDot();}catch(_){} scheduleSaveDraws();
+    try{syncLockAllBtn();}catch(_){}   // objek baru (tak terkunci) → tombol Lock all tak lagi "semua"
+    rearmDraw(); return false; },
+  onClick:(e)=>{ if(eraserOn){ if(!blockedByLock(e.overlay.id)) try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
     const o=e.overlay; selectedId=o&&o.id;
     // klik pada undangan "+ Add text" objek KOSONG → editor INLINE (bukan modal). Timer 220ms:
     // double-click (buka modal) akan membatalkannya lewat clearTimeout di onDoubleClick.
@@ -227,7 +229,7 @@ function delHooks(){ return {
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
-  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); return false; },
+  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); try{syncLockAllBtn();}catch(_){} return false; },
 };}
 // Instant-drop ala TradingView: shortcut H/V → garis langsung terpasang di posisi cursor
 // tanpa klik. Titik diambil dari cursor terakhir (lastPtr); null bila cursor di LUAR chart

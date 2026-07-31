@@ -59,6 +59,7 @@ function buildDrawsFromArray(arr){
       if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
   }catch(e){} });
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+  try{ syncLockAllBtn(); }catch(_){}   // restore bisa membawa objek terkunci → samakan tombol rail
 }
 window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
 

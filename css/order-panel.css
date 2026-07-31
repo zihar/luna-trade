@@ -146,7 +146,14 @@
   .dm-del{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--border);
     color:var(--muted); font-size:12px; padding:6px 12px; border-radius:8px; cursor:pointer; transition:color .12s, border-color .12s; }
   .dm-del svg{ width:13px; height:13px; }
-  .dm-del:hover{ color:var(--red); border-color:var(--red); }
+  .dm-del:hover:not(:disabled){ color:var(--red); border-color:var(--red); }
+  /* Delete dimatikan selama objek terkunci → buka kunci dulu (lihat js/draw-lock.js) */
+  .dm-del:disabled{ opacity:.45; cursor:not-allowed; }
+  /* toggle Lock objek: gaya sama dgn Delete, menyala (aksen) saat terkunci */
+  .dm-lock{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:12px;
+    padding:6px 12px; border-radius:8px; cursor:pointer; transition:color .12s, border-color .12s; }
+  .dm-lock:hover{ color:var(--fg); border-color:var(--btn-border-hover); }
+  .dm-lock.on{ color:var(--accent); border-color:var(--accent); }
   .dm-close{ margin-left:auto; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:12px;
     font-weight:600; padding:6px 18px; border-radius:8px; cursor:pointer; transition:filter .12s; }
   .dm-close:hover{ filter:brightness(1.07); }

@@ -94,3 +94,92 @@ test.describe('lock: inti & persistensi', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('lock: UI & proteksi hapus', () => {
+  test('tombol Lock di modal mengunci & mematikan Delete', async ({ page }) => {
+    await gotoApp(page);
+    const { obj } = await drawTool(page, 'trendline');
+    await page.evaluate((id) => openDrawModal(chart.getOverlayById(id), 'style'), obj.id);
+    const lockBtn = page.locator('.dmodal .dm-lock');
+    await expect(lockBtn).toBeVisible();
+    expect(await lockBtn.textContent()).toMatch(/lock/i);
+
+    await lockBtn.click();
+    expect(await page.evaluate((id) => isLocked(id), obj.id)).toBe(true);
+    await expect(page.locator('.dmodal .dm-del')).toBeDisabled();
+    expect(await page.locator('.dmodal .dm-del').getAttribute('title')).toMatch(/unlock/i);
+
+    await lockBtn.click();
+    expect(await page.evaluate((id) => isLocked(id), obj.id)).toBe(false);
+    await expect(page.locator('.dmodal .dm-del')).not.toBeDisabled();
+    assertNoPageErrors(page);
+  });
+
+  test('Delete melewati objek terkunci, jalan lagi setelah dibuka', async ({ page }) => {
+    await gotoApp(page);
+    const { obj } = await drawTool(page, 'trendline');
+    await page.evaluate((id) => setDrawLock(id, true), obj.id);
+
+    await page.evaluate((id) => { selectedId = id; }, obj.id);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+    expect((await overlays(page)).length, 'Delete tak boleh membuang objek terkunci').toBe(1);
+
+    await page.evaluate((id) => setDrawLock(id, false), obj.id);
+    await page.evaluate((id) => { selectedId = id; }, obj.id);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+    expect((await overlays(page)).length, 'setelah dibuka, Delete bekerja').toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  test('eraser melewati objek terkunci', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    await page.evaluate((id) => setDrawLock(id, true), obj.id);
+    await page.evaluate(() => setCursorMode('eraser'));
+
+    const mid = await midOf(page, obj.id);
+    await page.mouse.move(rect.x + mid.x, rect.y + mid.y, { steps: 3 });
+    await page.mouse.click(rect.x + mid.x, rect.y + mid.y);
+    await page.waitForTimeout(300);
+    expect((await overlays(page)).length, 'eraser tak boleh membuang objek terkunci').toBe(1);
+    assertNoPageErrors(page);
+  });
+
+  test('Remove-all menyisakan objek terkunci', async ({ page }) => {
+    await gotoApp(page);
+    const a = await drawTool(page, 'trendline');
+    await page.evaluate((id) => setDrawLock(id, true), a.obj.id);
+    await drawTool(page, 'rect');
+    expect((await overlays(page)).length).toBe(2);
+
+    await page.evaluate(() => removeAllDrawings());
+    await page.waitForTimeout(200);
+    const sisa = await overlays(page);
+    expect(sisa.length, 'yang terkunci disisakan').toBe(1);
+    expect(sisa[0].name).toBe('trendline');
+    expect(sisa[0].lock).toBe(true);
+    assertNoPageErrors(page);
+  });
+
+  test('tombol rail Lock all mengunci semua, klik lagi membuka semua', async ({ page }) => {
+    await gotoApp(page);
+    await drawTool(page, 'trendline');
+    await drawTool(page, 'rect');
+
+    const btn = page.locator('#lockAllBtn');
+    await expect(btn).toBeVisible();
+    expect(await btn.getAttribute('title'), 'teks UI Inggris').toMatch(/lock/i);
+    await expect(btn).not.toHaveClass(/armed/);
+
+    await btn.click();
+    expect(await page.evaluate(() => drawIds.every(isLocked)), 'semua terkunci').toBe(true);
+    await expect(btn).toHaveClass(/armed/);
+
+    await btn.click();
+    expect(await page.evaluate(() => drawIds.some(isLocked)), 'semua terbuka').toBe(false);
+    await expect(btn).not.toHaveClass(/armed/);
+    assertNoPageErrors(page);
+  });
+});

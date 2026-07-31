@@ -61,7 +61,7 @@ function openDrawModal(o, tab){
   panel.innerHTML=`<div class="dm-head">${OBJ_ICON[name]?`<span class="dm-ico">${OBJ_ICON[name]}</span>`:''}<span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
     +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}</div>`
     +`<div class="dm-body">${stylePane}${textPane}</div>`
-    +`<div class="dm-foot"><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
+    +`<div class="dm-foot"><button class="dm-lock"></button><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
   const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
   const dmSwitch=(t)=>{ panel.querySelectorAll('.dm-tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
     panel.querySelectorAll('.dm-pane').forEach(p=>{ p.hidden=(p.dataset.pane!==t); }); };
@@ -75,6 +75,17 @@ function openDrawModal(o, tab){
   if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
   const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(Math.round(window.innerWidth/2-90), 90); };
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
+  // Lock objek: terkunci = tak bisa digeser & tak bisa terhapus (js/draw-lock.js). Delete dimatikan
+  // selama terkunci supaya "buka kunci" jadi langkah sadar, bukan klik yang sama dua kali.
+  const lockBtn=panel.querySelector('.dm-lock');
+  const syncLock=()=>{ const on=isLocked(o.id);
+    lockBtn.textContent = on?'Unlock':'Lock';
+    lockBtn.classList.toggle('on',on);
+    const del=panel.querySelector('.dm-del');
+    del.disabled=on; del.title = on?'Unlock to delete':'';
+  };
+  lockBtn.onclick=()=>{ toggleDrawLock(o.id); syncLock(); };
+  syncLock();
   panel.querySelector('.dm-close').onclick=closeDrawModal;
   panel.querySelector('.dm-x').onclick=closeDrawModal;
   dmTarget=o;
