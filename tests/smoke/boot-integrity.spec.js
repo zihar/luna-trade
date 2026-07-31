@@ -104,6 +104,8 @@ const SENTINEL = {
 
   // Measure tool (ruler) — modul domain baru, bukan hasil pemecahan index.html.
   'measure.js': 'measureStats',
+  // Lock objek gambar — modul domain baru.
+  'draw-lock.js': 'setDrawLock',
 
   // PR-5 — potongan 3769-4524 (756 baris) ke lima file.
   'draw-rail.js': 'setCursorMode',
