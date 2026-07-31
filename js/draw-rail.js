@@ -193,8 +193,23 @@ if(keepDrawOn) _kd.classList.add('armed');
 _kd.onclick=()=>{ keepDrawOn=!keepDrawOn;
   try{ localStorage.setItem('br_keepdraw', keepDrawOn?'1':''); }catch(_){}
   _kd.classList.toggle('armed', keepDrawOn); };
-// urutan tombol bawah (atas→bawah): magnet, keep-drawing, hide, trash — urutan TV
-_dt.appendChild(_mag); _dt.appendChild(_kd); _dt.appendChild(_hd); _dt.appendChild(_tr);
+// toggle Lock all drawings — objek terkunci tak bisa digeser & tak bisa terhapus tak sengaja.
+// Statusnya TURUNAN dari objeknya (armed = ada gambar & semuanya terkunci), bukan state sendiri:
+// kunci per objek bisa diubah dari modal, jadi satu sumber kebenaran = properti lock overlay.
+const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="10.5" width="14" height="9.5" rx="1.6"/><path d="M8.2 10.5V7.6a3.8 3.8 0 0 1 7.6 0v2.9"/></svg>';
+const _lk=document.createElement('button'); _lk.id='lockAllBtn'; _lk.className='dtool';
+_lk.setAttribute('aria-label','Lock all drawings');
+_lk.innerHTML=LOCK_SVG;
+function syncLockAllBtn(){
+  const n=drawIds.length, all=(n>0 && lockedDrawCount()===n);
+  _lk.classList.toggle('armed',all);
+  _lk.title = all?'Unlock all drawings':'Lock all drawings';
+  _lk.disabled = (n===0);
+}
+_lk.onclick=()=>{ const n=drawIds.length; if(!n) return; setLockAllDrawings(lockedDrawCount()!==n); };
+// urutan tombol bawah (atas→bawah): magnet, keep-drawing, lock-all, hide, trash — urutan TV
+_dt.appendChild(_mag); _dt.appendChild(_kd); _dt.appendChild(_lk); _dt.appendChild(_hd); _dt.appendChild(_tr);
+syncLockAllBtn();
 
 // Catatan: undangan "+ Add text" MENYATU di canvas — placeholder muted di dalam rect/trendline
 // saat kosong & di-hover/pilih (lihat showAddTextHint + createPointFigures). Untuk rect, label

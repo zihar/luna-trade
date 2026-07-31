@@ -17,9 +17,9 @@ function removeMenuItems(){
   const nd=drawIds.length, ni=Object.keys(activeInd).length;
   const dL=`drawing${nd===1?'':'s'}`, iL=`indicator${ni===1?'':'s'}`;
   return [
-    {label:`Remove ${nd} ${dL}`,               disabled:nd===0,       fn:clearDrawings},
+    {label:`Remove ${nd} ${dL}`,               disabled:nd===0,       fn:removeAllDrawings},
     {label:`Remove ${ni} ${iL}`,               disabled:ni===0,       fn:removeAllInd},
-    {label:`Remove ${nd} ${dL} & ${ni} ${iL}`, disabled:(nd+ni)===0,  fn:()=>{ clearDrawings(); removeAllInd(); }},
+    {label:`Remove ${nd} ${dL} & ${ni} ${iL}`, disabled:(nd+ni)===0,  fn:()=>{ removeAllDrawings(); removeAllInd(); }},
   ];
 }
 function openRemoveMenu(x,y){ showCtx(x,y,removeMenuItems()); }
@@ -42,7 +42,9 @@ $('#chart').addEventListener('contextmenu',e=>{
     if(nearIdx>=0) items.push({label:`✕ Delete alert @ ${alerts[nearIdx].price}`, fn:()=>removeAlert(nearIdx)});
     items.push({label:`🔔 Create alert at ${(+price).toFixed(priceDecimals())}`, fn:()=>createAlertAt(price)});
   }
-  if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:clearDrawings}); }
+  // Aksi PENGGUNA → removeAllDrawings (menghormati kunci). clearDrawings() sengaja tak dipakai di
+  // sini: ia jalur internal tanpa syarat utk undo snapshot & ganti instrumen (js/draw-lock.js).
+  if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:removeAllDrawings}); }
   items.push({label:'↺ Reset chart view', fn:resetChartView});
   items.push({label:'⚙ Setting chart', fn:()=>{ track('chart_settings'); showChartSet(e.clientX, e.clientY); }});   // paling bawah
   showCtx(e.clientX, e.clientY, items);

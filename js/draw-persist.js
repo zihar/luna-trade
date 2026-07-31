@@ -17,7 +17,7 @@ function serializeDraws(){
     if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
     const pts=o.points.map(p=>({vt:tsOf(p), value:p.value}));
     if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
-    out.push({ name:o.name, points:pts,
+    out.push({ name:o.name, points:pts, lock:o.lock?1:0,
       extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
   }catch(e){} });
   return out;
@@ -49,14 +49,17 @@ function buildDrawsFromArray(arr){
         : {timestamp:pt.vt, value:pt.value};
     });
     const base={name:d.name, points:pts};
+    if(d.lock) base.lock=true;      // kunci dipulihkan bersama objeknya (js/draw-lock.js)
     if(d.extendData!=null) base.extendData=d.extendData;
     if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
     const id=chart.createOverlay(Object.assign(base,delHooks()));
     if(id){ drawIds.push(id);
       try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // restore full-point tak picu onDrawEnd → set flag di sini
+      if(d.lock) try{ applyLockVisual(id,true); }catch(_){}        // muncul tanpa handle sejak awal
       if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
   }catch(e){} });
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+  try{ syncLockAllBtn(); }catch(_){}   // restore bisa membawa objek terkunci → samakan tombol rail
 }
 window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
 

@@ -149,6 +149,12 @@ di `DRAG_SKIP` (`31-drag-precision.spec.js`): tanpa `needDefaultPointFigure` ia 
 jadi tak ada yang bisa digenggam untuk di-drag. Jangan menulis assertion yang menganggap objeknya
 masih hidup setelah gestur lain.
 
+Tambahan 4: **dua jalur "hapus semua gambar", jangan tertukar.** `clearDrawings()` tanpa syarat —
+jalur internal untuk `applyDrawsSnapshot()` (undo) & `loadChart()` (ganti instrumen); kalau ia
+menghormati kunci, undo akan menghasilkan objek dobel. `removeAllDrawings()` (`js/draw-lock.js`)
+adalah aksi pengguna dan **menyisakan objek terkunci**. Test yang membersihkan gambar harus memilih
+yang sesuai maksudnya.
+
 Tambahan 3: **keep drawing mode default MATI** (`keepDrawOn`, tombol `#keepDrawBtn`). Banyak test
 menunggu `inProgressId == null` setelah objek jadi; itu benar HANYA saat toggle mati. Kalau sebuah
 test menyalakannya, matikan lagi sebelum memakai `drawTool()`/`measureParity()`.
