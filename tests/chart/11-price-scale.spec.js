@@ -86,6 +86,46 @@ test('besar langkah skala sama di mana pun kursor secara vertikal', async ({ pag
   assertNoPageErrors(page);
 });
 
+// Langkah wheel HALUS (trackpad macOS mengirim deltaY ~2–15 per event, bukan 100). Tiap notch
+// disintesis sebagai gesture mousedown→mousemove→mouseup tersendiri, dan KLineCharts membuang
+// `pressedMouseMoveEvent` yang jarak manhattan-nya < 5px dari mousedown — jadi langkah kecil dulu
+// hilang tanpa efek. Lebih buruk: gesture yang gerakannya dibuang tetap terhitung CLICK, dan dua
+// click < 500ms di sumbu = double-click = KLineCharts mengembalikan AUTO-SCALE — zoom yang sudah
+// didapat pengguna dibatalkan. Dua test di bawah memaku kedua sisi itu.
+test('banyak langkah wheel halus terakumulasi jadi skala, tak hilang', async ({ page }) => {
+  await gotoApp(page);
+  const pt = await axisPoint(page, 300);
+
+  const span0 = await priceSpan(page);
+  for (let i = 0; i < 25; i++) await wheelAt(page, pt, -8); // 25 × 0.08 notch = 2 notch
+
+  const ratio = (await priceSpan(page)) / span0;
+  const ideal = Math.pow(1 / 1.05, 2); // 0.907
+  expect(ratio).toBeGreaterThan(ideal * 0.98); // tak boleh MELEBIHI niat pengguna
+  expect(ratio).toBeLessThan(0.94); // dan harus benar-benar sampai (dulu: ~1.0 atau balik ke auto)
+
+  assertNoPageErrors(page);
+});
+
+test('langkah wheel halus tak pernah mengembalikan auto-scale', async ({ page }) => {
+  await gotoApp(page);
+  const pt = await axisPoint(page, 300);
+
+  const auto = await priceSpan(page);
+  await wheelAt(page, pt, -100); // kunci skala manual
+  const locked = await priceSpan(page);
+  expect(locked).toBeLessThan(auto * 0.99);
+
+  await wheelAt(page, pt, -8); // dua langkah kecil berurutan: dulu = double-click → auto-scale
+  await wheelAt(page, pt, -8);
+
+  const after = await priceSpan(page);
+  expect(after).toBeLessThan(auto * 0.99); // masih terkunci manual, tidak pulang ke auto-fit
+  expect(after).toBeLessThanOrEqual(locked * 1.001); // dan tak melebar balik
+
+  assertNoPageErrors(page);
+});
+
 test('Shift+wheel di area plot tetap men-skala harga, bukan zoom waktu', async ({ page }) => {
   await gotoApp(page);
   const pt = await plotPoint(page, 0.5, 0.5);
