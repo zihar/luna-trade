@@ -68,6 +68,91 @@ test.describe('magnet', () => {
     assertNoPageErrors(page);
   });
 
+  // "Nempel ke SUATU OHLC" (test di atas) ternyata jauh lebih longgar dari yang dijanjikan magnet:
+  // ia lolos walau titik mendarat di bar lain atau di ujung yang salah. Dua test berikut memaku
+  // janji sebenarnya — kursor tepat di ujung wick harus mendarat DI UJUNG ITU.
+  //
+  // Kondisi yang dipasang di bawah bukan buatan: tiap TF di-load 5000 bar (js/switch-tf.js), jadi
+  // TF halus SELALU menutup rentang waktu jauh lebih pendek daripada TF kasar yang sedang tampil.
+  // Begitu pengguna pernah membuka TF halus, `finestLoadedTF()` memilihnya sebagai sumber nilai
+  // OHLC — dan di bagian rentang yang tak tertutup penuh, ujung wick yang TAMPAK tak pernah jadi
+  // kandidat sama sekali. Harness hermetik menyajikan fixture yang sama untuk semua granularity,
+  // jadi kondisinya dipasang langsung ke tfData.
+  test('magnet: kursor di ujung wick mendarat di ujung itu walau TF halus tak menutup penuh', async ({ page }) => {
+    await gotoApp(page);
+
+    const res = await page.evaluate(() => {
+      const cur = currentTF;
+      const arr = revealed(cur).slice();
+
+      // TF halus yang ter-load hanya memuat AWAL tiap bar — bagian yang memuat high/low
+      // sebenarnya tidak ikut (persis seperti jendela TF halus yang lebih pendek/terpotong).
+      const fine = arr.map((d) => {
+        const mid = (d.open + d.close) / 2;
+        return { timestamp: d.timestamp, open: d.open, high: Math.max(d.open, mid), low: Math.min(d.open, mid), close: mid };
+      });
+      tfData.M1 = fine;
+
+      const rows = [];
+      for (let i = arr.length - 12; i < arr.length - 2; i++) {
+        const d = arr[i];
+        for (const [kind, want] of [
+          ['high', d.high],
+          ['low', d.low],
+        ]) {
+          const s = magnetSnap(d.timestamp, want, 0, 0); // kursor TEPAT di ujung
+          rows.push({ kind, want, got: s && s.value });
+        }
+      }
+      delete tfData.M1;
+      return { finest: 'M1', rows };
+    });
+
+    const meleset = res.rows.filter((r) => r.got == null || Math.abs(r.got - r.want) > 1e-9);
+    expect(
+      meleset,
+      `magnet tak mendarat di ujung wick padahal kursor tepat di sana: ${JSON.stringify(meleset.slice(0, 4))}`
+    ).toEqual([]);
+
+    assertNoPageErrors(page);
+  });
+
+  test('magnet: penyempurnaan M5 tak menarik titik keluar dari ujung wick yang tampak', async ({ page }) => {
+    await gotoApp(page);
+
+    const res = await page.evaluate(async () => {
+      const cur = currentTF;
+      const arr = revealed(cur).slice();
+      const bar = arr[arr.length - 6];
+
+      // Jendela M5 yang TIDAK memuat ujung bar — nyata terjadi saat rentang bar lebih panjang
+      // dari yang muat diambil sekali (MN: count di-clamp 5000 → ~17 hari dari sebulan penuh),
+      // atau saat permintaan M5 balik tak lengkap.
+      const mid = (bar.open + bar.close) / 2;
+      window.ensureM5Window = async () => [
+        { timestamp: bar.timestamp, open: bar.open, high: Math.max(bar.open, mid), low: Math.min(bar.open, mid), close: mid },
+      ];
+
+      // trendline, BUKAN horizontalStraightLine: yang terakhir ada di MAGNET_REFINE_SKIP, jadi
+      // test-nya akan lolos tanpa pernah menjalankan jalur yang diuji.
+      const id = chart.createOverlay({
+        name: 'trendline',
+        points: [
+          { timestamp: bar.timestamp, value: bar.high }, // titik PERSIS di ujung high
+          { timestamp: arr[arr.length - 3].timestamp, value: bar.close },
+        ],
+      });
+      await refineMagnetPoints(id);
+      const o = chart.getOverlayById(id);
+      const after = o && o.points && o.points[0] ? o.points[0].value : null;
+      chart.removeOverlay({ id });
+      return { want: bar.high, after };
+    });
+
+    expect(res.after, 'titik yang sudah tepat di high digeser oleh penyempurnaan M5').toBeCloseTo(res.want, 9);
+    assertNoPageErrors(page);
+  });
+
   test('magnet di-toggle saat menggambar → mode overlay in-progress ikut berubah', async ({ page }) => {
     await gotoApp(page);
     const rect = await chartRect(page);

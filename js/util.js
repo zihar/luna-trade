@@ -175,14 +175,36 @@ function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].l
 function magnetSnap(time, value, px, py){
   const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
-  const i=Math.max(0,a-1), barOpen=arr[i].timestamp, barEnd=barEndAt(cur,i,arr);
+  const i=Math.max(0,a-1), bar=arr[i], barOpen=bar.timestamp, barEnd=barEndAt(cur,i,arr);
+  // OHLC bar yang TAMPAK selalu jadi kandidat. Data TF halus cuma boleh MENAMBAH presisi
+  // timestamp untuk nilai yang sama — bukan MENGGANTI daftar kandidatnya.
+  //
+  // Dulu `src` menimpa `arr` begitu ada TF lebih halus ter-load, dan fallback ke bar kasar hanya
+  // jalan kalau TF halus itu punya NOL candle dalam rentang bar. Padahal tiap TF di-load 5000 bar
+  // (js/switch-tf.js), jadi TF halus selalu menutup rentang waktu jauh lebih pendek: di bagian
+  // yang cuma tertutup SEBAGIAN, ujung wick yang tampak di layar tak pernah jadi kandidat sama
+  // sekali — magnet mendarat di tengah wick, kadang di harga yang bukan O/H/L/C bar itu.
+  // Hal yang sama terjadi di bar terbaru: tfData hanya memuat candle `complete`, jadi high/low
+  // bar berjalan cuma ada di bar kasarnya.
+  let best=null, bestD=Infinity, fromFine=false;
+  for(const v of [bar.open,bar.high,bar.low,bar.close]){
+    const d=Math.abs(v-value); if(d<bestD){bestD=d; best={timestamp:barOpen,value:v};}
+  }
   const ftf=finestLoadedTF();
-  const src=(DUR[ftf]<DUR[cur]&&tfData[ftf])?tfData[ftf]:arr;
-  let best=null, bestD=Infinity;
-  for(const c of src){ if(c.timestamp>=barOpen && c.timestamp<barEnd){
-    for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-value); if(d<bestD){bestD=d; best={timestamp:c.timestamp,value:v};} }
-  }}
-  if(!best){ const c=arr[i]; let bd=Infinity,bv=c.close; for(const v of [c.open,c.high,c.low,c.close]){const d=Math.abs(v-value);if(d<bd){bd=d;bv=v;}} best={timestamp:barOpen,value:bv}; }
+  if(DUR[ftf]<DUR[cur] && tfData[ftf]){
+    // revealed(), bukan tfData mentah: bar kasarnya sendiri diambil dari revealed(), jadi sumber
+    // halusnya harus dipotong di kursor yang sama — kalau tidak, di Bar Replay ia bisa menawarkan
+    // OHLC dari bagian bar yang belum boleh dilihat pengguna.
+    for(const c of revealed(ftf)){ if(c.timestamp>=barOpen && c.timestamp<barEnd){
+      for(const v of [c.open,c.high,c.low,c.close]){
+        const d=Math.abs(v-value);
+        // `<` di antara sesama candle halus (yang pertama menang, seperti dulu), tapi seri
+        // PERTAMA melawan bar kasar dimenangkan si halus — nilainya sama, timestamp-nya lebih
+        // presisi. Itu yang menjaga presisi sub-bar saat TF halus memang menutup penuh.
+        if(d<bestD || (!fromFine && d===bestD)){ bestD=d; best={timestamp:c.timestamp,value:v}; fromFine=true; }
+      }
+    }}
+  }
   // magnet "keras": selalu nempel ke nilai OHLC terdekat (tanpa gate jarak kursor).
   return best;
 }
