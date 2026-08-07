@@ -1,5 +1,8 @@
 // ===================== drawing tools (ikon, ala TV) =====================
 let selectedId=null, hoverId=null, hoverName=null, inProgressId=null, addTextTimer=null;
+// State gestur clone (Ctrl/⌘ + seret badan). Hidup berdampingan dgn dragBase karena ia bagian
+// dari daur hidup drag yang sama, dan direset bersamanya di onPressedMoveEnd.
+let cloneArmed=false, cloneDone=false;
 // Keep drawing mode ("Stay in Drawing Mode" ala TradingView): tool tetap aktif setelah objek jadi.
 // State-nya hidup di sini (bukan di draw-rail.js) karena yang memakainya createDraw/onDrawEnd;
 // tombolnya cuma UI. Default MATI, sama seperti TV.
@@ -100,7 +103,12 @@ function delHooks(){ return {
   // Guard subBar(): tool BAR_ANCHOR dilewati dengan sengaja. verticalStraightLine memang harus
   // snap ke bar, dan long/shortPosition punya jalur pressed-move sendiri (panel posisi + handle
   // SL/TP) yang tak boleh ditimpa.
-  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o&&subBar(o.name)) dragBase={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
+  onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o&&subBar(o.name)) dragBase={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y};
+    // Ctrl/⌘ ditahan saat gestur DIMULAI → drag ini meninggalkan salinan (js/draw-clone.js).
+    // `!o.lock` cuma sabuk pengaman: klinecharts sendiri tak memanggil pressed-move untuk objek
+    // terkunci, jadi jalur ini tak pernah tercapai — tapi mengandalkan itu diam-diam mahal.
+    cloneArmed = !!(cloneModHeld && o && !o.lock); cloneDone=false;
+    return false; },
   onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
     const OX=0, OY=0;
     // Shift = kunci sudut, jangkar = ujung SEBERANG. Dihitung sebelum anchor supaya jalur
@@ -141,6 +149,13 @@ function delHooks(){ return {
       }
     } else {                                            // seret BADAN objek → translasi semua titik
       if(!dragBase) return false;
+      // Salinan dibuat di GERAKAN PERTAMA, bukan di onPressedMoveStart: bila move-start ikut
+      // menyala pada mousedown tanpa gerak, tekan-lepas biasa akan meninggalkan salinan hantu
+      // persis menimpa aslinya. Titiknya diambil dari dragBase (posisi AWAL gestur) — itu yang
+      // memang harus ditinggalkan, dan ia tak bergantung pada apakah drag sudah sempat menulis
+      // titik baru. Clone hanya di cabang BADAN: menyeret handle titik tetap mengedit titik,
+      // sesuai TV yang memperlakukan clone sebagai operasi seluruh objek.
+      if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneOverlay(o.id, dragBase.pts); }catch(_){} }
       const sx=fracAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
       if(!sx || sv==null) return false;
       const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
@@ -152,7 +167,8 @@ function delHooks(){ return {
     return true;                                        // lewati snap bawaan klinecharts
   },
   // scheduleSaveDraws() WAJIB ikut: tanpa itu hasil drag tak tersimpan & tak masuk history undo.
-  onPressedMoveEnd:(e)=>{ dragBase=null; try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
+  onPressedMoveEnd:(e)=>{ dragBase=null; cloneArmed=false; cloneDone=false;
+    try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
     try{scheduleSaveDraws();}catch(_){} return false; },
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
