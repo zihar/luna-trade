@@ -106,7 +106,7 @@ $('#chart').addEventListener('mousedown',(e)=>{ if(!e.shiftKey) clearMeasure(); 
     if(!xa || v==null) return null;
     // magnet dihormati di jalur ini juga — kalau tidak, dua pintu masuk bisa memberi angka
     // berbeda untuk gestur yang sama.
-    if(magnetOn){ const t=tsOf(xa);
+    if(magnetActive()){ const t=tsOf(xa);
       if(t!=null){ const s=magnetSnap(t, v, px, py); if(s) v=s.value; } }
     return Object.assign({value:v}, xa);
   }

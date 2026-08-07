@@ -82,7 +82,7 @@ function delHooks(){ return {
     if(m===1 && angleLockOn(o.name)){ const a=anchorPx(o.points[0]);
       if(a){ const c=constrainPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
     const fa=fracAnchorFromPx(ex); let v=pxToValue(ey);
-    if(magnetOn && !locked && v!=null){ const xa=xAnchorFromPx(ex);
+    if(magnetActive() && !locked && v!=null){ const xa=xAnchorFromPx(ex);
       if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ex, ey);
         if(s){ o.points[m]={timestamp:s.timestamp, value:s.value}; return false; } } }
     if(fa && v!=null) o.points[m]={dataIndex:fa.dataIndex, value:v};
@@ -143,7 +143,7 @@ function delHooks(){ return {
         // balik {dataIndex}, dan magnet di sana akan menarik titik ke bar TERAKHIR → garis
         // kelempar ke kiri. Gate yang sama dipakai jalur klik (js/draw-pointer.js).
         let snapped=null;
-        if(magnetOn && !locked){ const ax=xAnchorFromPx(ex);
+        if(magnetActive() && !locked){ const ax=xAnchorFromPx(ex);
           if(ax && ax.timestamp!=null){ const s=magnetSnap(ax.timestamp, v, ex, ey); if(s) snapped={timestamp:s.timestamp, value:s.value}; } }
         pts[i]= snapped || {dataIndex:xa.dataIndex, value:v};
       }
@@ -168,7 +168,7 @@ function delHooks(){ return {
   },
   // scheduleSaveDraws() WAJIB ikut: tanpa itu hasil drag tak tersimpan & tak masuk history undo.
   onPressedMoveEnd:(e)=>{ dragBase=null; cloneArmed=false; cloneDone=false;
-    try{ if(magnetOn&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
+    try{ if(magnetActive()&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
     try{scheduleSaveDraws();}catch(_){} return false; },
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
@@ -257,7 +257,7 @@ function delHooks(){ return {
     } }catch(_){}
     pendingClicks=[];
     try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
-    if(magnetOn && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
+    if(magnetActive() && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
     // measure (ephemeral): id-nya dipegang di sini, BUKAN saat di-arm — supaya Esc selama menggambar
     // tetap jatuh ke cancelInProgressDraw() seperti tool lain (lihat js/measure.js).
     if(o && o.name==='measure') measureId=o.id;
@@ -332,7 +332,7 @@ function createDraw(name,btn,extra,instant){
     // magnet ON → mode 'strong_magnet' bawaan klinecharts: garis preview (rubber-band) LANGSUNG
     // nempel ke OHLC candle terdekat saat ditarik, bukan cuma titik yg sudah diklik. Presisi
     // sub-bar (timestamp M5) tetap disempurnakan oleh pendingClicks + refineMagnetPoints di onDrawEnd.
-    if(magnetOn) base.mode='strong_magnet';
+    if(magnetActive()) base.mode='strong_magnet';
     // instant-drop (H/V via shortcut): pre-fill 1 titik → overlay langsung jadi (tak masuk mode gambar)
     let dropped=false;
     if(instant && INSTANT_DROP[name]){ const pt=instantDropPoint(name); if(pt){ base.points=[pt]; dropped=true; } }
