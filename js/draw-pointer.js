@@ -3,7 +3,20 @@
 $('#chart').addEventListener('mousedown', (ev)=>{
   if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
   const r=$('#chart').getBoundingClientRect();
-  const px=ev.clientX-r.left, py=ev.clientY-r.top;
+  let px=ev.clientX-r.left, py=ev.clientY-r.top;
+  // Shift = kunci sudut (js/draw-constrain.js). WAJIB di sini juga, bukan cuma di onDrawing:
+  // titik yang benar-benar di-commit datang dari pendingClicks ini, jadi tanpa penguncian di
+  // jalur klik garis akan "lompat" ke kursor mentah tepat saat tombol ditekan.
+  let locked=false;
+  if(pendingClicks.length===1){ const nm=(chart.getOverlayById(inProgressId)||{}).name;
+    if(angleLockOn(nm)){
+      // Jangkar WAJIB dibaca dgn aturan anchor yg sama dgn jalur commit (onDrawEnd): klik magnet
+      // memakai `timestamp`, klik biasa memakai `fidx` PECAHAN. pendingClicks membawa KEDUANYA,
+      // dan `timestamp` sendiri meng-snap ke pusat bar saat dikonversi — memakainya untuk klik
+      // biasa menggeser jangkar s/d ½ bar, dan garis "vertikal" meleset beberapa piksel.
+      const pc=pendingClicks[0];
+      const a=anchorPx(pc.mag||!isFinite(pc.fidx) ? pc : {dataIndex:pc.fidx, value:pc.value});
+      if(a){ const c=constrainPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } } }
   const xa=xAnchorFromPx(px), v=pxToValue(py);
   if(!xa||v==null) return;
   // fidx = fractional dataIndex PRESISI di piksel klik (utk trendline; tsToPx meng-snap timestamp
@@ -14,7 +27,7 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
   // `mag:true` menandai klik yang SUDAH di-snap: onDrawEnd memakainya untuk membiarkan anchor
   // timestamp-nya (= terkunci di candle) alih-alih menimpanya dengan fidx kursor.
-  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
+  if(magnetOn && !locked && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
   pendingClicks.push(Object.assign({value:v, fidx}, xa));
 }, true);
 
@@ -36,14 +49,20 @@ function hideMagDot(){ magDot.style.display='none'; }
 function updateMagDot(ev){
   if(!inProgressId || cursorMode!=='dot'){ hideMagDot(); return; }   // reticle titik HANYA di cursor 'dot' (cross → cuma garis; arrow → bersih). Magnet tetap men-snap posisinya.
   const r=$('#chart').getBoundingClientRect();
-  const px=ev.clientX-r.left, py=ev.clientY-r.top;
+  let px=ev.clientX-r.left, py=ev.clientY-r.top;
+  // Reticle ikut terkunci saat Shift ditahan — kalau tidak, penanda dan garis menunjuk tempat
+  // berbeda, dan justru penanda itulah yang dipercaya pengguna saat membidik.
+  const o0=chart.getOverlayById(inProgressId);
+  let locked=false;
+  if(o0 && o0.points && o0.points.length===2 && angleLockOn(o0.name)){ const a=anchorPx(o0.points[0]);
+    if(a){ const c=constrainPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } }
   const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
   // Reticle WAJIB memakai anchor yg IDENTIK dgn titik yg akan di-commit, lalu dirender lewat
   // convertToPixel yg SAMA dgn mesin render → dijamin mendarat tepat di posisi titik sebenarnya.
   // (Kursor mentah meleset: convertToPixel(timestamp) meny-snap ke bar utk tool BAR_ANCHOR,
   // sedang tool sub-bar beranchor dataIndex pecahan/presisi. Menyatukan jalur magnet ON/OFF.)
   let anchor=null;
-  if(magnetOn){
+  if(magnetOn && !locked){
     const xa=xAnchorFromPx(px);
     if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s) anchor={timestamp:s.timestamp, value:s.value}; }
   }
