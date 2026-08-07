@@ -28,7 +28,13 @@ $('#chart').addEventListener('contextmenu',e=>{
   // Sedang menggambar → klik kanan = BATAL, bukan menu. Wajib sebelum cek hoverId: saat menggambar
   // hoverId sering menunjuk objek in-progress itu sendiri, dan itu akan membuka modal Style-nya.
   if(cancelInProgressDraw()){ hideCtx(); return; }
-  if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
+  // Ctrl+klik di macOS DIPETAKAN ke contextmenu oleh sistem, jadi Ctrl+drag objek (= clone,
+  // js/draw-clone.js) akan memunculkan modal Style di tengah gestur. Event ber-ctrlKey di ATAS
+  // objek karena itu diabaikan. Konsekuensi yang diterima: klik-kanan sambil sengaja menahan Ctrl
+  // tak lagi membuka modal objek — klik kanan biasa tak tersentuh, dan di Mac ⌘ adalah jalur
+  // clone yang dianjurkan justru karena ia bebas dari tabrakan ini.
+  if(hoverId && !e.ctrlKey){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
+  if(hoverId && e.ctrlKey){ hideCtx(); return; }
   const rect=$('#chart').getBoundingClientRect();
   const yIn=e.clientY-rect.top;
   const price=pxToValue(yIn);
