@@ -175,38 +175,64 @@ function finestLoadedTF(){ for(const tf of TF_LIST){ if(tfData[tf]&&tfData[tf].l
 function magnetSnap(time, value, px, py){
   const cur=currentTF, arr=revealed(cur); if(!arr.length) return null;
   let a=0,b=arr.length; while(a<b){const m=(a+b)>>1; if(arr[m].timestamp<=time) a=m+1; else b=m;}
-  const i=Math.max(0,a-1), bar=arr[i], barOpen=bar.timestamp, barEnd=barEndAt(cur,i,arr);
-  // OHLC bar yang TAMPAK selalu jadi kandidat. Data TF halus cuma boleh MENAMBAH presisi
-  // timestamp untuk nilai yang sama — bukan MENGGANTI daftar kandidatnya.
+  let i=Math.max(0,a-1);
+  // Bar TERDEKAT, bukan bar yang MEMUAT waktu itu. Sebuah candle digambar dgn timestamp-nya di
+  // TENGAH, jadi separuh KIRI badan candle punya waktu < jam bukanya — "bar yang memuat" di sana
+  // adalah candle SEBELUMNYA, dan magnet menempel ke tetangga yang tak ditunjuk kursor (terukur:
+  // klik 3px di kiri pusat bar mendarat di O/H/L/C bar sebelah). pxToTime menginterpolasi linear
+  // antar bar tetangga, jadi "terdekat dalam waktu" = "terdekat dalam piksel". Sama seperti
+  // snapTimeToBar untuk garis vertikal.
+  if(i+1<arr.length && (time-arr[i].timestamp) > (arr[i+1].timestamp-time)) i++;
+  const bar=arr[i], barOpen=bar.timestamp, barEnd=barEndAt(cur,i,arr);
+  // Kandidat harga PERSIS EMPAT: O/H/L/C bar yang tampak. Titik magnet harus DISKRIT — geser
+  // kursor beberapa piksel di dalam candle yang sama tak boleh memindahkannya; yang memindahkan
+  // hanya pindah candle atau pindah ke level OHLC lain.
   //
-  // Dulu `src` menimpa `arr` begitu ada TF lebih halus ter-load, dan fallback ke bar kasar hanya
-  // jalan kalau TF halus itu punya NOL candle dalam rentang bar. Padahal tiap TF di-load 5000 bar
-  // (js/switch-tf.js), jadi TF halus selalu menutup rentang waktu jauh lebih pendek: di bagian
-  // yang cuma tertutup SEBAGIAN, ujung wick yang tampak di layar tak pernah jadi kandidat sama
-  // sekali — magnet mendarat di tengah wick, kadang di harga yang bukan O/H/L/C bar itu.
-  // Hal yang sama terjadi di bar terbaru: tfData hanya memuat candle `complete`, jadi high/low
-  // bar berjalan cuma ada di bar kasarnya.
-  let best=null, bestD=Infinity, fromFine=false;
-  for(const v of [bar.open,bar.high,bar.low,bar.close]){
-    const d=Math.abs(v-value); if(d<bestD){bestD=d; best={timestamp:barOpen,value:v};}
+  // Data TF halus dulu ikut menyumbang O/H/L/C tiap sub-bar sebagai kandidat (`d<bestD`), padahal
+  // komentar di atasnya sudah menyatakan niat "cuma menambah presisi timestamp untuk nilai yang
+  // sama". Akibatnya daftar kandidat memuai: terukur 4 → 45 harga berbeda di satu bar M15 begitu
+  // M1 ter-load — di wick setinggi 62px itu ±1.4px per kandidat, jadi magnet praktis kontinu dan
+  // titiknya mengikuti kursor, bukan menempel. Sekarang TF halus hanya dipakai untuk MENAJAMKAN
+  // WAKTU: mencari sub-bar yang benar-benar mencetak nilai terpilih.
+  //
+  // Bar yang TAMPAK tetap satu-satunya sumber harga, jadi kasus lama tetap tertutup: TF halus
+  // yang cuma menutup SEBAGIAN rentang (tiap TF di-load 5000 bar, jadi jendelanya selalu lebih
+  // pendek) maupun bar berjalan (tfData hanya memuat candle `complete`) tak bisa lagi menggeser
+  // magnet keluar dari ujung wick — paling buruk waktunya saja yang tak tertajamkan.
+  let kind=null, bestV=null, bestD=Infinity;
+  for(const [k,v] of [['open',bar.open],['high',bar.high],['low',bar.low],['close',bar.close]]){
+    const d=Math.abs(v-value); if(d<bestD){bestD=d; bestV=v; kind=k;}
   }
+  if(bestV==null) return null;
+  let ts=barOpen;
   const ftf=finestLoadedTF();
   if(DUR[ftf]<DUR[cur] && tfData[ftf]){
     // revealed(), bukan tfData mentah: bar kasarnya sendiri diambil dari revealed(), jadi sumber
     // halusnya harus dipotong di kursor yang sama — kalau tidak, di Bar Replay ia bisa menawarkan
-    // OHLC dari bagian bar yang belum boleh dilihat pengguna.
-    for(const c of revealed(ftf)){ if(c.timestamp>=barOpen && c.timestamp<barEnd){
-      for(const v of [c.open,c.high,c.low,c.close]){
-        const d=Math.abs(v-value);
-        // `<` di antara sesama candle halus (yang pertama menang, seperti dulu), tapi seri
-        // PERTAMA melawan bar kasar dimenangkan si halus — nilainya sama, timestamp-nya lebih
-        // presisi. Itu yang menjaga presisi sub-bar saat TF halus memang menutup penuh.
-        if(d<bestD || (!fromFine && d===bestD)){ bestD=d; best={timestamp:c.timestamp,value:v}; fromFine=true; }
-      }
-    }}
+    // waktu dari bagian bar yang belum boleh dilihat pengguna.
+    const t=subBarTimeOf(revealed(ftf), barOpen, barEnd, kind, bestV); if(t!=null) ts=t;
   }
   // magnet "keras": selalu nempel ke nilai OHLC terdekat (tanpa gate jarak kursor).
-  return best;
+  return {timestamp:ts, value:bestV};
+}
+// menit sub-bar dalam [open,end) yang mencetak `v` sebagai `kind` bagi bar kasarnya, atau null
+// bila tak ada (mis. jendela TF halus tak menutup ujung bar). Nilai berasal dari agregasi
+// min/max/first/last atas angka yang sama, jadi perbandingannya memang persis.
+//
+// Rentangnya disaring DI SINI (bukan lewat .filter pemanggil): fungsi ini dipanggil tiap
+// mousemove atas array sepanjang 5000 bar, jadi array antara akan jadi sampah per-frame.
+// open dicetak sub-bar PERTAMA & close oleh yang TERAKHIR (agregasi), high/low oleh sub-bar
+// mana pun yang menyentuhnya → arah pencariannya beda per jenis.
+function subBarTimeOf(sub, open, end, kind, v){
+  if(!sub||!sub.length) return null;
+  if(kind==='close'){
+    for(let i=sub.length-1;i>=0;i--){ const c=sub[i]; if(c.timestamp>=end) continue; if(c.timestamp<open) break;
+      if(c.close===v) return c.timestamp; }
+    return null;
+  }
+  for(const c of sub){ if(c.timestamp<open) continue; if(c.timestamp>=end) break;
+    if(c[kind]===v) return c.timestamp; }
+  return null;
 }
 // [magnet presisi M5] Saat menggambar dgn magnet di TF besar (mis. Daily), nilai OHLC hanya
 // se-presisi data terhalus yg KEBETULAN ter-load → sering mentok di jam buka candle (mis.

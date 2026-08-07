@@ -60,15 +60,21 @@ function delHooks(){ return {
   // render tak re-snap), identik dgn jalur commit di onDrawEnd → preview == final.
   // Hook ini per-INSTANCE lewat createOverlay, jadi berlaku juga untuk 9 overlay BUILT-IN
   // klinecharts yang tak kita daftarkan sendiri.
-  // Magnet hanya menyetel VALUE (harga) ke OHLC; X tetap ikut kursor supaya preview & commit
-  // konsisten. e.x/e.y = container-relative (sama ruang dgn fracAnchorFromPx/pxToValue).
+  // Magnet menyetel KEDUA sumbu: titik mendarat di titik OHLC candle (anchor timestamp → render
+  // meng-snap ke bar itu), bukan menempel harga saja sementara X ikut kursor. Tanpa itu, geser
+  // kursor 3px = titik geser 3px walau magnet menyala — "nempel"-nya cuma di sumbu harga.
+  // Presisi lintas-TF tetap: timestamp yang disimpan adalah menit sub-bar yang mencetak nilai itu.
+  // e.x/e.y = container-relative (sama ruang dgn fracAnchorFromPx/pxToValue).
   onDrawing:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!o.points.length||!subBar(o.name)) return false;
     const m=o.points.length-1;                        // titik yg sedang ditarik = indeks terakhir
     for(let k=0;k<m;k++){ const pc=pendingClicks[k];  // titik yg sudah diklik → re-anchor ke fidx presisi
-      if(pc && isFinite(pc.fidx) && pc.value!=null) o.points[k]={dataIndex:pc.fidx, value:pc.value}; }
+      if(!pc || pc.value==null) continue;
+      if(pc.mag && pc.timestamp!=null) o.points[k]={timestamp:pc.timestamp, value:pc.value};   // magnet: terkunci di candle
+      else if(isFinite(pc.fidx)) o.points[k]={dataIndex:pc.fidx, value:pc.value}; }
     const fa=fracAnchorFromPx(e.x); let v=pxToValue(e.y);
-    if(magnetOn && v!=null){ const xa=xAnchorFromPx(e.x);   // magnet: value → OHLC terdekat, X tetap kursor
-      if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, e.x, e.y); if(s) v=s.value; } }
+    if(magnetOn && v!=null){ const xa=xAnchorFromPx(e.x);
+      if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, e.x, e.y);
+        if(s){ o.points[m]={timestamp:s.timestamp, value:s.value}; return false; } } }
     if(fa && v!=null) o.points[m]={dataIndex:fa.dataIndex, value:v};
     return false;
   },
@@ -104,7 +110,20 @@ function delHooks(){ return {
         // Tanpa ini, menarik satu handle menulis satu titik lepas → kotaknya rusak (terukur:
         // titik mendarat 202px dari kursor), bukan cuma kurang presisi.
         boxPressedMove({points:pts, performPointIndex:i, performPoint:{dataIndex:xa.dataIndex, value:v}});
-      } else if(pts[i]) pts[i]={dataIndex:xa.dataIndex, value:v};
+      } else if(pts[i]){
+        // Magnet berlaku saat MENYERET ujung juga, bukan cuma saat menggambar. Sebelumnya drag
+        // sama sekali tak lewat magnetSnap: titik mengikuti kursor bebas, lalu refineMagnetPoints
+        // menggesernya diam-diam saat tombol dilepas — persis gejala "geser dikit, garisnya ikut
+        // geser, tak presisi". BOX_TOOLS sengaja di luar cabang ini (rect/fib3 juga ada di
+        // MAGNET_REFINE_SKIP — kotaknya punya invariant 8 titik sendiri).
+        // xAnchorFromPx (bukan fidxToTs) yang menentukan "masih di dalam data": di area future ia
+        // balik {dataIndex}, dan magnet di sana akan menarik titik ke bar TERAKHIR → garis
+        // kelempar ke kiri. Gate yang sama dipakai jalur klik (js/draw-pointer.js).
+        let snapped=null;
+        if(magnetOn){ const ax=xAnchorFromPx(e.x);
+          if(ax && ax.timestamp!=null){ const s=magnetSnap(ax.timestamp, v, e.x, e.y); if(s) snapped={timestamp:s.timestamp, value:s.value}; } }
+        pts[i]= snapped || {dataIndex:xa.dataIndex, value:v};
+      }
     } else {                                            // seret BADAN objek → translasi semua titik
       if(!dragBase) return false;
       const sx=fracAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
@@ -164,6 +183,10 @@ function delHooks(){ return {
       // bila desync. Tool di BAR_ANCHOR sengaja dilewati — snap per-bar-nya memang diinginkan.
       if(subBar(o.name)){ o.points=o.points.map((p,k)=>{ if(!p||p.value==null) return p;
         const pc = refine ? pendingClicks[k] : null;
+        // Titik magnet DIKECUALIKAN: anchor timestamp-nya justru yang mengunci titik di candle
+        // (magnet menyetel kedua sumbu). Menimpanya dgn fidx kursor mengembalikan "geser 3px →
+        // titik geser 3px" yang jadi keluhan aslinya.
+        if(pc && pc.mag && p.timestamp!=null) return p;
         const idx = (pc && isFinite(pc.fidx)) ? pc.fidx
                   : (p.dataIndex!=null && isFinite(p.dataIndex)) ? p.dataIndex
                   : fidxOf(p);

@@ -12,7 +12,9 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   // magnet HANYA utk titik di dalam data (punya timestamp). Titik di area future (dataIndex,
   // tanpa candle) tak boleh di-snap: magnetSnap akan menariknya ke bar TERAKHIR → garis
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
-  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx}); return; } }
+  // `mag:true` menandai klik yang SUDAH di-snap: onDrawEnd memakainya untuk membiarkan anchor
+  // timestamp-nya (= terkunci di candle) alih-alih menimpanya dengan fidx kursor.
+  if(magnetOn && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
   pendingClicks.push(Object.assign({value:v, fidx}, xa));
 }, true);
 
