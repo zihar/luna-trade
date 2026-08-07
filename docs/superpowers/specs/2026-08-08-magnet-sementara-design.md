@@ -9,7 +9,7 @@ selama modifier itu ditahan.
 
 | Pertanyaan | Keputusan | Alasan |
 |---|---|---|
-| Saat magnet sudah ON | Ctrl **mematikan** magnet sementara (membalik, bukan sekadar menyalakan) | satu modifier menutup dua kebutuhan, termasuk "sesekali ingin lepas dari magnet" yang selama ini cuma bisa lewat mematikan tombolnya. Fakta TV untuk kasus magnet-sudah-ON **belum terverifikasi** — ini pilihan atas dasar kegunaan, dicatat supaya tak dikira temuan riset |
+| Saat magnet sudah ON | Ctrl **mematikan** magnet sementara (membalik, bukan sekadar menyalakan) | **terverifikasi** dari dokumentasi TV (2026-08-08): *"If the magnet mode is on, you can temporarily turn it off by holding CTRL/Command"* dan *"You can also turn magnet mode on/off by holding CTRL/Command, while editing drawings on the chart"* — [Magnet Mode](https://www.tradingview.com/support/solutions/43000722509-magnet-mode/), diperkuat [Cursor lags/jumps](https://www.tradingview.com/support/solutions/43000472716-cursor-lags-jumps-while-drawing/) |
 | Cakupan | saat **menggambar** dan saat **menyeret ujung**; juga jalur measure | dua pintu masuk yang sama-sama memakai `magnetSnap` — beda hasil untuk gestur yang sama akan membingungkan |
 | Tombol rail | tetap mencerminkan `magnetOn`, tak berkedip karena modifier | modifier itu sesaat; setelan tak berubah |
 | vs clone (A1) | tak bentrok | clone hanya di cabang **seret badan** objek jadi; magnet sementara di **menggambar** + **seret ujung**. Pembagian yang sama dengan TV |
@@ -55,3 +55,11 @@ Sembilan pembacaan `magnetOn` di jalur gambar/ukur → `magnetActive()`:
 
 - Magnet dua tingkat Weak/Strong (item E di backlog). Membalik-setelan menutup sebagian
   kebutuhannya, tapi bukan penggantinya.
+
+## Catatan verifikasi (2026-08-08)
+
+Saat PR ini ditulis, perilaku "membalik" dipilih atas dasar kegunaan dan ditandai belum
+terverifikasi. Verifikasi menyusul ke dokumentasi TV menunjukkan pilihannya **tepat** — tak ada
+kode yang perlu berubah. Verifikasi yang sama memunculkan satu penyimpangan di fitur tetangga
+(clone tanpa syarat objek terpilih), ditangani terpisah di
+`2026-08-08-clone-butuh-terpilih-design.md`.

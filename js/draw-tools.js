@@ -105,9 +105,17 @@ function delHooks(){ return {
   // SL/TP) yang tak boleh ditimpa.
   onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o&&subBar(o.name)) dragBase={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y};
     // Ctrl/⌘ ditahan saat gestur DIMULAI → drag ini meninggalkan salinan (js/draw-clone.js).
+    //
+    // Objek WAJIB terpilih dulu, sesuai TradingView: "To make a copy of drawing, select the item
+    // that should be cloned, hold Ctrl/Command and then drag the figure to the place you need."
+    // (https://www.tradingview.com/support/solutions/43000537251). Syaratnya bukan formalitas —
+    // Ctrl juga dipakai magnet sementara (js/magnet-temp.js), jadi tanpa ini menahan Ctrl lalu tak
+    // sengaja menyentuh badan objek meninggalkan salinan yang tak diminta. Objek yang baru
+    // digambar sudah terpilih otomatis, jadi alur "gambar lalu gandakan" tak berubah.
+    //
     // `!o.lock` cuma sabuk pengaman: klinecharts sendiri tak memanggil pressed-move untuk objek
     // terkunci, jadi jalur ini tak pernah tercapai — tapi mengandalkan itu diam-diam mahal.
-    cloneArmed = !!(cloneModHeld && o && !o.lock); cloneDone=false;
+    cloneArmed = !!(cloneModHeld && o && !o.lock && selectedId===o.id); cloneDone=false;
     return false; },
   onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
     const OX=0, OY=0;

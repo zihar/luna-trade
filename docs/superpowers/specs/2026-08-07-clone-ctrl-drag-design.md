@@ -14,6 +14,7 @@ salinan di posisi asal — yang bergerak adalah objek yang diseret. Perilaku Tra
 | Yang bergerak | objek **asli**; salinan diam di posisi asal | tak perlu mengalihkan target drag di tengah gestur — efek visualnya identik dengan TV |
 | Handle titik + modifier | **tidak** clone, tetap mengedit titik | di TV clone adalah operasi seluruh objek; membajak drag-handle menghilangkan cara mengedit ujung |
 | Objek terkunci | tak bisa di-clone | konsekuensi wajar: objek terkunci memang tak bisa diseret |
+| Objek harus terpilih? | **ya** — lihat catatan koreksi di bawah | ditambahkan 2026-08-08 setelah verifikasi dokumentasi TV |
 | Warisan `lock` | salinan tak terkunci | sumbernya pasti tak terkunci, jadi tak ada yang bisa diwarisi |
 | Yang ikut tersalin | `points`, `name`, gaya per objek (`objStyle[id]`), teks (`extendData`) | tanpa gaya & teks, "salinan" bukan salinan |
 
@@ -62,3 +63,9 @@ ia bagian dari daur hidup drag yang sama dan direset di `onPressedMoveEnd`.
 
 - `Ctrl+C` / `Ctrl+V` (A3) — butuh state clipboard + keputusan "paste di mana". PR sendiri.
 - Tombol Duplicate di modal Style — pintu masuk kedua; belum diminta.
+
+## Koreksi 2026-08-08
+
+PR ini semula tak mensyaratkan objek terpilih. Verifikasi dokumentasi TV menunjukkan syarat itu
+ada — dan ia penting justru karena `Ctrl` kemudian dipakai juga untuk magnet sementara (PR #176).
+Ditangani di `2026-08-08-clone-butuh-terpilih-design.md`.

@@ -68,6 +68,49 @@ test.describe('clone: Ctrl/⌘ + drag badan', () => {
     });
   }
 
+  // TradingView mensyaratkan objek TERPILIH lebih dulu:
+  // "To make a copy of drawing, select the item that should be cloned, hold Ctrl/Command and then
+  // drag the figure to the place you need." — https://www.tradingview.com/support/solutions/43000537251
+  // Syarat itu bukan formalitas: Ctrl juga dipakai magnet sementara (js/magnet-temp.js), jadi tanpa
+  // syarat ini menahan Ctrl lalu tak sengaja menyentuh badan objek meninggalkan salinan yang tak
+  // diminta. Objek yang baru digambar SUDAH terpilih otomatis, jadi alur normal tak berubah.
+  test('objek BELUM terpilih: Ctrl+drag badan menggeser, TIDAK meng-clone', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj, px } = await drawLine(page, rect);
+
+    await page.keyboard.press('Escape'); // lepas pilihan
+    await page.waitForTimeout(150);
+    expect(await page.evaluate(() => selectedId), 'prasyarat: objek harus tak terpilih').toBeNull();
+
+    await dragBody(page, rect, obj, px, 90, 60, 'Control');
+
+    expect(await overlays(page), 'objek yang belum terpilih tak boleh ter-clone').toHaveLength(1);
+    const after = await toPixels(page, (await overlays(page))[0].points);
+    after.forEach((p, i) => {
+      expect(Math.abs(p.x - px[i].x - 90), `titik #${i} tak ikut tergeser (drag badan harus tetap jalan)`).toBeLessThanOrEqual(3);
+      expect(Math.abs(p.y - px[i].y - 60), `titik #${i} tak ikut tergeser (drag badan harus tetap jalan)`).toBeLessThanOrEqual(3);
+    });
+    assertNoPageErrors(page);
+  });
+
+  test('objek dipilih ulang lewat klik → Ctrl+drag badan meng-clone lagi', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj, px } = await drawLine(page, rect);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    const spot = { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 };
+    await page.mouse.click(rect.x + spot.x, rect.y + spot.y);
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => selectedId), 'klik harus memilih objek lagi').toBe(obj.id);
+
+    await dragBody(page, rect, obj, px, 90, 60, 'Control');
+    expect(await overlays(page), 'objek terpilih harus bisa di-clone').toHaveLength(2);
+    assertNoPageErrors(page);
+  });
+
   test('tanpa modifier: drag badan tetap SATU objek', async ({ page }) => {
     await gotoApp(page);
     const rect = await chartRect(page);
