@@ -71,7 +71,14 @@ async function refineMagnetPoints(id){
       if(t>=stepBarTs(cur, arrC[arrC.length-1].timestamp, 1)) continue;
       const rng=barRangeContaining(cur,t); if(!rng) continue;
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
+      // OHLC bar yang TAMPAK ikut jadi kandidat, sama seperti magnetSnap. Tanpa ini, titik yang
+      // sudah tepat di ujung wick bisa DIGESER keluar begitu jendela M5 tak memuat menit ujung
+      // itu — mis. MN, yang rentangnya sebulan sedang `count` di ensureM5Window di-clamp 5000
+      // (~17 hari), atau saat permintaan M5 balik tak lengkap. Titik yang memang di ujung punya
+      // jarak 0 di sini, jadi tak ada candle M5 yang bisa menggesernya.
       let best=null,bd=Infinity;
+      const barC=arrC.find(c=>c.timestamp===rng.open);
+      if(barC){ for(const v of [barC.open,barC.high,barC.low,barC.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={value:v};} } }
       for(const c of m5){ if(c.timestamp>=rng.open && c.timestamp<rng.end){
         for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={value:v};} }
       }}
