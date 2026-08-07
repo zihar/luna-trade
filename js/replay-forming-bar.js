@@ -59,7 +59,10 @@ async function refineMagnetPoints(id){
     let changed=false;
     for(const p of pts){
       if(p.value==null) continue;
-      const t=tsOf(p); if(t==null) continue;   // titik ber-dataIndex pecahan ikut terlayani (fidxToTs)
+      // HANYA titik ber-timestamp yang dilayani = titik yang memang dijatuhkan magnet (jalur
+      // magnet meng-anchor timestamp; titik biasa meng-anchor dataIndex pecahan di kursor).
+      // Titik biasa yang harganya KEBETULAN sama dgn sebuah OHLC tak boleh ikut dipindah.
+      const t=p.timestamp; if(t==null) continue;
       // titik FUTURE (di kanan candle TERUNGKAP terakhir): tak ada candle nyata utk di-magnet.
       // Tanpa gate ini, barRangeContaining tak punya batas atas → utk ts apa pun setelah candle
       // terakhir ia balik ke rentang bar TERAKHIR, lalu magnet keras menarik value titik ke OHLC
@@ -70,23 +73,24 @@ async function refineMagnetPoints(id){
       const arrC=revealed(cur); if(!arrC.length) continue;
       if(t>=stepBarTs(cur, arrC[arrC.length-1].timestamp, 1)) continue;
       const rng=barRangeContaining(cur,t); if(!rng) continue;
+      // HARGA titik tak pernah disentuh di sini. magnetSnap sudah menetapkannya ke salah satu
+      // O/H/L/C bar yang TAMPAK — nilai final, bukan aproksimasi yang perlu "disempurnakan".
+      // Menggesernya ke OHLC M5 terdekat justru merusak: jendela M5 memuat puluhan harga lain
+      // (di satu bar M15 saja terukur 45 nilai berbeda), jadi titik yang sudah tepat di ujung
+      // wick bisa ditarik ke harga lain hanya karena kursor berhenti beberapa piksel di sebelahnya
+      // — dan pada drag, pergeseran itu baru terjadi SAAT TOMBOL DILEPAS.
+      //
+      // Yang tersisa justru gunanya yang asli: menajamkan WAKTU. Di TF besar tanpa data halus
+      // ter-load, magnetSnap hanya bisa menandai jam buka bar; M5 on-demand memberi tahu menit
+      // mana yang benar-benar mencetak nilai itu → titik mendarat di tempat yang benar saat
+      // pengguna pindah ke TF halus. Di TF sekarang X tak bergeser: render meng-snap timestamp ke
+      // bar yang memuatnya.
+      const barC=arrC.find(c=>c.timestamp===rng.open); if(!barC) continue;
+      const kind=['high','low','open','close'].find(k=>barC[k]===p.value);
+      if(!kind) continue;                       // bukan titik hasil magnet → jangan disentuh
       const m5=await ensureM5Window(rng.open,rng.end); if(!m5||!m5.length) continue;
-      // OHLC bar yang TAMPAK ikut jadi kandidat, sama seperti magnetSnap. Tanpa ini, titik yang
-      // sudah tepat di ujung wick bisa DIGESER keluar begitu jendela M5 tak memuat menit ujung
-      // itu — mis. MN, yang rentangnya sebulan sedang `count` di ensureM5Window di-clamp 5000
-      // (~17 hari), atau saat permintaan M5 balik tak lengkap. Titik yang memang di ujung punya
-      // jarak 0 di sini, jadi tak ada candle M5 yang bisa menggesernya.
-      let best=null,bd=Infinity;
-      const barC=arrC.find(c=>c.timestamp===rng.open);
-      if(barC){ for(const v of [barC.open,barC.high,barC.low,barC.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={value:v};} } }
-      for(const c of m5){ if(c.timestamp>=rng.open && c.timestamp<rng.end){
-        for(const v of [c.open,c.high,c.low,c.close]){ const d=Math.abs(v-p.value); if(d<bd){bd=d; best={value:v};} }
-      }}
-      // magnet "keras": semua titik digeser ke nilai OHLC M5 sebenarnya (tanpa gate jarak).
-      // HANYA value yang disempurnakan — anchor X dibiarkan apa adanya, sesuai kebijakan magnet:
-      // "magnet hanya menyetel VALUE; X tetap ikut kursor". Menulis p.timestamp di sini akan
-      // MENGHAPUS presisi sub-bar titik ber-dataIndex (render meng-snap timestamp ke pusat bar).
-      if(best && best.value!==p.value){ p.value=best.value; changed=true; }
+      const t2=subBarTimeOf(m5, rng.open, rng.end, kind, p.value);
+      if(t2!=null && t2!==p.timestamp){ p.timestamp=t2; changed=true; }
     }
     if(changed){ try{chart.overrideOverlay({id, points:pts});}catch(e){} }
   }catch(e){}

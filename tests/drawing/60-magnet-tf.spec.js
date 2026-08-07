@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect, toPixels, barAt, barSpace, plotWidth } = require('../helpers/chart');
-const { armTool, clickAt, overlays, drawTool, inProgress, CLICK_GAP_MS } = require('../helpers/draw');
+const { armTool, clickAt, overlays, drawTool, dragPoint, inProgress, CLICK_GAP_MS } = require('../helpers/draw');
 
 test.describe('magnet', () => {
   test('magnet ON: titik menempel ke salah satu nilai OHLC candle terdekat', async ({ page }) => {
@@ -150,6 +150,177 @@ test.describe('magnet', () => {
     });
 
     expect(res.after, 'titik yang sudah tepat di high digeser oleh penyempurnaan M5').toBeCloseTo(res.want, 9);
+    assertNoPageErrors(page);
+  });
+
+  // Janji magnet yang sebenarnya diminta: titik nempel ke SEBUAH titik OHLC candle — sebuah
+  // koordinat DISKRIT (x candle, harga OHLC). Menggeser kursor beberapa piksel di dalam candle
+  // yang sama tak boleh menggeser titiknya sama sekali; yang boleh memindahkannya cuma pindah
+  // candle atau pindah ke level OHLC lain.
+  //
+  // Dua hal yang dulu melanggarnya, keduanya membuat titik "mengikuti kursor":
+  //   1. sumbu X tak pernah di-snap — tool sub-bar meng-anchor dataIndex PECAHAN di kursor,
+  //      jadi geser 3px = titik geser 3px (terukur: dataIndex 492 → 492.375);
+  //   2. daftar harga kandidat memuai begitu TF halus ter-load — tiap sub-bar menyumbang O/H/L/C
+  //      sendiri (terukur: 4 → 45 nilai berbeda di satu bar M15, ±1.4px per kandidat di wick
+  //      setinggi 62px) sehingga magnet praktis kontinu.
+  const smallOffsets = [
+    { dx: 0, dy: 0 },
+    { dx: 3, dy: 3 },
+    { dx: -3, dy: 4 },
+  ];
+
+  test('magnet ON: geser kursor beberapa piksel DI DALAM candle yang sama → titik tak bergeser', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await page.locator('#magBtn').click();
+
+    const bar = await barAt(page, -8);
+    const far = await barAt(page, -4);
+    const [pxH, pxL, pxFar] = await toPixels(page, [
+      { timestamp: bar.timestamp, value: bar.high },
+      { timestamp: bar.timestamp, value: bar.low },
+      { timestamp: far.timestamp, value: far.close },
+    ]);
+    const midY = (pxH.y + pxL.y) / 2; // sengaja di TENGAH wick: paling peka terhadap kandidat rapat
+
+    const landed = [];
+    for (const off of smallOffsets) {
+      await page.evaluate(() => {
+        drawIds.slice().forEach((id) => { try { chart.removeOverlay({ id }); } catch (e) {} });
+        drawIds.length = 0;
+      });
+      await armTool(page, 'trendline');
+      await clickAt(page, rect, { x: pxH.x + off.dx, y: midY + off.dy });
+      await page.waitForTimeout(CLICK_GAP_MS);
+      await clickAt(page, rect, { x: pxFar.x, y: pxFar.y });
+      await page.waitForTimeout(CLICK_GAP_MS);
+      await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+      const obj = (await overlays(page))[0];
+      expect(obj, `objek harus terbentuk (offset ${off.dx},${off.dy})`).toBeTruthy();
+      const px = (await toPixels(page, [obj.points[0]]))[0];
+      landed.push({ off, value: obj.points[0].value, px });
+    }
+
+    const ref = landed[0];
+    landed.slice(1).forEach((l) => {
+      expect(l.value, `harga titik berubah saat kursor digeser ${l.off.dx},${l.off.dy}px di candle yang sama`).toBeCloseTo(ref.value, 9);
+      expect(Math.abs(l.px.x - ref.px.x), `titik bergeser horizontal saat kursor digeser ${l.off.dx}px di candle yang sama`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(l.px.y - ref.px.y), `titik bergeser vertikal saat kursor digeser ${l.off.dy}px di candle yang sama`).toBeLessThanOrEqual(0.5);
+    });
+    // …dan yang didarati memang salah satu OHLC bar itu, bukan bar tetangga.
+    expect([bar.open, bar.high, bar.low, bar.close].some((v) => Math.abs(v - ref.value) < 1e-9), 'harga bukan O/H/L/C bar yang diklik').toBe(true);
+    assertNoPageErrors(page);
+  });
+
+  test('magnet ON: pindah ke candle berikutnya → titik ikut pindah satu bar', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await page.locator('#magBtn').click();
+
+    const bar = await barAt(page, -8);
+    const next = await barAt(page, -7);
+    const far = await barAt(page, -4);
+    const bs = await barSpace(page);
+    const [pxBar, pxNext, pxFar] = await toPixels(page, [
+      { timestamp: bar.timestamp, value: bar.high },
+      { timestamp: next.timestamp, value: next.high },
+      { timestamp: far.timestamp, value: far.close },
+    ]);
+
+    const drawAt = async (x, y) => {
+      await page.evaluate(() => {
+        drawIds.slice().forEach((id) => { try { chart.removeOverlay({ id }); } catch (e) {} });
+        drawIds.length = 0;
+      });
+      await armTool(page, 'trendline');
+      await clickAt(page, rect, { x, y });
+      await page.waitForTimeout(CLICK_GAP_MS);
+      await clickAt(page, rect, { x: pxFar.x, y: pxFar.y });
+      await page.waitForTimeout(CLICK_GAP_MS);
+      await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+      const obj = (await overlays(page))[0];
+      return (await toPixels(page, [obj.points[0]]))[0];
+    };
+
+    const a = await drawAt(pxBar.x, pxBar.y);
+    const b = await drawAt(pxNext.x, pxNext.y);
+    expect(Math.abs(b.x - a.x), 'pindah satu candle harus memindahkan titik tepat satu bar').toBeCloseTo(bs, 0);
+    assertNoPageErrors(page);
+  });
+
+  test('magnet: TF halus tak boleh menambah harga kandidat — hanya menajamkan waktunya', async ({ page }) => {
+    await gotoApp(page);
+    const res = await page.evaluate(() => {
+      const cur = currentTF;
+      const arr = revealed(cur).slice();
+      const bar = arr[arr.length - 8];
+
+      // Sub-bar M1 realistis di dalam tiap bar M15 (di produksi selalu begini begitu pengguna
+      // pernah mampir ke TF halus). High & low bar kasar sengaja dicetak oleh sub-bar tertentu,
+      // supaya penajaman WAKTU-nya ikut terukur.
+      tfData.M1 = arr.flatMap((d) => {
+        const out = [];
+        for (let j = 0; j < 15; j++) {
+          // Sub-bar netral (O=H=L=C=mid) supaya HANYA dua menit di bawah yang mencetak ujung bar
+          // kasarnya — kalau sub-bar lain ikut menyentuh high/low, menit yang diharapkan jadi ambigu.
+          const mid = d.open + ((d.close - d.open) * j) / 14;
+          out.push({ timestamp: d.timestamp + j * 60000, open: mid, high: mid, low: mid, close: mid });
+        }
+        out[7].high = d.high;
+        out[11].low = d.low;
+        return out;
+      });
+
+      const nilai = new Set();
+      let tsHigh = null;
+      for (let k = 0; k <= 200; k++) {
+        const v = bar.low + ((bar.high - bar.low) * k) / 200;
+        const s = magnetSnap(bar.timestamp, v, 0, 0);
+        if (s) {
+          nilai.add(s.value);
+          if (Math.abs(s.value - bar.high) < 1e-9) tsHigh = s.timestamp;
+        }
+      }
+      delete tfData.M1;
+      return { ohlc: [bar.open, bar.high, bar.low, bar.close], nilai: [...nilai], tsHigh, wantTsHigh: bar.timestamp + 7 * 60000 };
+    });
+
+    const asing = res.nilai.filter((v) => !res.ohlc.some((o) => Math.abs(o - v) < 1e-9));
+    expect(asing, `magnet mendarat di harga yang bukan O/H/L/C bar: ${JSON.stringify(asing)}`).toEqual([]);
+    expect(res.tsHigh, 'waktu titik high tak ditajamkan ke menit sub-bar yang mencetaknya').toBe(res.wantTsHigh);
+    assertNoPageErrors(page);
+  });
+
+  test('magnet ON: menyeret ujung objek pun nempel & tak bergeser di dalam candle yang sama', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj } = await drawTool(page, 'trendline');
+    await page.locator('#magBtn').click();
+
+    const bar = await barAt(page, -8);
+    const [pxH, pxL] = await toPixels(page, [
+      { timestamp: bar.timestamp, value: bar.high },
+      { timestamp: bar.timestamp, value: bar.low },
+    ]);
+    const midY = (pxH.y + pxL.y) / 2;
+    const start = (await toPixels(page, [obj.points[0]]))[0];
+
+    const dragTo = async (x, y) => {
+      const from = (await toPixels(page, [(await overlays(page))[0].points[0]]))[0];
+      await dragPoint(page, rect, from, { x, y });
+      await page.waitForTimeout(250); // refineMagnetPoints jalan async setelah lepas
+      const p = (await overlays(page))[0].points[0];
+      return { point: p, px: (await toPixels(page, [p]))[0] };
+    };
+
+    const a = await dragTo(pxH.x, midY);
+    expect([bar.open, bar.high, bar.low, bar.close].some((v) => Math.abs(v - a.point.value) < 1e-9), 'ujung yang diseret tak nempel ke O/H/L/C candle').toBe(true);
+
+    const b = await dragTo(pxH.x + 3, midY + 3);
+    expect(b.point.value, 'harga ujung berubah saat diseret 3px di candle yang sama').toBeCloseTo(a.point.value, 9);
+    expect(Math.abs(b.px.x - a.px.x), 'ujung bergeser horizontal saat diseret 3px di candle yang sama').toBeLessThanOrEqual(0.5);
+    expect(start, 'sanity: titik awal harus terkonversi').toBeTruthy();
     assertNoPageErrors(page);
   });
 
