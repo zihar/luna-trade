@@ -25,16 +25,20 @@ function removeMenuItems(){
 function openRemoveMenu(x,y){ showCtx(x,y,removeMenuItems()); }
 $('#chart').addEventListener('contextmenu',e=>{
   e.preventDefault();
+  // macOS MEMETAKAN Ctrl+klik ke contextmenu di tingkat sistem, dan Ctrl kini punya dua tugas
+  // sendiri: clone (Ctrl+seret badan objek, js/draw-clone.js) dan magnet sementara (Ctrl ditahan
+  // saat menggambar, js/magnet-temp.js). Tanpa gerbang ini, keduanya rusak di Mac — gestur clone
+  // memunculkan modal Style di tengah jalan, dan Ctrl+klik saat menggambar MEMBATALKAN gambarnya
+  // (terukur: objek tak pernah terbentuk).
+  //
+  // Karena itu event contextmenu ber-ctrlKey diabaikan seluruhnya. Konsekuensi yang diterima:
+  // klik-kanan sambil SENGAJA menahan Ctrl tak lagi membuka menu/modal. Klik kanan biasa tak
+  // tersentuh sama sekali, dan di Mac ⌘ adalah jalur yang dianjurkan justru karena bebas dari ini.
+  if(e.ctrlKey){ hideCtx(); return; }
   // Sedang menggambar → klik kanan = BATAL, bukan menu. Wajib sebelum cek hoverId: saat menggambar
   // hoverId sering menunjuk objek in-progress itu sendiri, dan itu akan membuka modal Style-nya.
   if(cancelInProgressDraw()){ hideCtx(); return; }
-  // Ctrl+klik di macOS DIPETAKAN ke contextmenu oleh sistem, jadi Ctrl+drag objek (= clone,
-  // js/draw-clone.js) akan memunculkan modal Style di tengah gestur. Event ber-ctrlKey di ATAS
-  // objek karena itu diabaikan. Konsekuensi yang diterima: klik-kanan sambil sengaja menahan Ctrl
-  // tak lagi membuka modal objek — klik kanan biasa tak tersentuh, dan di Mac ⌘ adalah jalur
-  // clone yang dianjurkan justru karena ia bebas dari tabrakan ini.
-  if(hoverId && !e.ctrlKey){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
-  if(hoverId && e.ctrlKey){ hideCtx(); return; }
+  if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
   const rect=$('#chart').getBoundingClientRect();
   const yIn=e.clientY-rect.top;
   const price=pxToValue(yIn);

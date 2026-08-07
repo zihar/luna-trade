@@ -27,7 +27,7 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
   // `mag:true` menandai klik yang SUDAH di-snap: onDrawEnd memakainya untuk membiarkan anchor
   // timestamp-nya (= terkunci di candle) alih-alih menimpanya dengan fidx kursor.
-  if(magnetOn && !locked && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
+  if(magnetActive() && !locked && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
   pendingClicks.push(Object.assign({value:v, fidx}, xa));
 }, true);
 
@@ -62,7 +62,7 @@ function updateMagDot(ev){
   // (Kursor mentah meleset: convertToPixel(timestamp) meny-snap ke bar utk tool BAR_ANCHOR,
   // sedang tool sub-bar beranchor dataIndex pecahan/presisi. Menyatukan jalur magnet ON/OFF.)
   let anchor=null;
-  if(magnetOn && !locked){
+  if(magnetActive() && !locked){
     const xa=xAnchorFromPx(px);
     if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s) anchor={timestamp:s.timestamp, value:s.value}; }
   }

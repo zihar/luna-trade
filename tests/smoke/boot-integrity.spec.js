@@ -92,6 +92,7 @@ const SENTINEL = {
   // bersih SETELAH penawar `posPressedMove` mendarat (#138) — sebelum itu ada 2 bahaya senyap.
   'draw-constrain.js': 'ANGLE_LOCK',
   'draw-clone.js': 'cloneOverlay',
+  'magnet-temp.js': 'magnetActive',
   'draw-tools.js': 'hoverName',
   'draw-persist.js': 'PERSIST_DRAW',
   'draw-undo.js': 'DRAW_HISTORY_MAX',
