@@ -71,9 +71,16 @@ function delHooks(){ return {
       if(!pc || pc.value==null) continue;
       if(pc.mag && pc.timestamp!=null) o.points[k]={timestamp:pc.timestamp, value:pc.value};   // magnet: terkunci di candle
       else if(isFinite(pc.fidx)) o.points[k]={dataIndex:pc.fidx, value:pc.value}; }
-    const fa=fracAnchorFromPx(e.x); let v=pxToValue(e.y);
-    if(magnetOn && v!=null){ const xa=xAnchorFromPx(e.x);
-      if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, e.x, e.y);
+    // Shift = kunci sudut ke kelipatan 45° dari titik SEBELUMNYA (js/draw-constrain.js). Hanya saat
+    // menarik titik ke-2 (m===1): pada channel 3 titik, titik #3 cuma mengatur jarak paralel dan
+    // tak punya makna sudut. Saat terkunci, magnet dilewati untuk titik ini — "auto lurus" hanya
+    // bermakna kalau sudutnya persis, dan magnet yang ikut menarik membuatnya miring lagi.
+    let ex=e.x, ey=e.y, locked=false;
+    if(m===1 && angleLockOn(o.name)){ const a=anchorPx(o.points[0]);
+      if(a){ const c=constrainPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
+    const fa=fracAnchorFromPx(ex); let v=pxToValue(ey);
+    if(magnetOn && !locked && v!=null){ const xa=xAnchorFromPx(ex);
+      if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ex, ey);
         if(s){ o.points[m]={timestamp:s.timestamp, value:s.value}; return false; } } }
     if(fa && v!=null) o.points[m]={dataIndex:fa.dataIndex, value:v};
     return false;
@@ -96,7 +103,15 @@ function delHooks(){ return {
   onPressedMoveStart:(e)=>{ const o=e&&e.overlay; if(o&&subBar(o.name)) dragBase={pts:(o.points||[]).map(p=>Object.assign({},p)), x:e.x, y:e.y}; return false; },
   onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
     const OX=0, OY=0;
-    const xa=fracAnchorFromPx(e.x-OX), v=pxToValue(e.y-OY);
+    // Shift = kunci sudut, jangkar = ujung SEBERANG. Dihitung sebelum anchor supaya jalur
+    // magnet & penulisan titik di bawah memakai koordinat yang sama. Hanya cabang "seret satu
+    // ujung" yang kena — menggeser BADAN objek adalah translasi, sudutnya memang tak berubah.
+    let ex=e.x-OX, ey=e.y-OY, locked=false;
+    const fk=e.figureKey||'';
+    if(fk.indexOf('overlay_figure_point_')===0 && angleLockOn(o.name) && e.figureIndex<2 && o.points.length>=2){
+      const a=anchorPx(o.points[e.figureIndex===0?1:0]);
+      if(a){ const c=constrainPx(a.x, a.y, ex, ey); ex=c.x; ey=c.y; locked=true; } }
+    const xa=fracAnchorFromPx(ex), v=pxToValue(ey);
     if(!xa || v==null) return false;
     const pts=o.points.map(p=>Object.assign({},p));
     const key=e.figureKey||'';
@@ -120,8 +135,8 @@ function delHooks(){ return {
         // balik {dataIndex}, dan magnet di sana akan menarik titik ke bar TERAKHIR → garis
         // kelempar ke kiri. Gate yang sama dipakai jalur klik (js/draw-pointer.js).
         let snapped=null;
-        if(magnetOn){ const ax=xAnchorFromPx(e.x);
-          if(ax && ax.timestamp!=null){ const s=magnetSnap(ax.timestamp, v, e.x, e.y); if(s) snapped={timestamp:s.timestamp, value:s.value}; } }
+        if(magnetOn && !locked){ const ax=xAnchorFromPx(ex);
+          if(ax && ax.timestamp!=null){ const s=magnetSnap(ax.timestamp, v, ex, ey); if(s) snapped={timestamp:s.timestamp, value:s.value}; } }
         pts[i]= snapped || {dataIndex:xa.dataIndex, value:v};
       }
     } else {                                            // seret BADAN objek → translasi semua titik

@@ -113,6 +113,11 @@ $('#chart').addEventListener('mousedown',(e)=>{ if(!e.shiftKey) clearMeasure(); 
   el.addEventListener('mousedown',(e)=>{
     if(!e.shiftKey || e.button!==0) return;
     if(inProgressId || eraserOn) return;                 // sedang menggambar / mode hapus → jangan rebut
+    // Kursor di ATAS objek gambar → Shift+drag itu milik "geser ujung dgn sudut terkunci"
+    // (js/draw-constrain.js), bukan penggaris. Tanpa gate ini listener capture di bawah menelan
+    // mousedown-nya dan objek tak pernah bisa diseret selama Shift ditahan. Di ruang kosong
+    // (hoverId null) penggaris tetap menang seperti sebelumnya.
+    if(hoverId!=null) return;
     const tgt=e.target; if(!tgt || tgt.tagName!=='CANVAS') return;
     const p=ptFromEvent(e); if(!p) return;
     e.preventDefault(); e.stopPropagation();
