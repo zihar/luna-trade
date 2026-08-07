@@ -4,27 +4,29 @@
 // sumbu. Wheel di area plot tetap zoom-waktu bawaan KLineCharts. Shift+wheel di mana pun juga
 // men-skala harga (jalan pintas untuk yang tak mau menggeser kursor ke sumbu).
 //
-// KLineCharts 9.8.10 tak punya API zoom-harga, jadi caranya menyuntik gesture drag sumbu
-// (mousedown → mousemove → mouseup) di dalam sumbu — jalur skala miliknya sendiri, yang juga
-// otomatis memilih pane yang benar (candle atau osilator) dari koordinat.
+// KLineCharts 9.8.10 tak punya API zoom-harga di permukaan publiknya, tapi komponen sumbunya
+// terjangkau: `chart.getAllDrawPanes()` → `pane.getAxisComponent()` → `getRange()/setRange()`.
+// Itu persis yang dipakai jalur drag sumbu miliknya sendiri, jadi rumus di bawah cuma menyalin
+// rumus internal itu (rentang di-skala mengelilingi TENGAHNYA), lalu `adjustPaneViewport`.
 //
-// DUA jebakan yang bikin versi lama terasa "loncat", keduanya ditawar di sini:
-//   1. Skala drag sumbu dihitung dari rasio pageY ABSOLUT — `range × pageY_kini/pageY_awal`,
-//      bukan dari delta. Jadi delta tetap (dulu 14px) berarti ~14% saat kursor di dekat atas
-//      chart tapi hanya ~2% di dekat bawah. Penawarnya: hitung delta dari rasio yang
-//      diinginkan (`pageY × (ratio-1)`), bukan sebaliknya.
-//   2. Lebar sumbu dulu ditebak 70px, jadi wheel di dalam plot dekat tepi kanan diam-diam jadi
-//      skala harga. Penawarnya: batas plot dibaca dari chart (`getSize(...,'main').width`).
-//   3. KLineCharts membuang `pressedMouseMoveEvent` yang jaraknya < 5px (manhattan) dari
-//      mousedown-nya. Karena tiap notch di sini adalah gesture SENDIRI, langkah halus (trackpad
-//      macOS: deltaY ~2–15, bukan 100) menghasilkan gerak < 5px → skala tak jalan sama sekali,
-//      DAN gesture yang gerakannya dibuang tetap terhitung click; dua click < 500ms di sumbu =
-//      double-click = KLineCharts mengembalikan AUTO-SCALE, jadi zoom pengguna malah dibatalkan.
-//      Penawarnya: notch yang belum cukup besar DITAHAN (`pending`), bukan dikirim lalu dibuang.
+// KENAPA BUKAN MENSINTESIS DRAG (jalur lama, dicabut):
+//   Versi sebelumnya mengirim mousedown→mousemove→mouseup palsu per notch wheel. KLineCharts
+//   MEMBUANG `pressedMouseMoveEvent` yang jarak manhattan-nya < 5px dari mousedown-nya, jadi
+//   langkah trackpad (deltaY 2–15, bukan 100) harus DITAHAN sampai geseran implisitnya ≥ 6px
+//   baru boleh dilepas. Akibatnya terukur: cuma 5–20% event wheel yang mengubah skala, tiap
+//   perubahan meloncat 1,6–5,4% — sementara zoom-waktu di area plot menerapkan 100% event
+//   dengan langkah 0,6%. Itulah "bergetar/tersendat" yang cuma terasa di sumbu harga.
+//   Lebih buruk: ambang 6px itu dihitung dari pageY, jadi kekasarannya ikut ketinggian kursor
+//   (dekat tepi atas ~5,4% per loncatan, dekat bawah ~0,9%), dan sisa notch yang belum sampai
+//   ambang dibuang — total skalanya meleset dari niat pengguna.
+//
+//   Menyetel rentang langsung membuat semua itu hilang sekaligus: tak ada ambang, tak ada notch
+//   yang ditahan atau dibuang, tak ada click/double-click palsu yang bisa mengembalikan
+//   auto-scale, dan tak ada mousedown palsu yang bisa berubah jadi drag SL/TP (dulu butuh
+//   penjaga `elementFromPoint` sendiri).
 
 const AXIS_ZONE = 70;          // fallback lebar sumbu (px) bila getSize gagal
 const SCALE_PER_NOTCH = 1.05;  // satu notch wheel mouse (deltaY≈100) = 5%
-const MIN_MOVE = 6;            // px — di bawah ambang 5px KLineCharts, gesture jadi click (lihat #3)
 
 // Wheel → jumlah "notch" ternormalkan (mengikuti normalisasi deltaMode KLineCharts sendiri).
 // Trackpad mengirim banyak delta kecil → langkahnya halus; fling di-clamp supaya tak meloncat.
@@ -41,45 +43,53 @@ function plotRightEdge(c, rect){
   return rect.width - AXIS_ZONE;
 }
 
-// Kirim gesture skala: titik x di dalam sumbu, geseran vertikal dy px (>0 = memampatkan).
-// Batal (dan biarkan wheel default) bila titiknya tertutup node DOM — mis. pill P&L posisi atau
-// tag SL/TP — supaya scroll tak pernah berubah jadi drag SL/TP.
-function dispatchPriceScale(el, ax, e, dy){
-  if(Math.abs(dy) < MIN_MOVE) return false;        // jaring pengaman: di bawah ini gesture jadi click
-  const tgt = document.elementFromPoint(ax, e.clientY);
-  if(!tgt || tgt.tagName!=='CANVAS' || !el.contains(tgt)) return false;
-  const mk = (type,y,btn)=> new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:ax,clientY:y,buttons:btn,button:0});
-  tgt.dispatchEvent(mk('mousedown', e.clientY, 1));
-  tgt.dispatchEvent(mk('mousemove', e.clientY+dy, 1));
-  tgt.dispatchEvent(mk('mouseup',   e.clientY+dy, 0));
+// Pane yang menaungi ketinggian y (relatif kontainer) — begitulah wheel di sumbu osilator
+// men-skala osilatornya, bukan pane candle. Pane sumbu-X dilewati: "axis component"-nya sumbu
+// waktu, bukan harga.
+function paneAtY(c, y){
+  let xId = null;
+  try{ xId = c.getXAxisPane().getId(); }catch(e){}
+  const panes = c.getAllDrawPanes();
+  for(let i=0;i<panes.length;i++){
+    const p = panes[i];
+    if(p.getId() === xId) continue;
+    const b = p.getBounding();
+    if(y >= b.top && y < b.top + b.height) return p;
+  }
+  return null;
+}
+
+// Skala rentang harga satu pane dengan faktor f (>1 = memampatkan), mengelilingi tengah rentang.
+// Salinan rumus drag sumbu KLineCharts; `setRange` sekaligus mematikan auto-calc, sama seperti
+// drag — jadi "Reset chart view" & double-click di sumbu tetap satu-satunya jalan pulang ke auto.
+function scaleRange(c, pane, f){
+  const ax = pane.getAxisComponent();
+  if(!ax || !ax.getScrollZoomEnabled || !ax.getScrollZoomEnabled()) return false;
+  const r = ax.getRange();
+  if(!r || !isFinite(r.range)) return false;
+  const w = (r.range*f - r.range)/2;
+  const from = r.from - w, to = r.to + w;
+  if(!(to > from) || !isFinite(from) || !isFinite(to)) return false;
+  const realFrom = ax.convertToRealValue(from), realTo = ax.convertToRealValue(to);
+  ax.setRange({from, to, range: to-from, realFrom, realTo, realRange: realTo-realFrom});
+  c.adjustPaneViewport(false, true, true, true);
   return true;
 }
 
 // Pasang skala-harga ke satu elemen chart (panel utama & panel multi-chart).
 function attachPriceScale(el, c){
-  // Notch yang belum sempat dikirim. Akumulasi di domain log (notch), jadi arah berlawanan
-  // saling menghapus dengan sendirinya; tak ada timeout — residu selalu mewakili niat pengguna
-  // yang belum terlayani, bukan sisa basi.
-  let pending = 0;
   el.addEventListener('wheel',(e)=>{
     const rect = el.getBoundingClientRect();
-    const edge = plotRightEdge(c, rect);
-    const onAxis = (e.clientX-rect.left) >= edge;
+    const onAxis = (e.clientX-rect.left) >= plotRightEdge(c, rect);
     if(!onAxis && !e.shiftKey) return;              // area plot tanpa Shift → zoom-waktu default
     const notches = wheelNotches(e);
     if(!notches) return;
-    if(e.pageY < 8) return;                         // rasio pageY jadi tak stabil di dekat tepi atas
-    // Titik gesture: di sumbu → kolom yang sama dengan kursor; Shift di plot → tengah sumbu.
-    const ax = onAxis ? e.clientX : rect.left + (edge + rect.width)/2;
-    // scroll bawah (deltaY>0) → ratio>1 → rentang harga membesar = memampatkan; atas = meregang.
-    pending += notches;
-    const dy = e.pageY*(Math.pow(SCALE_PER_NOTCH, pending)-1);
-    // Belum cukup jauh untuk dihormati KLineCharts → tahan, tapi tetap konsumsi wheel-nya supaya
-    // halaman tak ikut scroll dan langkah kecil tak jatuh ke zoom-waktu.
-    if(Math.abs(dy) < MIN_MOVE){ e.preventDefault(); e.stopPropagation(); return; }
-    const sent = dispatchPriceScale(el, ax, e, dy);
-    pending = 0;                                    // gagal pun dibuang: jangan menumpuk lalu meloncat
-    if(sent){ e.preventDefault(); e.stopPropagation(); }
+    const pane = paneAtY(c, e.clientY - rect.top);
+    if(!pane) return;
+    // scroll bawah (deltaY>0) → faktor>1 → rentang harga membesar = memampatkan; atas = meregang.
+    let ok = false;
+    try{ ok = scaleRange(c, pane, Math.pow(SCALE_PER_NOTCH, notches)); }catch(err){ ok = false; }
+    if(ok){ e.preventDefault(); e.stopPropagation(); }
   },{passive:false,capture:true});
 }
 attachPriceScale($('#chart'), chart);

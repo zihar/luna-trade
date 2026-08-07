@@ -126,6 +126,84 @@ test('langkah wheel halus tak pernah mengembalikan auto-scale', async ({ page })
   assertNoPageErrors(page);
 });
 
+// HALUS, bukan cuma "sampai". Dua test di atas hanya menjamin niat pengguna akhirnya terlayani;
+// keduanya diam soal BAGAIMANA jalannya. Jalur lama menyintesis satu gesture drag per notch, dan
+// KLineCharts membuang gesture yang jarak manhattan-nya < 5px — jadi langkah trackpad ditahan
+// sampai geseran implisitnya ≥ 6px lalu dilepas sekaligus. TERUKUR di jalur lama: hanya 5–20%
+// event wheel yang mengubah skala, masing-masing meloncat 1,6–5,4%; zoom-waktu di area plot
+// menerapkan 100% event dengan langkah 0,6%. Itulah "bergetar"-nya. Dua test berikut memaku
+// selisih itu, bukan mekanismenya.
+test('tiap langkah trackpad diterapkan, tanpa loncatan', async ({ page }) => {
+  await gotoApp(page);
+  const pt = await axisPoint(page, 300);
+
+  const seq = [await priceSpan(page)];
+  for (let i = 0; i < 20; i++) {
+    await wheelAt(page, pt, -6); // trackpad macOS: deltaY kecil, bukan 100
+    seq.push(await priceSpan(page));
+  }
+
+  const steps = seq.slice(1).map((v, i) => v / seq[i]);
+  const applied = steps.filter((r) => Math.abs(r - 1) > 1e-9).length;
+  expect(applied).toBeGreaterThanOrEqual(18); // jalur lama: 4 dari 20
+
+  // 20 × 0,06 notch = 0,29% per langkah. Ambang 2% cuma menolak "ditahan lalu dilepas".
+  const worst = Math.max(...steps.map((r) => Math.abs(Math.log(r))));
+  expect(worst).toBeLessThan(Math.log(1.02));
+
+  assertNoPageErrors(page);
+});
+
+test('total skala sama dengan niat pengguna, di ketinggian kursor mana pun', async ({ page }) => {
+  await gotoApp(page);
+  const rect = await chartRect(page);
+
+  const run = async (y) => {
+    const pt = await axisPoint(page, y);
+    const before = await priceSpan(page);
+    for (let i = 0; i < 20; i++) await wheelAt(page, pt, -6);
+    return (await priceSpan(page)) / before;
+  };
+
+  const ideal = Math.pow(1 / 1.05, 20 * 0.06); // 0,9441
+
+  // Dekat ATAS: ambang 6px dulu berarti ~3,5% per langkah di sini, dan sisa notch yang belum
+  // sampai ambang DIBUANG — totalnya meleset jauh dari niat (terukur 0,9659 vs 0,9441).
+  expect(Math.abs((await run(120)) / ideal - 1)).toBeLessThan(0.005);
+  // Dekat BAWAH: ambang yang sama cuma ~1% per langkah, jadi dulu pun sudah dekat.
+  expect(Math.abs((await run(Math.round(rect.height) - 120)) / ideal - 1)).toBeLessThan(0.005);
+
+  assertNoPageErrors(page);
+});
+
+// Pane mana yang di-skala dulu ditentukan KLineCharts sendiri dari koordinat mousedown palsu.
+// Tanpa gesture palsu, pemilihan itu jadi tanggung jawab kode kita (paneAtY) — jadi diuji.
+test('wheel di sumbu osilator men-skala osilator, bukan pane candle', async ({ page }) => {
+  await gotoApp(page);
+  await page.evaluate(() => chart.createIndicator('MACD', false, { id: 'pane_macd' }));
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+  const rect = await chartRect(page);
+  const pw = await plotWidth(page);
+  const bounds = await page.evaluate(() =>
+    chart.getAllDrawPanes().map((p) => ({ id: p.getId(), top: p.getBounding().top, h: p.getBounding().height }))
+  );
+  const osc = bounds.find((b) => b.id === 'pane_macd');
+  expect(osc, 'pane osilator harus ada').toBeTruthy();
+
+  const oscRange = () => page.evaluate(() => chart.getDrawPaneById('pane_macd').getAxisComponent().getRange().range);
+
+  const candle0 = await priceSpan(page);
+  const osc0 = await oscRange();
+
+  await wheelAt(page, { x: rect.x + (pw + rect.width) / 2, y: rect.y + osc.top + osc.h / 2 }, -100);
+
+  expect(await oscRange()).toBeLessThan(osc0 * 0.99); // osilator ikut
+  expect(Math.abs((await priceSpan(page)) / candle0 - 1)).toBeLessThan(0.005); // candle tidak
+
+  assertNoPageErrors(page);
+});
+
 test('Shift+wheel di area plot tetap men-skala harga, bukan zoom waktu', async ({ page }) => {
   await gotoApp(page);
   const pt = await plotPoint(page, 0.5, 0.5);
