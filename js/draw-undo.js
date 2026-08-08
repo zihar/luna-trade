@@ -15,6 +15,14 @@ function applyDrawsSnapshot(arr){
   buildDrawsFromArray(arr);
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
   try{ localStorage.setItem(drawsKey(), JSON.stringify(arr)); }catch(e){}
+  // Sejak gambar hidup di SERVER, menulis localStorage saja berarti undo mendarat di tempat yang
+  // tak pernah dibaca lagi (cermin cuma dibaca saat request gagal): layar & cermin menunjukkan 4
+  // objek, server tetap 5, reload berikutnya menghidupkan lagi objek yang barusan di-undo.
+  // Snapshot-nya sendiri yang didorong — bukan serializeDraws() ulang — supaya yang naik ke server
+  // persis keadaan yang baru saja dipasang, bukan hasil pembacaan ulang kanvas yang bisa berbeda.
+  // Gerbang suppressDrawSave dihormati persis seperti saveDraws(): saat clear/restore programatik
+  // sedang berjalan, tak ada satu pun jalur yang boleh mendorong ke server.
+  if(!suppressDrawSave) try{ scheduleSyncDraws(inst, arr); }catch(_){}
 }
 function undoDraw(){
   if(!drawUndo.length) return;
