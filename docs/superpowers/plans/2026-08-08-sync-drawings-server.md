@@ -1166,7 +1166,10 @@ Harness hermetik satu browser; klaim inti fitur ini justru "gambar ikut pindah p
 3. Buka jendela **incognito**, login akun yang sama → trendline harus sudah ada.
 4. Di incognito, geser garisnya, tunggu ~2 detik. Kembali ke jendela pertama, gambar objek lain → **notice bentrok** harus muncul.
 5. Klik **Reload** → kanvas jadi versi incognito. Ulangi & klik **Keep mine** → versi jendela pertama yang menang.
-6. Catat hasil tiap langkah di badan PR.
+6. **Undo lalu reload halaman**: gambar 3 objek, tunggu ~2 detik, `Ctrl+Z` sekali, tunggu ~2 detik, muat ulang halaman → objek yang di-undo **harus tetap hilang**. Kalau ia kembali, undo cuma sampai ke cermin lokal dan tak pernah ke server (temuan C1).
+7. **Menggambar SELAGI notice bentrok terpampang**: buat bentrok seperti langkah 4, lalu — tanpa menutup notice — gambar dua objek lagi, baru klik **Keep mine**. Kedua objek baru itu **harus ada** di server (cek dengan reload halaman): "Keep mine" mengirim keadaan sekarang, bukan snapshot saat bentrok terjadi (temuan C2).
+8. **Ganti akun di browser yang sama**: logout, login dengan akun **berbeda**, buka simbol yang sama → gambar akun pertama **tak boleh muncul** dan **tak boleh terunggah** ke akun kedua (cek: baris `drawings` akun kedua tetap kosong / chart tetap bersih sesudah reload) — temuan I1.
+9. Catat hasil tiap langkah di badan PR.
 
 - [ ] **Step 5: Push & buka PR**
 

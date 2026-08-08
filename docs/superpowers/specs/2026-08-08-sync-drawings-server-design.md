@@ -25,7 +25,8 @@ mengambil versi terbaru diam-diam, dan itu persis kehilangan-senyap yang ditolak
 |---|---|---|
 | Bentrok antar perangkat | **Last-write-wins + deteksi versi** | satu kolom + satu perbandingan; mengubah kehilangan senyap jadi kejadian yang terlihat & bisa dipilih |
 | Bentuk penyimpanan | **satu blob JSON per (user, instrumen)**, format identik `serializeDraws()` | normalisasi per objek butuh id objek yang STABIL — belum ada (id dibuat ulang tiap restore) — dan akan menyeret format simpan, jalur restore, dan undo sekaligus |
-| Peran `localStorage` | **cermin yang hanya DIBACA saat request gagal** | jaringan putus tak boleh membuat gambar seolah lenyap; tapi sumber kebenaran cuma satu |
+| Peran `localStorage` | **cermin yang hanya DIBACA saat request gagal, tapi DITULIS ULANG tiap GET sukses** (dan saat aksi Reload) | jaringan putus tak boleh membuat gambar seolah lenyap; tapi sumber kebenaran cuma satu. Cermin yang tak pernah disegarkan dari server bukan cadangan melainkan jebakan: pengguna lama di browser baru yang GET-nya gagal akan melihat chart KOSONG walau server penuh — persis "kerjaanku hilang" yang fitur ini ada untuk menghapus. Jalur penyelamat yang isinya basi/kosong lebih buruk daripada tak ada jalur penyelamat, karena ia terlihat seperti kebenaran |
+| Skop kunci cermin | **`br_draws_<uid>_<INSTRUMEN>`**, uid dari `/api/auth/me` | satu browser dipakai bergantian oleh beberapa akun. Tanpa skop, sisa gambar user A jadi kandidat ADOPSI saat user B login → gambar A terunggah ke akun B lalu menyebar ke perangkat B. Entri lama tanpa skop dibiarkan berhenti dibaca; memigrasikannya berarti mengklaim tahu miliknya siapa, dan justru itu yang tak bisa dibuktikan |
 | Migrasi | **adopsi otomatis per simbol** saat server masih kosong untuk simbol itu | tanpa dialog, tanpa langkah manual, dan hanya menyentuh simbol yang benar-benar dibuka |
 | UX saat 409 | **notice yang MENETAP** — "Your drawings were changed on another device" + aksi **Reload** / **Keep mine** | mencerminkan peringatan TV: memberi tahu lalu membiarkan pengguna menimpa, bukan memaksa. **Bukan `toast()`**: toast hilang sendiri dalam 3,8 dtk dan tak punya slot tombol (`js/toast.js:13`), jadi ia justru kendaraan yang salah untuk keputusan yang tak boleh terlewat |
 | Irama dorong ke server | debounce **1,5 dtk**, di ATAS debounce lokal 350 ms yang tak berubah | rasa lokal tak berubah sama sekali; yang naik ke jaringan hanya versi yang sudah tenang |
@@ -96,14 +97,22 @@ lebih berat. Hasilnya masuk ke `buildDrawsFromArray()` yang sudah ada, tak berub
 Selama belum dipilih, dorongan otomatis untuk simbol itu **berhenti**. Tanpa itu, tiap 1,5 detik
 kita menembak 409 lagi dan peringatannya berubah jadi kebisingan yang justru diabaikan pengguna.
 
+**Editan yang lahir SELAMA bentrok menggantung** (pengguna hampir selalu terus menggambar alih-alih
+langsung memutuskan): yang dihentikan hanya PENGIRIMANNYA. Snapshot `mine` tetap **mengikuti keadaan
+lokal terkini** — tiap dorongan yang tertahan menimpa `mine`, bukan dibuang. Karena itu **"Keep mine"
+mengirim keadaan SEKARANG, bukan keadaan saat bentrok terjadi.** Kalau muatan yang tertahan dibuang
+begitu saja (dan `mine` beku di snapshot lama), Keep mine akan **menghapus di server** setiap objek
+yang digambar sesudah banner muncul — sementara objek-objek itu masih terpampang di layar. Kehilangan
+senyap yang bentuknya persis seperti yang seluruh rancangan ini tolak, cuma pintu masuknya lain.
+
 Notice-nya memakai bahasa visual `.toast` yang sudah ada (`css/layout.css:3`) — panel, border kiri
 beraksen, tipografi yang sama — tapi kelasnya sendiri: menetap sampai ditindak, `pointer-events`
 aktif karena tombolnya harus bisa diklik, dan tanpa drain bar (tak ada hitung mundur untuk
 diperlihatkan).
 
 **Migrasi.** Saat memuat simbol X: server balas `version: 0` + `payload: []` sementara
-`localStorage['br_draws_X']` berisi → unggah yang lokal sekali dengan `baseVersion: 0`, lalu pakai
-itu. Konsekuensi yang diterima: perangkat lama yang dibuka lagi bisa mengunggah gambar usang ke
+`localStorage['br_draws_<uid>_X']` berisi → unggah yang lokal sekali dengan `baseVersion: 0`, lalu
+pakai itu. Konsekuensi yang diterima: perangkat lama yang dibuka lagi bisa mengunggah gambar usang ke
 simbol yang server-nya masih kosong. Terbatas (hanya simbol yang server-nya belum punya apa-apa)
 dan tak menghapus apa pun.
 
