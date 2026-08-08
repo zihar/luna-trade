@@ -26,7 +26,10 @@ const FIXTURE_LAST_CLOSE = +CANDLES.candles[CANDLES.candles.length - 1].mid.c;
 // State server palsu, per-page. Dikembalikan ke test supaya bisa diperiksa/dimanipulasi.
 function newState() {
   return {
-    user: { email: 'e2e@luna.local', name: 'Luna E2E', picture: '', is_admin: false },
+    // `id` ditiru dari handleMe (auth.go): frontend memakainya untuk menskopkan cermin gambar
+    // per akun (`br_draws_<uid>_<INST>`). Tanpa id di stub, semua test akan memakai skop fallback
+    // dan justru melewatkan bug yang skop itu cegah.
+    user: { id: 1, email: 'e2e@luna.local', name: 'Luna E2E', picture: '', is_admin: false },
     account: { balance: 10000, equity: 10000, unrealizedPl: 0, marginUsed: 0, marginAvailable: 10000 },
     positions: [],
     trades: [],
@@ -211,6 +214,9 @@ async function installStubs(page) {
           const row = state.drawings[key] || { payload: [], version: 0 };
           return json(route, { payload: row.payload, version: row.version });
         }
+        // Muatan di atas batas server (256 KB) → 413. Diaktifkan lewat flag supaya test tak perlu
+        // benar-benar menggambar ratusan objek untuk menguji jalur penolakan permanennya.
+        if (state.tooBigDrawings) return json(route, { error: 'drawings too large' }, 413);
         const row = state.drawings[body.instrument] || { payload: [], version: 0 };
         if ((body.baseVersion | 0) !== row.version) {
           return json(route, { payload: row.payload, version: row.version }, 409);
@@ -243,6 +249,8 @@ async function installStubs(page) {
   await page.exposeFunction('__drawingsVersion', (instrument) => (state.drawings[instrument] || { version: 0 }).version);
   await page.exposeFunction('__setFailDrawings', (on) => { state.failDrawings = !!on; });
   await page.exposeFunction('__setMalformedDrawings', (on) => { state.malformedDrawings = !!on; });
+  await page.exposeFunction('__setTooBigDrawings', (on) => { state.tooBigDrawings = !!on; });
+  await page.exposeFunction('__drawingsPayload', (instrument) => (state.drawings[instrument] || { payload: [] }).payload);
 
   return state;
 }

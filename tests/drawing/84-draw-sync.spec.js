@@ -33,7 +33,7 @@ test.describe('draw-sync: memuat', () => {
     await gotoApp(page);
     const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
 
-    await page.evaluate((rows) => { localStorage.setItem('br_draws_' + inst, JSON.stringify(rows)); }, seedObject(ts));
+    await page.evaluate((rows) => { localStorage.setItem(drawsKey(), JSON.stringify(rows)); }, seedObject(ts));
     await page.evaluate(() => __setFailDrawings(true));   // stub membalas 500 selama flag ini menyala
     await page.evaluate(() => loadInit(true));
     await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
@@ -47,7 +47,7 @@ test.describe('draw-sync: memuat', () => {
     await gotoApp(page);
     const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
 
-    await page.evaluate((rows) => { localStorage.setItem('br_draws_' + inst, JSON.stringify(rows)); }, seedObject(ts));
+    await page.evaluate((rows) => { localStorage.setItem(drawsKey(), JSON.stringify(rows)); }, seedObject(ts));
     await page.evaluate(() => loadInit(true));
     await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
 
@@ -69,7 +69,7 @@ test.describe('draw-sync: memuat', () => {
       if (u.pathname === '/api/drawings' && r.method() === 'POST') posts.push(r.url());
     });
 
-    await page.evaluate((rows) => { localStorage.setItem('br_draws_' + inst, JSON.stringify(rows)); }, seedObject(ts));
+    await page.evaluate((rows) => { localStorage.setItem(drawsKey(), JSON.stringify(rows)); }, seedObject(ts));
     await page.evaluate(() => __setMalformedDrawings(true));   // stub membalas 200 dgn bodi `null`
     await page.evaluate(() => loadInit(true));
     await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
@@ -95,10 +95,12 @@ test.describe('draw-sync: memuat', () => {
 const { chartRect } = require('../helpers/chart');
 const { armTool, clickAt, CLICK_GAP_MS } = require('../helpers/draw');
 
-/** Gambar satu trendline (dua klik) di posisi yang bisa diprediksi. */
-async function drawLine(page, rect) {
-  const p1 = { x: Math.round(rect.width * 0.36), y: Math.round(rect.height * 0.4) };
-  const p2 = { x: Math.round(rect.width * 0.58), y: Math.round(rect.height * 0.6) };
+/** Gambar satu trendline (dua klik) di posisi yang bisa diprediksi. `off` menggeser vertikal
+ *  (pecahan tinggi chart) supaya garis kedua tak menimpa yang pertama. */
+async function drawLine(page, rect, off) {
+  const dy = off || 0;
+  const p1 = { x: Math.round(rect.width * 0.36), y: Math.round(rect.height * (0.4 + dy)) };
+  const p2 = { x: Math.round(rect.width * 0.58), y: Math.round(rect.height * (0.6 + dy)) };
   await armTool(page, 'trendline');
   await clickAt(page, rect, p1);
   await page.waitForTimeout(CLICK_GAP_MS);
@@ -360,6 +362,189 @@ test.describe('draw-sync: bentrok antar perangkat', () => {
     await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
 
     await expect(page.locator('#syncConflict .sc-msg')).toHaveText(`Your ${asal} drawings were changed on another device`);
+    assertNoPageErrors(page);
+  });
+});
+
+// ===================== ronde review akhir (temuan C1, C2, I1, I3, I5, I6, I7) =====================
+const { FIXTURE_LAST_TS } = require('../fixtures/api');
+
+test.describe('draw-sync: undo/redo ikut naik ke server', () => {
+  // C1: applyDrawsSnapshot dulu hanya menulis localStorage — benar saat localStorage masih sumber
+  // kebenaran, mematikan sesudah pindah ke server: cermin cuma DIBACA saat request gagal, jadi
+  // undo mendarat di tempat yang tak pernah dibaca. Layar 1 objek, server tetap 2, reload
+  // menghidupkan lagi objek yang barusan di-undo.
+  test('undo mendorong snapshot ke SERVER, bukan cuma ke cermin lokal', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await drawLine(page, rect, 0.14);
+    await expect
+      .poll(async () => (await page.evaluate((s) => __drawingsPayload(s), await page.evaluate(() => inst))).length, { timeout: 10000 })
+      .toBe(2);
+    const vSebelum = await page.evaluate(() => __drawingsVersion(inst));
+
+    await page.evaluate(() => undoDraw());
+    await expect(page.evaluate(() => drawIds.length)).resolves.toBe(1);   // kanvas sudah 1 objek seketika
+
+    await expect
+      .poll(async () => (await page.evaluate(() => __drawingsPayload(inst))).length, { timeout: 10000 })
+      .toBe(1);
+    expect(await page.evaluate(() => __drawingsVersion(inst)), 'undo harus jadi versi baru di server').toBeGreaterThan(vSebelum);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('draw-sync: editan selama bentrok tertunda', () => {
+  // C2: selama bentrok menunggu keputusan, pushDrawsNow dulu MEMBUANG muatan (flushSyncDraws sudah
+  // mengosongkan slot pending) sementara `mine` beku di snapshot saat bentrok terjadi. Akibatnya
+  // "Keep mine" mendorong keadaan PRA-bentrok → objek yang digambar sesudahnya terhapus di server
+  // padahal masih terpampang di layar.
+  test('Keep mine mengirim keadaan SEKARANG, bukan snapshot saat bentrok terjadi', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+
+    await page.evaluate(() => __seedDrawings(inst, [{ name: 'rect', points: [], lock: 0, extendData: null, style: null }], 9));
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    // Objek KEDUA digambar selagi banner terpampang — persis kebiasaan pengguna yang menunda
+    // keputusan dan terus bekerja.
+    await drawLine(page, rect, 0.14);
+    await expect
+      .poll(async () => page.evaluate(() => ((drawConflict[inst] || {}).mine || []).length), { timeout: 8000 })
+      .toBe(2);
+
+    await page.locator('#syncConflict [data-act="keep"]').click();
+    await expect.poll(async () => page.evaluate(() => __drawingsVersion(inst)), { timeout: 8000 }).toBe(10);
+    expect(
+      (await page.evaluate(() => __drawingsPayload(inst))).length,
+      'Keep mine tak boleh menghapus objek yang digambar selagi banner terpampang'
+    ).toBe(2);
+    expect(await overlays(page), 'layar & server harus sepakat').toHaveLength(2);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('draw-sync: cermin lokal berskop pengguna', () => {
+  // I1: kunci cermin dulu `br_draws_<INST>` tanpa uid dan tak pernah dibersihkan saat logout.
+  // Sebelum sync itu cuma artefak tampilan; sesudahnya, jalur adopsi MENGUNGGAH sisa milik user A
+  // ke akun user B yang kebetulan login di browser yang sama.
+  test('sisa gambar akun LAIN tak dibaca dan tak pernah diunggah', async ({ page }) => {
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/api/drawings')) posts.push(1); });
+
+    await gotoApp(page, {
+      beforeGoto: async (p) => {
+        // Tinggalan user id 1 di browser ini …
+        await p.addInitScript((rows) => {
+          try { localStorage.setItem('br_draws_1_EUR_USD', JSON.stringify(rows)); } catch (_) {}
+        }, seedObject(FIXTURE_LAST_TS));
+        // … lalu user id 2 yang login. Route ini didaftarkan sesudah stub default → ia yang menang.
+        await p.route('**/api/auth/me', (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ id: 2, email: 'b@luna.local', name: 'B', picture: '', is_admin: false }),
+          })
+        );
+      },
+    });
+
+    expect(await page.evaluate(() => authUid), 'sesi harus dikenali sbg user id 2').toBe('2');
+    expect(await overlays(page), 'gambar user lain tak boleh muncul').toHaveLength(0);
+    await page.waitForTimeout(2500);   // lewati debounce 1,5 dtk dgn margin
+    expect(posts, 'adopsi tak boleh mengunggah gambar milik akun lain').toHaveLength(0);
+    expect(await page.evaluate(() => __drawingsVersion('EUR_USD')), 'baris server user 2 harus tetap kosong').toBe(0);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('draw-sync: kegagalan permanen & cermin', () => {
+  // I3: `if(!r.ok) return;` menyamakan 413 (muatan di atas batas server) dgn kedipan jaringan —
+  // tanpa tanda apa pun ke pengguna, dan tiap editan berikutnya menembakkan ulang request yang
+  // sudah pasti gagal.
+  test('413 → satu peringatan, lalu berhenti mendorong simbol itu', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/api/drawings')) posts.push(1); });
+
+    await page.evaluate(async () => { await window.__setTooBigDrawings(true); });
+    await drawLine(page, rect);
+
+    await expect(page.locator('#toast.show')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('#toast .toast-msg')).toHaveText('Too many drawings on this symbol to sync');
+    await expect.poll(() => posts.length, { timeout: 8000 }).toBe(1);
+
+    await page.evaluate(() => { const id = chart.createOverlay({ name: 'rect', points: [] }); drawIds.push(id); saveDraws(); });
+    await page.waitForTimeout(2500);
+    expect(posts.length, 'sesudah 413, editan berikutnya tak boleh menembak ulang').toBe(1);
+    assertNoPageErrors(page);
+  });
+
+  // I5: cermin dulu hanya ditulis oleh editan lokal, tak pernah oleh hasil GET. Pengguna lama di
+  // browser baru yang GET-nya gagal karena itu melihat chart KOSONG walau server penuh.
+  test('cermin lokal disegarkan dari server tiap GET sukses', async ({ page }) => {
+    await gotoApp(page);
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+    await page.evaluate(async (rows) => {
+      await window.__seedDrawings('EUR_USD', rows, 4);
+      try { localStorage.removeItem(drawsKey('EUR_USD')); } catch (_) {}
+    }, seedObject(ts));
+
+    await page.evaluate(() => loadInit(true));
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
+
+    const mirror = await page.evaluate(() => JSON.parse(localStorage.getItem(drawsKey('EUR_USD')) || 'null'));
+    expect(Array.isArray(mirror) && mirror.length, 'cermin harus berisi salinan payload server').toBe(1);
+    assertNoPageErrors(page);
+  });
+
+  // I6: beforeunload memanggil saveDraws() dulu, visibilitychange tidak — padahal di mobile
+  // visibilitychange justru sinyal terminasi yang ANDAL. Gestur yang belum melewati debounce lokal
+  // 350 ms karena itu hilang seluruhnya.
+  test('tab disembunyikan sebelum debounce lokal: gestur terakhir tetap terkirim', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => __drawingsVersion(inst)), { timeout: 8000 }).toBe(1);
+
+    await page.evaluate(() => {
+      const id = chart.createOverlay({ name: 'rect', points: [] }); drawIds.push(id);
+      scheduleSaveDraws();                    // timer lokal 350 ms — belum ada apa pun di antrean sync
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      // bubbles:true — handler-nya terpasang di window (addEventListener top-level), dan
+      // visibilitychange sungguhan memang menggelembung dari document. Tanpa flag ini event-nya
+      // berhenti di document dan test jadi merah karena alasan yang salah.
+      document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+      // Halaman sungguhan yang dimatikan OS tak menjalankan timer apa pun sesudah ini; tanpa
+      // mematikannya di sini, jalur debounce biasa akan menyelamatkan test walau handler-nya salah.
+      clearTimeout(drawSaveTimer); clearTimeout(drawPushTimer);
+    });
+
+    await expect
+      .poll(async () => (await page.evaluate(() => __drawingsPayload(inst))).length, { timeout: 8000 })
+      .toBe(2);
+    assertNoPageErrors(page);
+  });
+
+  // I7: membatalkan dorongan yang antre memang menutup bahaya "payload basi menimpa state segar",
+  // tapi menutupnya dgn kehilangan — garis yang baru digambar lenyap dari layar DAN server.
+  // Sejak fix: dorongan DIKIRIM dulu & ditunggu, baru GET.
+  test('Load simbol yang SAMA dalam <1,5 dtk: gambar terakhir selamat di server & di layar', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const asal = await page.evaluate(() => inst);
+    await drawLine(page, rect);                 // dorongan antre, belum terkirim
+
+    await page.evaluate(() => loadInit(true));  // reload instrumen yang sama, di dalam jendela debounce
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
+
+    expect((await page.evaluate((s) => __drawingsPayload(s), asal)).length, 'gambar harus mendarat di server').toBe(1);
+    expect(await page.evaluate((s) => __drawingsVersion(s), asal)).toBe(1);
     assertNoPageErrors(page);
   });
 });

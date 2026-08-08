@@ -121,7 +121,7 @@ test.describe('persist setelah reload', () => {
       const before = await toPixels(page, obj.points);
 
       // Persist ditulis ber-debounce (scheduleSaveDraws) → tunggu storage benar-benar terisi.
-      await page.waitForFunction(() => (localStorage.getItem('br_draws_' + inst) || '').length > 2, null, { timeout: 5000 });
+      await page.waitForFunction(() => (localStorage.getItem(drawsKey()) || '').length > 2, null, { timeout: 5000 });
 
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => typeof chart !== 'undefined' && chart.getDataList().length > 0 && typeof drawIds !== 'undefined' && T !== null, null, { timeout: 20000 });
