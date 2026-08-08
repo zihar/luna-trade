@@ -615,7 +615,7 @@ test.describe('copy/paste objek: menu klik-kanan', () => {
     items = await openMenuAt(page, rect, kosong);
     paste = items.find((i) => /paste/i.test(i.label));
     expect(paste.disabled, 'Paste harus aktif sesudah copy').toBe(false);
-    expect(obj).toBeTruthy();
+    expect(await page.evaluate((id) => selectedId === id, obj.id), 'prasyarat: objek yang disalin memang terpilih').toBe(true);
     assertNoPageErrors(page);
   });
 
