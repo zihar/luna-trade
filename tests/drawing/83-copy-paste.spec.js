@@ -156,3 +156,85 @@ test.describe('copy/paste objek: API', () => {
     await expect.poll(async () => (await overlays(page)).length, { timeout: 5000 }).toBe(2);
   });
 });
+
+test.describe('copy/paste objek: hotkey', () => {
+  for (const mod of ['Control', 'Meta']) {
+    test(`${mod}+C lalu ${mod}+V → salinan mendarat di kursor`, async ({ page }) => {
+      await gotoApp(page);
+      const rect = await chartRect(page);
+      const { obj, px } = await drawLine(page, rect);
+
+      await page.keyboard.press(`${mod}+c`);
+      expect(await page.evaluate(() => drawClip != null), `${mod}+C tak mengisi clipboard`).toBe(true);
+
+      const target = { x: Math.round(rect.width * 0.22), y: Math.round(rect.height * 0.72) };
+      await page.mouse.move(rect.x + target.x, rect.y + target.y, { steps: 4 });
+      await page.keyboard.press(`${mod}+v`);
+      await page.waitForTimeout(200);
+
+      expect(await overlays(page), `${mod}+V harus menambah satu objek`).toHaveLength(2);
+      const baru = await otherThan(page, obj.id);
+      expect(Math.abs(baru.px[0].x - target.x), 'tak mendarat di X kursor').toBeLessThanOrEqual(1);
+      expect(Math.abs(baru.px[0].y - target.y), 'tak mendarat di Y kursor').toBeLessThanOrEqual(1);
+      expect(Math.abs((baru.px[1].x - baru.px[0].x) - (px[1].x - px[0].x)), 'bentuk berubah').toBeLessThanOrEqual(1);
+      assertNoPageErrors(page);
+    });
+  }
+
+  test('Ctrl+V tanpa copy: tak terjadi apa-apa', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+
+    await page.mouse.move(rect.x + 100, rect.y + 100, { steps: 4 });
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(200);
+
+    expect(await overlays(page), 'paste dgn clipboard kosong tak boleh membuat objek').toHaveLength(1);
+    assertNoPageErrors(page);
+  });
+
+  test('kursor di LUAR chart: salinan mendarat di tengah chart', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj } = await drawLine(page, rect);
+
+    await page.keyboard.press('Control+c');
+    // Keluar dari #chart → ptrOverChart harus padam (mouseleave), bukan sekadar koordinat berubah.
+    await page.mouse.move(rect.x + rect.width / 2, Math.max(2, rect.y - 30), { steps: 6 });
+    await page.waitForTimeout(150);
+    expect(await page.evaluate(() => ptrOverChart), 'prasyarat: pointer harus tercatat di luar chart').toBe(false);
+
+    await page.keyboard.press('Control+v');
+    await page.waitForTimeout(200);
+
+    expect(await overlays(page)).toHaveLength(2);
+    const baru = await otherThan(page, obj.id);
+    expect(Math.abs(baru.px[0].x - rect.width / 2), 'tak mendarat di tengah X').toBeLessThanOrEqual(2);
+    expect(Math.abs(baru.px[0].y - rect.height / 2), 'tak mendarat di tengah Y').toBeLessThanOrEqual(2);
+    assertNoPageErrors(page);
+  });
+
+  // Menyalin harga dari panel trades tak boleh diam-diam berubah jadi menyalin objek gambar.
+  test('ada teks terseleksi di halaman: Ctrl+C dibiarkan ke browser', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+
+    await page.evaluate(() => {
+      const s = document.createElement('span');
+      s.id = 'e2e-sel';
+      s.textContent = 'harga 1.2345';
+      document.body.appendChild(s);
+      const r = document.createRange();
+      r.selectNodeContents(s);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+
+    await page.keyboard.press('Control+c');
+    expect(await page.evaluate(() => drawClip), 'clipboard objek tak boleh terisi saat ada teks terseleksi').toBeNull();
+    assertNoPageErrors(page);
+  });
+});
