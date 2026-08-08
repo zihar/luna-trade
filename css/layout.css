@@ -25,7 +25,10 @@
 
   /* Notice bentrok sync: meminjam bahasa visual .toast, TAPI menetap sampai ditindak dan
      interaktif — ia meminta keputusan, bukan memberi kabar sekilas. */
-  .sync-conflict{ position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:2001;
+  /* top:64px (bukan 18px spt .toast): keduanya fixed & center, dan z-index banner lebih tinggi →
+     di posisi yang sama banner MENUTUP setiap toast yang muncul selagi ia terpampang, termasuk
+     toast alert harga. Digeser turun supaya keduanya terbaca sekaligus. */
+  .sync-conflict{ position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:2001;
           display:none; align-items:center; gap:10px; max-width:min(520px,92vw);
           background:var(--panel); border:1px solid var(--border); border-left:3px solid #e3b341; color:var(--txt);
           padding:9px 10px 10px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px; }
