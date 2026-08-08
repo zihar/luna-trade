@@ -39,9 +39,21 @@ async function loadDrawsFor(instrument){
   return arr;
 }
 
-// Instrumen yang sedang menunggu keputusan pengguna: {srv, mine}.
+// Instrumen yang sedang menunggu keputusan pengguna: instrument → {srv, mine}. Status ini per
+// INSTRUMEN & bisa berisi lebih dari satu entri sekaligus (dua simbol bisa bentrok bersamaan).
 // `mine` = muatan yang GAGAL terdorong; disimpan karena "Keep mine" harus bisa mengirim ulang
 // muatan itu walau pengguna sudah berpindah simbol.
+//
+// Elemen DOM #syncConflict TUNGGAL (satu banner utk seluruh app) sementara `drawConflict` bisa
+// punya banyak entri → banner HARUS jadi VIEW atas entri milik `inst` SAAT INI, bukan diikat ke
+// instrumen mana pun yang kebetulan bentrok terakhir. Round 1 review: versi lama merebind
+// innerHTML+onclick ke instrumen baru setiap showDrawConflict() dipanggil, jadi (a) instrumen
+// PERTAMA yang masih bentrok kehilangan satu-satunya jalur ke hideDrawConflict() → dorongannya
+// mati diam2 selamanya (gate di pushDrawsNow), dan (b) banner tetap nongol saat pengguna sudah
+// pindah ke simbol lain yg tak ada hubungannya, dgn tombol yg diam2 memutuskan instrumen BEDA
+// dari yg sedang dilihat. renderDrawConflict() adalah satu-satunya tempat yg menyentuh DOM;
+// dipanggil ulang tiap `drawConflict` berubah ATAU tiap pengguna pindah instrumen (loadInit,
+// dekat cancelPendingPushFor) sehingga banner selalu sinkron dgn `inst`.
 const drawConflict={};
 
 // Notice MENETAP — sengaja BUKAN toast(): toast hilang sendiri dalam 3,8 dtk dan tak punya slot
@@ -49,29 +61,39 @@ const drawConflict={};
 // TradingView "Your chart layout was changed": beri tahu, jangan blokir, biarkan pengguna memilih.
 function showDrawConflict(instrument, srv, mine){
   drawConflict[instrument]={srv, mine};
+  renderDrawConflict();   // no-op kalau `instrument` bukan `inst` saat ini — entrinya tetap tersimpan, menunggu giliran
+}
+
+// Sinkronkan banner tunggal dgn entri drawConflict milik `inst` SAAT INI. Pindah simbol HANYA
+// menyembunyikan banner (tak menghapus drawConflict entri manapun) — konfliknya tetap hidup &
+// kembali tampil begitu pengguna balik ke instrumen itu.
+function renderDrawConflict(){
+  const c=drawConflict[inst];
   let el=$('#syncConflict');
+  if(!c){ if(el) el.classList.remove('show'); return; }
   if(!el){ el=document.createElement('div'); el.id='syncConflict'; el.className='sync-conflict'; document.body.appendChild(el); }
   el.innerHTML='<span class="sc-msg"></span>'
     +'<button class="sc-act" type="button" data-act="reload">Reload</button>'
     +'<button class="sc-act sc-primary" type="button" data-act="keep">Keep mine</button>';
-  el.querySelector('.sc-msg').textContent='Your drawings were changed on another device';
+  el.querySelector('.sc-msg').textContent='Your '+inst+' drawings were changed on another device';
   el.classList.add('show');
+  const instrument=inst;   // ditangkap di sini: banner ini SELALU milik `inst` di saat render (lihat guard `if(!c)` di atas)
   el.querySelector('[data-act="reload"]').onclick=()=>{
-    const c=drawConflict[instrument]; hideDrawConflict(instrument);
-    if(!c || instrument!==inst) return;      // sudah pindah simbol → tak ada yang perlu diganti di layar
+    const cc=drawConflict[instrument]; hideDrawConflict(instrument);
+    if(!cc || instrument!==inst) return;      // sudah pindah simbol lagi sebelum klik → tak ada yang perlu diganti di layar
     const prev=suppressDrawSave; suppressDrawSave=true;
-    clearDrawings(); buildDrawsFromArray(c.srv.payload||[]);
+    clearDrawings(); buildDrawsFromArray(cc.srv.payload||[]);
     suppressDrawSave=prev;
     try{ resetDrawHistory(); }catch(_){}     // isi kanvas diganti wholesale → history lama tak lagi bermakna
   };
   el.querySelector('[data-act="keep"]').onclick=()=>{
-    const c=drawConflict[instrument]; hideDrawConflict(instrument);
-    if(c) pushDrawsNow(instrument, c.mine);  // drawVer sudah = versi server → dorongan ini menimpa
+    const cc=drawConflict[instrument]; hideDrawConflict(instrument);
+    if(cc) pushDrawsNow(instrument, cc.mine);  // drawVer sudah = versi server → dorongan ini menimpa
   };
 }
 function hideDrawConflict(instrument){
   delete drawConflict[instrument];
-  const el=$('#syncConflict'); if(el) el.classList.remove('show');
+  renderDrawConflict();   // instrumen yg baru diputuskan boleh jadi BUKAN `inst` skrg → sinkronkan ulang ke `inst`
 }
 
 // Dorongan satu tembakan. `opts.keepalive` dipakai saat halaman ditutup.

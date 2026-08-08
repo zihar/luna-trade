@@ -281,4 +281,85 @@ test.describe('draw-sync: bentrok antar perangkat', () => {
     expect(await overlays(page), 'objek lokal tetap seperti apa adanya').toHaveLength(1);
     assertNoPageErrors(page);
   });
+
+  // Fix round 1: banner adalah SATU elemen DOM tapi drawConflict per-instrumen bisa punya lebih
+  // dari satu entri. Bug lama merebind innerHTML+onclick ke instrumen TERAKHIR yang bentrok, jadi
+  // instrumen pertama kehilangan satu-satunya jalur ke hideDrawConflict() → dorongannya mati diam2
+  // selamanya (gate drawConflict[instrument] di pushDrawsNow tak pernah lepas).
+  test('bentrok KEDUA di instrumen lain tak boleh menghilangkan bentrok PERTAMA (orphaning)', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const asal = await page.evaluate(() => inst);
+
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+    await makeServerAhead(page);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    // Pindah simbol & bikin bentrok KEDUA di sana — instrumen asal masih menunggu keputusan.
+    await page.evaluate(() => selectSymbol('XAU_USD'));
+    await page.waitForFunction(() => inst === 'XAU_USD', null, { timeout: 15000 });
+    await expect(page.locator('#syncConflict')).toBeHidden();   // belum ada bentrok di XAU_USD
+
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+    await makeServerAhead(page);   // bergantung ke `inst` SAAT DIPANGGIL → menyasar XAU_USD
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('#syncConflict .sc-msg')).toContainText('XAU_USD');
+
+    // Balik ke instrumen ASAL: kalau banner cuma di-rebind (bug lama), yang pertama tak pernah
+    // tampil lagi & tombolnya sudah tak tersambung ke apa pun.
+    await page.evaluate((s) => selectSymbol(s), asal);
+    await page.waitForFunction((s) => inst === s, asal, { timeout: 15000 });
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('#syncConflict .sc-msg')).toContainText(asal);
+
+    await page.locator('#syncConflict [data-act="keep"]').click();
+    // Bukti hidup, bukan cuma elemen tampak: server harus benar2 menerima muatan instrumen asal
+    // di atas versi 9 (dari makeServerAhead pertama) → 10.
+    await expect.poll(async () => page.evaluate((s) => __drawingsVersion(s), asal), { timeout: 8000 }).toBe(10);
+    assertNoPageErrors(page);
+  });
+
+  test('pindah simbol saat bentrok belum diputuskan: banner sembunyi, konflik tetap tertunda & muncul lagi saat balik', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const asal = await page.evaluate(() => inst);
+
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+    await makeServerAhead(page);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    await page.evaluate(() => selectSymbol('XAU_USD'));
+    await page.waitForFunction(() => inst === 'XAU_USD', null, { timeout: 15000 });
+    await expect(page.locator('#syncConflict')).toBeHidden();
+
+    // Pindah simbol HANYA menyembunyikan tampilan — entri drawConflict instrumen asal tak dibuang.
+    const stillPending = await page.evaluate((s) => !!drawConflict[s], asal);
+    expect(stillPending, 'konflik instrumen asal tak boleh terhapus cuma krn ganti simbol').toBe(true);
+
+    await page.evaluate((s) => selectSymbol(s), asal);
+    await page.waitForFunction((s) => inst === s, asal, { timeout: 15000 });
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+    assertNoPageErrors(page);
+  });
+
+  test('pesan notice menyebut instrumen yang bentrok, bukan generik', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const asal = await page.evaluate(() => inst);
+
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+    await makeServerAhead(page);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    await expect(page.locator('#syncConflict .sc-msg')).toHaveText(`Your ${asal} drawings were changed on another device`);
+    assertNoPageErrors(page);
+  });
 });
