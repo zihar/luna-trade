@@ -62,6 +62,9 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(alertsSchema); err != nil {
 		return err
 	}
+	if _, err := s.db.Exec(drawingsSchema); err != nil {
+		return err
+	}
 	if _, err := s.db.Exec(newsSnapshotSchema); err != nil {
 		return err
 	}
@@ -185,6 +188,26 @@ CREATE TABLE IF NOT EXISTS price_alerts(
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_user ON price_alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_active ON price_alerts(active);`
+
+// Gambar pengguna: SATU baris per (user, instrumen) berisi blob JSON yang formatnya persis
+// keluaran serializeDraws() di frontend. Sengaja tidak dinormalisasi per objek — itu butuh id
+// objek yang STABIL lintas sesi, yang belum ada (id overlay dibuat ulang tiap restore).
+// `version` naik tiap tulis yang diterima; klien mengirim versi yang jadi dasar editnya sehingga
+// perangkat kedua yang memegang versi lama tak bisa menimpa diam-diam.
+// Primary key gabungan sudah jadi indeksnya — tak ada query yang memindai.
+const drawingsSchema = `
+CREATE TABLE IF NOT EXISTS drawings(
+  user_id    INTEGER NOT NULL,
+  instrument TEXT    NOT NULL,
+  payload    TEXT    NOT NULL,
+  version    INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id, instrument)
+);`
+
+// Batas ukuran satu baris. 256 KB ≈ 1.400 objek dalam satu simbol (objek ≈ 180 byte), jauh di
+// atas pemakaian nyata — gerbangnya supaya satu akun tak bisa menumbuhkan baris tanpa batas.
+const maxDrawingsBytes = 256 * 1024
 
 // User = baris tabel users (subset yang dipakai auth).
 type User struct {
@@ -811,4 +834,63 @@ func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
 func (s *Store) MarkAlertTriggered(id, triggeredAt int64) error {
 	_, err := s.db.Exec(`UPDATE price_alerts SET active=0, triggered_at=? WHERE id=? AND active=1`, triggeredAt, id)
 	return err
+}
+
+// GetDrawings mengembalikan payload JSON + versi utk (user, instrumen).
+// Belum ada barisnya → ("[]", 0, nil): "belum pernah menggambar" bukan kondisi error, dan
+// memaksa pemanggil membedakannya dari kegagalan hanya akan menyebar cabang yang tak berguna.
+func (s *Store) GetDrawings(userID int64, instrument string) (string, int64, error) {
+	var payload string
+	var version int64
+	err := s.db.QueryRow(`SELECT payload, version FROM drawings WHERE user_id=? AND instrument=?`,
+		userID, instrument).Scan(&payload, &version)
+	if err == sql.ErrNoRows {
+		return "[]", 0, nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	return payload, version, nil
+}
+
+// SaveDrawings menyimpan payload HANYA bila baseVersion masih cocok dengan versi server.
+// ok=false berarti versi basi — itu keadaan normal (perangkat lain menyimpan duluan), bukan error
+// teknis, jadi ia tidak dikembalikan sebagai err. Versi yang dikembalikan SELALU versi server
+// terkini supaya pemanggil bisa mengirimkannya ke klien tanpa query kedua.
+//
+// Satu pernyataan, bukan SELECT-lalu-UPDATE: seluruh akses DB diserialkan lewat
+// SetMaxOpenConns(1) (lihat openStore), jadi transaksi baca-lalu-tulis akan menahan SEMUA fitur
+// lain (alert monitor, paper monitor, analitik) selama ia berjalan.
+//
+// Bentuk `SELECT … WHERE ?=0 OR EXISTS(…)` bukan gaya-gayaan, dan `INSERT … VALUES … ON CONFLICT`
+// yang lebih ringkas TIDAK cukup:
+//   - baris belum ada + baseVersion=0  → SELECT menghasilkan baris → INSERT (versi 1);
+//   - baris ada                        → SELECT menghasilkan baris → konflik → DO UPDATE yang
+//     dijaga `WHERE drawings.version=?`;
+//   - baris BELUM ada + baseVersion>0  → SELECT kosong → tak ada apa pun yang terjadi → ditolak.
+// Tanpa cabang ketiga, klien yang memegang versi hantu akan membuat baris baru diam-diam.
+func (s *Store) SaveDrawings(userID int64, instrument, payload string, baseVersion, now int64) (int64, bool, error) {
+	if len(payload) > maxDrawingsBytes {
+		return 0, false, fmt.Errorf("payload %d byte melebihi batas %d", len(payload), maxDrawingsBytes)
+	}
+	res, err := s.db.Exec(`
+INSERT INTO drawings(user_id,instrument,payload,version,updated_at)
+SELECT ?,?,?,1,?
+  WHERE ?=0 OR EXISTS(SELECT 1 FROM drawings WHERE user_id=? AND instrument=?)
+ON CONFLICT(user_id,instrument) DO UPDATE SET
+  payload=excluded.payload, version=drawings.version+1, updated_at=excluded.updated_at
+  WHERE drawings.version=?`,
+		userID, instrument, payload, now, baseVersion, userID, instrument, baseVersion)
+	if err != nil {
+		return 0, false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, false, err
+	}
+	_, cur, err := s.GetDrawings(userID, instrument)
+	if err != nil {
+		return 0, false, err
+	}
+	return cur, n > 0, nil
 }
