@@ -438,9 +438,14 @@ test.describe('draw-sync: cermin lokal berskop pengguna', () => {
 
     await gotoApp(page, {
       beforeGoto: async (p) => {
-        // Tinggalan user id 1 di browser ini …
+        // Tinggalan user id 1 di browser ini, dalam KEDUA bentuk yang bisa ada: kunci berskop
+        // (ditulis sesudah fix) dan kunci lama TANPA skop (ditulis sebelum fix — dan justru itu
+        // yang kode tanpa skop akan baca lalu adopsi sebagai milik siapa pun yang login).
         await p.addInitScript((rows) => {
-          try { localStorage.setItem('br_draws_1_EUR_USD', JSON.stringify(rows)); } catch (_) {}
+          try {
+            localStorage.setItem('br_draws_1_EUR_USD', JSON.stringify(rows));
+            localStorage.setItem('br_draws_EUR_USD', JSON.stringify(rows));
+          } catch (_) {}
         }, seedObject(FIXTURE_LAST_TS));
         // … lalu user id 2 yang login. Route ini didaftarkan sesudah stub default → ia yang menang.
         await p.route('**/api/auth/me', (route) =>
@@ -538,13 +543,22 @@ test.describe('draw-sync: kegagalan permanen & cermin', () => {
     await gotoApp(page);
     const rect = await chartRect(page);
     const asal = await page.evaluate(() => inst);
+
+    // Versi awal dipaksa 1 (bukan 0) supaya jalur ADOPSI mati: dgn server versi 0, gambar yang
+    // dorongannya dibuang tetap "selamat" karena cermin lokal diunggah sebagai versi pertama —
+    // test akan hijau walau fixnya dipatahkan total. Persis jebakan yang sudah pernah menipu
+    // test flush beforeunload di ronde sebelumnya.
+    await page.evaluate(async () => { await window.__seedDrawings(inst, [], 1); });
+    await page.evaluate(() => loadInit(true));
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(0);
+
     await drawLine(page, rect);                 // dorongan antre, belum terkirim
 
     await page.evaluate(() => loadInit(true));  // reload instrumen yang sama, di dalam jendela debounce
     await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
 
     expect((await page.evaluate((s) => __drawingsPayload(s), asal)).length, 'gambar harus mendarat di server').toBe(1);
-    expect(await page.evaluate((s) => __drawingsVersion(s), asal)).toBe(1);
+    expect(await page.evaluate((s) => __drawingsVersion(s), asal), 'naik dari basis 1 lewat SATU dorongan sungguhan').toBe(2);
     assertNoPageErrors(page);
   });
 });
