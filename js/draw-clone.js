@@ -17,27 +17,50 @@ addEventListener('keydown',(e)=>{ if(e.key==='Control'||e.key==='Meta') cloneMod
 addEventListener('keyup',(e)=>{ if(e.key==='Control'||e.key==='Meta') cloneModHeld=false; });
 addEventListener('blur',()=>{ cloneModHeld=false; });
 
-// Salin objek `id` menjadi overlay baru di titik `pts` (default: titik objek itu sendiri).
-// Mengembalikan id salinan, atau null bila gagal.
-//
-// `pts` sengaja bisa dioper: pemanggilnya (drag) sudah memegang snapshot posisi AWAL gestur, dan
-// itu yang harus ditinggalkan — membaca o.points di sini akan bergantung pada apakah drag sudah
-// sempat menulis titik baru atau belum.
-function cloneOverlay(id, pts){
+// Deskripsi objek yang BERDIRI SENDIRI — cukup untuk membuat ulang objek tanpa objek aslinya.
+// Dipisah dari createFromDesc karena clipboard (js/draw-copy-paste.js) bisa hidup lebih lama dari
+// objeknya: objek dihapus, atau instrumen berganti sehingga overlay-nya sudah tak ada.
+function descOf(id){
   const o=chart.getOverlayById(id); if(!o||!o.points||!o.points.length) return null;
-  const src=pts||o.points;
-  const base={name:o.name, points:src.map(p=>Object.assign({},p))};
-  if(o.extendData!==undefined) base.extendData=o.extendData;   // teks "Add text" ikut tersalin
-  if(o.styles) base.styles=o.styles;
+  // styles WAJIB deep-copy, bukan Object.assign dangkal: setObjStyle pada BUILTIN_LINE memanggil
+  // overrideOverlay({id,styles:…}) yang MEMUTASI o.styles in-place. Referensi dangkal berarti
+  // menyalin lalu me-restyle ASLINYA diam-diam ikut mengubah warna deskripsi yang sudah "disalin" —
+  // salinan tampak berubah warna sendiri (bahkan sesudah reload, karena objStyle[nid] tetap benar
+  // tapi styles overlay-nya sudah ikut objek sumber).
+  return {name:o.name, styles:o.styles?JSON.parse(JSON.stringify(o.styles)):null, extendData:o.extendData,
+          objStyle:objStyle[id]?Object.assign({},objStyle[id]):null, points:o.points};
+}
+
+// Buat overlay baru dari deskripsi, dengan titik `pts` (wajib — pemanggil yang menentukan posisi).
+// Mengembalikan id objek baru, atau null bila gagal.
+function createFromDesc(desc, pts){
+  if(!desc||!pts||!pts.length) return null;
+  const base={name:desc.name, points:pts.map(p=>Object.assign({},p))};
+  if(desc.extendData!==undefined) base.extendData=desc.extendData;   // teks "Add text" ikut tersalin
+  if(desc.styles) base.styles=desc.styles;
   // delHooks(): salinan harus punya hook yang SAMA dgn objek biasa (drag presisi sub-bar, magnet,
   // kunci sudut, simpan-otomatis). Tanpa itu ia jadi objek kelas dua yang perilakunya beda.
   const nid=chart.createOverlay(Object.assign(base, delHooks()));
   if(!nid) return null;
   drawIds.push(nid);
+  // Jalur FULL-POINT ke-4 (bareng onDrawEnd, restore js/draw-persist.js, instant-drop di
+  // js/draw-tools.js) — tanpa ini, garis built-in (rayLine/priceChannelLine/fibonacciLine/…) hasil
+  // clone/paste menampilkan tag tanggal default sumbu-X klinecharts yang tak dipakai objek lain.
+  try{ applyXDateFlag(chart.getOverlayById(nid)); }catch(_){}
   // Gaya per-objek hidup di peta terpisah (objStyle), jadi ia tak ikut lewat createOverlay.
   // Pola override-setelah-set menyusul js/draw-persist.js: overlay custom membaca gayanya saat
   // render, jadi ia perlu satu putaran render lagi; garis built-in sudah membawa `styles` di atas.
-  if(objStyle[id]){ objStyle[nid]=Object.assign({}, objStyle[id]);
-    if(!BUILTIN_LINE[o.name]) try{ chart.overrideOverlay({id:nid, points:base.points}); }catch(_){} }
+  if(desc.objStyle){ objStyle[nid]=Object.assign({}, desc.objStyle);
+    if(!BUILTIN_LINE[desc.name]) try{ chart.overrideOverlay({id:nid, points:base.points}); }catch(_){} }
   return nid;
+}
+
+// Salin objek `id` di titik `pts` (default: titik objek itu sendiri).
+//
+// `pts` sengaja bisa dioper: pemanggilnya (drag) sudah memegang snapshot posisi AWAL gestur, dan
+// itu yang harus ditinggalkan — membaca o.points di sini akan bergantung pada apakah drag sudah
+// sempat menulis titik baru atau belum.
+function cloneOverlay(id, pts){
+  const d=descOf(id); if(!d) return null;
+  return createFromDesc(d, pts||d.points);
 }

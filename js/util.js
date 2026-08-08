@@ -165,6 +165,17 @@ function snapTimeToBar(t){
   const b=arr[lo].timestamp, a=arr[lo-1]?arr[lo-1].timestamp:b;
   return (t-a<=b-t)?a:b;
 }
+// Pixel-x + harga → titik anchor menurut kebijakan per-tool: tool sub-bar dapat dataIndex PECAHAN
+// (presisi), tool BAR_ANCHOR dapat timestamp lalu di-snap ke bar (x-nya memang harus align ke
+// candle). Satu-satunya tempat kebijakan ini ditulis — instantDropPoint (js/draw-tools.js) dan
+// pasteOverlayAt (js/draw-copy-paste.js) sama-sama memakainya, dan menyimpang dari kebijakan ini
+// membuat titik "loncat" saat objek dibuat.
+function anchorFromPx(name, x, v){
+  const xa = subBar(name) ? fracAnchorFromPx(x) : xAnchorFromPx(x); if(!xa) return null;
+  const np=Object.assign({value:v}, xa);
+  if(name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
+  return np;
+}
 
 // [magnet] snap (time,value) ke nilai OHLC candle terdekat — pakai data intraday
 // terhalus yang ter-load dalam rentang bar saat ini → mendarat di OHLC PRESISI.

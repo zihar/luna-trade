@@ -49,6 +49,12 @@ window.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
     if(k==='z'){ e.preventDefault(); e.shiftKey?redoDraw():undoDraw(); return; }
     if(k==='y'){ e.preventDefault(); redoDraw(); return; }
+    // copy/paste objek gambar (js/draw-copy-paste.js). Teks yang sedang terseleksi menang:
+    // menyalin harga dari panel trades tak boleh berubah jadi menyalin objek gambar.
+    if(k==='c'){ let sel=''; try{ sel=String(getSelection()||''); }catch(_){}
+      if(sel.trim()) return;
+      if(copyOverlay()) e.preventDefault(); return; }
+    if(k==='v'){ const p=pastePoint(); if(p && pasteOverlayAt(p.x,p.y)) e.preventDefault(); return; }
   }
   // Ketik DIGIT → buka dialog "Change interval" (konfirmasi, bukan ganti TF langsung).
   // Ketik HURUF / '/' → symbol search. Digit vs huruf → tak ada tabrakan namespace.
