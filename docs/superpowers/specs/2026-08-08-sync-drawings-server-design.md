@@ -105,6 +105,13 @@ begitu saja (dan `mine` beku di snapshot lama), Keep mine akan **menghapus di se
 yang digambar sesudah banner muncul — sementara objek-objek itu masih terpampang di layar. Kehilangan
 senyap yang bentuknya persis seperti yang seluruh rancangan ini tolak, cuma pintu masuknya lain.
 
+Karena `mine` ikut irama debounce 1,5 dtk, ia selalu tertinggal untuk gestur paling akhir. Maka saat
+tombol diklik muatannya **diselesaikan ulang di detik itu**, berurutan: kanvas hidup (`serializeDraws()`)
+bila simbolnya yang sedang tampil → muatan yang masih di antrean untuk simbol itu → baru `mine`
+(sumber yang benar begitu pengguna sudah pindah simbol). Dan **kedua aksi membuang antrean simbol itu**:
+apa pun yang masih menunggu sudah digantikan oleh keputusan pengguna, jadi membiarkannya terkirim
+belakangan berarti menimpa hasil keputusan itu dengan muatan yang justru baru saja ditolak.
+
 Notice-nya memakai bahasa visual `.toast` yang sudah ada (`css/layout.css:3`) — panel, border kiri
 beraksen, tipografi yang sama — tapi kelasnya sendiri: menetap sampai ditindak, `pointer-events`
 aktif karena tombolnya harus bisa diklik, dan tanpa drain bar (tak ada hitung mundur untuk

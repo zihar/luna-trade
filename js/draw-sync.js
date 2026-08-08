@@ -96,6 +96,12 @@ function renderDrawConflict(){
   const instrument=inst;   // ditangkap di sini: banner ini SELALU milik `inst` di saat render (lihat guard `if(!c)` di atas)
   el.querySelector('[data-act="reload"]').onclick=()=>{
     const cc=drawConflict[instrument]; hideDrawConflict(instrument);
+    // Muatan lokal yang masih antre untuk simbol ini BARU SAJA dibuang oleh keputusan pengguna.
+    // Kalau dibiarkan, timernya jalan sesudah banner ditutup — gerbang bentrok sudah lepas dan
+    // baseVersion sudah = versi server (disegarkan saat 409), jadi server MENERIMANYA dan menimpa
+    // persis salinan yang barusan dipilih pengguna. Dibuang di luar guard di bawah karena bahaya
+    // ini tak ada hubungannya dgn simbol mana yang sedang tampil.
+    dropPendingPushFor(instrument);
     if(!cc || instrument!==inst) return;      // sudah pindah simbol lagi sebelum klik → tak ada yang perlu diganti di layar
     const prev=suppressDrawSave; suppressDrawSave=true;
     clearDrawings(); buildDrawsFromArray(cc.srv.payload||[]);
@@ -105,8 +111,27 @@ function renderDrawConflict(){
   };
   el.querySelector('[data-act="keep"]').onclick=()=>{
     const cc=drawConflict[instrument]; hideDrawConflict(instrument);
-    if(cc) pushDrawsNow(instrument, cc.mine);  // drawVer sudah = versi server → dorongan ini menimpa
+    if(!cc) return;
+    const payload=freshestDrawsFor(instrument, cc.mine);   // dibaca SEBELUM antrean dibuang di bawah
+    dropPendingPushFor(instrument);   // sudah terwakili `payload` (yg sama atau lebih baru) → mengirimnya lagi cuma memundurkan keadaan
+    pushDrawsNow(instrument, payload);  // drawVer sudah = versi server → dorongan ini menimpa
   };
+}
+
+// Muatan TERSEGAR yang bisa didapat untuk `instrument` saat keputusan bentrok diklik.
+// `mine` saja tak cukup: ia hanya ikut diperbarui di dalam pushDrawsNow, yang baru jalan SESUDAH
+// debounce jaringan 1,5 dtk. Gestur yang lahir kurang dari 1,5 dtk sebelum klik masih duduk di
+// drawPushPending dan belum pernah lewat sana, jadi "Keep mine" mendorong muatan yang kehilangan
+// gestur itu — menghapusnya di server padahal objeknya masih terpampang di layar. Terukur, bukan
+// teori: tunggu 1,2 dtk → kanvas 3 objek, server 2; tunggu 2,6 dtk → 3 dan 3.
+// Urutannya dari yang paling bisa dipercaya:
+function freshestDrawsFor(instrument, fallback){
+  // 1. simbol yang sedang tampil → kanvas hidup ADALAH keadaan pengguna saat ini, tanpa perantara;
+  if(instrument===inst){ try{ return serializeDraws(); }catch(_){} }
+  // 2. simbol lain yang masih punya antrean → muatan antrean lebih baru daripada `mine`;
+  if(drawPushPending && drawPushPending.instrument===instrument) return drawPushPending.payload;
+  // 3. sisanya: `mine`, yang memang sumber yang benar begitu pengguna pindah simbol.
+  return fallback;
 }
 function hideDrawConflict(instrument){
   delete drawConflict[instrument];
@@ -195,6 +220,15 @@ function flushSyncDraws(opts){
 // menutupnya dgn KEHILANGAN: garis yang baru digambar lenyap dari layar DAN dari server. Dgn
 // dikirim lebih dulu, GET sesudahnya mengembalikan gambar itu, dan tak ada lagi dorongan tertunda
 // yang bisa mendarat belakangan. Tanpa keepalive: ini halaman hidup, bukan unload.
+// Buang antrean untuk `instrument` TANPA mengirimnya. Hanya dipakai saat keputusan bentrok sudah
+// menggantikan muatan itu — entah dgn salinan server (Reload) atau dgn muatan yang lebih baru
+// (Keep mine). Di luar dua kasus itu, membuang dorongan = membuang pekerjaan pengguna (temuan I7).
+function dropPendingPushFor(instrument){
+  if(drawPushPending && drawPushPending.instrument===instrument){
+    clearTimeout(drawPushTimer); drawPushTimer=null; drawPushPending=null;
+  }
+}
+
 function flushPendingPushFor(instrument){
   if(!(drawPushPending && drawPushPending.instrument===instrument)) return;
   const p=drawPushPending;
