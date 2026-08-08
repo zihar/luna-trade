@@ -20,6 +20,10 @@ async function loadDrawsFor(instrument){
     const r=await fetch('/api/drawings?instrument='+encodeURIComponent(instrument));
     if(!r.ok) throw new Error('HTTP '+r.status);
     d=await r.json();
+    // 200 tapi bodinya bukan objek (mis. null) → JANGAN dikira "server kosong utk simbol ini":
+    // itu yg memicu adopsi (unggah localStorage sbg versi pertama). Respons tak terbaca berarti
+    // kita betul2 tak tahu keadaan server, jadi diperlakukan sama dgn kegagalan jaringan di bawah.
+    if(!d||typeof d!=='object') throw new Error('bentuk respons tak terduga');
   }catch(_){
     drawVer[instrument]=null;              // versi tak diketahui → pushDraws menolak mendorong
     return readLocalDraws(instrument);

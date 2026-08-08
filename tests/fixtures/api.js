@@ -204,6 +204,9 @@ async function installStubs(page) {
         // persistensi bergantung pada isinya bertahan lewat reload.
         if (state.failDrawings) return json(route, { error: 'boom' }, 500);
         if (method === 'GET') {
+          // 200 tapi bodi bukan objek — uji jalur pertahanan draw-sync.js (ronde review 1):
+          // respons tak terbaca HARUS diperlakukan sbg gagal, bukan "server kosong".
+          if (state.malformedDrawings) return json(route, null);
           const key = url.searchParams.get('instrument') || '';
           const row = state.drawings[key] || { payload: [], version: 0 };
           return json(route, { payload: row.payload, version: row.version });
@@ -239,6 +242,7 @@ async function installStubs(page) {
   });
   await page.exposeFunction('__drawingsVersion', (instrument) => (state.drawings[instrument] || { version: 0 }).version);
   await page.exposeFunction('__setFailDrawings', (on) => { state.failDrawings = !!on; });
+  await page.exposeFunction('__setMalformedDrawings', (on) => { state.malformedDrawings = !!on; });
 
   return state;
 }

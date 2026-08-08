@@ -55,4 +55,39 @@ test.describe('draw-sync: memuat', () => {
     await expect.poll(async () => page.evaluate(() => window.__drawingsVersion(inst)), { timeout: 8000 }).toBe(1);
     assertNoPageErrors(page);
   });
+
+  // Ronde review 1: 200 dgn bodi tak terbaca (mis. null) HARUS diperlakukan sbg gagal, bukan
+  // "server kosong utk simbol ini" — kalau tidak, adopsi keliru menganggap belum ada apa2 di
+  // server lalu menimpa/mengunggah tanpa dasar yang benar.
+  test('GET 200 tapi bodi bukan objek → diperlakukan gagal: pakai localStorage, versi null, TANPA POST adopsi', async ({ page }) => {
+    await gotoApp(page);
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+
+    const posts = [];
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (u.pathname === '/api/drawings' && r.method() === 'POST') posts.push(r.url());
+    });
+
+    await page.evaluate((rows) => { localStorage.setItem('br_draws_' + inst, JSON.stringify(rows)); }, seedObject(ts));
+    await page.evaluate(() => __setMalformedDrawings(true));   // stub membalas 200 dgn bodi `null`
+    await page.evaluate(() => loadInit(true));
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
+
+    expect(await page.evaluate(() => drawVer[inst]), 'versi harus null saat bodi 200 tak terduga').toBeNull();
+    expect(posts, 'tak boleh ada POST adopsi saat bentuk respons tak diketahui').toHaveLength(0);
+    assertNoPageErrors(page);
+  });
+
+  // Bug yang ditemukan review: restoreDraws() melempar (mis. TypeError akses properti d.version)
+  // → suppressDrawSave nyangkut true selamanya krn baris resetnya tak pernah tercapai. Sejak fix,
+  // js/load-chart.js membungkus restoreDraws() dgn try/finally.
+  test('setelah bodi 200 tak terduga, suppressDrawSave tetap dilepas → simpan lokal tetap jalan', async ({ page }) => {
+    await gotoApp(page);
+    await page.evaluate(() => __setMalformedDrawings(true));
+    await page.evaluate(() => loadInit(true));
+
+    expect(await page.evaluate(() => suppressDrawSave), 'suppressDrawSave harus lepas walau load gagal-bentuk').toBe(false);
+    assertNoPageErrors(page);
+  });
 });
