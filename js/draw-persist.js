@@ -10,7 +10,13 @@ const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,
 // simpleAnnotation & simpleTag sengaja TIDAK di sini (ditarik dari rail, lihat DRAW_GROUPS):
 // buildDrawsFromArray memfilter lewat daftar ini, jadi objek lama yang masih tersimpan di
 // localStorage pengguna otomatis berhenti dimuat — tak perlu migrasi.
-function drawsKey(){ return 'br_draws_'+inst; }
+// Kunci cermin localStorage — SATU-SATUNYA tempat formatnya hidup (js/draw-sync.js ikut memakainya).
+// Berskop per PENGGUNA sejak sync ke server: dulu `br_draws_<INST>` tanpa uid cuma artefak tampilan
+// lokal, tapi kini isinya bisa DIUNGGAH (jalur adopsi). Tanpa skop, user B yang login di browser
+// bekas user A akan mengunggah gambar A ke akunnya sendiri lalu menyebarkannya ke perangkat B.
+// Entri lama tanpa skop sengaja dibiarkan berhenti dibaca — memigrasikannya berarti mengklaim tahu
+// milik siapa, padahal justru itu yang tak bisa dibuktikan.
+function drawsKey(instrument){ return 'br_draws_'+(authUid||'anon')+'_'+(instrument||inst); }
 function serializeDraws(){
   const out=[];
   drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);
@@ -23,14 +29,18 @@ function serializeDraws(){
   return out;
 }
 function saveDraws(){ if(suppressDrawSave) return;
-  const json=JSON.stringify(serializeDraws());
+  const arr=serializeDraws(), json=JSON.stringify(arr);
   try{ localStorage.setItem(drawsKey(), json); }catch(e){}
   recordDrawHistory(json);
+  // Muatan + instrumen diserahkan BERSAMAAN ke lapisan sync (js/draw-sync.js) supaya dorongan yang
+  // tertunda tak pernah perlu membaca ulang `inst` yang mungkin sudah berganti.
+  try{ scheduleSyncDraws(inst, arr); }catch(_){}
 }
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
-function restoreDraws(){
-  let arr; try{ arr=JSON.parse(localStorage.getItem(drawsKey())); }catch(e){ arr=null; }
-  buildDrawsFromArray(arr);
+// Sumbernya kini SERVER (js/draw-sync.js); localStorage hanya jalur penyelamat saat request gagal.
+// Fungsinya jadi async — pemanggilnya (loadInit) menunggunya bersama fetch candles.
+async function restoreDraws(){
+  buildDrawsFromArray(await loadDrawsFor(inst));
 }
 function buildDrawsFromArray(arr){
   if(!Array.isArray(arr)||!arr.length) return;
@@ -61,5 +71,10 @@ function buildDrawsFromArray(arr){
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
   try{ syncLockAllBtn(); }catch(_){}   // restore bisa membawa objek terkunci → samakan tombol rail
 }
-window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
+// Jaring akhir "tangkap drag/edit yg belum ter-flush" pindah SELURUHNYA ke flushSyncDrawsOnExit()
+// (js/draw-sync.js), yang memanggil saveDraws() sendiri. Listener terpisah di sini justru berbahaya:
+// ia terdaftar LEBIH DULU (draw-persist dimuat sebelum draw-sync), jadi ia jalan sebelum handler
+// sync sempat mengosongkan antrean simbol lain — dan scheduleSyncDraws() di dalamnya lalu mengirim
+// muatan simbol itu sebagai fetch POLOS di tengah unload, yang rutin dibatalkan browser (temuan N1).
+// Satu pintu keluar, urutannya terkendali di satu tempat.
 

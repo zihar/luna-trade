@@ -77,6 +77,13 @@ async function loadInit(latest){
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   suppressDrawSave=true; clearTimeout(drawSaveTimer);   // clear+reload jangan timpa storage (restore di akhir)
+  // Dorongan yg masih antre utk instrumen ini DIKIRIM DULU (bukan dibuang) dan ditunggu sebelum
+  // restoreDraws() melakukan GET-nya — lihat flushPendingPushFor (js/draw-sync.js). Janjinya
+  // dimulai di sini supaya berjalan berbarengan dgn fetch candles, dan baru di-await tepat sebelum
+  // restore: yang penting urutannya terhadap GET, bukan terhadap candle.
+  let pendingPush=null;
+  try{ pendingPush=flushPendingPushFor(inst); }catch(_){}
+  try{ renderDrawConflict(); }catch(_){}   // banner bentrok ikut `inst`: sembunyikan/tampilkan sesuai simbol baru (js/draw-sync.js)
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
   setStatus('Fetching '+inst+' '+currentTF+' …');
@@ -97,8 +104,14 @@ async function loadInit(latest){
   setReplayUI(false);   // Load → kembali ke realtime (keluar mode replay bila aktif)
   startLive();          // live = default
   try{ clearMeasure(); }catch(_){}   // ganti instrumen → hasil ukur instrumen lama dibuang (js/measure.js)
-  restoreDraws();       // munculkan kembali gambar tersimpan utk instrumen ini
-  suppressDrawSave=false; clearTimeout(drawSaveTimer);
+  try{
+    try{ await pendingPush; }catch(_){}   // dorongan lokal mendarat DULU → GET di bawah ikut memuatnya
+    await restoreDraws();   // sumbernya server → async; menunggunya sebelum melepas suppressDrawSave
+  }finally{
+    // WAJIB jalan walau restoreDraws melempar: suppressDrawSave tak boleh nyangkut true —
+    // itu berarti penyimpanan gambar mati diam2 utk sisa sesi (lihat review Task 3, ronde 1).
+    suppressDrawSave=false; clearTimeout(drawSaveTimer);
+  }
   try{ resetDrawHistory(); }catch(e){}   // history undo/redo bersifat per-instrumen → reset
 }
 

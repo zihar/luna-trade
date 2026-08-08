@@ -22,6 +22,24 @@
   .toast.t-error{ --tc:var(--red); }
   .toast.t-warn{ --tc:#e3b341; }
   .toast.t-info{ --tc:var(--accent); }
+
+  /* Notice bentrok sync: meminjam bahasa visual .toast, TAPI menetap sampai ditindak dan
+     interaktif — ia meminta keputusan, bukan memberi kabar sekilas. */
+  /* top:64px (bukan 18px spt .toast): keduanya fixed & center, dan z-index banner lebih tinggi →
+     di posisi yang sama banner MENUTUP setiap toast yang muncul selagi ia terpampang, termasuk
+     toast alert harga. Digeser turun supaya keduanya terbaca sekaligus. */
+  .sync-conflict{ position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:2001;
+          display:none; align-items:center; gap:10px; max-width:min(520px,92vw);
+          background:var(--panel); border:1px solid var(--border); border-left:3px solid #e3b341; color:var(--txt);
+          padding:9px 10px 10px 13px; border-radius:9px; box-shadow:var(--shadow); font-size:13px; }
+  .sync-conflict.show{ display:flex; }
+  .sync-conflict .sc-msg{ flex:1; min-width:0; }
+  .sync-conflict .sc-act{ flex:none; cursor:pointer; padding:4px 10px; border-radius:6px; font-size:12px;
+          border:1px solid var(--border); background:transparent; color:var(--txt); transition:background .15s, border-color .15s; }
+  .sync-conflict .sc-act:hover{ background:rgba(255,255,255,.07); }
+  .sync-conflict .sc-act:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .sync-conflict .sc-primary{ border-color:var(--accent); }
+
   @media (prefers-reduced-motion: reduce){ .toast .toast-bar{ display:none; } }
   /* hormati preferensi kurangi-gerak: matikan animasi/transisi non-esensial */
   @media (prefers-reduced-motion: reduce){

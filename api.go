@@ -37,6 +37,8 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/alerts", requireUser(handleAlertsList))
 	mux.HandleFunc("POST /api/alerts", requireUser(handleAlertCreate))
 	mux.HandleFunc("POST /api/alerts/delete", requireUser(handleAlertDelete))
+	mux.HandleFunc("GET /api/drawings", requireUser(handleDrawingsGet))
+	mux.HandleFunc("POST /api/drawings", requireUser(handleDrawingsSave))
 }
 
 // handleTrack mencatat satu event pemakaian fitur (analytics DIY, lihat store.LogEvent).
@@ -192,6 +194,85 @@ func handleAlertDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// GET /api/drawings?instrument=EUR_USD → {payload:[…], version:N}
+func handleDrawingsGet(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	instrument := r.URL.Query().Get("instrument")
+	if instrument == "" {
+		writeErr(w, http.StatusBadRequest, "instrument required")
+		return
+	}
+	payload, version, err := store.GetDrawings(uid, instrument)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// payload sudah berupa teks JSON di DB → tulis mentah, jangan di-encode dua kali.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"payload":` + payload + `,"version":` + strconv.FormatInt(version, 10) + `}`))
+}
+
+// POST /api/drawings {instrument, payload, baseVersion}
+//   versi cocok → 200 {version}
+//   versi basi  → 409 {version, payload} MILIK SERVER, keduanya dari SATU pembacaan store yang
+//                  sama — klien memakai pasangan ini apa adanya untuk menawarkan Reload, jadi
+//                  version yang basi berpasangan dengan payload yang baru (TOCTOU) tak boleh terjadi
+//   kebesaran   → 413
+func handleDrawingsSave(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	// ContentLength diperiksa lebih dulu: badan yang JAUH melebihi batas (mis. 3× lipat) akan
+	// dipotong oleh LimitReader di bawah sebelum JSON-nya lengkap, sehingga decoder gagal dengan
+	// "unexpected EOF" — itu salah dibaca sebagai JSON rusak (400) padahal sebenarnya kebesaran
+	// (413). Cek ini menangkap kasus itu lebih awal. Body kecil yang memang rusak tetap lolos ke
+	// decoder dan dijawab 400 seperti biasa.
+	if r.ContentLength > maxDrawingsBytes+4096 {
+		writeErr(w, http.StatusRequestEntityTooLarge, "drawings too large")
+		return
+	}
+	var req struct {
+		Instrument  string          `json:"instrument"`
+		Payload     json.RawMessage `json:"payload"`
+		BaseVersion int64           `json:"baseVersion"`
+	}
+	// LimitReader tetap jadi jaring pengaman untuk badan tanpa Content-Length yang diketahui
+	// (mis. chunked) — sedikit di atas batas payload supaya badan yang kebesaran tetap TERBACA
+	// dan bisa dijawab 413 yang jelas oleh pemeriksaan len(req.Payload) di bawah.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxDrawingsBytes+4096)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if req.Instrument == "" || len(req.Payload) == 0 {
+		writeErr(w, http.StatusBadRequest, "instrument & payload required")
+		return
+	}
+	if len(req.Payload) > maxDrawingsBytes {
+		writeErr(w, http.StatusRequestEntityTooLarge, "drawings too large")
+		return
+	}
+	version, ok, err := store.SaveDrawings(uid, req.Instrument, string(req.Payload), req.BaseVersion, time.Now().UnixMilli())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		// srvVersion (BUKAN `version` dari SaveDrawings) — antara kegagalan simpan di atas dan
+		// baris ini, device lain bisa saja berhasil menyimpan versi baru; ambil version DARI
+		// pembacaan yang sama dengan payload supaya 409 tak memasangkan version basi dengan
+		// payload yang lebih baru.
+		srv, srvVersion, err := store.GetDrawings(uid, req.Instrument)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"payload":` + srv + `,"version":` + strconv.FormatInt(srvVersion, 10) + `}`))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"version": version})
 }
 
 // handlePrices = SSE harga realtime. Butuh OANDA_ACCOUNT_ID (stream upstream).
