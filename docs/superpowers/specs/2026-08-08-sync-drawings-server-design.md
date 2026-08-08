@@ -27,7 +27,7 @@ mengambil versi terbaru diam-diam, dan itu persis kehilangan-senyap yang ditolak
 | Bentuk penyimpanan | **satu blob JSON per (user, instrumen)**, format identik `serializeDraws()` | normalisasi per objek butuh id objek yang STABIL — belum ada (id dibuat ulang tiap restore) — dan akan menyeret format simpan, jalur restore, dan undo sekaligus |
 | Peran `localStorage` | **cermin yang hanya DIBACA saat request gagal** | jaringan putus tak boleh membuat gambar seolah lenyap; tapi sumber kebenaran cuma satu |
 | Migrasi | **adopsi otomatis per simbol** saat server masih kosong untuk simbol itu | tanpa dialog, tanpa langkah manual, dan hanya menyentuh simbol yang benar-benar dibuka |
-| UX saat 409 | toast **"Your drawings were changed on another device"** + aksi **Reload** / **Keep mine** | mencerminkan peringatan TV: memberi tahu lalu membiarkan pengguna menimpa, bukan memaksa |
+| UX saat 409 | **notice yang MENETAP** — "Your drawings were changed on another device" + aksi **Reload** / **Keep mine** | mencerminkan peringatan TV: memberi tahu lalu membiarkan pengguna menimpa, bukan memaksa. **Bukan `toast()`**: toast hilang sendiri dalam 3,8 dtk dan tak punya slot tombol (`js/toast.js:13`), jadi ia justru kendaraan yang salah untuk keputusan yang tak boleh terlewat |
 | Irama dorong ke server | debounce **1,5 dtk**, di ATAS debounce lokal 350 ms yang tak berubah | rasa lokal tak berubah sama sekali; yang naik ke jaringan hanya versi yang sudah tenang |
 | Flush terakhir | `fetch(…, {keepalive:true})`, **bukan** `navigator.sendBeacon` | semantiknya sama, tapi ia lewat jalur yang bisa dicegat `page.route` → jaring pengamannya ikut TERUJI, bukan cuma diklaim |
 | `PRAGMA synchronous=NORMAL` | **tidak** di PR ini | mengubah jaminan durabilitas SELURUH aplikasi demi kecepatan yang belum terbukti dibutuhkan |
@@ -87,14 +87,19 @@ lebih berat. Hasilnya masuk ke `buildDrawsFromArray()` yang sudah ada, tak berub
 - dorongan ke server didebounce **1,5 dtk** di atasnya, di-flush saat `visibilitychange` → hidden
   dan saat `beforeunload`.
 
-**Bentrok (409).** Toast dengan teks Inggris **"Your drawings were changed on another device"** dan
-dua aksi:
+**Bentrok (409).** Sebuah **notice yang menetap** (tak auto-hilang) dengan teks Inggris
+**"Your drawings were changed on another device"** dan dua aksi:
 - **Reload** — pakai payload server yang ikut di badan 409, buang yang lokal;
 - **Keep mine** — dorong ulang dengan versi server sebagai `baseVersion` → menimpa, persis akibat
   yang TV peringatkan.
 
 Selama belum dipilih, dorongan otomatis untuk simbol itu **berhenti**. Tanpa itu, tiap 1,5 detik
-kita menembak 409 lagi dan toast berubah jadi kebisingan yang justru diabaikan pengguna.
+kita menembak 409 lagi dan peringatannya berubah jadi kebisingan yang justru diabaikan pengguna.
+
+Notice-nya memakai bahasa visual `.toast` yang sudah ada (`css/layout.css:3`) — panel, border kiri
+beraksen, tipografi yang sama — tapi kelasnya sendiri: menetap sampai ditindak, `pointer-events`
+aktif karena tombolnya harus bisa diklik, dan tanpa drain bar (tak ada hitung mundur untuk
+diperlihatkan).
 
 **Migrasi.** Saat memuat simbol X: server balas `version: 0` + `payload: []` sementara
 `localStorage['br_draws_X']` berisi → unggah yang lokal sekali dengan `baseVersion: 0`, lalu pakai
@@ -114,10 +119,11 @@ butuh login, jadi keadaan ini praktis tak terjadi).
 |---|---|
 | `store.go` | skema `drawings` + `GetDrawings` / `SaveDrawings(userID, instrument, payload, baseVersion)` |
 | `api.go` | `GET /api/drawings`, `POST /api/drawings`, keduanya `requireUser` |
-| `js/draw-sync.js` (baru) | fetch/push, state versi per instrumen, debounce 1,5 dtk, flush keepalive, penanganan 409 |
+| `js/draw-sync.js` (baru) | fetch/push, state versi per instrumen, debounce 1,5 dtk, flush keepalive, notice 409 |
+| `css/layout.css` | gaya notice bentrok (`.sync-conflict`), bertetangga dengan `.toast` yang bahasanya dipinjam |
 | `js/draw-persist.js` | `restoreDraws()` jadi asinkron & bersumber server; localStorage turun pangkat jadi cermin/fallback |
 | `js/load-chart.js` | fetch drawings dibarengkan dengan fetch candles |
-| `index.html` | `<script src="/js/draw-sync.js">` sebelum `draw-persist.js` |
+| `index.html` | `<script src="/js/draw-sync.js">` **sesudah** `draw-persist.js` — urutan listener `beforeunload` mengikuti urutan pendaftaran, jadi flush harus terdaftar setelah `saveDraws` supaya ia mengirim keadaan terakhir, bukan yang sebelumnya |
 | `tests/fixtures/api.js` | stub `/api/drawings` dengan state (payload+version) per instrumen |
 | `tests/smoke/boot-integrity.spec.js` | entri `SENTINEL` untuk modul baru |
 
@@ -160,9 +166,9 @@ butuh login, jadi keadaan ini praktis tak terjadi).
 3. reload → objek masih ada (jalur server, bukan localStorage);
 4. **flush cepat**: gambar lalu langsung reload (<1,5 dtk) → objek tetap selamat (membuktikan
    `beforeunload` + keepalive benar-benar jalan);
-5. server balas 409 → toast muncul, objek lokal **tidak** tergantikan, dan **tak ada POST lanjutan**
-   sampai aksi dipilih;
-6. **Reload** pada toast → isi server yang dipakai; **Keep mine** → POST ulang dengan versi server
+5. server balas 409 → notice muncul **dan tetap ada** (tak hilang sendiri), objek lokal **tidak**
+   tergantikan, dan **tak ada POST lanjutan** sampai aksi dipilih;
+6. **Reload** pada notice → isi server yang dipakai; **Keep mine** → POST ulang dengan versi server
    dan menang;
 7. adopsi: server kosong + localStorage berisi → satu POST `baseVersion 0`, objek tampil;
 8. GET gagal (stub 500) → objek dari localStorage tampil, dan **tak ada POST sama sekali**.
