@@ -209,3 +209,76 @@ test.describe('draw-sync: mendorong', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('draw-sync: bentrok antar perangkat', () => {
+  /** Buat server berjalan lebih dulu, sehingga dorongan berikutnya pasti 409. */
+  async function makeServerAhead(page) {
+    await page.evaluate(() => __seedDrawings(inst, [{ name: 'rect', points: [], lock: 0, extendData: null, style: null }], 9));
+  }
+
+  test('409 → notice MENETAP, objek lokal tak tergantikan, dorongan berhenti', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+
+    await makeServerAhead(page);
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/api/drawings')) posts.push(1); });
+
+    // chart.createOverlay() langsung TAK masuk drawIds (yg mendaftarkannya cuma delHooks() di
+    // createDraw/clone/restore — lihat tests/helpers/draw.js) — didorong manual di sini supaya
+    // overlays()/serializeDraws() ikut melihatnya sbg objek lokal KEDUA yg harus tetap utuh.
+    await page.evaluate(() => { const id = chart.createOverlay({ name: 'rect', points: [] }); drawIds.push(id); scheduleSyncDraws(inst, serializeDraws()); });
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    // Menetap: toast biasa hilang 3,8 dtk — ini tidak boleh.
+    await page.waitForTimeout(4500);
+    await expect(page.locator('#syncConflict')).toBeVisible();
+
+    expect(await overlays(page), 'objek lokal tak boleh diganti tanpa persetujuan').toHaveLength(2);
+    const n = posts.length;
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await page.waitForTimeout(2500);
+    expect(posts.length, 'tak boleh menembak 409 berulang selama menunggu keputusan').toBe(n);
+    assertNoPageErrors(page);
+  });
+
+  test('Reload → isi server yang dipakai', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+    await page.evaluate((t) => __seedDrawings(inst, [
+      { name: 'trendline', points: [{ vt: t - 7200000, value: 1.05 }, { vt: t, value: 1.06 }], lock: 0, extendData: null, style: null },
+      { name: 'trendline', points: [{ vt: t - 3600000, value: 1.07 }, { vt: t, value: 1.08 }], lock: 0, extendData: null, style: null },
+    ], 9), ts);
+
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+    await page.locator('#syncConflict [data-act="reload"]').click();
+
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(2);
+    await expect(page.locator('#syncConflict')).toBeHidden();
+    assertNoPageErrors(page);
+  });
+
+  test('Keep mine → punya perangkat ini yang menang', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+
+    await makeServerAhead(page);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+    await page.locator('#syncConflict [data-act="keep"]').click();
+
+    // Server menerima muatan lokal di atas versi 9 → jadi 10.
+    await expect.poll(async () => page.evaluate(() => __drawingsVersion(inst)), { timeout: 8000 }).toBe(10);
+    expect(await overlays(page), 'objek lokal tetap seperti apa adanya').toHaveLength(1);
+    assertNoPageErrors(page);
+  });
+});

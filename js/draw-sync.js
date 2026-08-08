@@ -39,16 +39,60 @@ async function loadDrawsFor(instrument){
   return arr;
 }
 
+// Instrumen yang sedang menunggu keputusan pengguna: {srv, mine}.
+// `mine` = muatan yang GAGAL terdorong; disimpan karena "Keep mine" harus bisa mengirim ulang
+// muatan itu walau pengguna sudah berpindah simbol.
+const drawConflict={};
+
+// Notice MENETAP — sengaja BUKAN toast(): toast hilang sendiri dalam 3,8 dtk dan tak punya slot
+// tombol (js/toast.js:13), padahal ini keputusan yang tak boleh terlewat. Mengikuti peringatan
+// TradingView "Your chart layout was changed": beri tahu, jangan blokir, biarkan pengguna memilih.
+function showDrawConflict(instrument, srv, mine){
+  drawConflict[instrument]={srv, mine};
+  let el=$('#syncConflict');
+  if(!el){ el=document.createElement('div'); el.id='syncConflict'; el.className='sync-conflict'; document.body.appendChild(el); }
+  el.innerHTML='<span class="sc-msg"></span>'
+    +'<button class="sc-act" type="button" data-act="reload">Reload</button>'
+    +'<button class="sc-act sc-primary" type="button" data-act="keep">Keep mine</button>';
+  el.querySelector('.sc-msg').textContent='Your drawings were changed on another device';
+  el.classList.add('show');
+  el.querySelector('[data-act="reload"]').onclick=()=>{
+    const c=drawConflict[instrument]; hideDrawConflict(instrument);
+    if(!c || instrument!==inst) return;      // sudah pindah simbol → tak ada yang perlu diganti di layar
+    const prev=suppressDrawSave; suppressDrawSave=true;
+    clearDrawings(); buildDrawsFromArray(c.srv.payload||[]);
+    suppressDrawSave=prev;
+    try{ resetDrawHistory(); }catch(_){}     // isi kanvas diganti wholesale → history lama tak lagi bermakna
+  };
+  el.querySelector('[data-act="keep"]').onclick=()=>{
+    const c=drawConflict[instrument]; hideDrawConflict(instrument);
+    if(c) pushDrawsNow(instrument, c.mine);  // drawVer sudah = versi server → dorongan ini menimpa
+  };
+}
+function hideDrawConflict(instrument){
+  delete drawConflict[instrument];
+  const el=$('#syncConflict'); if(el) el.classList.remove('show');
+}
+
 // Dorongan satu tembakan. `opts.keepalive` dipakai saat halaman ditutup.
 function pushDrawsNow(instrument, payload, opts){
   const base=drawVer[instrument];
   if(base==null) return;                   // GET belum pernah sukses → tak tahu baseVersion
+  if(drawConflict[instrument]) return;      // menunggu keputusan pengguna → jangan menembak 409 lagi
   const init={method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({instrument, payload, baseVersion:base})};
   if(opts&&opts.keepalive) init.keepalive=true;
   return fetch('/api/drawings', init)
-    .then(async r=>{ if(!r.ok) return; const d=await r.json().catch(()=>null);
-      if(d&&d.version!=null) drawVer[instrument]=d.version|0; })
+    .then(async r=>{
+      if(r.status===409){                       // perangkat lain menyimpan duluan
+        const d=await r.json().catch(()=>null);
+        if(d){ drawVer[instrument]=d.version|0; showDrawConflict(instrument, d, payload); }
+        return;
+      }
+      if(!r.ok) return;                         // gagal sementara → versi tak berubah, dorongan berikutnya mencoba lagi
+      const d=await r.json().catch(()=>null);
+      if(d&&d.version!=null) drawVer[instrument]=d.version|0;
+    })
     .catch(()=>{});
 }
 
