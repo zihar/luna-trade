@@ -314,15 +314,10 @@ function instantDropPoint(name){
   // anchor X WAJIB ada utk kedua garis: walau x tak relevan visual utk horizontal,
   // serializeDraws melewati titik tanpa `vt` → tanpa anchor X garis tak ter-persist & tak
   // masuk history undo (sama spt garis yg digambar manual: klik memberi anchor dari posisi-x).
-  // Bentuk anchor ikut kebijakan subBar() yg sama dgn onDrawEnd: horizontalStraightLine
-  // (sub-bar) → dataIndex PECAHAN via fracAnchorFromPx, supaya jalur instant-drop (dropped=true,
+  // Bentuknya sendiri: js/util.js:anchorFromPx() — supaya jalur instant-drop (dropped=true,
   // onDrawEnd/subBar() tak pernah jalan) mendarat presisi juga, bukan snap ke pusat bar spt
-  // sebelumnya. verticalStraightLine (BAR_ANCHOR) tetap xAnchorFromPx lalu snap ke bar di bawah
-  // (x memang relevan → wajib align ke candle yg diklik).
-  const xa = subBar(name) ? fracAnchorFromPx(px) : xAnchorFromPx(px); if(!xa) return null;
-  const np=Object.assign({value:v}, xa);
-  if(name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
-  return np;
+  // sebelumnya.
+  return anchorFromPx(name, px, v);
 }
 function createDraw(name,btn,extra,instant){
   track('draw',{tool:name});

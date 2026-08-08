@@ -32,12 +32,9 @@ function pasteOverlayAt(px,py){
   for(const o of drawClip.off){
     const x=px+o.dx, y=py+o.dy;
     const v=pxToValue(y); if(v==null) return null;
-    // Jalur anchor IDENTIK dgn instantDropPoint (js/draw-tools.js): tool sub-bar → dataIndex
-    // PECAHAN supaya mendarat presisi, BAR_ANCHOR → timestamp lalu snap ke bar (x-nya memang
-    // harus align ke candle). Menyimpang dari jalur itu = salinan yang "loncat" saat dibuat.
-    const xa = subBar(drawClip.name) ? fracAnchorFromPx(x) : xAnchorFromPx(x); if(!xa) return null;
-    const np=Object.assign({value:v}, xa);
-    if(drawClip.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
+    // Jalur anchor: js/util.js:anchorFromPx() — kebijakan SAMA dgn instantDropPoint
+    // (js/draw-tools.js), satu tempat, supaya salinan tak "loncat" saat dibuat.
+    const np=anchorFromPx(drawClip.name, x, v); if(!np) return null;
     pts.push(np);
   }
   const nid=createFromDesc(drawClip, pts);
