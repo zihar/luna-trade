@@ -77,6 +77,7 @@ async function loadInit(latest){
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   suppressDrawSave=true; clearTimeout(drawSaveTimer);   // clear+reload jangan timpa storage (restore di akhir)
+  try{ cancelPendingPushFor(inst); }catch(_){}   // buang dorongan basi instrumen yg sama (js/draw-sync.js)
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
   setStatus('Fetching '+inst+' '+currentTF+' …');

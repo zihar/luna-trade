@@ -61,7 +61,10 @@ let drawPushTimer=null;
 let drawPushPending=null;
 
 function scheduleSyncDraws(instrument, payload){
-  if(drawPushPending && drawPushPending.instrument!==instrument) flushSyncDraws();   // selesaikan simbol lama dulu
+  // Simbol beda dari yg lagi antre → selesaikan dulu simbol lama. Dipanggil saat page akan
+  // ditutup (lihat beforeunload) sama gawatnya spt saat lanjut dipakai, jadi ikut keepalive:true
+  // supaya tak dibatalkan browser di tengah unload (ronde review 1, temuan 2).
+  if(drawPushPending && drawPushPending.instrument!==instrument) flushSyncDraws({keepalive:true});
   drawPushPending={instrument, payload};
   clearTimeout(drawPushTimer);
   drawPushTimer=setTimeout(()=>flushSyncDraws(), DRAW_PUSH_MS);
@@ -72,6 +75,18 @@ function flushSyncDraws(opts){
   clearTimeout(drawPushTimer); drawPushTimer=null;
   const p=drawPushPending; drawPushPending=null;
   if(p) pushDrawsNow(p.instrument, p.payload, opts);
+}
+
+// Reload INSTRUMEN YANG SAMA (Load tombol tanggal lain, boot ulang, dst) harus membuang dorongan
+// yg masih antre milik instrumen itu: restoreDraws() sudah menimpa kanvas dgn state SERVER segar
+// & menyegarkan drawVer ke versi sungguhan server — kalau dorongan lama tetap terkirim sesudahnya,
+// baseVersion yg baru saja disegarkan itu justru COCOK (server menerimanya begitu saja) dan diam2
+// menimpa hasil restore yg benar dgn payload yg sudah basi (ronde review 1, temuan 1: version
+// protection tak menangkap ini krn base-nya memang benar, yg basi justru payload-nya).
+function cancelPendingPushFor(instrument){
+  if(drawPushPending && drawPushPending.instrument===instrument){
+    clearTimeout(drawPushTimer); drawPushTimer=null; drawPushPending=null;
+  }
 }
 
 // Halaman disembunyikan / ditutup → kirim tanpa menunggu debounce. `fetch(keepalive:true)`, BUKAN

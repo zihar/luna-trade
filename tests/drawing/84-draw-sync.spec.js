@@ -118,9 +118,23 @@ test.describe('draw-sync: mendorong', () => {
     assertNoPageErrors(page);
   });
 
-  test('reload CEPAT (<1,5 dtk) tetap menyimpan — flush beforeunload', async ({ page }) => {
+  test('reload CEPAT (<1,5 dtk) tetap menyimpan — flush beforeunload mem-POST sungguhan', async ({ page }) => {
     await gotoApp(page);
     const rect = await chartRect(page);
+
+    // Ronde review 1, temuan 3: dgn versi server dibiarkan 0 (bawaan stub kosong), jalur "adopsi"
+    // (Task 3 — server kosong & versi 0 → unggah localStorage) DIAM-DIAM bisa meloloskan test ini
+    // walau flush beforeunload dihapus total, sebab beforeunload LAMA di draw-persist.js (yang
+    // mendahului task ini) tetap menulis localStorage & adopsi mengunggahnya sendiri sesudah
+    // reload. Memaksa versi awal jadi 1 (bukan 0) mematikan jalur pintas itu — adopsi cuma jalan
+    // saat versi PERSIS 0 — sehingga satu2nya cara objek ini bisa selamat lewat reload cepat
+    // adalah POST sungguhan sebelum unload (flush keepalive).
+    await page.evaluate(() => window.__seedDrawings(inst, [], 1));
+    await page.evaluate(() => loadInit(true));
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(0);
+
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/api/drawings')) posts.push(r.url()); });
     await drawLine(page, rect);
     // sengaja TIDAK menunggu debounce 1500ms: inilah yang diuji
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -129,6 +143,8 @@ test.describe('draw-sync: mendorong', () => {
       null, { timeout: 20000 }
     );
     await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
+    expect(await page.evaluate(() => __drawingsVersion(inst)), 'versi server harus naik dari basis 1 lewat SATU dorongan sungguhan').toBe(2);
+    expect(posts, 'flush beforeunload harus benar2 mem-POST, bukan cuma bertahan lewat adopsi localStorage').toHaveLength(1);
     assertNoPageErrors(page);
   });
 
@@ -161,6 +177,35 @@ test.describe('draw-sync: mendorong', () => {
 
     expect(await page.evaluate((s) => __drawingsVersion(s), asal), `gambar harus mendarat di ${asal}`).toBe(1);
     expect(await page.evaluate(() => __drawingsVersion('XAU_USD')), 'XAU_USD tak boleh menerima gambar simbol asal').toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  // Ronde review 1, temuan 1: reload INSTRUMEN YANG SAMA (mis. tombol Load, boot ulang) saat
+  // dorongan lokal masih antre. restoreDraws() menimpa kanvas dgn state server segar & menyegarkan
+  // drawVer — kalau dorongan lama tak dibatalkan, ia terkirim belakangan dgn baseVersion yg
+  // (kebetulan) sudah cocok, sehingga server MENERIMANYA & diam2 menimpa hasil restore yg benar
+  // dgn payload pra-reload yg sudah basi. Version protection tak menangkap ini krn base-nya
+  // memang benar — yg basi justru payload-nya.
+  test('reload instrumen SAMA saat dorongan tertunda: payload basi tak boleh menimpa state server segar', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const asal = await page.evaluate(() => inst);
+    await drawLine(page, rect);   // menjadwalkan dorongan lokal (payload lama), belum terkirim
+
+    // Server berubah SEBELUM dorongan lama sempat terkirim (device lain, atau siapa pun) — versi
+    // & payload sengaja beda dari yg lokal supaya "basi menang" vs "segar menang" bisa dibedakan.
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+    await page.evaluate(({ rows, instr }) => window.__seedDrawings(instr, rows, 5), { rows: seedObject(ts), instr: asal });
+
+    await page.evaluate(() => loadInit(true));   // reload INSTRUMEN SAMA saat dorongan lama msh antre
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(1);
+
+    // Lewati window debounce 1,5 dtk penuh dgn margin. Kalau dorongan lama tak dibatalkan, ia akan
+    // terkirim sesudah loadInit selesai, dgn baseVersion yg sudah disegarkan (5) — cocok, diterima
+    // server, & menaikkan versi jadi 6 sambil menimpa payload segar dgn payload basi.
+    await page.waitForTimeout(2500);
+
+    expect(await page.evaluate((s) => __drawingsVersion(s), asal), 'dorongan basi harus dibatalkan, bukan menimpa versi segar').toBe(5);
     assertNoPageErrors(page);
   });
 });
