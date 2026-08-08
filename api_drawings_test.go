@@ -102,6 +102,73 @@ func TestDrawingsTooLarge(t *testing.T) {
 	}
 }
 
+// Badan yang JAUH melebihi batas (beberapa kali lipat maxDrawingsBytes) dulu terpotong oleh
+// LimitReader sebelum JSON-nya lengkap → decoder gagal "unexpected EOF" → salah dijawab 400
+// ("bad json"), padahal seharusnya 413. Ini kasus yang ditemukan review sebagai patah.
+func TestDrawingsGrosslyOversizedReturns413NotBadJSON(t *testing.T) {
+	storeForAPI(t)
+	huge := `{"instrument":"EUR_USD","baseVersion":0,"payload":["` + strings.Repeat("x", 3*maxDrawingsBytes) + `"]}`
+	w := httptest.NewRecorder()
+	handleDrawingsSave(w, reqAsUser("POST", "/api/drawings", huge, 1))
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status=%d body=%s, mau 413 (bukan 400 bad json)", w.Code, w.Body.String())
+	}
+}
+
+// Badan KECIL yang memang rusak (bukan kebesaran) harus tetap 400 — perbaikan 413 di atas
+// tak boleh menelan semua kegagalan decode jadi 413.
+func TestDrawingsSmallMalformedBodyStays400(t *testing.T) {
+	storeForAPI(t)
+	w := httptest.NewRecorder()
+	handleDrawingsSave(w, reqAsUser("POST", "/api/drawings", `{"instrument":`, 1))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, mau 400", w.Code, w.Body.String())
+	}
+}
+
+// 409 harus mengambil version DAN payload dari SATU pembacaan store yang sama — bukan
+// mencampur version dari SaveDrawings yang gagal (bisa jadi sudah basi lagi di saat
+// pembacaan payload berikutnya dijalankan) dengan payload dari pembacaan terpisah.
+// Skenario: dua save DITERIMA berurutan, lalu satu save basi (baseVersion=0) → 409 harus
+// melaporkan version=2 (jumlah save yang diterima) BERPASANGAN dengan payload save kedua.
+func TestDrawingsStale409VersionMatchesReturnedPayload(t *testing.T) {
+	storeForAPI(t)
+	w := httptest.NewRecorder()
+	handleDrawingsSave(w, reqAsUser("POST", "/api/drawings",
+		`{"instrument":"EUR_USD","payload":[{"name":"a"}],"baseVersion":0}`, 1))
+	if w.Code != http.StatusOK {
+		t.Fatalf("save pertama: status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	handleDrawingsSave(w, reqAsUser("POST", "/api/drawings",
+		`{"instrument":"EUR_USD","payload":[{"name":"b"}],"baseVersion":1}`, 1))
+	var v2 struct {
+		Version int64 `json:"version"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &v2)
+	if w.Code != http.StatusOK || v2.Version != 2 {
+		t.Fatalf("save kedua: status=%d body=%s, mau 200 version=2", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	handleDrawingsSave(w, reqAsUser("POST", "/api/drawings",
+		`{"instrument":"EUR_USD","payload":[{"name":"c"}],"baseVersion":0}`, 1))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status=%d, mau 409", w.Code)
+	}
+	var conf struct {
+		Version int64 `json:"version"`
+		Payload []struct {
+			Name string `json:"name"`
+		} `json:"payload"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &conf)
+	if conf.Version != 2 || len(conf.Payload) != 1 || conf.Payload[0].Name != "b" {
+		t.Fatalf("409 harus version=2 berpasangan dgn payload save kedua (\"b\"): %s", w.Body.String())
+	}
+}
+
 func TestDrawingsInstrumentRequired(t *testing.T) {
 	storeForAPI(t)
 	w := httptest.NewRecorder()

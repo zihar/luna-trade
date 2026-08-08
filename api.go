@@ -217,17 +217,29 @@ func handleDrawingsGet(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/drawings {instrument, payload, baseVersion}
 //   versi cocok → 200 {version}
-//   versi basi  → 409 {version, payload} MILIK SERVER (klien perlu keduanya untuk menawarkan Reload)
+//   versi basi  → 409 {version, payload} MILIK SERVER, keduanya dari SATU pembacaan store yang
+//                  sama — klien memakai pasangan ini apa adanya untuk menawarkan Reload, jadi
+//                  version yang basi berpasangan dengan payload yang baru (TOCTOU) tak boleh terjadi
 //   kebesaran   → 413
 func handleDrawingsSave(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
+	// ContentLength diperiksa lebih dulu: badan yang JAUH melebihi batas (mis. 3× lipat) akan
+	// dipotong oleh LimitReader di bawah sebelum JSON-nya lengkap, sehingga decoder gagal dengan
+	// "unexpected EOF" — itu salah dibaca sebagai JSON rusak (400) padahal sebenarnya kebesaran
+	// (413). Cek ini menangkap kasus itu lebih awal. Body kecil yang memang rusak tetap lolos ke
+	// decoder dan dijawab 400 seperti biasa.
+	if r.ContentLength > maxDrawingsBytes+4096 {
+		writeErr(w, http.StatusRequestEntityTooLarge, "drawings too large")
+		return
+	}
 	var req struct {
 		Instrument  string          `json:"instrument"`
 		Payload     json.RawMessage `json:"payload"`
 		BaseVersion int64           `json:"baseVersion"`
 	}
-	// LimitReader sedikit di atas batas payload supaya badan yang kebesaran tetap TERBACA dan
-	// bisa dijawab 413 yang jelas, bukan "bad json" yang menyesatkan.
+	// LimitReader tetap jadi jaring pengaman untuk badan tanpa Content-Length yang diketahui
+	// (mis. chunked) — sedikit di atas batas payload supaya badan yang kebesaran tetap TERBACA
+	// dan bisa dijawab 413 yang jelas oleh pemeriksaan len(req.Payload) di bawah.
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxDrawingsBytes+4096)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad json")
 		return
@@ -246,14 +258,18 @@ func handleDrawingsSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		srv, _, err := store.GetDrawings(uid, req.Instrument)
+		// srvVersion (BUKAN `version` dari SaveDrawings) — antara kegagalan simpan di atas dan
+		// baris ini, device lain bisa saja berhasil menyimpan versi baru; ambil version DARI
+		// pembacaan yang sama dengan payload supaya 409 tak memasangkan version basi dengan
+		// payload yang lebih baru.
+		srv, srvVersion, err := store.GetDrawings(uid, req.Instrument)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte(`{"payload":` + srv + `,"version":` + strconv.FormatInt(version, 10) + `}`))
+		_, _ = w.Write([]byte(`{"payload":` + srv + `,"version":` + strconv.FormatInt(srvVersion, 10) + `}`))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int64{"version": version})
