@@ -77,7 +77,12 @@ async function loadInit(latest){
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
   suppressDrawSave=true; clearTimeout(drawSaveTimer);   // clear+reload jangan timpa storage (restore di akhir)
-  try{ cancelPendingPushFor(inst); }catch(_){}   // buang dorongan basi instrumen yg sama (js/draw-sync.js)
+  // Dorongan yg masih antre utk instrumen ini DIKIRIM DULU (bukan dibuang) dan ditunggu sebelum
+  // restoreDraws() melakukan GET-nya — lihat flushPendingPushFor (js/draw-sync.js). Janjinya
+  // dimulai di sini supaya berjalan berbarengan dgn fetch candles, dan baru di-await tepat sebelum
+  // restore: yang penting urutannya terhadap GET, bukan terhadap candle.
+  let pendingPush=null;
+  try{ pendingPush=flushPendingPushFor(inst); }catch(_){}
   try{ renderDrawConflict(); }catch(_){}   // banner bentrok ikut `inst`: sembunyikan/tampilkan sesuai simbol baru (js/draw-sync.js)
   clearDrawings(); resetTrade();
   chart.setPriceVolumePrecision(priceDecimals(),0);
@@ -100,6 +105,7 @@ async function loadInit(latest){
   startLive();          // live = default
   try{ clearMeasure(); }catch(_){}   // ganti instrumen → hasil ukur instrumen lama dibuang (js/measure.js)
   try{
+    try{ await pendingPush; }catch(_){}   // dorongan lokal mendarat DULU → GET di bawah ikut memuatnya
     await restoreDraws();   // sumbernya server → async; menunggunya sebelum melepas suppressDrawSave
   }finally{
     // WAJIB jalan walau restoreDraws melempar: suppressDrawSave tak boleh nyangkut true —

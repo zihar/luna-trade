@@ -7,11 +7,25 @@
 // ingin dicegah seluruh rancangan ini.
 const drawVer={};
 
-// Isi localStorage utk satu instrumen (jalur penyelamat, bukan sumber kebenaran).
+// Isi localStorage utk satu instrumen (jalur penyelamat, bukan sumber kebenaran). Format kuncinya
+// hidup di SATU tempat — drawsKey() (js/draw-persist.js) — supaya skop per-pengguna tak bisa
+// benar di satu pembaca dan salah di pembaca lain.
 function readLocalDraws(instrument){
-  try{ const a=JSON.parse(localStorage.getItem('br_draws_'+instrument)); return Array.isArray(a)?a:[]; }
+  try{ const a=JSON.parse(localStorage.getItem(drawsKey(instrument))); return Array.isArray(a)?a:[]; }
   catch(_){ return []; }
 }
+// Segarkan cermin. Dipanggil tiap kali kita TAHU keadaan server (GET sukses / Reload), bukan cuma
+// saat ada editan lokal: cermin yang isinya basi atau kosong lebih buruk daripada tak ada cermin —
+// pengguna yang GET-nya gagal di browser baru akan melihat chart KOSONG padahal server penuh, yaitu
+// persis pengalaman "kerjaanku hilang" yang jadi alasan fitur ini ada.
+function writeLocalDraws(instrument, arr){
+  try{ localStorage.setItem(drawsKey(instrument), JSON.stringify(arr||[])); }catch(_){}
+}
+
+// Simbol yang muatannya DITOLAK PERMANEN server (413, di atas 256 KB). Dorongan berikutnya untuk
+// simbol itu pasti ditolak juga, jadi berhenti sampai ada GET sukses berikutnya (mis. sesudah
+// pengguna menghapus sebagian gambar lalu memuat ulang).
+const drawTooBig={};
 
 // Muat gambar utk `instrument`. Mengembalikan array siap dioper ke buildDrawsFromArray().
 async function loadDrawsFor(instrument){
@@ -29,6 +43,7 @@ async function loadDrawsFor(instrument){
     return readLocalDraws(instrument);
   }
   drawVer[instrument]=d.version|0;
+  delete drawTooBig[instrument];           // keadaan server diketahui lagi → boleh mencoba lagi
   const arr=Array.isArray(d.payload)?d.payload:[];
   // Adopsi sekali (migrasi era localStorage): server belum punya apa pun utk simbol ini tapi
   // perangkat ini punya. Unggah yang lokal sbg versi pertama, lalu pakai itu.
@@ -36,6 +51,7 @@ async function loadDrawsFor(instrument){
     const local=readLocalDraws(instrument);
     if(local.length){ pushDrawsNow(instrument, local); return local; }
   }
+  writeLocalDraws(instrument, arr);        // cermin selalu = keadaan server terakhir yang kita tahu
   return arr;
 }
 
@@ -53,7 +69,7 @@ async function loadDrawsFor(instrument){
 // pindah ke simbol lain yg tak ada hubungannya, dgn tombol yg diam2 memutuskan instrumen BEDA
 // dari yg sedang dilihat. renderDrawConflict() adalah satu-satunya tempat yg menyentuh DOM;
 // dipanggil ulang tiap `drawConflict` berubah ATAU tiap pengguna pindah instrumen (loadInit,
-// dekat cancelPendingPushFor) sehingga banner selalu sinkron dgn `inst`.
+// dekat flushPendingPushFor) sehingga banner selalu sinkron dgn `inst`.
 const drawConflict={};
 
 // Notice MENETAP — sengaja BUKAN toast(): toast hilang sendiri dalam 3,8 dtk dan tak punya slot
@@ -84,6 +100,7 @@ function renderDrawConflict(){
     const prev=suppressDrawSave; suppressDrawSave=true;
     clearDrawings(); buildDrawsFromArray(cc.srv.payload||[]);
     suppressDrawSave=prev;
+    writeLocalDraws(instrument, cc.srv.payload||[]);   // isi server jadi kebenaran baru → cermin ikut, jangan tertinggal di versi lokal yg baru saja dibuang
     try{ resetDrawHistory(); }catch(_){}     // isi kanvas diganti wholesale → history lama tak lagi bermakna
   };
   el.querySelector('[data-act="keep"]').onclick=()=>{
@@ -96,19 +113,47 @@ function hideDrawConflict(instrument){
   renderDrawConflict();   // instrumen yg baru diputuskan boleh jadi BUKAN `inst` skrg → sinkronkan ulang ke `inst`
 }
 
-// Dorongan satu tembakan. `opts.keepalive` dipakai saat halaman ditutup.
+// Chromium menolak fetch(keepalive) dgn badan di atas ~64 KB — dan penolakannya mendarat di
+// .catch(()=>{}) alias hilang tanpa jejak. Batas server justru 256 KB, jadi tepat pengguna dgn
+// gambar TERBANYAK yang jaring pengaman unload-nya diam2 tak pernah ada. Ambang 60000 memberi
+// ruang utk header/overhead di bawah batas browser.
+const KEEPALIVE_MAX_BYTES=60000;
+function bodyBytes(s){ try{ return new TextEncoder().encode(s).length; }catch(_){ return s.length; } }
+
+// Dorongan satu tembakan. `opts.keepalive` HANYA dari handler unload/hidden — bukan dari flush
+// rekonsiliasi biasa, yang jalan saat halaman masih hidup & fetch polos tak punya batas ukuran.
 function pushDrawsNow(instrument, payload, opts){
   const base=drawVer[instrument];
   if(base==null) return;                   // GET belum pernah sukses → tak tahu baseVersion
-  if(drawConflict[instrument]) return;      // menunggu keputusan pengguna → jangan menembak 409 lagi
-  const init={method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({instrument, payload, baseVersion:base})};
-  if(opts&&opts.keepalive) init.keepalive=true;
+  if(drawTooBig[instrument]) return;        // ditolak permanen (413) → mengulang cuma membakar request
+  // Menunggu keputusan pengguna → jangan menembak 409 lagi, TAPI muatannya jangan dibuang: pengguna
+  // biasanya terus menggambar selama banner terpampang, dan "Keep mine" harus mengirim keadaan
+  // SEKARANG. Versi lama membuang muatan ini, jadi Keep mine mendorong snapshot saat bentrok terjadi
+  // dan menghapus semua yang digambar sesudahnya — padahal objeknya masih terlihat di layar.
+  if(drawConflict[instrument]){ drawConflict[instrument].mine=payload; return; }
+  const body=JSON.stringify({instrument, payload, baseVersion:base});
+  const init={method:'POST', headers:{'Content-Type':'application/json'}, body};
+  // Di atas ambang: turun ke fetch biasa. Kompromi yang dipilih sadar — fetch biasa bisa tak
+  // selesai kalau tab benar2 ditutup paksa, tapi keepalive yang ditolak browser tak punya peluang
+  // sama sekali.
+  if(opts&&opts.keepalive&&bodyBytes(body)<=KEEPALIVE_MAX_BYTES) init.keepalive=true;
   return fetch('/api/drawings', init)
     .then(async r=>{
       if(r.status===409){                       // perangkat lain menyimpan duluan
         const d=await r.json().catch(()=>null);
         if(d){ drawVer[instrument]=d.version|0; showDrawConflict(instrument, d, payload); }
+        return;
+      }
+      // 413 & 401 adalah kegagalan PERMANEN, bukan kedipan jaringan: mendiamkannya berarti tiap
+      // editan berikutnya menembakkan ulang request yang sudah pasti gagal, tanpa satu pun tanda
+      // ke pengguna bahwa gambarnya berhenti tersimpan.
+      if(r.status===413){
+        if(!drawTooBig[instrument]){ drawTooBig[instrument]=1; try{ toast('Too many drawings on this symbol to sync','warn'); }catch(_){} }
+        return;
+      }
+      if(r.status===401){                       // sesi habis → jalur yang sudah ada di app (authGate, js/auth-overlay.js)
+        drawVer[instrument]=null;               // tak tahu lagi keadaan server → berhenti mendorong
+        try{ showAuthOverlay(); }catch(_){}
         return;
       }
       if(!r.ok) return;                         // gagal sementara → versi tak berubah, dorongan berikutnya mencoba lagi
@@ -127,10 +172,10 @@ let drawPushTimer=null;
 let drawPushPending=null;
 
 function scheduleSyncDraws(instrument, payload){
-  // Simbol beda dari yg lagi antre → selesaikan dulu simbol lama. Dipanggil saat page akan
-  // ditutup (lihat beforeunload) sama gawatnya spt saat lanjut dipakai, jadi ikut keepalive:true
-  // supaya tak dibatalkan browser di tengah unload (ronde review 1, temuan 2).
-  if(drawPushPending && drawPushPending.instrument!==instrument) flushSyncDraws({keepalive:true});
+  // Simbol beda dari yg lagi antre → selesaikan dulu simbol lama. Flush ini BUKAN jalur unload
+  // (halaman masih hidup: pengguna baru saja pindah simbol), jadi TANPA keepalive — fetch polos
+  // tak punya batas ~64 KB dan di sini tak ada yang perlu bertahan melewati penutupan halaman.
+  if(drawPushPending && drawPushPending.instrument!==instrument) flushSyncDraws();
   drawPushPending={instrument, payload};
   clearTimeout(drawPushTimer);
   drawPushTimer=setTimeout(()=>flushSyncDraws(), DRAW_PUSH_MS);
@@ -143,20 +188,26 @@ function flushSyncDraws(opts){
   if(p) pushDrawsNow(p.instrument, p.payload, opts);
 }
 
-// Reload INSTRUMEN YANG SAMA (Load tombol tanggal lain, boot ulang, dst) harus membuang dorongan
-// yg masih antre milik instrumen itu: restoreDraws() sudah menimpa kanvas dgn state SERVER segar
-// & menyegarkan drawVer ke versi sungguhan server — kalau dorongan lama tetap terkirim sesudahnya,
-// baseVersion yg baru saja disegarkan itu justru COCOK (server menerimanya begitu saja) dan diam2
-// menimpa hasil restore yg benar dgn payload yg sudah basi (ronde review 1, temuan 1: version
-// protection tak menangkap ini krn base-nya memang benar, yg basi justru payload-nya).
-function cancelPendingPushFor(instrument){
-  if(drawPushPending && drawPushPending.instrument===instrument){
-    clearTimeout(drawPushTimer); drawPushTimer=null; drawPushPending=null;
-  }
+// Reload INSTRUMEN YANG SAMA (Load tombol tanggal lain, boot ulang, dst) saat masih ada dorongan
+// antre untuk instrumen itu: KIRIM DULU, lalu pemanggil MENUNGGU janji ini sebelum GET-nya.
+// Urutan itulah penawarnya. Membuang dorongan (versi lama) memang menutup bahaya "payload basi
+// menimpa state server segar" — sebab baseVersion yg baru disegarkan kebetulan cocok — tapi
+// menutupnya dgn KEHILANGAN: garis yang baru digambar lenyap dari layar DAN dari server. Dgn
+// dikirim lebih dulu, GET sesudahnya mengembalikan gambar itu, dan tak ada lagi dorongan tertunda
+// yang bisa mendarat belakangan. Tanpa keepalive: ini halaman hidup, bukan unload.
+function flushPendingPushFor(instrument){
+  if(!(drawPushPending && drawPushPending.instrument===instrument)) return;
+  const p=drawPushPending;
+  clearTimeout(drawPushTimer); drawPushTimer=null; drawPushPending=null;
+  return pushDrawsNow(p.instrument, p.payload);
 }
 
 // Halaman disembunyikan / ditutup → kirim tanpa menunggu debounce. `fetch(keepalive:true)`, BUKAN
 // navigator.sendBeacon: semantiknya sama tapi ia lewat jalur yang bisa dicegat page.route, jadi
 // jaring pengaman ini ikut TERUJI, bukan sekadar diklaim.
-addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSyncDraws({keepalive:true}); });
+// saveDraws() dipanggil DULU, persis seperti beforeunload di bawah: debounce lokal 350 ms berarti
+// gestur terakhir bisa belum masuk antrean sama sekali, jadi "flush apa yang tertunda" saja tak
+// menyelamatkan apa pun. Di mobile visibilitychange justru sinyal terminasi yang ANDAL
+// (beforeunload sering tak pernah jalan), jadi di sanalah kehilangannya paling nyata.
+addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ try{ saveDraws(); }catch(_){} flushSyncDraws({keepalive:true}); } });
 addEventListener('beforeunload',()=>{ try{ saveDraws(); }catch(_){} flushSyncDraws({keepalive:true}); });
