@@ -97,7 +97,7 @@ async function loadInit(latest){
   setReplayUI(false);   // Load → kembali ke realtime (keluar mode replay bila aktif)
   startLive();          // live = default
   try{ clearMeasure(); }catch(_){}   // ganti instrumen → hasil ukur instrumen lama dibuang (js/measure.js)
-  restoreDraws();       // munculkan kembali gambar tersimpan utk instrumen ini
+  await restoreDraws();   // sumbernya server → async; menunggunya sebelum melepas suppressDrawSave
   suppressDrawSave=false; clearTimeout(drawSaveTimer);
   try{ resetDrawHistory(); }catch(e){}   // history undo/redo bersifat per-instrumen → reset
 }

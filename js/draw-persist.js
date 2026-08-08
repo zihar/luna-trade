@@ -28,9 +28,10 @@ function saveDraws(){ if(suppressDrawSave) return;
   recordDrawHistory(json);
 }
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
-function restoreDraws(){
-  let arr; try{ arr=JSON.parse(localStorage.getItem(drawsKey())); }catch(e){ arr=null; }
-  buildDrawsFromArray(arr);
+// Sumbernya kini SERVER (js/draw-sync.js); localStorage hanya jalur penyelamat saat request gagal.
+// Fungsinya jadi async — pemanggilnya (loadInit) menunggunya bersama fetch candles.
+async function restoreDraws(){
+  buildDrawsFromArray(await loadDrawsFor(inst));
 }
 function buildDrawsFromArray(arr){
   if(!Array.isArray(arr)||!arr.length) return;

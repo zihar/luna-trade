@@ -33,6 +33,7 @@ function newState() {
     alerts: [],
     tracked: [], // event analytics yang dikirim FE (POST /api/track)
     nextId: 1,
+    drawings: {},   // instrument → {payload, version}; bertahan lewat page.reload() krn dipegang closure route
   };
 }
 
@@ -198,6 +199,23 @@ async function installStubs(page) {
           ],
         });
 
+      case '/api/drawings': {
+        // Stub INI menyimpan state sungguhan (bukan selalu balas kosong): seluruh test
+        // persistensi bergantung pada isinya bertahan lewat reload.
+        if (state.failDrawings) return json(route, { error: 'boom' }, 500);
+        if (method === 'GET') {
+          const key = url.searchParams.get('instrument') || '';
+          const row = state.drawings[key] || { payload: [], version: 0 };
+          return json(route, { payload: row.payload, version: row.version });
+        }
+        const row = state.drawings[body.instrument] || { payload: [], version: 0 };
+        if ((body.baseVersion | 0) !== row.version) {
+          return json(route, { payload: row.payload, version: row.version }, 409);
+        }
+        state.drawings[body.instrument] = { payload: body.payload, version: row.version + 1 };
+        return json(route, { version: row.version + 1 });
+      }
+
       case '/api/track':
         state.tracked.push(body);
         return json(route, { ok: true });
@@ -213,6 +231,14 @@ async function installStubs(page) {
         return json(route, { error: 'stub tak dikenal: ' + p }, 501);
     }
   });
+
+  // Jembatan test → stub. Test berjalan di Node, stub hidup di closure ini; tanpa jembatan,
+  // test tak bisa menyemai isi server atau memaksa kegagalan.
+  await page.exposeFunction('__seedDrawings', (instrument, payload, version) => {
+    state.drawings[instrument] = { payload, version };
+  });
+  await page.exposeFunction('__drawingsVersion', (instrument) => (state.drawings[instrument] || { version: 0 }).version);
+  await page.exposeFunction('__setFailDrawings', (on) => { state.failDrawings = !!on; });
 
   return state;
 }
