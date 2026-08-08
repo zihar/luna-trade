@@ -238,3 +238,59 @@ test.describe('copy/paste objek: hotkey', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('copy/paste objek: menu klik-kanan', () => {
+  /** Klik-kanan di area kosong chart, kembalikan daftar item menu yang terlihat. */
+  async function openMenuAt(page, rect, p) {
+    await page.mouse.click(rect.x + p.x, rect.y + p.y, { button: 'right' });
+    await page.waitForTimeout(200);
+    return page.$$eval('.ctxmenu .ctxitem', (els) =>
+      els.map((el) => ({ label: el.textContent, disabled: el.classList.contains('disabled') }))
+    );
+  }
+
+  test('item Paste redup saat clipboard kosong, aktif sesudah copy', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const kosong = { x: Math.round(rect.width * 0.12), y: Math.round(rect.height * 0.15) };
+
+    let items = await openMenuAt(page, rect, kosong);
+    let paste = items.find((i) => /paste/i.test(i.label));
+    expect(paste, 'item Paste tak ada di menu klik-kanan').toBeTruthy();
+    expect(paste.disabled, 'Paste harus redup saat clipboard kosong').toBe(true);
+
+    // Tutup menu dgn klik kiri (hideCtx dipasang di event `click` window — Escape tak menutupnya),
+    // supaya menu yang masih terbuka tak menelan klik pertama saat menggambar.
+    await page.mouse.click(rect.x + Math.round(rect.width * 0.8), rect.y + Math.round(rect.height * 0.85));
+    await page.waitForTimeout(150);
+    const { obj } = await drawLine(page, rect);
+    await page.keyboard.press('Control+c');
+
+    items = await openMenuAt(page, rect, kosong);
+    paste = items.find((i) => /paste/i.test(i.label));
+    expect(paste.disabled, 'Paste harus aktif sesudah copy').toBe(false);
+    expect(await page.evaluate((id) => selectedId === id, obj.id), 'prasyarat: objek yang disalin memang terpilih').toBe(true);
+    assertNoPageErrors(page);
+  });
+
+  test('Paste dari menu menempatkan objek di titik yang diklik-kanan', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj } = await drawLine(page, rect);
+    await page.keyboard.press('Control+c');
+
+    const titik = { x: Math.round(rect.width * 0.14), y: Math.round(rect.height * 0.2) };
+    await page.mouse.click(rect.x + titik.x, rect.y + titik.y, { button: 'right' });
+    await page.waitForTimeout(200);
+    const idx = await page.$$eval('.ctxmenu .ctxitem', (els) => els.findIndex((el) => /paste/i.test(el.textContent)));
+    expect(idx, 'item Paste tak ketemu').toBeGreaterThanOrEqual(0);
+    await page.locator('.ctxmenu .ctxitem').nth(idx).click();
+    await page.waitForTimeout(250);
+
+    expect(await overlays(page), 'Paste dari menu harus menambah objek').toHaveLength(2);
+    const baru = await otherThan(page, obj.id);
+    expect(Math.abs(baru.px[0].x - titik.x), 'tak mendarat di X titik klik-kanan').toBeLessThanOrEqual(1);
+    expect(Math.abs(baru.px[0].y - titik.y), 'tak mendarat di Y titik klik-kanan').toBeLessThanOrEqual(1);
+    assertNoPageErrors(page);
+  });
+});
