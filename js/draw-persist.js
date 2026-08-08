@@ -23,9 +23,12 @@ function serializeDraws(){
   return out;
 }
 function saveDraws(){ if(suppressDrawSave) return;
-  const json=JSON.stringify(serializeDraws());
+  const arr=serializeDraws(), json=JSON.stringify(arr);
   try{ localStorage.setItem(drawsKey(), json); }catch(e){}
   recordDrawHistory(json);
+  // Muatan + instrumen diserahkan BERSAMAAN ke lapisan sync (js/draw-sync.js) supaya dorongan yang
+  // tertunda tak pernah perlu membaca ulang `inst` yang mungkin sudah berganti.
+  try{ scheduleSyncDraws(inst, arr); }catch(_){}
 }
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
 // Sumbernya kini SERVER (js/draw-sync.js); localStorage hanya jalur penyelamat saat request gagal.

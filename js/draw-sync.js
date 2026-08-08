@@ -39,13 +39,43 @@ async function loadDrawsFor(instrument){
   return arr;
 }
 
-// Dorongan satu tembakan. Task 4 menambahkan penjadwalan & flush di atasnya.
-function pushDrawsNow(instrument, payload){
+// Dorongan satu tembakan. `opts.keepalive` dipakai saat halaman ditutup.
+function pushDrawsNow(instrument, payload, opts){
   const base=drawVer[instrument];
   if(base==null) return;                   // GET belum pernah sukses → tak tahu baseVersion
-  return fetch('/api/drawings',{method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({instrument, payload, baseVersion:base})})
+  const init={method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({instrument, payload, baseVersion:base})};
+  if(opts&&opts.keepalive) init.keepalive=true;
+  return fetch('/api/drawings', init)
     .then(async r=>{ if(!r.ok) return; const d=await r.json().catch(()=>null);
       if(d&&d.version!=null) drawVer[instrument]=d.version|0; })
     .catch(()=>{});
 }
+
+const DRAW_PUSH_MS=1500;        // debounce JARINGAN, di atas debounce lokal 350ms (draw-persist)
+let drawPushTimer=null;
+// Muatan yang menunggu dikirim: {instrument, payload}. Instrumen & isinya DITANGKAP BERSAMAAN saat
+// dijadwalkan — bukan dibaca ulang saat kirim. Debounce 1,5 dtk memberi jendela di mana `inst`
+// sudah berganti sementara muatan yang antre milik simbol lama; membaca ulang di sana akan
+// menyimpan gambar EUR ke baris XAU, kerusakan senyap yang baru ketahuan berhari-hari kemudian.
+let drawPushPending=null;
+
+function scheduleSyncDraws(instrument, payload){
+  if(drawPushPending && drawPushPending.instrument!==instrument) flushSyncDraws();   // selesaikan simbol lama dulu
+  drawPushPending={instrument, payload};
+  clearTimeout(drawPushTimer);
+  drawPushTimer=setTimeout(()=>flushSyncDraws(), DRAW_PUSH_MS);
+}
+
+// Kirim sekarang apa pun yang tertunda. `opts.keepalive` dipakai saat halaman ditutup.
+function flushSyncDraws(opts){
+  clearTimeout(drawPushTimer); drawPushTimer=null;
+  const p=drawPushPending; drawPushPending=null;
+  if(p) pushDrawsNow(p.instrument, p.payload, opts);
+}
+
+// Halaman disembunyikan / ditutup → kirim tanpa menunggu debounce. `fetch(keepalive:true)`, BUKAN
+// navigator.sendBeacon: semantiknya sama tapi ia lewat jalur yang bisa dicegat page.route, jadi
+// jaring pengaman ini ikut TERUJI, bukan sekadar diklaim.
+addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSyncDraws({keepalive:true}); });
+addEventListener('beforeunload',()=>{ try{ saveDraws(); }catch(_){} flushSyncDraws({keepalive:true}); });
