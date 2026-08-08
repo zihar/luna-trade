@@ -205,9 +205,30 @@ function flushPendingPushFor(instrument){
 // Halaman disembunyikan / ditutup → kirim tanpa menunggu debounce. `fetch(keepalive:true)`, BUKAN
 // navigator.sendBeacon: semantiknya sama tapi ia lewat jalur yang bisa dicegat page.route, jadi
 // jaring pengaman ini ikut TERUJI, bukan sekadar diklaim.
-// saveDraws() dipanggil DULU, persis seperti beforeunload di bawah: debounce lokal 350 ms berarti
-// gestur terakhir bisa belum masuk antrean sama sekali, jadi "flush apa yang tertunda" saja tak
-// menyelamatkan apa pun. Di mobile visibilitychange justru sinyal terminasi yang ANDAL
-// (beforeunload sering tak pernah jalan), jadi di sanalah kehilangannya paling nyata.
-addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ try{ saveDraws(); }catch(_){} flushSyncDraws({keepalive:true}); } });
-addEventListener('beforeunload',()=>{ try{ saveDraws(); }catch(_){} flushSyncDraws({keepalive:true}); });
+//
+// Urutannya tiga langkah, dan tiap langkah menutup satu kehilangan yang sudah pernah terjadi:
+//
+// 1. Muatan simbol LAIN yang masih antre dikirim DULU, dgn keepalive. Jalur ini nyata: gambar di
+//    EUR_USD → pindah ke XAU_USD dalam jendela 1,5 dtk (flush di jalur muat cuma menyentuh simbol
+//    yang SEDANG dimuat, jadi entri EUR tetap menggantung) → tutup/background tab sebelum timernya
+//    jalan. Tanpa langkah ini, saveDraws() di bawah memanggil scheduleSyncDraws() yang mengirim
+//    entri EUR lewat cabang rekonsiliasinya sebagai fetch POLOS di tengah unload — dan browser
+//    rutin membatalkan itu. Editannya lalu hilang dari server SEKALIGUS dari cermin, karena GET
+//    sukses berikutnya menimpa cermin dgn keadaan server yang tak pernah menerimanya (temuan N1).
+//    Simbol yang SAMA sengaja TIDAK ikut di sini: saveDraws() akan menyegarkan muatannya, dan
+//    mengirim dua kali membuat dorongan kedua kena 409 — yang tersimpan justru versi lebih tua.
+// 2. saveDraws() — debounce lokal 350 ms berarti gestur terakhir bisa belum masuk antrean sama
+//    sekali, jadi "flush apa yang tertunda" saja tak menyelamatkan apa pun. Di mobile
+//    visibilitychange justru sinyal terminasi yang ANDAL (beforeunload sering tak pernah jalan),
+//    jadi di sanalah kehilangannya paling nyata.
+// 3. flush terakhir: kirim apa yang baru saja dijadwalkan langkah 2.
+//
+// Batas ~60 KB di pushDrawsNow tetap berlaku untuk semua dorongan di sini — badan yang kebesaran
+// turun ke fetch biasa alih-alih jadi keepalive yang ditolak browser tanpa jejak.
+function flushSyncDrawsOnExit(){
+  if(drawPushPending && drawPushPending.instrument!==inst) flushSyncDraws({keepalive:true});
+  try{ saveDraws(); }catch(_){}
+  flushSyncDraws({keepalive:true});
+}
+addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSyncDrawsOnExit(); });
+addEventListener('beforeunload', flushSyncDrawsOnExit);

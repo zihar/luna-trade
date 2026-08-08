@@ -71,5 +71,10 @@ function buildDrawsFromArray(arr){
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
   try{ syncLockAllBtn(); }catch(_){}   // restore bisa membawa objek terkunci → samakan tombol rail
 }
-window.addEventListener('beforeunload', saveDraws);   // jaring akhir: tangkap drag/edit yg belum ter-flush
+// Jaring akhir "tangkap drag/edit yg belum ter-flush" pindah SELURUHNYA ke flushSyncDrawsOnExit()
+// (js/draw-sync.js), yang memanggil saveDraws() sendiri. Listener terpisah di sini justru berbahaya:
+// ia terdaftar LEBIH DULU (draw-persist dimuat sebelum draw-sync), jadi ia jalan sebelum handler
+// sync sempat mengosongkan antrean simbol lain — dan scheduleSyncDraws() di dalamnya lalu mengirim
+// muatan simbol itu sebagai fetch POLOS di tengah unload, yang rutin dibatalkan browser (temuan N1).
+// Satu pintu keluar, urutannya terkendali di satu tempat.
 
