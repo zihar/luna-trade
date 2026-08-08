@@ -1,0 +1,87 @@
+// [copy/paste] Ctrl/⌘+C menyalin objek TERPILIH ke clipboard aplikasi; Ctrl/⌘+V menaruh salinannya
+// di posisi kursor. Rancangan & keputusannya:
+// docs/superpowers/specs/2026-08-08-copy-paste-objek-design.md
+//
+// Bentuk objek direkam sebagai offset PIKSEL antar titik (saat copy), BUKAN delta bar/harga: itu
+// satu-satunya satuan yang tetap masuk akal saat di-paste ke instrumen lain — delta harga 0.0050
+// milik EUR tak berarti apa-apa di XAU. Konsekuensi yang diterima: paste sesudah zoom berubah
+// menghasilkan objek yang mencakup lebih banyak/sedikit bar — ia mendarat seperti yang TERLIHAT.
+//
+// Clipboard hidup di memori saja: ia sengaja tak selamat dari reload (clipboard yang mengingat
+// objek dari kemarin mengagetkan, untungnya tipis).
+let drawClip=null;   // {name, styles, extendData, objStyle, off:[{dx,dy}]}
+
+// Salin objek TERPILIH. Hanya `selectedId` — hover sengaja TIDAK dipakai (walau Delete memakainya):
+// menyalin objek yang cuma kelewatan kursor tak punya niat di baliknya. Objek terkunci boleh
+// disalin: menyalin tak mengubah apa pun.
+function copyOverlay(){
+  const id=selectedId; if(!id) return false;
+  const d=descOf(id); if(!d) return false;
+  const px=d.points.map(anchorPx);
+  if(px.some(p=>!p)) return false;   // ada titik yang tak terkonversi → jangan simpan bentuk separuh
+  drawClip={ name:d.name, styles:d.styles, extendData:d.extendData, objStyle:d.objStyle,
+             off:px.map(p=>({dx:p.x-px[0].x, dy:p.y-px[0].y})) };
+  return true;
+}
+
+// Tempatkan isi clipboard sehingga TITIK KE-1 mendarat di (px,py) container-relative terhadap
+// #chart. Mengembalikan id objek baru, atau null.
+function pasteOverlayAt(px,py){
+  if(!drawClip) return null;
+  const pts=[];
+  for(const o of drawClip.off){
+    const x=px+o.dx, y=py+o.dy;
+    const v=pxToValue(y); if(v==null) return null;
+    // Jalur anchor IDENTIK dgn instantDropPoint (js/draw-tools.js): tool sub-bar → dataIndex
+    // PECAHAN supaya mendarat presisi, BAR_ANCHOR → timestamp lalu snap ke bar (x-nya memang
+    // harus align ke candle). Menyimpang dari jalur itu = salinan yang "loncat" saat dibuat.
+    const xa = subBar(drawClip.name) ? fracAnchorFromPx(x) : xAnchorFromPx(x); if(!xa) return null;
+    const np=Object.assign({value:v}, xa);
+    if(drawClip.name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
+    pts.push(np);
+  }
+  const nid=createFromDesc(drawClip, pts);
+  if(!nid) return null;
+  // Dua hal yang clone dapat GRATIS dari drag-nya, dan paste harus kerjakan sendiri:
+  scheduleSaveDraws();   // tanpa ini objek hilang saat reload & Ctrl+Z tak bisa membatalkannya
+  selectPastedOverlay(nid);
+  return nid;
+}
+
+// Pilih objek yang baru di-paste — kebalikan deselectOverlay() (js/draw-tools.js), lewat jalur
+// internal klinecharts@9.8.10 yang sama.
+//
+// onClick di-lepas SEMENTARA karena setClickInstanceInfo memanggilnya, dan onClick kita punya dua
+// efek samping yang keliru di sini: mode eraser akan langsung MENGHAPUS objek yang baru lahir, dan
+// objek kosong yang kursornya kebetulan di atas placeholder akan membuka editor teks inline.
+// Yang kita mau cuma state seleksinya; onSelected (yang menyetel selectedId) tetap terpanggil.
+function selectPastedOverlay(id){
+  try{
+    const inst=chart.getOverlayById(id); if(!inst) return;
+    const oc=inst.onClick; inst.onClick=null;
+    try{
+      chart.getChartStore().getOverlayStore().setClickInstanceInfo(
+        {paneId:'candle_pane', instance:inst, figureType:0, figureKey:'', figureIndex:-1, attrsIndex:-1}, {}
+      );
+    } finally { inst.onClick=oc; }
+  }catch(_){}   // internal berubah → paste tetap jadi, cuma tak terpilih
+}
+
+// Titik jatuh untuk Ctrl/⌘+V: posisi kursor bila ia di atas chart, selain itu TENGAH area chart.
+//
+// Gerbangnya `ptrOverChart`, BUKAN membandingkan lastPtr dengan rect: lastPtr hanya di-update
+// mousemove DI DALAM #chart, jadi ia tak pernah berisi koordinat di luar dan cek rect tak akan
+// pernah gugur (Temuan 4 E2E — fallback instantDropPoint pernah jadi kode mati justru karena itu).
+// Cek rect tetap dipertahankan sebagai lapis kedua, mis. chart menyusut sesudah pointer tercatat.
+//
+// Tengah chart dipilih sebagai fallback, bukan "posisi asal + offset": sesudah clipboard lintas
+// instrumen, posisi asal bisa tak ada di layar — bahkan tak ada di data instrumen ini.
+function pastePoint(){
+  const el=$('#chart'); if(!el) return null;
+  const r=el.getBoundingClientRect();
+  if(ptrOverChart){
+    const x=lastPtr.x-r.left, y=lastPtr.y-r.top;
+    if(x>=0 && y>=0 && x<=r.width && y<=r.height) return {x,y};
+  }
+  return {x:r.width/2, y:r.height/2};
+}
