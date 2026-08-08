@@ -5,6 +5,7 @@ const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect, toPixels } = require('../helpers/chart');
 const { armTool, clickAt, overlays, CLICK_GAP_MS } = require('../helpers/draw');
+const { dataList } = require('../helpers/chart');
 
 /** Gambar satu trendline di posisi yang bisa diprediksi, kembalikan objek + pixel titiknya. */
 async function drawLine(page, rect) {
@@ -15,6 +16,34 @@ async function drawLine(page, rect) {
   await page.waitForTimeout(CLICK_GAP_MS);
   await clickAt(page, rect, p2);
   await page.waitForTimeout(CLICK_GAP_MS);
+  await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+  const obj = (await overlays(page))[0];
+  return { obj, px: await toPixels(page, obj.points) };
+}
+
+/** Gambar satu verticalStraightLine (BAR_ANCHOR, 1 klik) — kembalikan objek + pixel titiknya. */
+async function drawVLine(page, rect) {
+  const p = { x: Math.round(rect.width * 0.4), y: Math.round(rect.height * 0.5) };
+  await armTool(page, 'verticalStraightLine');
+  await clickAt(page, rect, p);
+  await page.waitForTimeout(CLICK_GAP_MS);
+  await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+  const obj = (await overlays(page))[0];
+  return { obj, px: await toPixels(page, obj.points) };
+}
+
+/** Gambar satu priceChannelLine (builtin, 3 klik, TANPA invariant kotak BOX_TOOLS). */
+async function drawChannel(page, rect) {
+  const pts = [
+    { x: Math.round(rect.width * 0.3), y: Math.round(rect.height * 0.3) },
+    { x: Math.round(rect.width * 0.5), y: Math.round(rect.height * 0.5) },
+    { x: Math.round(rect.width * 0.5), y: Math.round(rect.height * 0.7) },
+  ];
+  await armTool(page, 'priceChannelLine');
+  for (const p of pts) {
+    await clickAt(page, rect, p);
+    await page.waitForTimeout(CLICK_GAP_MS);
+  }
   await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
   const obj = (await overlays(page))[0];
   return { obj, px: await toPixels(page, obj.points) };
@@ -115,6 +144,32 @@ test.describe('copy/paste objek: API', () => {
       const p = await toPixels(page, all.find((o) => o.id === id).points);
       expect(Math.abs(p[0].y - t.y), `objek ${id} tak mendarat di Y-nya`).toBeLessThanOrEqual(1);
     }
+    assertNoPageErrors(page);
+  });
+
+  // Premis inti dari seluruh refactor descOf/createFromDesc (js/draw-clone.js): clipboard harus
+  // hidup lebih lama dari objek sumbernya. Sebelum refactor ini, cloneOverlay(id,pts) membaca
+  // objeknya lewat chart.getOverlayById(id) — kalau objek sumber sudah dihapus sebelum di-paste,
+  // paste akan gagal diam-diam. Tak ada test yang menagih janji ini sampai sekarang.
+  test('clipboard bertahan walau objek sumber sudah dihapus', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj } = await drawLine(page, rect);
+
+    expect(await page.evaluate(() => copyOverlay()), 'copy harus berhasil sebelum objek dihapus').toBe(true);
+
+    await page.evaluate((id) => chart.removeOverlay(id), obj.id);
+    await expect.poll(async () => (await overlays(page)).length).toBe(0);
+
+    const target = { x: 80, y: 80 };
+    const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
+    expect(nid, 'paste harus tetap berhasil walau objek sumber sudah tak ada').toBeTruthy();
+
+    const all = await overlays(page);
+    expect(all, 'paste harus menghasilkan tepat satu objek').toHaveLength(1);
+    const px = await toPixels(page, all[0].points);
+    expect(Math.abs(px[0].x - target.x), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
+    expect(Math.abs(px[0].y - target.y), 'titik-1 tak mendarat di Y titik paste').toBeLessThanOrEqual(1);
     assertNoPageErrors(page);
   });
 
@@ -291,6 +346,61 @@ test.describe('copy/paste objek: menu klik-kanan', () => {
     const baru = await otherThan(page, obj.id);
     expect(Math.abs(baru.px[0].x - titik.x), 'tak mendarat di X titik klik-kanan').toBeLessThanOrEqual(1);
     expect(Math.abs(baru.px[0].y - titik.y), 'tak mendarat di Y titik klik-kanan').toBeLessThanOrEqual(1);
+    assertNoPageErrors(page);
+  });
+});
+
+test.describe('copy/paste objek: cabang anchor yang belum tersentuh', () => {
+  // Semua test paste di atas memakai trendline — tool SUB-BAR (fracAnchorFromPx). Cabang
+  // BAR_ANCHOR di anchorFromPx (js/util.js) — xAnchorFromPx + snap verticalStraightLine ke bar
+  // lewat snapTimeToBar — tak pernah dilewati paste sampai sekarang.
+  test('paste verticalStraightLine (BAR_ANCHOR): X mendarat di bar terdekat, bukan piksel mentah', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj } = await drawVLine(page, rect);
+
+    expect(await page.evaluate(() => copyOverlay())).toBe(true);
+    const target = { x: Math.round(rect.width * 0.65), y: Math.round(rect.height * 0.3) };
+    const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
+    expect(nid).toBeTruthy();
+
+    const baru = await otherThan(page, obj.id);
+    expect(baru.obj.name, 'salinan harus tetap verticalStraightLine').toBe('verticalStraightLine');
+
+    // Ekspektasi diturunkan lewat converter chart (dataList + toPixels), BUKAN via anchorFromPx/
+    // snapTimeToBar langsung — supaya test tak sekadar membandingkan kode dgn dirinya sendiri:
+    // bar TERDEKAT secara piksel terhadap titik paste, di antara SEMUA bar yang di-render chart.
+    const bars = await dataList(page);
+    const barPx = await toPixels(page, bars.map((b) => ({ timestamp: b.timestamp, value: 0 })));
+    let bestX = null, bestD = Infinity;
+    for (const p of barPx) { if (!p) continue; const d = Math.abs(p.x - target.x); if (d < bestD) { bestD = d; bestX = p.x; } }
+    expect(bestX, 'prasyarat: harus ada bar yang bisa dikonversi ke piksel').not.toBeNull();
+
+    expect(Math.abs(baru.px[0].x - bestX), 'X titik-1 tak snap ke bar terdekat').toBeLessThanOrEqual(1);
+    assertNoPageErrors(page);
+  });
+
+  // Spec menyatakan objek >2 titik (channel/fib/posisi) lewat jalur yang SAMA tanpa perlakuan
+  // khusus — offset direkam per titik. Ini pembuktian klaim itu, bukan cuma trendline 2-titik.
+  test('paste objek multi-titik (priceChannelLine): jumlah titik & bentuk terjaga', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const { obj, px } = await drawChannel(page, rect);
+    expect(px.length, 'prasyarat: channel harus punya 3 titik').toBe(3);
+
+    expect(await page.evaluate(() => copyOverlay())).toBe(true);
+    const target = { x: Math.round(rect.width * 0.15), y: Math.round(rect.height * 0.2) };
+    const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
+    expect(nid).toBeTruthy();
+
+    const baru = await otherThan(page, obj.id);
+    expect(baru.px.length, 'jumlah titik channel harus tetap 3 setelah paste').toBe(3);
+    expect(Math.abs(baru.px[0].x - target.x), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
+    expect(Math.abs(baru.px[0].y - target.y), 'titik-1 tak mendarat di Y titik paste').toBeLessThanOrEqual(1);
+    for (let i = 1; i < px.length; i++) {
+      expect(Math.abs((baru.px[i].x - baru.px[0].x) - (px[i].x - px[0].x)), `offset X titik #${i} berubah`).toBeLessThanOrEqual(1);
+      expect(Math.abs((baru.px[i].y - baru.px[0].y) - (px[i].y - px[0].y)), `offset Y titik #${i} berubah`).toBeLessThanOrEqual(1);
+    }
     assertNoPageErrors(page);
   });
 });
