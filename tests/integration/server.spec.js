@@ -19,7 +19,10 @@ test.describe('@integration server asli', () => {
     expect(login.ok(), `login gagal di ${baseURL} — pastikan server jalan & akun test ada`).toBe(true);
 
     const me = await (await request.get('/api/auth/me')).json();
-    expect(Object.keys(me).sort(), 'field /api/auth/me').toEqual(['email', 'is_admin', 'name', 'picture'].sort());
+    // Daftar ini sengaja EKSHAUSTIF (toEqual, bukan toContain): field yang muncul/hilang di server
+    // tanpa ikut berubah di tests/fixtures/api.js adalah persis penyimpangan yang spec ini jaga.
+    // `id` masuk saat cermin gambar lokal diskopkan per akun (br_draws_<uid>_<INST>).
+    expect(Object.keys(me).sort(), 'field /api/auth/me').toEqual(['email', 'id', 'is_admin', 'name', 'picture'].sort());
 
     const cfg = await (await request.get('/api/auth/config')).json();
     expect(cfg).toHaveProperty('google');

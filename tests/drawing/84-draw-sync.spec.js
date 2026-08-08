@@ -562,3 +562,56 @@ test.describe('draw-sync: kegagalan permanen & cermin', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('draw-sync: unload dgn dorongan simbol lain menggantung', () => {
+  // N1: `beforeunload`/`visibilitychange` memanggil saveDraws(), yang memanggil scheduleSyncDraws();
+  // kalau yang antre milik simbol LAIN, cabang rekonsiliasi di sana ikut jalan — dan sebelum fix ia
+  // mengirimnya sebagai fetch POLOS di tengah unload, yang rutin dibatalkan browser. Urutannya:
+  // gambar di EUR_USD → pindah ke XAU_USD dalam <1,5 dtk (flush jalur muat hanya menyentuh simbol
+  // yang sedang dimuat) → tutup tab sebelum timer 1,5 dtk jalan → editan EUR hilang dari server,
+  // lalu hilang juga dari cermin begitu GET sukses berikutnya menimpanya.
+  //
+  // Yang diperiksa bukan cuma "muatannya sampai" (di test, fetch polos memang sampai — tak ada
+  // proses yang benar-benar dimatikan), tapi juga BENDERA keepalive-nya. Mengandalkan browser
+  // sungguhan membatalkan fetch polos saat unload akan jadi test yang menang-kalah acak.
+  test('dorongan simbol LAIN saat unload dikirim dengan keepalive, dan benar-benar mendarat', async ({ page }) => {
+    await gotoApp(page);
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+
+    await page.evaluate(() => selectSymbol('XAU_USD'));
+    await page.waitForFunction(() => inst === 'XAU_USD', null, { timeout: 15000 });
+
+    // Perekam bendera keepalive per POST. Modul memanggil `fetch(...)` polos → resolve ke
+    // window.fetch saat dipanggil, jadi pembungkus ini terlihat olehnya.
+    await page.evaluate(() => {
+      window.__pushLog = [];
+      const orig = window.fetch;
+      window.fetch = function (u, init) {
+        try {
+          if (String(u).includes('/api/drawings') && init && init.method === 'POST')
+            window.__pushLog.push({ body: String(init.body), keepalive: !!init.keepalive });
+        } catch (_) {}
+        return orig.apply(this, arguments);
+      };
+    });
+
+    await page.evaluate((rows) => {
+      scheduleSyncDraws('EUR_USD', rows);          // dorongan EUR_USD menggantung sementara `inst` = XAU_USD
+      window.dispatchEvent(new Event('beforeunload'));
+      // Halaman yang benar-benar ditutup tak menjalankan timer apa pun sesudah ini; tanpa
+      // mematikannya, debounce biasa akan menyelamatkan test walau handler exit-nya salah.
+      clearTimeout(drawSaveTimer); clearTimeout(drawPushTimer);
+    }, seedObject(ts));
+
+    await expect
+      .poll(async () => (await page.evaluate(() => __drawingsPayload('EUR_USD'))).length, { timeout: 8000 })
+      .toBe(1);
+
+    const eur = (await page.evaluate(() => window.__pushLog)).filter((e) => {
+      try { return JSON.parse(e.body).instrument === 'EUR_USD'; } catch (_) { return false; }
+    });
+    expect(eur, 'tepat satu dorongan EUR_USD saat unload').toHaveLength(1);
+    expect(eur[0].keepalive, 'dorongan simbol lain saat unload harus keepalive, bukan fetch polos').toBe(true);
+    assertNoPageErrors(page);
+  });
+});
