@@ -66,6 +66,28 @@ mencakup lebih banyak bar daripada aslinya. Itu benar menurut aturan di atas (ia
 yang terlihat), tapi inilah titik yang paling mungkin terasa aneh bagi pengguna, dan sudah
 disepakati di muka.
 
+Dua lagi, ditemukan saat code review menyeluruh sebelum merge — sengaja **tidak** diperbaiki,
+karena keduanya lahir dari mekanisme yang sudah disetujui di atas, bukan bug baru:
+
+- **`Ctrl/⌘+V` saat sedang menggambar (mode in-progress) tak digerbang.** `createDraw()`
+  (`js/draw-tools.js`) membatalkan overlay yang telantar sebelum membuat yang baru
+  (`cancelInProgressDraw()`); `pasteOverlayAt` tidak — paste dan gambar-yang-sedang-berjalan hidup
+  berdampingan. Ini tak merusak apa pun: overlay in-progress punya id sendiri di luar `drawIds`
+  sampai `onDrawEnd`, dan overlay hasil paste sudah lengkap sejak lahir, jadi klinecharts tak
+  bingung mana yang mana. Yang benar-benar bisa terjadi: `scheduleSaveDraws()` yang dipicu paste
+  boleh menyala 350ms kemudian sementara objek yang sedang digambar itu **masih** ada — kalau ia
+  keburu masuk `drawIds` (mis. tool sub-bar yang mendaftarkan diri di awal gestur), snapshot undo
+  yang tersimpan bisa memuat objek setengah-jadi itu. Digerbang seperti `createDraw` berarti setiap
+  `Ctrl+V` menyela gambar yang sedang berjalan — pengorbanan yang lebih terasa daripada masalahnya:
+  pengguna jarang menekan Ctrl+V persis di tengah menggambar objek lain.
+- **Dua `Ctrl+V` beruntun (tanpa jeda) menyatu jadi SATU langkah undo.** Sebab yang sama:
+  debounce `scheduleSaveDraws()` 350ms. `Ctrl+V Ctrl+V Ctrl+Z` membuang KEDUA salinan sekaligus,
+  bukan cuma yang terakhir. Ini bukan cacat khusus paste — clone (Ctrl+drag) sudah punya sifat yang
+  identik sejak PR #175 karena memakai `scheduleSaveDraws()` yang sama, dan belum pernah jadi
+  keluhan. Memperbaikinya (flush sebelum paste berikutnya, atau debounce per-gestur bukan
+  per-timer) adalah perubahan ke mekanisme undo yang dipakai bersama BANYAK gestur lain, jadi
+  bukan sesuatu yang aman diputuskan sepihak dalam PR copy/paste ini.
+
 ## Arsitektur
 
 Modul baru **`js/draw-copy-paste.js`**, pola sama dengan `draw-constrain.js` / `draw-clone.js` /
