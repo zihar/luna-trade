@@ -17,6 +17,11 @@ let drawClip=null;   // {name, styles, extendData, objStyle, off:[{dx,dy}]}
 function copyOverlay(){
   const id=selectedId; if(!id) return false;
   const d=descOf(id); if(!d) return false;
+  // Gerbang PERSIST_DRAW (js/draw-persist.js): tool ephemeral (measure) lewat jalur normal yang
+  // sama jadi BISA selectedId & lolos sampai sini, tapi menyalinnya melahirkan overlay `measure`
+  // permanen di drawIds — persistence tak menjangkaunya (tak masuk PERSIST_DRAW) dan
+  // clearMeasure() tak tahu id-nya, jadi ia jadi hantu yang cuma hilang saat reload.
+  if(!PERSIST_DRAW[d.name]) return false;
   const px=d.points.map(anchorPx);
   if(px.some(p=>!p)) return false;   // ada titik yang tak terkonversi → jangan simpan bentuk separuh
   drawClip={ name:d.name, styles:d.styles, extendData:d.extendData, objStyle:d.objStyle,
@@ -28,6 +33,11 @@ function copyOverlay(){
 // #chart. Mengembalikan id objek baru, atau null.
 function pasteOverlayAt(px,py){
   if(!drawClip) return null;
+  // Sama seperti createDraw() (js/draw-tools.js): mau membuat objek baru → tampilkan lagi semua
+  // gambar. Tanpa ini, paste saat drawing disembunyikan melahirkan satu objek yang KELIHATAN
+  // sendirian di tengah chart yang kosong, sementara tombol mata masih bilang "Show all drawings" —
+  // membingungkan, seolah objek lama hilang padahal cuma disembunyikan.
+  if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }
   const pts=[];
   for(const o of drawClip.off){
     const x=px+o.dx, y=py+o.dy;
@@ -54,14 +64,23 @@ function pasteOverlayAt(px,py){
 // Yang kita mau cuma state seleksinya; onSelected (yang menyetel selectedId) tetap terpanggil.
 function selectPastedOverlay(id){
   try{
-    const inst=chart.getOverlayById(id); if(!inst) return;
-    const oc=inst.onClick; inst.onClick=null;
-    try{
-      chart.getChartStore().getOverlayStore().setClickInstanceInfo(
-        {paneId:'candle_pane', instance:inst, figureType:0, figureKey:'', figureIndex:-1, attrsIndex:-1}, {}
-      );
-    } finally { inst.onClick=oc; }
+    const inst=chart.getOverlayById(id);
+    if(inst){
+      const oc=inst.onClick; inst.onClick=null;
+      try{
+        chart.getChartStore().getOverlayStore().setClickInstanceInfo(
+          {paneId:'candle_pane', instance:inst, figureType:0, figureKey:'', figureIndex:-1, attrsIndex:-1}, {}
+        );
+      } finally { inst.onClick=oc; }
+    }
   }catch(_){}   // internal berubah → paste tetap jadi, cuma tak terpilih
+  // WAJIB di luar try/catch, sama alasannya dgn deselectOverlay() (js/draw-tools.js): invariant
+  // "selectedId tak boleh tertinggal di objek SUMBER" tak boleh bergantung pada jalur internal di
+  // atas berhasil. Bila overlay belum ketemu (inst null) atau setClickInstanceInfo melempar,
+  // selectedId tanpa baris ini masih menunjuk objek ASLI (copyOverlay mensyaratkan selectedId) —
+  // Delete berikutnya akan menghapus objek sumber, bukan salinan yang dikira pengguna sudah dipilih.
+  // Pada jalur sukses baris ini tak berefek: onSelected sudah menyetel nilai yang sama.
+  selectedId=id;
 }
 
 // Titik jatuh untuk Ctrl/⌘+V: posisi kursor bila ia di atas chart, selain itu TENGAH area chart.

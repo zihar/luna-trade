@@ -55,8 +55,11 @@ $('#chart').addEventListener('contextmenu',e=>{
   // Paste objek gambar di titik yang diklik — pintu masuk kedua selain Ctrl/⌘+V, sekaligus
   // penanda satu-satunya bahwa clipboard berisi (Ctrl+C sengaja tak memberi toast, ikut TV).
   items.push({label:'📋 Paste drawing', disabled:!drawClip, fn:()=>{
-    const rr=$('#chart').getBoundingClientRect();
-    pasteOverlayAt(e.clientX-rr.left, e.clientY-rr.top);
+    // Pakai `rect` yang sudah dihitung di atas (saat klik-kanan), BUKAN dihitung ulang saat item
+    // diklik: e.clientX/clientY sendiri dicatat saat klik-kanan, jadi mencocokkannya dgn rect yang
+    // dihitung belakangan (mis. chart sempat resize selagi menu terbuka) bisa mismatch — selain
+    // reflow yang tak perlu untuk sesuatu yang sudah ada di closure.
+    pasteOverlayAt(e.clientX-rect.left, e.clientY-rect.top);
   }});
   // Aksi PENGGUNA → removeAllDrawings (menghormati kunci). clearDrawings() sengaja tak dipakai di
   // sini: ia jalur internal tanpa syarat utk undo snapshot & ganti instrumen (js/draw-lock.js).

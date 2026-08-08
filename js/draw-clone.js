@@ -22,7 +22,12 @@ addEventListener('blur',()=>{ cloneModHeld=false; });
 // objeknya: objek dihapus, atau instrumen berganti sehingga overlay-nya sudah tak ada.
 function descOf(id){
   const o=chart.getOverlayById(id); if(!o||!o.points||!o.points.length) return null;
-  return {name:o.name, styles:o.styles||null, extendData:o.extendData,
+  // styles WAJIB deep-copy, bukan Object.assign dangkal: setObjStyle pada BUILTIN_LINE memanggil
+  // overrideOverlay({id,styles:…}) yang MEMUTASI o.styles in-place. Referensi dangkal berarti
+  // menyalin lalu me-restyle ASLINYA diam-diam ikut mengubah warna deskripsi yang sudah "disalin" —
+  // salinan tampak berubah warna sendiri (bahkan sesudah reload, karena objStyle[nid] tetap benar
+  // tapi styles overlay-nya sudah ikut objek sumber).
+  return {name:o.name, styles:o.styles?JSON.parse(JSON.stringify(o.styles)):null, extendData:o.extendData,
           objStyle:objStyle[id]?Object.assign({},objStyle[id]):null, points:o.points};
 }
 
@@ -38,6 +43,10 @@ function createFromDesc(desc, pts){
   const nid=chart.createOverlay(Object.assign(base, delHooks()));
   if(!nid) return null;
   drawIds.push(nid);
+  // Jalur FULL-POINT ke-4 (bareng onDrawEnd, restore js/draw-persist.js, instant-drop di
+  // js/draw-tools.js) — tanpa ini, garis built-in (rayLine/priceChannelLine/fibonacciLine/…) hasil
+  // clone/paste menampilkan tag tanggal default sumbu-X klinecharts yang tak dipakai objek lain.
+  try{ applyXDateFlag(chart.getOverlayById(nid)); }catch(_){}
   // Gaya per-objek hidup di peta terpisah (objStyle), jadi ia tak ikut lewat createOverlay.
   // Pola override-setelah-set menyusul js/draw-persist.js: overlay custom membaca gayanya saat
   // render, jadi ia perlu satu putaran render lagi; garis built-in sudah membawa `styles` di atas.
