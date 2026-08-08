@@ -168,7 +168,11 @@ func handleMe(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "sesi tidak valid")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"email": u.Email, "name": u.DisplayName, "picture": u.Picture, "is_admin": isAnalyticsAdmin(u.Email)})
+	// `id` ikut dikirim karena frontend memakainya untuk MENSKOPKAN penyimpanan lokal per akun
+	// (mis. cermin gambar `br_draws_<uid>_<INST>`, js/draw-persist.js): satu browser bisa dipakai
+	// bergantian oleh beberapa akun, dan data satu akun tak boleh terbaca — apalagi terunggah —
+	// sebagai milik akun berikutnya.
+	writeJSON(w, http.StatusOK, map[string]any{"id": u.ID, "email": u.Email, "name": u.DisplayName, "picture": u.Picture, "is_admin": isAnalyticsAdmin(u.Email)})
 }
 
 // requireUser membungkus handler: tolak 401 bila tak ada sesi valid, jika valid

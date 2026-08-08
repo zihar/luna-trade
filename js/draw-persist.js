@@ -10,7 +10,13 @@ const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,
 // simpleAnnotation & simpleTag sengaja TIDAK di sini (ditarik dari rail, lihat DRAW_GROUPS):
 // buildDrawsFromArray memfilter lewat daftar ini, jadi objek lama yang masih tersimpan di
 // localStorage pengguna otomatis berhenti dimuat — tak perlu migrasi.
-function drawsKey(){ return 'br_draws_'+inst; }
+// Kunci cermin localStorage — SATU-SATUNYA tempat formatnya hidup (js/draw-sync.js ikut memakainya).
+// Berskop per PENGGUNA sejak sync ke server: dulu `br_draws_<INST>` tanpa uid cuma artefak tampilan
+// lokal, tapi kini isinya bisa DIUNGGAH (jalur adopsi). Tanpa skop, user B yang login di browser
+// bekas user A akan mengunggah gambar A ke akunnya sendiri lalu menyebarkannya ke perangkat B.
+// Entri lama tanpa skop sengaja dibiarkan berhenti dibaca — memigrasikannya berarti mengklaim tahu
+// milik siapa, padahal justru itu yang tak bisa dibuktikan.
+function drawsKey(instrument){ return 'br_draws_'+(authUid||'anon')+'_'+(instrument||inst); }
 function serializeDraws(){
   const out=[];
   drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);

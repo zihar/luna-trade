@@ -15,8 +15,14 @@ function setAvatar(elm, pic, ini){
     elm.appendChild(img);
   } else { elm.textContent=ini; }
 }
+// Identitas pengguna sesi ini, dipakai untuk MENSKOPKAN data lokal per akun (mis. drawsKey() di
+// js/draw-persist.js). Diisi sekali saat authGate memastikan sesi valid, sebelum bootApp() jalan.
+// Fallback ke email: bila suatu saat /api/auth/me tak menyertakan id, lebih baik terskop lemah
+// daripada semua akun berbagi satu kunci di browser yang sama.
+let authUid = '';
 function onAuthed(u){
   const email = (u && u.email) ? u.email : '';
+  authUid = (u && u.id != null) ? String(u.id) : email;
   const name  = (u && u.name)  ? u.name  : email;
   const pic   = (u && u.picture) ? u.picture : '';
   let el = document.getElementById('userMenu');
