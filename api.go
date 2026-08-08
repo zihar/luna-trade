@@ -37,6 +37,8 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/alerts", requireUser(handleAlertsList))
 	mux.HandleFunc("POST /api/alerts", requireUser(handleAlertCreate))
 	mux.HandleFunc("POST /api/alerts/delete", requireUser(handleAlertDelete))
+	mux.HandleFunc("GET /api/drawings", requireUser(handleDrawingsGet))
+	mux.HandleFunc("POST /api/drawings", requireUser(handleDrawingsSave))
 }
 
 // handleTrack mencatat satu event pemakaian fitur (analytics DIY, lihat store.LogEvent).
@@ -192,6 +194,69 @@ func handleAlertDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// GET /api/drawings?instrument=EUR_USD → {payload:[…], version:N}
+func handleDrawingsGet(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	instrument := r.URL.Query().Get("instrument")
+	if instrument == "" {
+		writeErr(w, http.StatusBadRequest, "instrument required")
+		return
+	}
+	payload, version, err := store.GetDrawings(uid, instrument)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// payload sudah berupa teks JSON di DB → tulis mentah, jangan di-encode dua kali.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"payload":` + payload + `,"version":` + strconv.FormatInt(version, 10) + `}`))
+}
+
+// POST /api/drawings {instrument, payload, baseVersion}
+//   versi cocok → 200 {version}
+//   versi basi  → 409 {version, payload} MILIK SERVER (klien perlu keduanya untuk menawarkan Reload)
+//   kebesaran   → 413
+func handleDrawingsSave(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		Instrument  string          `json:"instrument"`
+		Payload     json.RawMessage `json:"payload"`
+		BaseVersion int64           `json:"baseVersion"`
+	}
+	// LimitReader sedikit di atas batas payload supaya badan yang kebesaran tetap TERBACA dan
+	// bisa dijawab 413 yang jelas, bukan "bad json" yang menyesatkan.
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxDrawingsBytes+4096)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if req.Instrument == "" || len(req.Payload) == 0 {
+		writeErr(w, http.StatusBadRequest, "instrument & payload required")
+		return
+	}
+	if len(req.Payload) > maxDrawingsBytes {
+		writeErr(w, http.StatusRequestEntityTooLarge, "drawings too large")
+		return
+	}
+	version, ok, err := store.SaveDrawings(uid, req.Instrument, string(req.Payload), req.BaseVersion, time.Now().UnixMilli())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		srv, _, err := store.GetDrawings(uid, req.Instrument)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"payload":` + srv + `,"version":` + strconv.FormatInt(version, 10) + `}`))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"version": version})
 }
 
 // handlePrices = SSE harga realtime. Butuh OANDA_ACCOUNT_ID (stream upstream).
