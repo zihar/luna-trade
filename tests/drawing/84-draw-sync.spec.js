@@ -615,3 +615,77 @@ test.describe('draw-sync: unload dgn dorongan simbol lain menggantung', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('draw-sync: keputusan bentrok vs antrean debounce', () => {
+  /** Server berjalan lebih dulu → dorongan berikutnya pasti 409. */
+  async function serverAhead(page) {
+    await page.evaluate(() => __seedDrawings(inst, [{ name: 'rect', points: [], lock: 0, extendData: null, style: null }], 9));
+  }
+  async function bikinBentrok(page, rect) {
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+    await serverAhead(page);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+  }
+
+  // Ditemukan verifikasi manual lintas-perangkat, bukan oleh suite: `mine` cuma disegarkan DI DALAM
+  // pushDrawsNow, yang baru jalan sesudah debounce 1,5 dtk. Gestur yang lahir <1,5 dtk sebelum klik
+  // masih di drawPushPending → "Keep mine" mendorong muatan yang kehilangan gestur itu, menghapusnya
+  // di server padahal masih di layar. Test ini SENGAJA mengklik di dalam jendela debounce.
+  test('Keep mine di dalam jendela debounce: objek terakhir tetap ikut terkirim', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await bikinBentrok(page, rect);
+
+    await drawLine(page, rect, 0.14);      // objek kedua, digambar selagi banner terpampang
+    await page.waitForTimeout(300);        // jauh di bawah 1500 ms: dorongannya PASTI masih di antrean
+    expect(
+      await page.evaluate(() => ((drawConflict[inst] || {}).mine || []).length),
+      'prasyarat test: `mine` memang belum sempat menyusul (kalau sudah 2, jendela debounce terlewat & test ini tak menguji apa pun)'
+    ).toBe(1);
+
+    await page.locator('#syncConflict [data-act="keep"]').click();
+    await expect.poll(async () => page.evaluate(() => __drawingsVersion(inst)), { timeout: 8000 }).toBe(10);
+
+    const diKanvas = (await overlays(page)).length;
+    expect((await page.evaluate(() => __drawingsPayload(inst))).length, 'server harus memuat SEMUA objek yang ada di kanvas').toBe(diKanvas);
+
+    // Antrean yang tersisa tak boleh menyusul & memundurkan keadaan sesudah keputusan.
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => __drawingsVersion(inst)), 'tak ada dorongan susulan sesudah Keep mine').toBe(10);
+    expect((await page.evaluate(() => __drawingsPayload(inst))).length).toBe(diKanvas);
+    assertNoPageErrors(page);
+  });
+
+  // Cerminan masalah yang sama di tombol sebelahnya: dorongan yang masih antre saat Reload diklik
+  // akan jalan SESUDAH banner ditutup, dgn baseVersion yang sudah disegarkan ke versi server →
+  // diterima server & menimpa salinan yang barusan dipilih pengguna.
+  test('Reload di dalam jendela debounce: antrean lokal tak boleh menimpa salinan server', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await drawLine(page, rect);
+    await expect.poll(async () => page.evaluate(() => drawVer[inst]), { timeout: 8000 }).toBe(1);
+
+    // Salinan server berisi objek SUNGGUHAN (bertitik): objek berpoint-kosong difilter
+    // buildDrawsFromArray, jadi ia tak bisa dipakai untuk membuktikan apa yang mendarat di kanvas.
+    const ts = await page.evaluate(() => chart.getDataList().at(-1).timestamp);
+    await page.evaluate((t) => __seedDrawings(inst, [
+      { name: 'trendline', points: [{ vt: t - 7200000, value: 1.05 }, { vt: t, value: 1.06 }], lock: 0, extendData: null, style: null },
+      { name: 'trendline', points: [{ vt: t - 3600000, value: 1.07 }, { vt: t, value: 1.08 }], lock: 0, extendData: null, style: null },
+    ], 9), ts);
+    await page.evaluate(() => scheduleSyncDraws(inst, serializeDraws()));
+    await expect(page.locator('#syncConflict')).toBeVisible({ timeout: 8000 });
+
+    await drawLine(page, rect, 0.14);      // menjadwalkan dorongan lokal yang belum terkirim
+    await page.waitForTimeout(300);
+    await page.locator('#syncConflict [data-act="reload"]').click();
+
+    // Kanvas jadi salinan server: dua trendline, dan yang lokal (2 objek) dibuang.
+    await expect.poll(async () => (await overlays(page)).length, { timeout: 8000 }).toBe(2);
+
+    await page.waitForTimeout(2500);       // lewati sisa debounce dgn margin
+    expect(await page.evaluate(() => __drawingsVersion(inst)), 'versi server harus tetap 9 — tak ada dorongan lokal yang lolos').toBe(9);
+    assertNoPageErrors(page);
+  });
+});
