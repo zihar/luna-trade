@@ -171,7 +171,7 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().UnixMilli()
-	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now)
+	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, "", "", nil)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

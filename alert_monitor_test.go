@@ -23,7 +23,7 @@ func TestCrossed(t *testing.T) {
 
 func TestMonitorOneShot(t *testing.T) {
 	s := mustTestStore(t)
-	id, _ := s.CreateAlert(1, "EUR_USD", 1.15, 1000)
+	id, _ := s.CreateAlert(1, "EUR_USD", 1.15, 1000, "", "", nil)
 	_ = id
 	// simulasikan langkah inti monitor tanpa Hub: prev→cur melintas → MarkAlertTriggered sekali
 	rows, _ := s.AllActiveAlerts()
