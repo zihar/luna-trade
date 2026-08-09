@@ -188,3 +188,59 @@ test.describe('alert garis: tab & pembuatan', () => {
     assertNoPageErrors(page);
   });
 });
+
+test.describe('alert garis: mengikuti objeknya', () => {
+  async function buatAlert(page, rect) {
+    const o = await drawTrendline(page, rect);
+    await page.evaluate((id) => createLineAlert(id, 'cross'), o.id);
+    await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
+    return o;
+  }
+
+  test('menggeser garis memperbarui anchor alert di server', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await buatAlert(page, rect);
+    const sebelum = await page.evaluate(() => __alertRow(0));
+
+    // geser badan garis ke bawah
+    const px = await page.evaluate((id) => {
+      const ov = chart.getOverlayById(id);
+      return ov.points.map((p) => { let c = chart.convertToPixel(p.timestamp != null ? { timestamp: p.timestamp, value: p.value } : { dataIndex: p.dataIndex, value: p.value }, { paneId: 'candle_pane', absolute: true }); if (Array.isArray(c)) c = c[0]; return { x: c.x, y: c.y }; });
+    }, o.id);
+    const spot = { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 };
+    await page.mouse.move(rect.x + spot.x, rect.y + spot.y, { steps: 4 });
+    await page.mouse.down();
+    await page.mouse.move(rect.x + spot.x, rect.y + spot.y + 70, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(1200);
+
+    const sesudah = await page.evaluate(() => __alertRow(0));
+    expect(sesudah.p1, 'anchor harga harus ikut bergeser').not.toBe(sebelum.p1);
+    assertNoPageErrors(page);
+  });
+
+  test('menghapus garis menghapus alertnya', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await buatAlert(page, rect);
+
+    await page.evaluate((id) => chart.removeOverlay(id), o.id);
+    await expect.poll(async () => page.evaluate(() => __alertCount()), { timeout: 6000 }).toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  // Gerbang penyapuan: chart kosong SESAAT saat memuat tak boleh memusnahkan alert.
+  test('memuat ulang instrumen TIDAK menghapus alert', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await buatAlert(page, rect);
+    await page.waitForTimeout(2500);   // gambar tersimpan ke server
+
+    await page.evaluate(() => loadInit(true));
+    await page.waitForTimeout(2500);
+
+    expect(await page.evaluate(() => __alertCount()), 'alert tak boleh hilang saat memuat ulang').toBe(1);
+    assertNoPageErrors(page);
+  });
+});

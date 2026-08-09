@@ -35,6 +35,7 @@ function saveDraws(){ if(suppressDrawSave) return;
   // Muatan + instrumen diserahkan BERSAMAAN ke lapisan sync (js/draw-sync.js) supaya dorongan yang
   // tertunda tak pernah perlu membaca ulang `inst` yang mungkin sudah berganti.
   try{ scheduleSyncDraws(inst, arr); }catch(_){}
+  try{ syncAlertAnchors(); }catch(_){}   // alert ikut pindah bila objeknya bergeser (js/draw-alert.js)
 }
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
 // Sumbernya kini SERVER (js/draw-sync.js); localStorage hanya jalur penyelamat saat request gagal.

@@ -276,6 +276,8 @@ async function installStubs(page) {
   await page.exposeFunction('__setMalformedDrawings', (on) => { state.malformedDrawings = !!on; });
   await page.exposeFunction('__setTooBigDrawings', (on) => { state.tooBigDrawings = !!on; });
   await page.exposeFunction('__drawingsPayload', (instrument) => (state.drawings[instrument] || { payload: [] }).payload);
+  await page.exposeFunction('__alertCount', () => state.alerts.length);
+  await page.exposeFunction('__alertRow', (i) => state.alerts[i] || null);
 
   return state;
 }

@@ -291,7 +291,14 @@ function delHooks(){ return {
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
-  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null; scheduleSaveDraws(); try{syncLockAllBtn();}catch(_){} return false; },
+  onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
+    // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.
+    // Gerbang suppressDrawSave WAJIB: clearDrawings() saat reload (js/load-chart.js) dan tiap
+    // langkah undo/redo (js/draw-undo.js) juga lewat chart.removeOverlay → onRemoved ini, dgn
+    // suppressDrawSave=true persis supaya churn programatik itu tak disalahartikan sbg hapus
+    // pengguna. Tanpa gerbang ini, reload/undo/redo akan menghapus alert yg objeknya masih ada.
+    if(!suppressDrawSave) try{ const d=objDid[e.overlay.id]; if(d) deleteAlertsForDid(d); }catch(_){}
+    scheduleSaveDraws(); try{syncLockAllBtn();}catch(_){} return false; },
 };}
 // Instant-drop ala TradingView: shortcut H/V → garis langsung terpasang di posisi cursor
 // tanpa klik. Titik diambil dari cursor terakhir (lastPtr); null bila cursor di LUAR chart

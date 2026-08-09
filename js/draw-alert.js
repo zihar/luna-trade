@@ -100,6 +100,37 @@ async function createLineAlert(overlayId, cond){
   }catch(e){ return null; }
 }
 
+// Anchor alert diperbarui dari objeknya. Menumpang irama simpan gambar, BUKAN hook per-gestur:
+// dengan begitu drag, undo/redo, kunci sudut Shift, dan magnet semuanya ikut benar tanpa masing-
+// masing perlu diingat.
+async function syncAlertAnchors(){
+  const byDid={}; drawIds.forEach(id=>{ const d=objDid[id]; if(d) byDid[d]=id; });
+  for(const a of alerts.slice()){
+    if(!a.drawId || a.sym!==inst) continue;
+    const oid=byDid[a.drawId]; if(!oid) continue;          // objeknya tak ada di layar → urusan penyapuan
+    const an=lineAnchorsOf(oid); if(!an) continue;
+    if(a.t1===an.t1 && a.p1===an.p1 && a.t2===an.t2 && a.p2===an.p2) continue;   // tak berubah → jangan kirim
+    Object.assign(a, an);
+    try{ await fetch('/api/alerts/anchors',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({id:a.id}, an))}); }catch(_){}
+  }
+}
+
+// Objek gambarnya sudah tak ada → alertnya ikut dibuang. Jaring untuk penghapusan yang terjadi di
+// tempat lain (perangkat lain, atau saat tab ini tertutup); penghapusan di sesi ini ditangani
+// seketika oleh onRemoved.
+//
+// HANYA boleh jalan sesudah instrumen ini selesai dimuat: selama memuat, drawIds kosong sesaat, dan
+// aturan naif "did tak ditemukan → hapus" akan memusnahkan SEMUA alert setiap kali chart dimuat.
+async function sweepAlertsForMissingDrawings(){
+  if(suppressDrawSave) return;
+  const ada=new Set(drawIds.map(id=>objDid[id]).filter(Boolean));
+  for(const a of alerts.slice()){
+    if(!a.drawId || a.sym!==inst) continue;
+    if(!ada.has(a.drawId)) await deleteAlertsForDid(a.drawId);
+  }
+}
+
 async function deleteAlertsForDid(did){
   if(!did) return;
   try{ await fetch('/api/alerts/by-drawing/delete',{method:'POST',headers:{'Content-Type':'application/json'},
