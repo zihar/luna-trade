@@ -3,11 +3,16 @@
 Tanggal: 2026-08-09 · Status: disetujui, siap dikerjakan
 
 Klik-kanan sebuah garis → tab **Alert** → pilih kondisi → alert dibuat, **terikat pada garis itu**.
-Level alert mengikuti garisnya: untuk garis miring ia berubah seiring waktu, dan kalau garisnya
-digeser, alertnya ikut pindah.
+Level alert mengikuti garisnya, dan kalau garisnya digeser, alertnya ikut pindah.
 
 Ini bagian **pertama** dari dua. Zona (channel & rectangle: *Entering / Exiting / Inside / Outside*)
-punya specnya sendiri — lihat "Kenapa dipecah" di bawah.
+**dan garis MIRING** punya specnya sendiri — lihat "Kenapa dipecah" di bawah.
+
+> **Amandemen 2026-08-09 (review akhir cabang, C1): v1 HANYA garis HORIZONTAL.**
+> Enam objek keluarga garis diciutkan jadi tiga: `horizontalStraightLine`, `horizontalRayLine`,
+> `priceLine`. Alasannya ada di "Kenapa dipecah jadi dua spec" di bawah (basis waktu). Semua
+> keputusan lain di dokumen ini tetap berlaku apa adanya — skema, monitor, dan mesin garisnya tak
+> berubah, karena garis horizontal adalah kasus `p1 == p2` dari rumus yang sama.
 
 ## Yang terverifikasi dari TradingView (jangan riset ulang)
 
@@ -25,6 +30,20 @@ karena itu **pilihan kita**, bukan klaim tentang perilaku TV.
 
 Garis dan zona terlihat bertetangga, tapi mesinnya berbeda:
 
+- **Basis waktu garis miring** *(alasan yang ditemukan di review akhir, 2026-08-09 — dan alasan
+  garis miring ikut pindah ke spec kedua)*. Anchor alert adalah **milidetik wall-clock**, dan
+  monitor mengekstrapolasi `level(t)` linear dalam **waktu kalender**. Tapi chart menggambar
+  sumbu-x linear dalam **indeks bar**. Keduanya hanya sepakat pada instrumen **tanpa jeda sesi**.
+  Forex tak punya bar selama ~48 dari 168 jam tiap pekan; saham hanya 6,5 dari 24 jam tiap hari
+  (≈3,7× lebih cepat lari sejak hari pertama). Akibatnya garis yang diekstrapolasi berjalan **jauh
+  mendahului garis yang digambar pengguna** — untuk forex bisa hitungan hari, dan karena monitor
+  hidup melewati akhir pekan, tick pertama Senin bisa menyalakan alert garis miring **berbondong-
+  bondong** saat chart dan harga sama sekali tak berdekatan dengan levelnya.
+  Keputusan wall-clock di dokumen ini **dibuat tanpa menganalisis jeda sesi** — itu cacat spec,
+  bukan cacat implementasi; kode hari ini mengerjakan persis apa yang tertulis. Basis waktu yang
+  benar (indeks bar? kalender sesi? waktu dagang?) adalah keputusan rancangan tersendiri, dan
+  dirancang di spec kedua bersama zona. **Garis horizontal tak tersentuh sama sekali**: levelnya
+  konstan, jadi basis waktunya tak berpengaruh — karena itu ia yang dirilis di v1.
 - **Garis** → setiap saat ia satu angka, `level(t)`. Monitor cukup memakai ulang
   `crossed(prev, cur, lvl)` yang sudah ada. **Tanpa state.**
 - **Zona** → *Entering/Exiting* menuntut monitor mengingat "sebelumnya di dalam atau di luar"
@@ -38,7 +57,7 @@ Garis dan zona terlihat bertetangga, tapi mesinnya berbeda:
 
 | Pertanyaan | Keputusan | Alasan |
 |---|---|---|
-| Objek yang didukung | keluarga **garis**: `trendline`, `rayLine`, `straightLine`, `horizontalStraightLine`, `horizontalRayLine`, `priceLine` | zona menyusul di spec kedua |
+| Objek yang didukung | **garis HORIZONTAL saja**: `horizontalStraightLine`, `horizontalRayLine`, `priceLine` | garis miring & zona menyusul di spec kedua — lihat "Kenapa dipecah" (basis waktu). Tool miring **tidak** diterima walau kebetulan datar (`p1===p2`): pengguna bisa menyeret satu ujungnya sesudahnya dan diam-diam mendapat kasus miring yang baru ditunda. Untuk tool yang didukung, `p1===p2` dijamin **secara konstruksi** — harga diambil dari `points[0]` untuk kedua anchor, sebab nilai titik kedua `horizontalRayLine` tak selalu tersinkron (muatan lama) |
 | Kondisi | **Crossing · Crossing up · Crossing down** | arah bermakna nyata di garis miring, dan ketiganya tetap tanpa state. *Greater/Less than* dilewati: itu KEADAAN, bukan lintasan, jadi ia menuntut aturan pengulangan yang alert Luna belum punya konsepnya (semua one-shot) |
 | Ikatan ke objek | **menempel** lewat id stabil `did` | trader menggeser garisnya terus; alert yang cuma salinan akan diam-diam menjaga level lama |
 | Nama field id | **`did`**, bukan `oid` | `a.oid` di frontend sudah berarti "id overlay garis alert" (`js/forming-candle.js:112`); dua arti untuk satu nama di file yang sama = bug murah yang mahal |
@@ -80,11 +99,24 @@ daripada diam-diam memilih salah satu ujungnya.
 ## Evaluasi (monitor)
 
 `alert_monitor.go` berubah tipis. Per tick, per alert: hitung `lvl` (konstan untuk alert biasa,
-`level(now)` untuk alert garis), lalu
+`level(now)` untuk alert garis), lalu uji **perubahan tanda jarak** `d = harga − level`, dengan sisi
+sebelumnya diukur terhadap **level sebelumnya** (`prevLvl` dari `levelTracker`, anchor yang sama):
 
-- `cross` → `crossed(prev, cur, lvl)` — fungsi yang sudah ada, tak disentuh
-- `up` → `prev < lvl && cur >= lvl`
-- `down` → `prev > lvl && cur <= lvl`
+- `up` → `dPrev < 0 && dCur >= 0`
+- `down` → `dPrev > 0 && dCur <= 0`
+- `cross` → salah satu dari keduanya (= `crossed(dPrev, dCur, 0)`)
+
+Satu uji ini menutup dua gerakan sekaligus: harga melewati garis yang diam, **dan** garis melewati
+harga yang diam. Tanpa baseline yang sah (belum ada entry tracker, atau anchornya berubah sejak tick
+terakhir) tick itu **dilewati** — bukan ditebak dengan memakai level sekarang sebagai pengganti level
+sebelumnya, sebab itu mengarang persilangan tiap kali level melompat (pengguna menyeret garis, proses
+lanjut sesudah jeda, perangkat lain memindahkannya). Untuk alert harga biasa `prevLvl == lvl ==
+price`, jadi perilakunya identik dengan sebelum fitur ini.
+
+*(Amandemen review akhir: versi awal spec ini memakai `condHit(prev, cur, lvl)` — harga LAMA vs level
+BARU — plus jalur "level bergerak" terpisah yang menyala tanpa melihat `cond` sama sekali. Yang
+pertama mengarang persilangan; yang kedua menyalakan `up` saat garis bergerak TURUN, dan karena
+one-shot, persilangan sungguhannya tak pernah bisa menyala lagi.)*
 
 Cache 2 detik, `last[instrument]`, dan one-shot tetap. `AllActiveAlerts` mengembalikan kolom baru
 sehingga monitor tak perlu query kedua.
@@ -106,7 +138,13 @@ sebelum ada baris alert yang menunjuknya.
 **Geser garis → alert ikut.** Bukan lewat hook per-gestur, melainkan menumpang irama simpan yang
 sudah ada: setiap kali gambar tersimpan, anchor tiap alert milik instrumen ini dihitung ulang dari
 objeknya dan didorong ke server bila berubah. Satu tempat, bukan lima — dan otomatis ikut benar
-untuk drag, undo/redo, kunci sudut Shift, magnet, semuanya.
+untuk drag, kunci sudut Shift, magnet, semuanya.
+
+**Undo/redo perlu satu panggilan sendiri.** `applyDrawsSnapshot` (`js/draw-undo.js`) sengaja TIDAK
+lewat `saveDraws()` — ia mendorong snapshotnya sendiri ke lapisan sync — padahal `saveDraws()` adalah
+satu-satunya pemanggil `syncAlertAnchors()`. Jadi ia memanggilnya sendiri, sesudah gerbang
+`suppressDrawSave`. *(Amandemen review akhir: klaim "otomatis ikut benar untuk undo/redo" di versi
+awal spec ini tidak benar sampai panggilan itu ditambahkan.)*
 
 **Hapus garis → alertnya ikut hilang**, lewat dua jalur yang perannya berbeda:
 
@@ -118,6 +156,14 @@ untuk drag, undo/redo, kunci sudut Shift, magnet, semuanya.
 Penyapuan itu **hanya** boleh jalan sesudah instrumen tersebut selesai dimuat (`suppressDrawSave`
 sudah lepas), dan hanya menyentuh alert instrumen itu. Aturan naif tanpa gerbang ini akan
 memusnahkan semua alert setiap kali chart sedang kosong saat memuat.
+
+*(Amandemen review akhir)* "Selesai dimuat" **tidak sama dengan** "dimuat secara otoritatif": kalau
+`GET /api/drawings` gagal, `loadDrawsFor` jatuh ke cermin localStorage — kosong di browser baru,
+jendela private, atau sesudah data situs dibersihkan — dan sapuan akan menyimpulkan semua alert
+kehilangan objeknya lalu menghapusnya di server tanpa bisa dikembalikan. Karena itu sapuan juga
+menolak jalan saat `drawVer[inst] == null`, **predikat yang sama** yang sudah dipakai jalur dorong
+untuk menolak mendorong: kalau kita tak boleh MENULIS gambar saat versi server tak diketahui, kita
+jelas tak boleh MENGHAPUS alert atas dasar keadaan gambar yang sama-sama tak diketahui itu.
 
 ## Antarmuka
 
@@ -158,28 +204,42 @@ kapan saja. Bukti utamanya karena itu di Go, bukan di browser.
 
 **Go** (`alert_monitor_test.go` sudah punya polanya: `TestCrossed`, `TestMonitorOneShot`):
 1. `level(t)` garis miring — pada tiga waktu berbeda, termasuk sebelum `t1` dan sesudah `t2`
-   (perpanjangan tak hingga);
+   (perpanjangan tak hingga). *Mesinnya diuji sekarang walau tool miring baru dirilis di spec kedua;*
+   *bug yang tidur dengan test jauh lebih murah daripada bug yang tidur tanpa test.*
 2. `p1 == p2` → level konstan (jalur horizontal lewat rumus yang sama);
 3. `t1 == t2` ditolak saat pembuatan;
 4. tiga kondisi: `cross` menyala dua arah, `up` hanya naik, `down` hanya turun;
-5. garis miring yang **belum** terlewati pada `t` awal tapi terlewati kemudian tanpa harga berubah —
-   inilah inti fitur: yang bergerak adalah levelnya;
-6. one-shot tetap: satu trigger → tak lagi aktif;
-7. isolasi antar pengguna pada endpoint baru.
+5. garis yang **belum** terlewati pada `t` awal tapi terlewati kemudian tanpa harga berubah —
+   yang bergerak adalah levelnya;
+6. *(amandemen)* arah dihormati pada pergerakan LEVEL juga: garis yang bergerak NAIK melewati harga
+   yang diam menyalakan `down`, bukan `up`;
+7. *(amandemen)* dua tick di sisi yang sama (masing-masing terhadap levelnya sendiri) tak menyalakan
+   apa pun, dan tanpa baseline yang sah evaluasi dilewati;
+8. *(amandemen)* alert harga biasa memberi hasil identik dgn semantik lama — bukti tak ada regresi;
+9. one-shot tetap: satu trigger → tak lagi aktif;
+10. isolasi antar pengguna pada endpoint baru.
 
-**E2E hermetik** (`tests/drawing/85-draw-alert.spec.js`):
-1. tab **Alert** muncul untuk trendline, **tidak** muncul untuk `rect`;
-2. membuat alert mengirim `cond` + `did` + empat anchor yang benar;
-3. menggeser garis memperbarui anchor di server;
+**E2E hermetik** (`tests/drawing/86-alert-garis.spec.js`):
+1. tab **Alert** muncul untuk ketiga tool horizontal, **tidak** muncul untuk `rect` maupun untuk
+   ketiga tool miring;
+2. ketiga tool horizontal: membuat alert mengirim `cond` + `did` + empat anchor, dengan
+   `p1 === p2` dan `t1 !== t2`;
+3. menggeser garis memperbarui anchor di server; **undo sesudahnya mengembalikan anchor itu juga**;
 4. menghapus garis menghapus alertnya;
-5. memuat ulang instrumen dgn chart kosong sesaat **tidak** menghapus alert (gerbang penyapuan);
-6. daftar alert menampilkan kondisi & asal, bukan "Crossing" hardcoded;
-7. clone/paste garis ber-alert menghasilkan objek tanpa alert.
+5. memuat ulang instrumen dgn chart kosong sesaat **tidak** menghapus alert (gerbang penyapuan), dan
+   **GET gambar yang GAGAL + cermin lokal kosong juga tidak** (gerbang otoritatif);
+6. ganti instrumen bolak-balik dgn gambar NYATA di kedua simbol: kedua alert selamat;
+7. daftar alert menampilkan kondisi & asal **sesudah satu putaran poll**, bukan "Crossing" hardcoded;
+8. refresh pane yang tertunda tak menulis ulang modal objek lain;
+9. clone/paste garis ber-alert menghasilkan objek tanpa alert (`tests/drawing/85-draw-did.spec.js`).
 
 Sebelum push: `go test ./...` + `npx playwright test tests/smoke --project=hermetic`.
 
 ## Di luar cakupan
 
+- **Garis MIRING** (`trendline`, `rayLine`, `straightLine`) — spec kedua, bersama rancangan
+  **basis waktu**-nya (lihat "Kenapa dipecah"). Mesin garis di server (`level(t)`, kolom anchor,
+  `sideHit`) sudah ada dan tetap benar; yang belum dirancang adalah *dalam waktu apa* `t` diukur.
 - **Zona** (channel & rectangle) — spec kedua, termasuk state per-alert dan keputusan rentang-waktu
   rectangle.
 - *Greater than* / *Less than* — butuh konsep pengulangan yang alert Luna belum punya.

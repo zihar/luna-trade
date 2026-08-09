@@ -1,20 +1,20 @@
-// Alert dari objek gambar (garis) — tab Alert, pembuatan, dan label daftar.
+// Alert dari objek gambar (garis HORIZONTAL) — tab Alert, pembuatan, dan label daftar.
 // Spec: docs/superpowers/specs/2026-08-09-alert-dari-garis-design.md
+//
+// v1 mendukung PERSIS tiga tool: horizontalStraightLine, horizontalRayLine, priceLine. Tool miring
+// (trendline / rayLine / straightLine) SENGAJA tak didukung — anchor alert adalah waktu wall-clock
+// sementara chart menggambar sumbu-x dalam indeks bar, jadi garis miring yang diekstrapolasi berlari
+// mendahului garis yang digambar begitu instrumennya punya jeda sesi. Karena itu berkas ini tak
+// punya satu pun test yang membuat alert dari tool miring: yang ada justru test bahwa tab Alert
+// TIDAK muncul untuknya.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { chartRect } = require('../helpers/chart');
+const { chartRect, toPixels } = require('../helpers/chart');
 const { armTool, clickAt, overlays, drawTool, CLICK_GAP_MS } = require('../helpers/draw');
 
-async function drawTrendline(page, rect) {
-  await armTool(page, 'trendline');
-  await clickAt(page, rect, { x: Math.round(rect.width * 0.36), y: Math.round(rect.height * 0.4) });
-  await page.waitForTimeout(CLICK_GAP_MS);
-  await clickAt(page, rect, { x: Math.round(rect.width * 0.58), y: Math.round(rect.height * 0.6) });
-  await page.waitForTimeout(CLICK_GAP_MS);
-  await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
-  return (await overlays(page))[0];
-}
+const HLINE_TOOLS = ['horizontalStraightLine', 'horizontalRayLine', 'priceLine'];
+const SLOPED_TOOLS = ['trendline', 'rayLine', 'straightLine'];
 
 async function drawRect(page, rect) {
   await armTool(page, 'rect');
@@ -26,102 +26,148 @@ async function drawRect(page, rect) {
   return (await overlays(page))[0];
 }
 
+/**
+ * Seret BADAN objek ke bawah sejauh `dy` px.
+ *
+ * Spot-nya sengaja dihitung sendiri, BUKAN lewat hoverableSpot(): kandidat pertama helper itu
+ * adalah titik anchor objek, dan menekan tepat di handle titik pada garis horizontal tak
+ * menghasilkan gerakan sama sekali (terverifikasi utk ketiga tool — hover true, geser nol).
+ * Yang menggerakkan objek adalah tekanan di BADAN garis, sedikit menjauh dari handle.
+ */
+async function dragBodyBy(page, obj, rect, dy) {
+  const px = await toPixels(page, obj.points);
+  const spot = px.length > 1
+    ? { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 }
+    : { x: px[0].x + 60, y: px[0].y };
+  await page.mouse.move(rect.x + spot.x, rect.y + spot.y, { steps: 6 });
+  await page.mouse.down();
+  await page.mouse.move(rect.x + spot.x, rect.y + spot.y + dy, { steps: 10 });
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
 test.describe('alert garis: tab & pembuatan', () => {
-  test('tab Alert muncul untuk trendline, TIDAK untuk rect', async ({ page }) => {
+  for (const name of HLINE_TOOLS) {
+    test(`tab Alert muncul untuk ${name}`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), obj.id);
+      await expect(page.locator('.dm-tab[data-tab="alert"]')).toBeVisible();
+      assertNoPageErrors(page);
+    });
+  }
+
+  // C1: tool MIRING tak boleh punya tab Alert sama sekali. Bukan "boleh kalau kebetulan datar" —
+  // pengguna lalu bisa membuat alert pada trendline datar lalu menyeret satu ujungnya dan diam-diam
+  // mendapat persis kasus miring yang ditunda ke spec kedua.
+  for (const name of SLOPED_TOOLS) {
+    test(`tab Alert TIDAK muncul untuk ${name} (garis miring ditunda ke spec kedua)`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), obj.id);
+      await expect(page.locator('.dmodal-scrim.show'), 'modal setelan tetap harus terbuka').toHaveCount(1);
+      await expect(page.locator('.dm-tab[data-tab="alert"]')).toHaveCount(0);
+      expect(await page.evaluate((n) => ALERTABLE_LINE.has(n), name), `${name} tak boleh alertable`).toBe(false);
+      assertNoPageErrors(page);
+    });
+  }
+
+  test('tab Alert TIDAK muncul untuk rect (zona = spec kedua)', async ({ page }) => {
     await gotoApp(page);
     const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
-
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), o.id);
-    await expect(page.locator('.dm-tab[data-tab="alert"]')).toBeVisible();
-    await page.keyboard.press('Escape');
-
-    await page.evaluate(() => { drawIds.slice().forEach((i) => chart.removeOverlay(i)); });
     const r = await drawRect(page, rect);
     await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), r.id);
     await expect(page.locator('.dm-tab[data-tab="alert"]')).toHaveCount(0);
     assertNoPageErrors(page);
   });
 
-  test('membuat alert mengirim cond + did + empat anchor', async ({ page }) => {
+  // I6: ketiga tool yang didukung harus SAMA-SAMA mengirim anchor yang sah. p1===p2 dijamin SECARA
+  // KONSTRUKSI (harga diambil dari points[0] utk kedua anchor) — horizontalRayLine punya dua titik
+  // dan nilai titik keduanya tak selalu tersinkron ke titik pertama; "horizontal" yang anchornya
+  // berselisih adalah alert MIRING berkostum horizontal. t1!==t2 karena server menolak vertikal.
+  for (const name of HLINE_TOOLS) {
+    test(`${name}: POST alert membawa cond + did + p1===p2 dan t1!==t2`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      const did = await page.evaluate((id) => objDid[id], obj.id);
+
+      const posts = [];
+      page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts')) posts.push(r.postDataJSON()); });
+
+      await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
+      await page.selectOption('.dm-pane[data-pane="alert"] select', 'up');
+      await page.click('.dm-pane[data-pane="alert"] .da-create');
+      await expect.poll(() => posts.length, { timeout: 5000 }).toBe(1);
+
+      const body = posts[0];
+      expect(body.cond).toBe('up');
+      expect(body.drawId).toBe(did);
+      for (const k of ['t1', 'p1', 't2', 'p2']) {
+        expect(body[k], `anchor ${k} harus terkirim`).not.toBeUndefined();
+        expect(body[k], `anchor ${k} tak boleh null`).not.toBeNull();
+      }
+      expect(body.p1, 'garis horizontal: kedua anchor harga HARUS identik').toBe(body.p2);
+      expect(body.t1, 't1 dan t2 harus beda — garis vertikal ditolak server').not.toBe(body.t2);
+      assertNoPageErrors(page);
+    });
+  }
+
+  // C1 (bagian "secara konstruksi"): garis horizontal yang digambar lewat UI selalu punya dua nilai
+  // titik yang sama — klinecharts memaksakannya, bahkan overrideOverlay() diluruskan kembali. Jadi
+  // test di atas tak bisa membedakan "diambil dari points[0] dua kali" dari "dibaca dari points[1]".
+  // Yang dijaga di sini adalah kasus yang TAK bisa dibuat lewat kanvas: muatan lama / desync yang
+  // titik keduanya berbeda. Karena itu lineAnchorsOf() diuji langsung atas objek palsu (pola
+  // monkey-patch yang sama dgn chart.createOverlay di test drawAlertLines di bawah). Kalau harga
+  // dibaca dari points[1], yang tersimpan adalah alert MIRING berkostum horizontal.
+  test('lineAnchorsOf: nilai titik kedua yang MELENCENG tetap menghasilkan p1===p2', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
-    const did = await page.evaluate((id) => objDid[id], o.id);
-
-    const posts = [];
-    page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts')) posts.push(r.postDataJSON()); });
-
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
-    await page.selectOption('.dm-pane[data-pane="alert"] select', 'up');
-    await page.click('.dm-pane[data-pane="alert"] .da-create');
-    await expect.poll(() => posts.length, { timeout: 5000 }).toBe(1);
-
-    const body = posts[0];
-    expect(body.cond).toBe('up');
-    expect(body.drawId).toBe(did);
-    for (const k of ['t1', 'p1', 't2', 'p2']) {
-      expect(body[k], `anchor ${k} harus terkirim`).not.toBeUndefined();
-      expect(body[k], `anchor ${k} tak boleh null`).not.toBeNull();
-    }
-    expect(body.t1, 't1 dan t2 harus beda — garis vertikal ditolak server').not.toBe(body.t2);
+    const an = await page.evaluate(() => {
+      const orig = chart.getOverlayById;
+      chart.getOverlayById = () => ({ id: 'fake', name: 'horizontalRayLine',
+        points: [{ timestamp: 1_700_000_000_000, value: 1.10 }, { timestamp: 1_700_000_600_000, value: 1.15 }] });
+      try { return lineAnchorsOf('fake'); } finally { chart.getOverlayById = orig; }
+    });
+    expect(an, 'anchor harus terbentuk').not.toBeNull();
+    expect(an.p1, 'harga kedua anchor diambil dari points[0] → identik apa pun isi points[1]').toBe(an.p2);
+    expect(an.p1).toBe(1.10);
+    expect(an.t1).not.toBe(an.t2);
     assertNoPageErrors(page);
   });
 
-  test('daftar alert menampilkan kondisi & asal, bukan "Crossing" hardcoded', async ({ page }) => {
+  // I4: label asal alert diambil dari objek yang HIDUP lewat `did`, bukan dari field yang dititipkan
+  // saat create — alertPoll() menulis ulang `alerts` tiap ~2dtk dari respons server, dan server tak
+  // menyimpan tipe objeknya. Karena itu test ini menunggu SATU putaran poll dulu (keadaan mantap);
+  // versi lama lolos hanya karena kebetulan tak ada poll yang mendarat di sela-selanya.
+  test('daftar alert menampilkan kondisi & asal — dan bertahan sesudah satu putaran poll', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
+    const { obj } = await drawTool(page, 'horizontalRayLine');
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await page.selectOption('.dm-pane[data-pane="alert"] select', 'down');
     await page.click('.dm-pane[data-pane="alert"] .da-create');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
 
+    // Keadaan MANTAP: satu putaran alertPoll() sudah menulis ulang `alerts` dari server.
+    await page.evaluate(async () => { await alertPoll(); });
+
     const teks = await page.locator('#alertList .al-item .al-main').first().textContent();
     expect(teks, 'harus menyebut kondisi arah').toMatch(/Crossing down/i);
-    expect(teks, 'harus menyebut asal objeknya').toMatch(/Trend/i);
+    expect(teks, 'harus menyebut asal objeknya (judul dari OBJ_TITLE), bukan "Drawing"').toContain('Horizontal Ray');
     assertNoPageErrors(page);
   });
 
   test('objek yang sudah punya alert: tab menampilkannya + bisa dihapus', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
+    const { obj } = await drawTool(page, 'horizontalStraightLine');
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await page.click('.dm-pane[data-pane="alert"] .da-create');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await expect(page.locator('.dm-pane[data-pane="alert"] .da-del')).toBeVisible();
     await page.click('.dm-pane[data-pane="alert"] .da-del');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(0);
-    assertNoPageErrors(page);
-  });
-
-  // Fix round 1 — review menemukan: horizontalStraightLine & priceLine cuma 1 titik, jadi
-  // lineAnchorsOf lama (yg mensyaratkan points.length>=2) SELALU gagal utknya walau keduanya
-  // anggota ALERTABLE_LINE. Pakai horizontalStraightLine (drawTool sudah menanganinya sbg
-  // objek 1-klik, lihat tests/drawing/30-interaction.spec.js).
-  test('horizontalStraightLine (objek 1-titik): alert tetap mengirim empat anchor, t1 !== t2', async ({ page }) => {
-    await gotoApp(page);
-    const { obj: o } = await drawTool(page, 'horizontalStraightLine');
-
-    const posts = [];
-    page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts')) posts.push(r.postDataJSON()); });
-
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
-    await page.click('.dm-pane[data-pane="alert"] .da-create');
-    await expect.poll(() => posts.length, { timeout: 5000 }).toBe(1);
-
-    const body = posts[0];
-    for (const k of ['t1', 'p1', 't2', 'p2']) {
-      expect(body[k], `anchor ${k} harus terkirim`).not.toBeUndefined();
-      expect(body[k], `anchor ${k} tak boleh null`).not.toBeNull();
-    }
-    expect(body.p1).toBe(body.p2);   // level konstan: satu-satunya harga objek dipakai dua kali
-    expect(body.t1, 'objek 1-titik harus tetap dapat t1 !== t2 (server menolak vertikal)').not.toBe(body.t2);
     assertNoPageErrors(page);
   });
 
@@ -130,10 +176,9 @@ test.describe('alert garis: tab & pembuatan', () => {
   // SENGAJA tidak reopen modal — itulah yg bikin gagal lama luput ketahuan.
   test('sesudah Create, pane yg masih terbuka (TANPA reopen) langsung tampil Delete', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
+    const { obj } = await drawTool(page, 'priceLine');
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await page.click('.dm-pane[data-pane="alert"] .da-create');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
 
@@ -143,14 +188,44 @@ test.describe('alert garis: tab & pembuatan', () => {
     assertNoPageErrors(page);
   });
 
+  // I5: `panel` adalah SATU node modal yang dipakai ulang, sedangkan `o` ditangkap saat klik Create
+  // — dan jalur create bisa makan beberapa detik. Kalau modal sudah menampilkan objek LAIN saat
+  // refresh yang tertunda mendarat, pane objek baru ditimpa keadaan objek lama dan tombol Delete-nya
+  // terikat ke objek lama: "hapus alert garis ini" menghapus alert garis LAIN.
+  test('refresh pane yang tertunda tak boleh menulis ulang modal objek LAIN', async ({ page }) => {
+    await gotoApp(page);
+    const { obj: a } = await drawTool(page, 'horizontalStraightLine');
+    // Objek kedua di ketinggian berbeda supaya tak berimpit dgn yang pertama.
+    const rect = await chartRect(page);
+    await armTool(page, 'horizontalStraightLine');
+    await clickAt(page, rect, { x: Math.round(rect.width * 0.5), y: Math.round(rect.height * 0.7) });
+    await page.waitForTimeout(CLICK_GAP_MS);
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+    await page.keyboard.press('Escape');
+    const b = (await overlays(page)).find((o) => o.id !== a.id);
+    expect(b, 'harus ada objek kedua').toBeTruthy();
+
+    // A punya alert; B belum. Modal sedang menampilkan B.
+    await page.evaluate((id) => createLineAlert(id, 'cross'), a.id);
+    await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), b.id);
+    await expect(page.locator('.dm-pane[data-pane="alert"] .da-create'), 'B belum punya alert').toBeVisible();
+
+    // Refresh yang "terlambat" untuk A mendarat sekarang.
+    await page.evaluate((id) => refreshAlertPane(drawModal.querySelector('.dmodal'), chart.getOverlayById(id)), a.id);
+
+    await expect(page.locator('.dm-pane[data-pane="alert"] .da-create'), 'pane B tak boleh berubah jadi keadaan A').toBeVisible();
+    await expect(page.locator('.dm-pane[data-pane="alert"] .da-del')).toHaveCount(0);
+    assertNoPageErrors(page);
+  });
+
   // Fix round 1 — review menemukan: gerbang !a.drawId di drawAlertLines() ada tapi tak pernah
   // diuji siapa pun; regresi di situ menggambar garis datar di harga 0 utk tiap alert garis.
   test('drawAlertLines() tak membuat overlay alertLine untuk alert garis', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
+    const { obj } = await drawTool(page, 'horizontalStraightLine');
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await page.click('.dm-pane[data-pane="alert"] .da-create');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
 
@@ -172,12 +247,11 @@ test.describe('alert garis: tab & pembuatan', () => {
   // js/draw-alert.js) harus tetap membiarkan alert terbentuk dlm batas waktu wajar.
   test('flush gambar yang STALL tak menyandera Create — alert tetap terbentuk dlm batas waktu', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await drawTrendline(page, rect);
+    const { obj } = await drawTool(page, 'horizontalStraightLine');
 
     await page.evaluate(() => __setStallDrawings(true));   // /api/drawings kini digantung stub, tak pernah fulfill
 
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
     await page.click('.dm-pane[data-pane="alert"] .da-create');
 
     // Timeout di sini (6dtk) sengaja jauh di atas ALERT_FLUSH_TIMEOUT_MS (~2dtk) + overhead —
@@ -190,42 +264,57 @@ test.describe('alert garis: tab & pembuatan', () => {
 });
 
 test.describe('alert garis: mengikuti objeknya', () => {
-  async function buatAlert(page, rect) {
-    const o = await drawTrendline(page, rect);
-    await page.evaluate((id) => createLineAlert(id, 'cross'), o.id);
+  async function buatAlert(page, name = 'horizontalRayLine') {
+    const { obj, rect } = await drawTool(page, name);
+    await page.evaluate((id) => createLineAlert(id, 'cross'), obj.id);
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
-    return o;
+    return { obj, rect };
   }
 
   test('menggeser garis memperbarui anchor alert di server', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await buatAlert(page, rect);
+    const { obj, rect } = await buatAlert(page);
     const sebelum = await page.evaluate(() => __alertRow(0));
 
-    // geser badan garis ke bawah
-    const px = await page.evaluate((id) => {
-      const ov = chart.getOverlayById(id);
-      return ov.points.map((p) => { let c = chart.convertToPixel(p.timestamp != null ? { timestamp: p.timestamp, value: p.value } : { dataIndex: p.dataIndex, value: p.value }, { paneId: 'candle_pane', absolute: true }); if (Array.isArray(c)) c = c[0]; return { x: c.x, y: c.y }; });
-    }, o.id);
-    const spot = { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 };
-    await page.mouse.move(rect.x + spot.x, rect.y + spot.y, { steps: 4 });
-    await page.mouse.down();
-    await page.mouse.move(rect.x + spot.x, rect.y + spot.y + 70, { steps: 10 });
-    await page.mouse.up();
+    await dragBodyBy(page, obj, rect, 70);
     await page.waitForTimeout(1200);
 
     const sesudah = await page.evaluate(() => __alertRow(0));
     expect(sesudah.p1, 'anchor harga harus ikut bergeser').not.toBe(sebelum.p1);
+    expect(sesudah.p1, 'sesudah geser pun kedua anchor harga tetap identik').toBe(sesudah.p2);
+    assertNoPageErrors(page);
+  });
+
+  // I3: applyDrawsSnapshot (js/draw-undo.js) memanggil lapisan sync LANGSUNG, bukan lewat saveDraws()
+  // — padahal saveDraws() satu-satunya pemanggil syncAlertAnchors(). Akibatnya: seret garis ber-alert
+  // (anchor ikut), Ctrl+Z (garis kembali), tapi alertnya tetap mengawasi posisi yang barusan di-undo.
+  test('undo sesudah menggeser mengembalikan anchor alert juga, bukan cuma garisnya', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await buatAlert(page);
+    await page.waitForTimeout(600);   // snapshot awal tercatat di history
+    const awal = await page.evaluate(() => __alertRow(0));
+
+    await dragBodyBy(page, obj, rect, 70);
+    await page.waitForTimeout(1200);
+    const setelahGeser = await page.evaluate(() => __alertRow(0));
+    expect(setelahGeser.p1, 'prasyarat: geser harus memindahkan anchor').not.toBe(awal.p1);
+
+    await page.evaluate(() => undoDraw());
+    await page.waitForTimeout(1200);
+
+    const garis = await page.evaluate(() => { const o = chart.getOverlayById(drawIds[0]); return o ? o.points[0].value : null; });
+    expect(garis, 'prasyarat: undo harus mengembalikan garisnya').toBeCloseTo(awal.p1, 6);
+    const setelahUndo = await page.evaluate(() => __alertRow(0));
+    expect(setelahUndo.p1, 'alert harus ikut kembali ke posisi sebelum digeser').toBeCloseTo(awal.p1, 6);
+    expect(setelahUndo.p1, 'kedua anchor harga tetap identik').toBe(setelahUndo.p2);
     assertNoPageErrors(page);
   });
 
   test('menghapus garis menghapus alertnya', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await buatAlert(page, rect);
+    const { obj } = await buatAlert(page);
 
-    await page.evaluate((id) => chart.removeOverlay(id), o.id);
+    await page.evaluate((id) => chart.removeOverlay(id), obj.id);
     await expect.poll(async () => page.evaluate(() => __alertCount()), { timeout: 6000 }).toBe(0);
     assertNoPageErrors(page);
   });
@@ -233,14 +322,67 @@ test.describe('alert garis: mengikuti objeknya', () => {
   // Gerbang penyapuan: chart kosong SESAAT saat memuat tak boleh memusnahkan alert.
   test('memuat ulang instrumen TIDAK menghapus alert', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    await buatAlert(page, rect);
+    await buatAlert(page);
     await page.waitForTimeout(2500);   // gambar tersimpan ke server
 
     await page.evaluate(() => loadInit(true));
     await page.waitForTimeout(2500);
 
     expect(await page.evaluate(() => __alertCount()), 'alert tak boleh hilang saat memuat ulang').toBe(1);
+    assertNoPageErrors(page);
+  });
+
+  // I2 — temuan bernilai tertinggi review: gerbang lama cuma membuktikan pemuatan SELESAI, bukan
+  // OTORITATIF. Kalau GET /api/drawings gagal, loadDrawsFor() jatuh ke cermin localStorage — yang
+  // KOSONG di browser baru / jendela private / sesudah data situs dibersihkan. drawIds lalu kosong,
+  // sweep menyimpulkan SEMUA alert kehilangan objeknya, dan menghapusnya di server tanpa bisa
+  // dikembalikan. Predikat drawVer[inst]==null ("keadaan server tak diketahui") adalah predikat yang
+  // SAMA yang sudah dipakai jalur dorong untuk menolak mendorong.
+  test('GET gambar GAGAL + cermin lokal kosong → sweep TIDAK menghapus alert apa pun', async ({ page }) => {
+    await gotoApp(page);
+    await buatAlert(page);
+    await page.waitForTimeout(2500);   // gambar tersimpan ke server
+
+    await page.evaluate(() => {
+      __setFailDrawings(true);                 // GET /api/drawings → 500
+      Object.keys(localStorage).filter((k) => k.startsWith('br_draws_')).forEach((k) => localStorage.removeItem(k));
+    });
+
+    await page.evaluate(() => loadInit(true));
+    await page.waitForTimeout(2500);
+
+    expect(await page.evaluate(() => drawVer[inst]), 'prasyarat: keadaan server harus TAK diketahui').toBeNull();
+    expect(await page.evaluate(() => drawIds.length), 'prasyarat: chart harus kosong (cermin dikosongkan)').toBe(0);
+    expect(await page.evaluate(() => __alertCount()), 'pemuatan yang gagal tak boleh memusnahkan alert').toBe(1);
+    assertNoPageErrors(page);
+  });
+
+  // I6: jalur BAHAGIA penyapuan dgn gambar SUNGGUHAN di dua simbol — test sweep satu-satunya
+  // sebelumnya memakai alert yatim sintetis di atas kanvas kosong, jadi ia tak pernah membuktikan
+  // sweep membiarkan alert yang objeknya memang ada, apalagi lintas ganti instrumen.
+  test('ganti instrumen dgn gambar nyata di KEDUA simbol: kedua alert selamat', async ({ page }) => {
+    await gotoApp(page);
+    // Alert di EUR_USD (instrumen awal).
+    await buatAlert(page);
+    await page.waitForTimeout(2500);
+
+    // Pindah ke GBP_USD, gambar + alert di sana juga.
+    await page.evaluate(() => { $('#instrument').value = 'GBP_USD'; return loadInit(true); });
+    await page.waitForTimeout(2000);
+    const { obj: b } = await drawTool(page, 'horizontalStraightLine');
+    await page.evaluate((id) => createLineAlert(id, 'cross'), b.id);
+    await expect.poll(async () => page.evaluate(() => __alertCount()), { timeout: 6000 }).toBe(2);
+    await page.waitForTimeout(2500);
+
+    // Kembali ke EUR_USD: sweep jalan atas gambar EUR_USD yang otoritatif dari server.
+    await page.evaluate(() => { $('#instrument').value = 'EUR_USD'; return loadInit(true); });
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => __alertCount()), 'kedua alert punya objeknya masing-masing → tak boleh ada yang tersapu').toBe(2);
+
+    // Dan sekali lagi ke GBP_USD, arah sebaliknya.
+    await page.evaluate(() => { $('#instrument').value = 'GBP_USD'; return loadInit(true); });
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => __alertCount()), 'arah sebaliknya pun sama').toBe(2);
     assertNoPageErrors(page);
   });
 
@@ -293,8 +435,7 @@ test.describe('alert garis: mengikuti objeknya', () => {
   // yg dipicu gambar LAIN yg tak ada hubungannya) mem-POST ulang anchor semua alert garis, sia-sia.
   test('anchor tak berubah → saveDraws TIDAK mem-POST; anchor berubah → PERSIS satu POST', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const o = await buatAlert(page, rect);
+    const { obj, rect } = await buatAlert(page);
     // Paksa satu putaran poll (dan hentikan pollingnya) → cache anchor di client terisi dari
     // respons server, meniru kondisi "sudah lewat >=1 siklus poll sejak alert dibuat" yg jadi
     // pemicu bug ini di dunia nyata.
@@ -309,15 +450,7 @@ test.describe('alert garis: mengikuti objeknya', () => {
     expect(posts.length, 'anchor tak berubah → tak boleh mem-POST').toBe(0);
 
     // Sekarang geser badan garis — anchornya SUNGGUH berubah.
-    const px = await page.evaluate((id) => {
-      const ov = chart.getOverlayById(id);
-      return ov.points.map((p) => { let c = chart.convertToPixel(p.timestamp != null ? { timestamp: p.timestamp, value: p.value } : { dataIndex: p.dataIndex, value: p.value }, { paneId: 'candle_pane', absolute: true }); if (Array.isArray(c)) c = c[0]; return { x: c.x, y: c.y }; });
-    }, o.id);
-    const spot = { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 };
-    await page.mouse.move(rect.x + spot.x, rect.y + spot.y, { steps: 4 });
-    await page.mouse.down();
-    await page.mouse.move(rect.x + spot.x, rect.y + spot.y + 70, { steps: 10 });
-    await page.mouse.up();
+    await dragBodyBy(page, obj, rect, 70);
     await page.waitForTimeout(1200);
 
     expect(posts.length, 'anchor berubah → PERSIS satu POST, bukan nol atau lebih dari satu').toBe(1);
