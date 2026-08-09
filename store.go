@@ -791,7 +791,24 @@ type AlertRow struct {
 var (
 	ErrAlertCond     = errors.New("kondisi alert tak dikenal")
 	ErrAlertVertical = errors.New("garis vertikal tak bisa dijadikan alert")
+	// Garis MIRING yang kedua ujungnya jatuh di jendela pasar-tutup yang sama tak punya
+	// waktu dagang untuk diinterpolasi. Hanya berlaku bila P1 != P2: garis horizontal
+	// levelnya konstan, dan miliknya memang boleh berspan nol (lihat #180, t2 = t1+1).
+	ErrAlertNoTradingSpan = errors.New("garis tak punya waktu dagang di antara kedua ujungnya")
 )
+
+// validAnchors menolak dua bentuk anchor yang tak bisa dievaluasi. Dipakai CreateAlert dan
+// UpdateAlertAnchors — satu tempat, supaya penolakan saat create tak bisa dilewati dengan
+// membuat alert pada garis yang sah lalu menyeretnya ke akhir pekan.
+func validAnchors(instrument string, an LineAnchors) error {
+	if an.T1 == an.T2 {
+		return ErrAlertVertical
+	}
+	if an.P1 != an.P2 && tradingElapsed(instrument, an.T1, an.T2) == 0 {
+		return ErrAlertNoTradingSpan
+	}
+	return nil
+}
 
 // CreateAlert membuat alert baru untuk user, aktif sejak dibuat.
 // `an` nil → alert harga biasa (level tetap = price). `an` terisi → alert terikat garis:
@@ -808,10 +825,10 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 	var t1, t2 any
 	var p1, p2 any
 	if an != nil {
-		// Garis vertikal tak punya "harga pada waktu t" yang bermakna → tolak di pintu masuk,
+		// Anchor yang tak punya "harga pada waktu t" yang bermakna ditolak di pintu masuk,
 		// bukan dijaga diam-diam saat evaluasi.
-		if an.T1 == an.T2 {
-			return 0, ErrAlertVertical
+		if err := validAnchors(instrument, *an); err != nil {
+			return 0, err
 		}
 		t1, p1, t2, p2 = an.T1, an.P1, an.T2, an.P2
 	}
@@ -836,8 +853,16 @@ func nullIfEmpty(s string) any {
 // UpdateAlertAnchors memindahkan acuan garis sebuah alert (dipakai saat pengguna menggeser
 // objeknya). Alert-nya tetap alert yang sama — id, kondisi, dan status triggered tak tersentuh.
 func (s *Store) UpdateAlertAnchors(uid, id int64, an LineAnchors) error {
-	if an.T1 == an.T2 {
-		return ErrAlertVertical
+	// Instrumen dibaca dari barisnya sendiri, bukan dari muatan klien: model sesi (24/5 vs 24/7)
+	// menentukan apakah anchor ini sah, jadi klien tak boleh bisa memilih model yang lebih longgar
+	// dengan mengaku instrumen lain.
+	var instrument string
+	if err := s.db.QueryRow(`SELECT instrument FROM price_alerts WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
+		id, uid).Scan(&instrument); err != nil {
+		return fmt.Errorf("alert not found")
+	}
+	if err := validAnchors(instrument, an); err != nil {
+		return err
 	}
 	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
 		an.T1, an.P1, an.T2, an.P2, id, uid)
