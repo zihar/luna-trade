@@ -5,8 +5,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -237,9 +239,17 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 	// kebenaran (baris tersimpan vs respons) di satu titik panggil.
 	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, cond, req.DrawID, an)
 	if err != nil {
-		// Jaring pengaman: kedua kondisi penolakan store sudah dicegah di atas, tapi kalau
-		// store menolak karena alasan lain, tetap jangan forward err.Error() (Indonesia) ke FE.
-		writeErr(w, http.StatusBadRequest, "invalid alert parameters")
+		// Jaring pengaman: kedua penolakan VALIDASI store sudah dicegah di atas, tapi kalau ia
+		// tetap terjadi, itu memang salah pemanggil → 400. Kegagalan LAIN (mis. database mati)
+		// bukan salah pemanggil dan tak boleh dijawab 400 "invalid alert parameters" — itu
+		// menyuruh klien memperbaiki permintaan yang sebenarnya sudah benar. Dua-duanya tetap
+		// menyembunyikan err.Error() (berbahasa Indonesia / bisa berisi SQL mentah) dari klien.
+		if errors.Is(err, ErrAlertCond) || errors.Is(err, ErrAlertVertical) {
+			writeErr(w, http.StatusBadRequest, "invalid alert parameters")
+			return
+		}
+		log.Printf("alert create: %v", err)
+		writeErr(w, http.StatusInternalServerError, "could not create alert")
 		return
 	}
 	writeJSON(w, http.StatusOK, toAlertView(Alert{
@@ -315,7 +325,10 @@ func handleAlertDeleteByDrawing(w http.ResponseWriter, r *http.Request) {
 	}
 	n, err := store.DeleteAlertsByDrawing(uid, req.Instrument, req.DrawID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+		// Jangan forward err.Error(): itu satu-satunya tempat tersisa di jalur ini yang bisa
+		// membocorkan pesan store (Indonesia) atau SQL mentah ke klien. Detailnya ke log.
+		log.Printf("alert delete-by-drawing: %v", err)
+		writeErr(w, http.StatusInternalServerError, "could not delete alerts")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int{"deleted": n})

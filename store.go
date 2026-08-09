@@ -785,6 +785,14 @@ type AlertRow struct {
 	An         *LineAnchors // nil untuk alert harga biasa
 }
 
+// Dua penolakan VALIDASI dari CreateAlert, dijadikan sentinel supaya pemanggil HTTP bisa
+// membedakannya dari kegagalan lain (mis. database mati). Tanpa pembeda ini, kegagalan DB
+// terjawab 400 "invalid alert parameters" — menyalahkan pemanggil atas kesalahan server.
+var (
+	ErrAlertCond     = errors.New("kondisi alert tak dikenal")
+	ErrAlertVertical = errors.New("garis vertikal tak bisa dijadikan alert")
+)
+
 // CreateAlert membuat alert baru untuk user, aktif sejak dibuat.
 // `an` nil → alert harga biasa (level tetap = price). `an` terisi → alert terikat garis:
 // level-nya dihitung dari dua anchor, dan `price` tak dipakai.
@@ -795,7 +803,7 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 		cond = "cross"
 	}
 	if cond != "cross" && cond != "up" && cond != "down" {
-		return 0, fmt.Errorf("kondisi tak dikenal: %s", cond)
+		return 0, fmt.Errorf("%w: %s", ErrAlertCond, cond)
 	}
 	var t1, t2 any
 	var p1, p2 any
@@ -803,7 +811,7 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 		// Garis vertikal tak punya "harga pada waktu t" yang bermakna → tolak di pintu masuk,
 		// bukan dijaga diam-diam saat evaluasi.
 		if an.T1 == an.T2 {
-			return 0, fmt.Errorf("garis vertikal tak bisa dijadikan alert")
+			return 0, ErrAlertVertical
 		}
 		t1, p1, t2, p2 = an.T1, an.P1, an.T2, an.P2
 	}
@@ -829,7 +837,7 @@ func nullIfEmpty(s string) any {
 // objeknya). Alert-nya tetap alert yang sama — id, kondisi, dan status triggered tak tersentuh.
 func (s *Store) UpdateAlertAnchors(uid, id int64, an LineAnchors) error {
 	if an.T1 == an.T2 {
-		return fmt.Errorf("garis vertikal tak bisa dijadikan alert")
+		return ErrAlertVertical
 	}
 	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
 		an.T1, an.P1, an.T2, an.P2, id, uid)
