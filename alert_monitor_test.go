@@ -342,3 +342,36 @@ func TestLevelTrackerPruneRemovesInactiveAlerts(t *testing.T) {
 		t.Fatalf("alert 2 sudah tak aktif, entrinya harus dibuang")
 	}
 }
+
+// Garis yang SELURUHNYA di masa depan (kedua anchor sesudah now) tak boleh diawasi: levelnya
+// hanya bisa didapat dengan mengekstrapolasi ke KIRI, ke bagian garis yang tak seorang pun gambar.
+func TestEvalAlertGarisBelumMulai(t *testing.T) {
+	now := nyMs(t, 2026, time.January, 6, 9, 0)
+	besok := nyMs(t, 2026, time.January, 7, 9, 0)
+	a := AlertRow{
+		ID: 1, Instrument: "EUR_USD", Cond: "cross",
+		An: &LineAnchors{T1: besok, P1: 1.10, T2: besok + 10*jam, P2: 1.20},
+	}
+	lt := levelTracker{}
+	// Baseline sah lebih dulu, supaya yang diuji benar-benar penjagaan waktu — bukan sekadar
+	// "tick pertama selalu dilewati".
+	lt.record(a.ID, *a.An, 1.10)
+	if _, hit := evalAlert(a, 1.05, 1.15, now, lt); hit {
+		t.Fatalf("alert menyala padahal garisnya belum mulai")
+	}
+}
+
+// Begitu waktu melewati anchor pertama, alert hidup seperti biasa.
+func TestEvalAlertHidupSesudahT1(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{
+		ID: 2, Instrument: "EUR_USD", Cond: "cross",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.20},
+	}
+	now := t1 + 5*jam // level = 1.15
+	lt := levelTracker{}
+	lt.record(a.ID, *a.An, 1.15)
+	if _, hit := evalAlert(a, 1.14, 1.16, now, lt); !hit {
+		t.Fatalf("alert tak menyala padahal harga melintasi level 1.15")
+	}
+}

@@ -135,6 +135,13 @@ func evalAlert(a AlertRow, prev, cur float64, now int64, lvlTrack levelTracker) 
 	lvl = levelAt(a, now)
 	prevLvl := lvl
 	if a.An != nil {
+		// Garis yang seluruhnya masih di masa depan tak diawasi: satu-satunya cara mendapat
+		// levelnya sekarang adalah mengekstrapolasi ke KIRI, ke bagian garis yang tak digambar
+		// siapa pun. Bukan penonaktifan — begitu waktu melewati anchor pertama, ia hidup sendiri.
+		// Kedua anchor diperiksa (bukan cuma T1) supaya benar juga saat anchornya terbalik.
+		if now < a.An.T1 && now < a.An.T2 {
+			return lvl, false
+		}
 		pv, ok := lvlTrack.prevLevel(a.ID, *a.An)
 		lvlTrack.record(a.ID, *a.An, lvl) // dicatat lebih dulu: tick berikutnya butuh baseline ini juga saat tick INI dilewati
 		if !ok {
