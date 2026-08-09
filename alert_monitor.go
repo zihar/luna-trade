@@ -29,27 +29,29 @@ func levelAt(r AlertRow, now int64) float64 {
 	return r.An.P1 + (r.An.P2-r.An.P1)*f
 }
 
-// condHit menerjemahkan kondisi pengguna jadi keputusan menyala/tidak.
-// `cross` memakai crossed() yang sudah ada (dua arah, termasuk sentuh tepat); `up`/`down` adalah
-// separuhnya masing-masing.
-func condHit(cond string, prev, cur, lvl float64) bool {
+// sideHit memutuskan alert menyala atau tidak dari PERUBAHAN TANDA jarak harga-ke-level,
+// d = harga − level. Satu uji untuk dua gerakan sekaligus: harga bergerak melewati garis yang diam,
+// DAN garis bergerak melewati harga yang diam — keduanya sama-sama membalik tanda d.
+//
+// Ini menggantikan dua predikat lama (condHit + crossedByLevelMove) yang masing-masing salah:
+//   - condHit membandingkan harga SEBELUMNYA terhadap level SEKARANG. Saat level melompat antar
+//     tick (pengguna menyeret garisnya, proses lanjut sesudah jeda, perangkat lain memindahkannya),
+//     itu mengarang persilangan yang tak pernah terjadi;
+//   - jalur "level bergerak" menyalakan alert tanpa melihat a.Cond sama sekali, jadi alert `up`
+//     menyala saat garis bergerak TURUN melewati harga yang diam (dan sebaliknya) — dan karena
+//     alert bersifat one-shot, persilangan yang sungguhan lalu tak pernah bisa menyala lagi.
+//
+// `cross` sengaja memakai ulang crossed() dgn ambang 0: "d berpindah sisi" adalah persilangan yang
+// sama persis, cuma dinyatakan pada sumbu selisih.
+func sideHit(cond string, dPrev, dCur float64) bool {
 	switch cond {
 	case "up":
-		return prev < lvl && cur >= lvl
+		return dPrev < 0 && dCur >= 0
 	case "down":
-		return prev > lvl && cur <= lvl
+		return dPrev > 0 && dCur <= 0
 	default:
-		return crossed(prev, cur, lvl)
+		return crossed(dPrev, dCur, 0)
 	}
-}
-
-// crossedByLevelMove menangani hal yang tak bisa dilihat dgn membandingkan harga saja: harga DIAM
-// sementara GARISNYA yang bergerak melewatinya. Tanpa ini, trendline curam bisa menyeberangi harga
-// di antara dua tick dan tak pernah menyalakan alert. Predikatnya sama persis dgn crossed() — bedanya
-// cuma makna argumen (level yang bergerak vs harga yang diam) — nama terpisah dipertahankan karena
-// di titik pemanggilan itulah yang memberi tahu pembaca APA yang sedang diperiksa menyeberang.
-func crossedByLevelMove(prevLvl, curLvl, price float64) bool {
-	return crossed(prevLvl, curLvl, price)
 }
 
 // lvlEntry menyimpan level yang pernah dihitung utk sebuah alert garis BESERTA anchor
@@ -97,25 +99,31 @@ func (lt levelTracker) prune(active map[int64]bool) {
 	}
 }
 
-// evalAlert mengevaluasi satu alert pada satu tick: menghitung levelnya sekarang,
-// memutuskan apakah kondisinya menyala (lewat pergerakan harga ATAU lewat pergerakan
-// garis), lalu memperbarui bookkeeping level per-alert. Dipisah dari loop goroutine
-// supaya bisa dites langsung tanpa Hub/DB.
+// evalAlert mengevaluasi satu alert pada satu tick: menghitung levelnya sekarang, membandingkan
+// SISI harga terhadap level di tick sebelumnya vs sekarang, lalu memperbarui bookkeeping level
+// per-alert. Dipisah dari loop goroutine supaya bisa dites langsung tanpa Hub/DB.
+//
+// Sisi SEBELUMNYA dihitung terhadap level SEBELUMNYA (dari tracker, anchor yang sama), bukan
+// terhadap level sekarang: itulah satu-satunya cara "harga bergerak" dan "garis bergerak" jadi satu
+// pertanyaan yang jujur. Alert harga biasa punya prevLvl == lvl == price, jadi perilakunya identik
+// dgn sebelumnya.
+//
+// Tanpa baseline yang sah (belum ada entry, atau anchornya berubah sejak tick terakhir) evaluasi
+// DILEWATI sama sekali. Menebak dgn memakai level sekarang sbg pengganti level sebelumnya persis
+// yang membuat reposisi garis oleh pengguna sendiri terbaca sbg persilangan; tak menyalakan apa pun
+// pada satu tick adalah jawaban yang jujur — tick berikutnya sudah punya baseline.
 func evalAlert(a AlertRow, prev, cur float64, now int64, lvlTrack levelTracker) (lvl float64, hit bool) {
 	lvl = levelAt(a, now)
-	hit = condHit(a.Cond, prev, cur, lvl)
-	if a.An == nil {
-		return lvl, hit // alert harga biasa: tak pernah butuh bookkeeping level
-	}
-	if !hit {
-		// Garis miring: level bergerak sendiri, jadi ia bisa menyeberangi harga yang
-		// diam. Butuh level pada tick SEBELUMNYA (dari anchor yang SAMA) utk melihatnya.
-		if pv, ok := lvlTrack.prevLevel(a.ID, *a.An); ok && crossedByLevelMove(pv, lvl, cur) {
-			hit = true
+	prevLvl := lvl
+	if a.An != nil {
+		pv, ok := lvlTrack.prevLevel(a.ID, *a.An)
+		lvlTrack.record(a.ID, *a.An, lvl) // dicatat lebih dulu: tick berikutnya butuh baseline ini juga saat tick INI dilewati
+		if !ok {
+			return lvl, false
 		}
+		prevLvl = pv
 	}
-	lvlTrack.record(a.ID, *a.An, lvl)
-	return lvl, hit
+	return lvl, sideHit(a.Cond, prev-prevLvl, cur-lvl)
 }
 
 // startAlertMonitor menjalankan goroutine tunggal yang memantau harga & menandai
