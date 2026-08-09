@@ -108,14 +108,24 @@ klinecharts.registerOverlay({
 });
 function drawAlertLines(){
   alerts.forEach(a=>{ if(a.oid){ try{chart.removeOverlay(a.oid);}catch(e){} a.oid=null; } });
-  alerts.filter(a=>a.sym===inst).forEach(a=>{
+  alerts.filter(a=>a.sym===inst && !a.drawId).forEach(a=>{   // alert garis: objeknya SUDAH jadi garisnya
     try{ a.oid=chart.createOverlay({name:'alertLine', points:[{value:a.price}], lock:true}); }catch(e){}
   });
+}
+// Judul satu baris alert. Alert biasa tetap "Crossing <harga>"; alert garis menyebut kondisi dan
+// asal objeknya — tanpa ini tiga kondisi baru tak terbedakan di satu-satunya tempat pengguna
+// melihat alertnya.
+function alertTitle(a){
+  const cond=({cross:'Crossing', up:'Crossing up', down:'Crossing down'})[a.cond||'cross'];
+  if(!a.drawId) return `${dispSym(a.sym)} ${cond} ${a.price}`;
+  const src=({trendline:'Trend line', rayLine:'Ray', straightLine:'Line',
+    horizontalStraightLine:'Horizontal line', horizontalRayLine:'Horizontal ray', priceLine:'Price line'})[a.name]||'Drawing';
+  return `${dispSym(a.sym)} · ${src} · ${cond}`;
 }
 function renderAlertList(){
   const el=$('#alertList'); if(!el) return;
   el.innerHTML = alerts.length
-    ? alerts.map((a,i)=>`<div class="al-item"><div class="al-main">${dispSym(a.sym)} Crossing ${a.price}</div>`
+    ? alerts.map((a,i)=>`<div class="al-item"><div class="al-main">${alertTitle(a)}</div>`
         +`<div class="al-sub">${dispSym(a.sym)} · <span class="al-st${a.triggeredAt?' trig':''}">${a.triggeredAt?'Triggered':'Active'}</span></div>`
         +`<button class="al-x" data-i="${i}" title="Delete">✕</button></div>`).join('')
     : '<div class="al-empty">No alerts yet. Click + to add.</div>';
@@ -176,12 +186,14 @@ async function alertPoll(){
     const rows=await r.json();
     // sinkron list dasar (untuk panel) — pertahankan oid overlay bila id sama
     const byId={}; alerts.forEach(a=>byId[a.id]=a);
-    const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt, oid:(byId[a.id]&&byId[a.id].oid)||null}));
+    const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt,
+      oid:(byId[a.id]&&byId[a.id].oid)||null, cond:a.cond||'cross', drawId:a.drawId||''}));
     // deteksi triggered baru → toast + Notification + ack (hapus)
     for(const a of rows){
       if(a.triggeredAt!=null && !shownTriggered.has(a.id)){
         shownTriggered.add(a.id);
-        const msg=a.instrument+' crossed '+a.price;
+        const msg = a.drawId ? `${dispSym(a.instrument)} — ${({cross:'crossing',up:'crossing up',down:'crossing down'})[a.cond||'cross']} your line`
+                             : a.instrument+' crossed '+a.price;
         try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
         toast(msg,'success');
         try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}

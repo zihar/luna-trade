@@ -134,6 +134,7 @@ const SENTINEL = {
   'replay-ui.js': 'pickMode',
   'draw-style-modal.js': 'PALETTE',
   'chart-settings.js': 'CHART_DEFAULT',
+  'draw-alert.js': 'ALERTABLE_LINE',
   'indicators.js': 'IND_DEFS',
   'context-menu.js': 'ctxMenu',
   'chart-type.js': {
