@@ -171,3 +171,38 @@ func TestHorizontalLineNoTradingSpanAccepted(t *testing.T) {
 		t.Fatalf("garis horizontal harus tetap 200, dapat %d body=%s", w.Code, w.Body.String())
 	}
 }
+
+// Alert zona lewat HTTP: pOff ikut tersimpan, dan kondisinya enter.
+func TestZoneAlertViaAPI(t *testing.T) {
+	storeForLineAlertAPI(t)
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	body := `{"instrument":"EUR_USD","cond":"enter","drawId":"z-1"` +
+		`,"t1":` + strconv.FormatInt(t1, 10) + `,"p1":1.10` +
+		`,"t2":` + strconv.FormatInt(t1+3*jam, 10) + `,"p2":1.20,"pOff":0.05}`
+	w := httptest.NewRecorder()
+	handleAlertCreate(w, reqUser("POST", "/api/alerts", body, 1))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	rows, _ := store.AllActiveAlerts()
+	if len(rows) != 1 || rows[0].An.POff != 0.05 || rows[0].Cond != "enter" {
+		t.Fatalf("baris DB: %+v", rows)
+	}
+}
+
+// Kondisi zona tanpa pOff ditolak 400 dgn pesan bahasa Inggris.
+func TestZoneAlertWithoutPOffRejected(t *testing.T) {
+	storeForLineAlertAPI(t)
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	body := `{"instrument":"EUR_USD","cond":"enter","drawId":"z-2"` +
+		`,"t1":` + strconv.FormatInt(t1, 10) + `,"p1":1.10` +
+		`,"t2":` + strconv.FormatInt(t1+3*jam, 10) + `,"p2":1.20}`
+	w := httptest.NewRecorder()
+	handleAlertCreate(w, reqUser("POST", "/api/alerts", body, 1))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("harus 400, dapat %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "zone") {
+		t.Fatalf("pesan harus bahasa Inggris & menyebut zone, dapat %q", w.Body.String())
+	}
+}

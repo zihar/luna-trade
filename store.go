@@ -809,6 +809,10 @@ var (
 	// waktu dagang untuk diinterpolasi. Hanya berlaku bila P1 != P2: garis horizontal
 	// levelnya konstan, dan miliknya memang boleh berspan nol (lihat #180, t2 = t1+1).
 	ErrAlertNoTradingSpan = errors.New("garis tak punya waktu dagang di antara kedua ujungnya")
+	// Kondisi & bentuk harus sepadan: enter/exit butuh pita (POff != 0), cross/up/down butuh garis
+	// (POff == 0). Dijaga di store, bukan cuma di UI, supaya baris yang mustahil dievaluasi tak
+	// pernah bisa masuk DB lewat klien mana pun.
+	ErrAlertZonePair = errors.New("kondisi zona & lebar zona tak sepadan")
 )
 
 // validAnchors menolak dua bentuk anchor yang tak layak dipakai saat alert DIBUAT: vertikal (tak
@@ -817,9 +821,12 @@ var (
 //
 // Hanya CreateAlert yang memakainya. UpdateAlertAnchors sengaja lebih longgar — alasannya ada di
 // sana, dan bukan kelalaian.
-func validAnchors(instrument string, an LineAnchors) error {
+func validAnchors(instrument, cond string, an LineAnchors) error {
 	if an.T1 == an.T2 {
 		return ErrAlertVertical
+	}
+	if (cond == "enter" || cond == "exit") != (an.POff != 0) {
+		return ErrAlertZonePair
 	}
 	if an.P1 != an.P2 && tradingElapsed(instrument, an.T1, an.T2) == 0 {
 		return ErrAlertNoTradingSpan
@@ -836,7 +843,7 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 	if cond == "" {
 		cond = "cross"
 	}
-	if cond != "cross" && cond != "up" && cond != "down" {
+	if cond != "cross" && cond != "up" && cond != "down" && cond != "enter" && cond != "exit" {
 		return 0, fmt.Errorf("%w: %s", ErrAlertCond, cond)
 	}
 	var t1, t2 any
@@ -844,7 +851,7 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 	if an != nil {
 		// Anchor yang tak punya "harga pada waktu t" yang bermakna ditolak di pintu masuk,
 		// bukan dijaga diam-diam saat evaluasi.
-		if err := validAnchors(instrument, *an); err != nil {
+		if err := validAnchors(instrument, cond, *an); err != nil {
 			return 0, err
 		}
 		t1, p1, t2, p2, pOff = an.T1, an.P1, an.T2, an.P2, an.POff
