@@ -853,16 +853,17 @@ func nullIfEmpty(s string) any {
 // UpdateAlertAnchors memindahkan acuan garis sebuah alert (dipakai saat pengguna menggeser
 // objeknya). Alert-nya tetap alert yang sama — id, kondisi, dan status triggered tak tersentuh.
 func (s *Store) UpdateAlertAnchors(uid, id int64, an LineAnchors) error {
-	// Instrumen dibaca dari barisnya sendiri, bukan dari muatan klien: model sesi (24/5 vs 24/7)
-	// menentukan apakah anchor ini sah, jadi klien tak boleh bisa memilih model yang lebih longgar
-	// dengan mengaku instrumen lain.
-	var instrument string
-	if err := s.db.QueryRow(`SELECT instrument FROM price_alerts WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
-		id, uid).Scan(&instrument); err != nil {
-		return fmt.Errorf("alert not found")
-	}
-	if err := validAnchors(instrument, an); err != nil {
-		return err
+	// Di sini SENGAJA cuma vertikal yang ditolak, bukan validAnchors() lengkap seperti di
+	// CreateAlert. Menolak "tak ada waktu dagang" pada jalur GESER justru merugikan: pemanggilnya
+	// (syncAlertAnchors, js/draw-alert.js) menulis state lokalnya SEBELUM fetch dan menelan
+	// kegagalan tanpa retry — penolakan di sini membuat garis di layar bergerak sementara alert
+	// diam-diam tetap mengawasi posisi LAMA, tanpa apa pun yang memberi tahu pengguna.
+	//
+	// Dan yang dicegah itu tak berbahaya: levelAt() membekukan level di P1 saat span dagang nol,
+	// jadi anchor seperti itu punya perilaku yang terdefinisi. Penolakan tetap ada di CreateAlert,
+	// tempat pengguna hadir, mendapat pesan, dan bisa memperbaiki garisnya.
+	if an.T1 == an.T2 {
+		return ErrAlertVertical
 	}
 	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
 		an.T1, an.P1, an.T2, an.P2, id, uid)

@@ -165,15 +165,22 @@ Ini yang membuat PR-nya kecil:
    jatuh di dalam jendela pasar-tutup yang sama — bukan kasus teoretis: anchor bisa berada di **area
    future** (kanan bar terakhir), dan menggambar di akhir pekan menaruh keduanya di sana.
 
-   Ditangani dua tempat, dengan satu syarat yang wajib diikuti:
+   Ditangani dua tempat, dan **jalur create sengaja lebih ketat daripada jalur geser**:
 
-   - **Penolakan saat create/update anchor hanya berlaku bila `P1 != P2`.** Menolak semua span nol
-     akan **meregresi #180**: alert garis horizontal memakai `t2 = t1+1`, jadi garis horizontal yang
-     digambar di area future pada akhir pekan punya span dagang nol — dan hari ini ia sah. Level
-     garis horizontal konstan, jadi span memang tak relevan untuknya.
    - **Saat evaluasi, `span == 0` → `level = P1`** (bukan pembagian, bukan `r.Price`). Untuk garis
-     horizontal itu jawaban yang benar; untuk garis miring yang lolos lewat jalur lain itu jawaban
-     paling tak berbahaya — level membeku di anchor pertama alih-alih meledak.
+     horizontal itu jawaban yang benar; untuk garis miring itu jawaban paling tak berbahaya — level
+     membeku di anchor pertama alih-alih meledak. Ini yang membuat anchor semacam itu **terdefinisi**,
+     bukan sekadar dicegah.
+   - **CreateAlert menolaknya bila `P1 != P2`.** Di sinilah pengguna hadir: ia menekan Create,
+     mendapat pesan, dan bisa memperbaiki garisnya. Syarat `P1 != P2` wajib — menolak semua span nol
+     akan **meregresi #180**, karena alert garis horizontal memakai `t2 = t1+1` sehingga yang
+     digambar di area future pada akhir pekan punya span dagang nol, dan hari ini ia sah.
+   - **UpdateAlertAnchors TIDAK menolaknya** (hanya vertikal). Ini revisi dari rancangan awal, hasil
+     review cabang. Menolak di jalur geser tampak seperti menutup celah "buat alert pada garis sah
+     lalu seret ke akhir pekan", tapi celah itu tak berbahaya (level membeku, lihat butir pertama)
+     sementara penolakannya berbahaya: `syncAlertAnchors` menulis state lokalnya **sebelum** fetch
+     dan menelan kegagalan tanpa retry, jadi penolakan membuat garis di layar bergerak sementara
+     alert diam-diam tetap mengawasi posisi LAMA — tanpa pesan, tanpa pemulihan.
 2. **`now < t1`** → lewati evaluasi (Keputusan 2).
 3. **Instrumen tak dikenal** → jatuh ke model `24/5`, bukan error. Model salah lebih baik daripada
    alert yang diam-diam mati, dan 24/5 adalah tebakan teraman untuk instrumen OANDA apa pun.

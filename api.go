@@ -310,12 +310,6 @@ func handleAlertAnchors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := store.UpdateAlertAnchors(uid, req.ID, LineAnchors{T1: req.T1, P1: req.P1, T2: req.T2, P2: req.P2}); err != nil {
-		// Penolakan VALIDASI dibedakan dari "tak ketemu": menyeret garis miring ke akhir pekan
-		// bukan kesalahan identitas alert, dan pesannya harus mengatakan yang sebenarnya.
-		if errors.Is(err, ErrAlertNoTradingSpan) {
-			writeErr(w, http.StatusBadRequest, "line has no market time between its two points")
-			return
-		}
 		writeErr(w, http.StatusBadRequest, "alert not found")
 		return
 	}

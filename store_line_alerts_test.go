@@ -116,9 +116,12 @@ func TestCreateAlertHorizontalTanpaWaktuDagangTetapSah(t *testing.T) {
 	}
 }
 
-// Jalur update anchor dijaga sama — kalau tidak, penolakan saat create bisa dilewati dgn
-// membuat alert pada garis yang sah lalu menyeretnya ke akhir pekan.
-func TestUpdateAnchorsMiringTanpaWaktuDagang(t *testing.T) {
+// Jalur GESER sengaja lebih longgar dari jalur CREATE: menyeret garis sampai kedua ujungnya masuk
+// akhir pekan harus TETAP tersimpan. Kalau ditolak, syncAlertAnchors (yang menulis state lokalnya
+// sebelum fetch dan menelan kegagalan) membuat garis di layar bergerak sementara alert diam-diam
+// mengawasi posisi lama. Perilaku anchor seperti itu sendiri terdefinisi: levelAt membekukannya
+// di P1.
+func TestUpdateAnchorsKeAkhirPekanTetapTersimpan(t *testing.T) {
 	s := storeForLineAlerts(t)
 	senin := nyMs(t, 2026, time.January, 12, 9, 0)
 	an := LineAnchors{T1: senin, P1: 1.10, T2: senin + 3*jam, P2: 1.20}
@@ -127,13 +130,27 @@ func TestUpdateAnchorsMiringTanpaWaktuDagang(t *testing.T) {
 		t.Fatalf("setup gagal: %v", err)
 	}
 	sabtu := nyMs(t, 2026, time.January, 10, 8, 0)
-	buruk := LineAnchors{T1: sabtu, P1: 1.10, T2: sabtu + 3*jam, P2: 1.20}
-	if err := s.UpdateAlertAnchors(1, id, buruk); !errors.Is(err, ErrAlertNoTradingSpan) {
-		t.Fatalf("err = %v, mau ErrAlertNoTradingSpan", err)
+	geser := LineAnchors{T1: sabtu, P1: 1.30, T2: sabtu + 3*jam, P2: 1.40}
+	if err := s.UpdateAlertAnchors(1, id, geser); err != nil {
+		t.Fatalf("geser ke akhir pekan harus tersimpan, dapat: %v", err)
 	}
-	// Anchor lama harus utuh — penolakan tak boleh menulis separuh.
 	rows, _ := s.AllActiveAlerts()
-	if len(rows) != 1 || rows[0].An.T1 != senin {
-		t.Fatalf("anchor lama ikut berubah: %+v", rows)
+	if len(rows) != 1 || rows[0].An.T1 != sabtu || rows[0].An.P1 != 1.30 {
+		t.Fatalf("anchor tak tersimpan: %+v", rows)
+	}
+	// Dan levelnya terdefinisi: beku di P1, bukan pembagian nol.
+	if got := levelAt(rows[0], sabtu+jam); got != 1.30 {
+		t.Fatalf("level = %v, mau 1.30 (beku di P1)", got)
+	}
+}
+
+// Vertikal tetap ditolak di jalur geser — ia tak punya "harga pada waktu t" sama sekali.
+func TestUpdateAnchorsVertikalDitolak(t *testing.T) {
+	s := storeForLineAlerts(t)
+	senin := nyMs(t, 2026, time.January, 12, 9, 0)
+	an := LineAnchors{T1: senin, P1: 1.10, T2: senin + 3*jam, P2: 1.20}
+	id, _ := s.CreateAlert(1, "EUR_USD", 0, 1000, "cross", "did-4", &an)
+	if err := s.UpdateAlertAnchors(1, id, LineAnchors{T1: senin, P1: 1.1, T2: senin, P2: 1.2}); !errors.Is(err, ErrAlertVertical) {
+		t.Fatalf("err = %v, mau ErrAlertVertical", err)
 	}
 }
