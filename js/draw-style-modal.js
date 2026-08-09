@@ -37,7 +37,7 @@ function openDrawModal(o, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
   const name=o.name, st=dstyle(o), isFib=(name==='fib3');
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
-  const hasAlert=ALERTABLE_LINE.has(name);
+  const hasAlert=ALERTABLE.has(name);
   const active=(tab==='text'&&hasText)?'text':(tab==='alert'&&hasAlert)?'alert':'style';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');

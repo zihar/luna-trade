@@ -193,7 +193,7 @@ async function alertPoll(){
     // yg tak ada hubungannya) mem-POST ulang anchor tiap alert garis di instrumen ini, sia-sia.
     const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt,
       oid:(byId[a.id]&&byId[a.id].oid)||null, cond:a.cond||'cross', drawId:a.drawId||'',
-      t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2}));
+      t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2, pOff:a.pOff||0}));
     // deteksi triggered baru → toast + Notification + ack (hapus)
     for(const a of rows){
       if(a.triggeredAt!=null && !shownTriggered.has(a.id)){

@@ -147,6 +147,7 @@ type alertView struct {
 	P1          *float64 `json:"p1"`
 	T2          *int64   `json:"t2"`
 	P2          *float64 `json:"p2"`
+	POff        *float64 `json:"pOff"` // zona: jarak harga ke batas kedua; 0/absen = bukan zona
 }
 
 // toAlertView mengubah baris Alert (store) jadi alertView (JSON FE). Anchor garis
@@ -164,6 +165,7 @@ func toAlertView(a Alert) alertView {
 	}
 	if a.An != nil {
 		v.T1, v.P1, v.T2, v.P2 = &a.An.T1, &a.An.P1, &a.An.T2, &a.An.P2
+		v.POff = &a.An.POff
 	}
 	return v
 }
