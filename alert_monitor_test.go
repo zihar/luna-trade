@@ -116,3 +116,63 @@ func TestSlopedLineCrossesWithoutPriceChange(t *testing.T) {
 		t.Fatalf("garis yang melewati harga harus terdeteksi")
 	}
 }
+
+// Fix round 1 — bug #1: men-drag garis tak boleh membangkitkan alert palsu. Level
+// lama (dari anchor SEBELUM digeser) tak boleh dibandingkan seakan level itu berasal
+// dari garis yang sama dgn anchor yang berlaku sekarang.
+func TestLevelTrackerIgnoresStaleLevelAfterAnchorChange(t *testing.T) {
+	lvlTrack := levelTracker{}
+	const price = 1.50
+
+	// Tick 1: garis LAMA, levelnya di BAWAH harga (harga diam di kedua tick).
+	oldAn := LineAnchors{T1: 0, P1: 1.00, T2: 10_000, P2: 2.00} // level(4000) = 1.40
+	a := AlertRow{ID: 1, Cond: "cross", An: &oldAn}
+	lvl1, hit1 := evalAlert(a, price, price, 4000, lvlTrack)
+	if hit1 {
+		t.Fatalf("tick pertama belum boleh menyala")
+	}
+	if lvl1 >= price {
+		t.Fatalf("prasyarat salah: level lama %v harus di BAWAH harga %v", lvl1, price)
+	}
+
+	// Pengguna men-drag garis: anchor baru (horizontal) taruh levelnya di ATAS harga,
+	// pada waktu evaluasi yang SAMA — persis skenario reload cache di tengah drag.
+	newAn := LineAnchors{T1: 0, P1: 1.60, T2: 10_000, P2: 1.60}
+	a.An = &newAn
+	lvl2, hit2 := evalAlert(a, price, price, 4000, lvlTrack)
+	if lvl2 <= price {
+		t.Fatalf("prasyarat salah: level baru %v harus di ATAS harga %v", lvl2, price)
+	}
+	if hit2 {
+		t.Fatalf("reposisi garis oleh pengguna sendiri tak boleh menyalakan alert (level lama basi terpakai)")
+	}
+}
+
+// Fix round 1 — bug #2 (bagian tulis): alert harga biasa tak pernah membaca
+// levelTracker, jadi tak boleh ditulis ke sana juga (kalau tidak, peta tumbuh
+// tanpa guna selama umur proses monitor).
+func TestLevelTrackerSkipsPlainPriceAlerts(t *testing.T) {
+	lvlTrack := levelTracker{}
+	a := AlertRow{ID: 7, Cond: "cross", Price: 1.2345} // An nil: alert harga biasa
+	evalAlert(a, 1.10, 1.20, 1000, lvlTrack)
+	if _, ok := lvlTrack[7]; ok {
+		t.Fatalf("alert harga biasa (An nil) tak boleh dicatat di levelTracker")
+	}
+}
+
+// Fix round 1 — bug #2 (bagian pangkas): entry milik alert yang sudah tak aktif
+// (triggered/dihapus) harus lenyap setelah reload, bukan menumpuk selamanya —
+// goroutine monitor didesain hidup lama tanpa browser terbuka.
+func TestLevelTrackerPruneRemovesInactiveAlerts(t *testing.T) {
+	lvlTrack := levelTracker{
+		1: {lvl: 1.10},
+		2: {lvl: 1.20},
+	}
+	lvlTrack.prune(map[int64]bool{1: true}) // alert 2 sudah tak ada di cache aktif
+	if _, ok := lvlTrack[1]; !ok {
+		t.Fatalf("alert 1 masih aktif, entrinya tak boleh hilang")
+	}
+	if _, ok := lvlTrack[2]; ok {
+		t.Fatalf("alert 2 sudah tak aktif, entrinya harus dibuang")
+	}
+}
