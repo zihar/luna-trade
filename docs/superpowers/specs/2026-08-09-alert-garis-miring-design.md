@@ -75,9 +75,16 @@ tepat 120 jam wall-clock, tanpa pekan 119/121 jam yang harus dikecualikan.
 - **Jeda harian instrumen non-forex tidak dimodelkan.** Indeks & energi CFD (DE30, UK100, JP225,
   WTICO, NATGAS…) tidak buka 24 jam pada hari kerja, jadi levelnya masih berjalan lebih cepat dari
   garis di layar. Model 24/5 tetap memperbaiki potongan terbesar (48 jam/pekan) untuk instrumen ini.
-  **Saat verifikasi manual, jeda harian aktual diukur dari candle H1 nyata dan angkanya ditulis
-  balik ke bagian ini**; kalau ternyata besar, ia jadi item backlog sendiri — dengan data, bukan
-  tebakan.
+
+  **Angkanya belum diukur, dan alasannya bukan kelalaian:** pengukuran direncanakan dari candle H1
+  nyata, tapi jaringan tempat pengembangan ini berjalan memblokir OANDA — TLS ke
+  `api-fxpractice.oanda.com` mendarat di sertifikat `internetpositif.id` (DNS hijack ISP), jadi
+  `/api/candles` mengembalikan error, bukan data. Yang ditulis di sini adalah keadaan sebenarnya,
+  bukan tebakan berkostum pengukuran.
+
+  **Cara menyelesaikannya nanti** (item backlog, bukan blocker rilis): jalankan dari EC2 — yang
+  punya akses OANDA — hitung berapa bar H1 yang benar-benar ada per hari kerja untuk tiap instrumen
+  indeks/energi, bandingkan dengan 24, dan kalau selisihnya besar, tambahkan model sesi ketiga.
 
 Keduanya menggeser level, bukan membalik arah, dan keduanya jauh lebih kecil dari 28,6% yang
 diperbaiki.
