@@ -4,7 +4,7 @@
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect } = require('../helpers/chart');
-const { armTool, clickAt, overlays, CLICK_GAP_MS } = require('../helpers/draw');
+const { armTool, clickAt, overlays, drawTool, CLICK_GAP_MS } = require('../helpers/draw');
 
 async function drawTrendline(page, rect) {
   await armTool(page, 'trendline');
@@ -97,6 +97,71 @@ test.describe('alert garis: tab & pembuatan', () => {
     await expect(page.locator('.dm-pane[data-pane="alert"] .da-del')).toBeVisible();
     await page.click('.dm-pane[data-pane="alert"] .da-del');
     await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(0);
+    assertNoPageErrors(page);
+  });
+
+  // Fix round 1 — review menemukan: horizontalStraightLine & priceLine cuma 1 titik, jadi
+  // lineAnchorsOf lama (yg mensyaratkan points.length>=2) SELALU gagal utknya walau keduanya
+  // anggota ALERTABLE_LINE. Pakai horizontalStraightLine (drawTool sudah menanganinya sbg
+  // objek 1-klik, lihat tests/drawing/30-interaction.spec.js).
+  test('horizontalStraightLine (objek 1-titik): alert tetap mengirim empat anchor, t1 !== t2', async ({ page }) => {
+    await gotoApp(page);
+    const { obj: o } = await drawTool(page, 'horizontalStraightLine');
+
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts')) posts.push(r.postDataJSON()); });
+
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.click('.dm-pane[data-pane="alert"] .da-create');
+    await expect.poll(() => posts.length, { timeout: 5000 }).toBe(1);
+
+    const body = posts[0];
+    for (const k of ['t1', 'p1', 't2', 'p2']) {
+      expect(body[k], `anchor ${k} harus terkirim`).not.toBeUndefined();
+      expect(body[k], `anchor ${k} tak boleh null`).not.toBeNull();
+    }
+    expect(body.p1).toBe(body.p2);   // level konstan: satu-satunya harga objek dipakai dua kali
+    expect(body.t1, 'objek 1-titik harus tetap dapat t1 !== t2 (server menolak vertikal)').not.toBe(body.t2);
+    assertNoPageErrors(page);
+  });
+
+  // Fix round 1 — review menemukan: modal yg masih terbuka sesudah Create tetap menampilkan
+  // form Create (bukan Delete), jadi klik kedua mengirim POST /api/alerts KEDUA. Test ini
+  // SENGAJA tidak reopen modal — itulah yg bikin gagal lama luput ketahuan.
+  test('sesudah Create, pane yg masih terbuka (TANPA reopen) langsung tampil Delete', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await drawTrendline(page, rect);
+
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.click('.dm-pane[data-pane="alert"] .da-create');
+    await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
+
+    // TANPA openObjSettings lagi: pane yg sudah terbuka harus sudah berganti sendiri.
+    await expect(page.locator('.dm-pane[data-pane="alert"] .da-del')).toBeVisible();
+    await expect(page.locator('.dm-pane[data-pane="alert"] .da-create')).toHaveCount(0);
+    assertNoPageErrors(page);
+  });
+
+  // Fix round 1 — review menemukan: gerbang !a.drawId di drawAlertLines() ada tapi tak pernah
+  // diuji siapa pun; regresi di situ menggambar garis datar di harga 0 utk tiap alert garis.
+  test('drawAlertLines() tak membuat overlay alertLine untuk alert garis', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await drawTrendline(page, rect);
+
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.click('.dm-pane[data-pane="alert"] .da-create');
+    await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
+
+    const created = await page.evaluate(() => {
+      const calls = [];
+      const orig = chart.createOverlay;
+      chart.createOverlay = (opts) => { if (opts && opts.name === 'alertLine') calls.push(opts); return orig.call(chart, opts); };
+      try { drawAlertLines(); } finally { chart.createOverlay = orig; }
+      return calls;
+    });
+    expect(created, 'alert garis tak boleh menghasilkan overlay alertLine — garisnya sudah ADA sbg objek gambar').toHaveLength(0);
     assertNoPageErrors(page);
   });
 });
