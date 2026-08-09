@@ -75,4 +75,39 @@ test.describe('did: id stabil objek gambar', () => {
     expect(dids[1], 'salinan tetap harus punya did').toBeTruthy();
     assertNoPageErrors(page);
   });
+
+  // Test 1 lama (di atas) lolos LEWAT jaring pengaman debounce simpan (350ms) — CLICK_GAP_MS
+  // (450ms) yang sudah dilewati sebelum diperiksa lebih lama dari itu, jadi ia tak membuktikan
+  // did lahir SAAT objek didaftarkan. Test ini memeriksa tanpa jeda buatan sama sekali: armTool()
+  // sendiri baru resolve setelah `inProgressId != null` (tests/helpers/draw.js), dan penetapan
+  // did di js/draw-tools.js terjadi PADA baris yang sama (sebelum `inProgressId=id`) — jadi kalau
+  // did tak didaftarkan di situ, objDid[inProgressId] masih kosong persis di titik ini, tanpa
+  // perlu menunggu apa pun.
+  test('did ada SEGERA saat objek didaftarkan — bukan lewat debounce simpan', async ({ page }) => {
+    await gotoApp(page);
+    await armTool(page, 'trendline');   // resolve-nya sendiri sudah menyaratkan inProgressId != null
+
+    const did = await page.evaluate(() => objDid[inProgressId]);
+    expect(did, 'did harus ada begitu objek didaftarkan ke drawIds, sebelum debounce 350ms sempat jalan').toBeTruthy();
+    assertNoPageErrors(page);
+  });
+
+  // Instant-drop (Alt+H/Alt+V) tak pernah lewat onDrawEnd — satu-satunya bukti jalur ini benar
+  // adalah tes langsung terhadapnya. Alt+H → activateShortcut → pickTool → createDraw() semuanya
+  // sinkron (js/draw-rail.js, js/keyboard.js): tak ada await/setTimeout di antaranya, jadi begitu
+  // page.keyboard.press() resolve, garis (dan did-nya, kalau fix ini benar) sudah ada.
+  test('instant-drop (Alt+H) dapat did segera, tanpa menunggu debounce', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await page.mouse.move(rect.x + rect.width * 0.5, rect.y + rect.height * 0.5, { steps: 4 });
+    await page.keyboard.press('Alt+H');
+    // instant-drop: tak masuk mode gambar → inProgressId kembali null di keydown yang sama
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 3000 });
+
+    const hline = (await overlays(page)).find((o) => o.name === 'horizontalStraightLine');
+    expect(hline, 'Alt+H harus langsung menjatuhkan garis').toBeTruthy();
+    const did = await page.evaluate((id) => objDid[id], hline.id);
+    expect(did, 'garis instant-drop harus punya did segera setelah jatuh').toBeTruthy();
+    assertNoPageErrors(page);
+  });
 });

@@ -341,6 +341,11 @@ function createDraw(name,btn,extra,instant){
     if(instant && INSTANT_DROP[name]){ const pt=instantDropPoint(name); if(pt){ base.points=[pt]; dropped=true; } }
     const id=chart.createOverlay(Object.assign(base,delHooks(),extra||{}));
     if(id){ drawIds.push(id);
+      // did didaftarkan DI SINI, bukan ditunda ke debounce simpan (js/draw-persist.js): jalur ini
+      // melayani DUA dari empat cara objek lahir (finish-drawing non-instant & instant-drop H/V),
+      // dan objek yang baru jadi bisa langsung dipilih/dipakai (mis. diikat ke alert) sebelum
+      // 350ms debounce sempat jalan. didOf() tetap jadi jaring pengaman, bukan jalur utama.
+      didOf(id);
       if(dropped){   // sudah jadi (bukan mode gambar): onDrawEnd TAK terpanggil → tangani manual
         inProgressId=null; disarmIcons();
         try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // spt jalur restore
