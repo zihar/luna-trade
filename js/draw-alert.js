@@ -1,41 +1,53 @@
 // [alert-garis] Alert yang terikat objek gambar: levelnya mengikuti garisnya, bukan satu harga
 // tetap. Rancangan & keputusannya: docs/superpowers/specs/2026-08-09-alert-dari-garis-design.md
 
-// v1 HANYA garis HORIZONTAL. Ini penyempitan sadar dari enam anggota keluarga garis, bukan
-// kelalaian: anchor alert adalah waktu WALL-CLOCK dan monitor mengekstrapolasi level secara linear
-// dalam waktu KALENDER, sementara chart menggambar sumbu-x linear dalam INDEKS BAR. Keduanya cuma
-// sepakat pada instrumen tanpa jeda sesi. Forex libur ~48 dari 168 jam tiap pekan, saham ~17,5 dari
-// 24 jam tiap hari — jadi garis MIRING yang diekstrapolasi berlari jauh mendahului garis yang
-// digambar pengguna (untuk forex bisa hitungan hari sesudah akhir pekan, dan monitor tetap hidup
-// melewati akhir pekan itu). Garis horizontal levelnya KONSTAN, jadi basis waktunya tak berpengaruh
-// sama sekali dan kode hari ini sudah benar untuknya. Garis miring menyusul di spec kedua, bersama
-// zona (channel & rectangle), setelah basis waktunya dirancang benar.
+// Tool yang bisa dijadikan alert. Dua keluarga, dan pembedaannya BUKAN kosmetik: anchor keduanya
+// dibaca dengan aturan yang berbeda (lihat lineAnchorsOf).
 //
-// Sengaja TIDAK ada jalur "terima tool miring kalau kebetulan datar (p1===p2)": pengguna lalu bisa
-// membuat alert pada trendline datar lalu menyeret salah satu ujungnya — dan diam-diam mendapat
-// persis kasus miring yang baru saja ditunda.
-const ALERTABLE_LINE=new Set(['horizontalStraightLine','horizontalRayLine','priceLine']);
+// Garis MIRING dibuka di spec kedua (docs/superpowers/specs/2026-08-09-alert-garis-miring-design.md)
+// sesudah basis waktunya diperbaiki: monitor kini menginterpolasi level dalam JAM DAGANG
+// (session.go), bukan waktu kalender, sehingga level yang diawasi sama dengan garis yang digambar
+// di sumbu indeks-bar. Sebelum itu — dan inilah sebab v1 (#180) sengaja horizontal saja — garis
+// miring yang diekstrapolasi berlari 28,6% mendahului garisnya sendiri di forex, karena pasar
+// kehilangan 48 dari 168 jam tiap pekan sementara wall-clock terus berjalan.
+//
+// Zona (rect, parallelStraightLine, priceChannelLine) masih di luar: ia butuh kondisi enter/exit
+// dan level KEDUA, bukan sekadar basis waktu yang benar.
+const SLOPED_LINE=new Set(['trendline','rayLine','straightLine']);
+const ALERTABLE_LINE=new Set(['horizontalStraightLine','horizontalRayLine','priceLine',...SLOPED_LINE]);
 
 // Dua anchor objek sebagai {t1,p1,t2,p2} waktu wall-clock — bentuk yang dipahami server.
 //
-// HARGA diambil dari points[0] untuk KEDUA anchor, bukan dibaca dari titik kedua: `p1===p2` jadi
-// benar SECARA KONSTRUKSI, bukan kebetulan. `horizontalRayLine` punya dua titik dan nilai titik
-// keduanya tak selalu ikut tersinkron ke titik pertama (muatan lama terutama) — "garis horizontal"
-// yang anchornya berselisih adalah alert MIRING berkostum horizontal, persis yang ditunda di atas.
+// SELALU MENAIK (t1 < t2). Garis boleh digambar kanan ke kiri, dan server memakai selisih waktu
+// dagang antar anchor sebagai penyebut. Menormalkan di sini menutup jalur create maupun
+// syncAlertAnchors sekaligus, jadi satu bentuk geometris punya satu representasi — kalau tidak,
+// pembandingan "anchor berubah?" di syncAlertAnchors bisa melihat perubahan yang tak pernah terjadi.
 //
+// Garis MIRING: kedua titik dibaca sungguhan. Kalau titik kedua hilang atau waktunya kembar,
+// objeknya DITOLAK — sengaja tidak jatuh ke fallback t1+1 milik tool 1-klik, sebab untuk garis
+// miring fallback itu akan mengarang kemiringan yang praktis tak hingga.
+//
+// Garis HORIZONTAL: HARGA diambil dari points[0] untuk KEDUA anchor, bukan dibaca dari titik kedua,
+// jadi `p1===p2` benar SECARA KONSTRUKSI. `horizontalRayLine` punya dua titik dan nilai titik
+// keduanya tak selalu ikut tersinkron (muatan lama terutama) — "garis horizontal" yang anchornya
+// berselisih adalah alert MIRING berkostum horizontal, dan sekarang levelnya betul-betul berjalan.
 // WAKTU: `horizontalStraightLine` & `priceLine` cuma punya 1 TITIK (TOOL_SPEC: clicks:1), jadi t2
 // dibuat t1+1. Interval itu sendiri tak bermakna — p1===p2 membuat level(t) konstan untuk interval
-// APA PUN; yang penting hanya t1!==t2 karena server menolak "garis vertikal". +1ms dipilih karena
-// itu pembeda PALING KECIL yang mungkin. Titik kedua yang waktunya hilang/kembar jatuh ke fallback
-// yang sama, bukan ditolak: menolaknya cuma akan membuat ray horizontal yang sah gagal jadi alert
-// padahal levelnya jelas dan konstan.
+// APA PUN; yang penting hanya t1!==t2 karena server menolak "garis vertikal". Titik kedua yang
+// waktunya hilang/kembar jatuh ke fallback yang sama, bukan ditolak: menolaknya cuma akan membuat
+// ray horizontal yang sah gagal jadi alert padahal levelnya jelas dan konstan.
 function lineAnchorsOf(overlayId){
   const o=chart.getOverlayById(overlayId); if(!o||!o.points||!o.points.length) return null;
   const a=o.points[0];
   const t1=tsOf(a); if(t1==null||a.value==null) return null;
+  if(SLOPED_LINE.has(o.name)){
+    const b=o.points[1]; if(!b||b.value==null) return null;
+    const t2=tsOf(b); if(t2==null||t2===t1) return null;
+    return t1<t2 ? {t1, p1:a.value, t2, p2:b.value} : {t1:t2, p1:b.value, t2:t1, p2:a.value};
+  }
   let t2=t1+1;
   if(o.points.length>1){ const tb=tsOf(o.points[1]); if(tb!=null && tb!==t1) t2=tb; }
-  return {t1, p1:a.value, t2, p2:a.value};
+  return (t1<t2) ? {t1, p1:a.value, t2, p2:a.value} : {t1:t2, p1:a.value, t2:t1, p2:a.value};
 }
 
 // Label kondisi alert — SATU tempat. Sebelumnya ditulis ulang tiga kali di dua berkas (di sini,

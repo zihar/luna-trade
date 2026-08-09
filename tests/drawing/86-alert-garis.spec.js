@@ -1,12 +1,14 @@
-// Alert dari objek gambar (garis HORIZONTAL) — tab Alert, pembuatan, dan label daftar.
-// Spec: docs/superpowers/specs/2026-08-09-alert-dari-garis-design.md
+// Alert dari objek gambar — tab Alert, pembuatan, dan label daftar.
+// Spec v1 (horizontal): docs/superpowers/specs/2026-08-09-alert-dari-garis-design.md
+// Spec v2 (miring):     docs/superpowers/specs/2026-08-09-alert-garis-miring-design.md
 //
-// v1 mendukung PERSIS tiga tool: horizontalStraightLine, horizontalRayLine, priceLine. Tool miring
-// (trendline / rayLine / straightLine) SENGAJA tak didukung — anchor alert adalah waktu wall-clock
-// sementara chart menggambar sumbu-x dalam indeks bar, jadi garis miring yang diekstrapolasi berlari
-// mendahului garis yang digambar begitu instrumennya punya jeda sesi. Karena itu berkas ini tak
-// punya satu pun test yang membuat alert dari tool miring: yang ada justru test bahwa tab Alert
-// TIDAK muncul untuknya.
+// Didukung: tiga tool HORIZONTAL (horizontalStraightLine, horizontalRayLine, priceLine) dan tiga
+// tool MIRING (trendline, rayLine, straightLine). Keduanya diuji berdampingan di berkas ini karena
+// anchornya dibaca dengan aturan BERBEDA: horizontal memaksa p1===p2 dari points[0], miring membaca
+// kedua titik sungguhan lalu menormalkannya jadi menaik.
+//
+// Zona (rect, parallelStraightLine, priceChannelLine) masih di luar — ia butuh kondisi enter/exit
+// dan level kedua, bukan sekadar basis waktu. Test rect di bawah menjaga batas itu.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
@@ -57,20 +59,49 @@ test.describe('alert garis: tab & pembuatan', () => {
     });
   }
 
-  // C1: tool MIRING tak boleh punya tab Alert sama sekali. Bukan "boleh kalau kebetulan datar" —
-  // pengguna lalu bisa membuat alert pada trendline datar lalu menyeret satu ujungnya dan diam-diam
-  // mendapat persis kasus miring yang ditunda ke spec kedua.
+  // Spec v2: tool MIRING kini punya tab Alert. Basis waktunya sudah jam-dagang (session.go), jadi
+  // level yang diawasi monitor sama dengan garis yang digambar di sumbu indeks-bar.
   for (const name of SLOPED_TOOLS) {
-    test(`tab Alert TIDAK muncul untuk ${name} (garis miring ditunda ke spec kedua)`, async ({ page }) => {
+    test(`tab Alert muncul untuk ${name} (garis miring)`, async ({ page }) => {
       await gotoApp(page);
       const { obj } = await drawTool(page, name);
       await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), obj.id);
-      await expect(page.locator('.dmodal-scrim.show'), 'modal setelan tetap harus terbuka').toHaveCount(1);
-      await expect(page.locator('.dm-tab[data-tab="alert"]')).toHaveCount(0);
-      expect(await page.evaluate((n) => ALERTABLE_LINE.has(n), name), `${name} tak boleh alertable`).toBe(false);
+      await expect(page.locator('.dm-tab[data-tab="alert"]')).toBeVisible();
+      expect(await page.evaluate((n) => ALERTABLE_LINE.has(n), name), `${name} harus alertable`).toBe(true);
       assertNoPageErrors(page);
     });
   }
+
+  // Kebalikan dari invarian horizontal: anchor tool miring membawa DUA harga yang berbeda, dan
+  // waktunya menaik. p1===p2 di sini justru berarti harga titik kedua tak terbaca.
+  for (const name of SLOPED_TOOLS) {
+    test(`${name}: anchor MIRING menaik (t1<t2) dan kedua harganya berbeda`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      const an = await page.evaluate((id) => lineAnchorsOf(id), obj.id);
+      expect(an, 'anchor harus terbentuk').not.toBeNull();
+      expect(an.t1, 't1 harus lebih awal dari t2 (dinormalkan)').toBeLessThan(an.t2);
+      expect(an.p1, 'garis miring: harga kedua ujung berbeda').not.toBe(an.p2);
+      assertNoPageErrors(page);
+    });
+  }
+
+  // Menggambar MUNDUR (kanan → kiri) adalah gestur yang sah. Server memakai selisih waktu dagang
+  // antar anchor sebagai penyebut, jadi anchor yang menurun akan membalik arah garisnya.
+  test('garis digambar KANAN ke KIRI tetap menghasilkan anchor menaik', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    await armTool(page, 'trendline');
+    await clickAt(page, rect, { x: Math.round(rect.width * 0.6), y: Math.round(rect.height * 0.3) });
+    await page.waitForTimeout(CLICK_GAP_MS);
+    await clickAt(page, rect, { x: Math.round(rect.width * 0.3), y: Math.round(rect.height * 0.6) });
+    await page.waitForTimeout(CLICK_GAP_MS);
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 5000 });
+    const obj = (await overlays(page))[0];
+    const an = await page.evaluate((id) => lineAnchorsOf(id), obj.id);
+    expect(an.t1, 'anchor harus dinormalkan menaik walau digambar mundur').toBeLessThan(an.t2);
+    assertNoPageErrors(page);
+  });
 
   test('tab Alert TIDAK muncul untuk rect (zona = spec kedua)', async ({ page }) => {
     await gotoApp(page);
