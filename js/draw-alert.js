@@ -11,10 +11,16 @@
 // miring yang diekstrapolasi berlari 28,6% mendahului garisnya sendiri di forex, karena pasar
 // kehilangan 48 dari 168 jam tiap pekan sementara wall-clock terus berjalan.
 //
-// Zona (rect, parallelStraightLine, priceChannelLine) masih di luar: ia butuh kondisi enter/exit
-// dan level KEDUA, bukan sekadar basis waktu yang benar.
+// Zona (rect, parallelStraightLine, priceChannelLine) menyusul di spec ketiga
+// (2026-08-10-alert-zona-design.md): ia menumpang basis waktu yang sama, dan yang ditambahkannya
+// cuma batas KEDUA (pOff) serta kondisi transisi keadaan (enter/exit).
 const SLOPED_LINE=new Set(['trendline','rayLine','straightLine']);
 const ALERTABLE_LINE=new Set(['horizontalStraightLine','horizontalRayLine','priceLine',...SLOPED_LINE]);
+
+// Zona = pita antara DUA batas. Ketiganya dinormalkan ke bentuk yang sama sebelum dikirim — garis
+// batas pertama + jarak harga ke batas kedua — supaya server tak perlu tahu tool apa yang membuatnya.
+const ZONE_TOOL=new Set(['rect','parallelStraightLine','priceChannelLine']);
+const ALERTABLE=new Set([...ALERTABLE_LINE, ...ZONE_TOOL]);
 
 // Dua anchor objek sebagai {t1,p1,t2,p2} waktu wall-clock — bentuk yang dipahami server.
 //
@@ -50,9 +56,66 @@ function lineAnchorsOf(overlayId){
   return (t1<t2) ? {t1, p1:a.value, t2, p2:a.value} : {t1:t2, p1:a.value, t2:t1, p2:a.value};
 }
 
+// Anchor zona: garis batas pertama + `pOff` (jarak HARGA ke batas kedua, boleh negatif).
+//
+// Offset dihitung dalam INDEKS BAR lewat fidxOf(), bukan piksel dan bukan wall-clock. Sumbu-x chart
+// linear terhadap indeks bar (lihat komentar fidxOf di js/util.js), jadi inilah satu-satunya basis
+// yang memberi offset persis seperti yang tergambar: piksel akan ikut berubah saat chart digeser
+// (titik di luar layar → nilai ekstrapolasi/NaN), sedang wall-clock adalah cacat yang baru
+// diperbaiki PR #181. Karena sumbu harga Luna linear (tak ada skala log), offset harga konstan
+// sepanjang zona — jadi satu angka memang cukup, dan server tak perlu tahu tool asalnya.
+function zoneAnchorsOf(overlayId){
+  const o=chart.getOverlayById(overlayId); if(!o||!o.points||o.points.length<2) return null;
+  const P=o.points;
+  if(o.name==='rect'){
+    // Kotak sudah mekar jadi 8 handle (js/box-resize.js). Batas dibaca dari SEMUA titik, bukan dari
+    // indeks tertentu, supaya tak ikut pecah kalau tata letak handle berubah.
+    const vs=P.map(p=>p&&p.value).filter(v=>v!=null); if(vs.length<2) return null;
+    const lo=Math.min(...vs), hi=Math.max(...vs); if(hi===lo) return null;
+    const fs=P.map(fidxOf).filter(v=>v!=null&&isFinite(v)); if(fs.length<2) return null;
+    const t1=fidxToTs(Math.min(...fs)), t2=fidxToTs(Math.max(...fs));
+    if(t1==null||t2==null||t1===t2) return null;
+    // Batas pertama = sisi BAWAH kotak (horizontal, p1===p2 → level konstan apa pun basis waktunya).
+    return {t1, p1:lo, t2, p2:lo, pOff:hi-lo};
+  }
+  if(P.length<3||P[0].value==null||P[1].value==null||P[2].value==null) return null;
+  const i1=fidxOf(P[0]), i2=fidxOf(P[1]), i3=fidxOf(P[2]);
+  if(i1==null||i2==null||i3==null||i2===i1) return null;
+  const off=P[2].value-(P[0].value+(P[1].value-P[0].value)*((i3-i1)/(i2-i1)));
+  if(!isFinite(off)||off===0) return null;
+  const ta=tsOf(P[0]), tb=tsOf(P[1]); if(ta==null||tb==null||ta===tb) return null;
+  // Dinormalkan menaik, alasan sama dgn lineAnchorsOf.
+  const naik=ta<tb;
+  const t1=naik?ta:tb, p1=naik?P[0].value:P[1].value;
+  const t2=naik?tb:ta, p2=naik?P[1].value:P[0].value;
+  // priceChannelLine: yang digambar pengguna adalah SUMBU TENGAH — klinecharts menggambar garis
+  // lewat titik ke-3 DAN cerminnya (fungsi re() di sumbernya), jadi kedua batas simetris terhadap
+  // garis itu. Geser garisnya ke batas bawah lalu lipatgandakan offsetnya. Penggeseran murni di
+  // sumbu HARGA, tak menyentuh waktu, jadi tak butuh jam-dagang di sini.
+  if(o.name==='priceChannelLine') return {t1, p1:p1-off, t2, p2:p2-off, pOff:off*2};
+  return {t1, p1, t2, p2, pOff:off};
+}
+
+// Satu pintu untuk kedua keluarga — dipakai createLineAlert & syncAlertAnchors, supaya zona ikut
+// mengikuti objeknya (geser, undo, hapus) tanpa satu pun jalur baru.
+function anchorsOf(overlayId){
+  const o=chart.getOverlayById(overlayId); if(!o) return null;
+  const an=ZONE_TOOL.has(o.name) ? zoneAnchorsOf(overlayId) : lineAnchorsOf(overlayId);
+  if(an && an.pOff==null) an.pOff=0;
+  return an;
+}
+
 // Label kondisi alert — SATU tempat. Sebelumnya ditulis ulang tiga kali di dua berkas (di sini,
 // alertTitle & alertPoll di js/forming-candle.js) dan sudah sempat berbeda isinya.
-const COND_LABEL={cross:'Crossing', up:'Crossing up', down:'Crossing down'};
+const COND_LABEL={cross:'Crossing', up:'Crossing up', down:'Crossing down',
+  enter:'Entering zone', exit:'Exiting zone'};
+
+// Kondisi yang ditawarkan per keluarga objek. Zona memakai TRANSISI keadaan (masuk/keluar pita),
+// bukan persilangan satu level — dan namanya mengikuti TradingView. TV juga punya Inside/Outside,
+// tapi keduanya di sana bergantung pada periodicity (Once Per Bar / Every Time) yang Luna tak
+// punya: alert di sini one-shot, jadi "Outside" akan menyala beberapa detik sesudah dibuat karena
+// harga hampir selalu sedang di luar zona. Keduanya menunggu alert berulang, bukan dilupakan.
+const COND_OPTS={line:['cross','up','down'], zone:['enter','exit']};
 
 // Label asal alert untuk daftar alert. Diambil dari objek yang HIDUP di chart lewat `did`, bukan
 // dari field yang dititipkan saat alert dibuat: alertPoll() menulis ulang `alerts` tiap ~2 detik
@@ -76,10 +139,10 @@ function alertPaneHTML(o){
   const did=objDid[o.id], ex=alertForDid(did);
   if(ex) return `<div class="dm-pane" data-pane="alert"><div class="da-has">Alert active — ${COND_LABEL[ex.cond]||'Crossing'}</div>`
     +`<button class="da-del" type="button">Delete alert</button></div>`;
+  const opts=COND_OPTS[ZONE_TOOL.has(o.name)?'zone':'line']
+    .map(c=>`<option value="${c}">${COND_LABEL[c]}</option>`).join('');
   return `<div class="dm-pane" data-pane="alert">`
-    +`<label class="da-row"><span>Condition</span><select class="da-cond">`
-    +`<option value="cross">Crossing</option><option value="up">Crossing up</option><option value="down">Crossing down</option>`
-    +`</select></label>`
+    +`<label class="da-row"><span>Condition</span><select class="da-cond">${opts}</select></label>`
     +`<button class="da-create" type="button">Create alert</button></div>`;
 }
 
@@ -133,7 +196,7 @@ function timeoutAfter(ms){ return new Promise(res=>setTimeout(res, ms)); }
 // didOf) drpd memblokir pengguna — jaring pengamannya (unload/visibilitychange) sudah ada di
 // draw-sync.js.
 async function createLineAlert(overlayId, cond){
-  const an=lineAnchorsOf(overlayId); if(!an){ toast('This line cannot be used for an alert','warn'); return null; }
+  const an=anchorsOf(overlayId); if(!an){ toast('This drawing cannot be used for an alert','warn'); return null; }
   const did=didOf(overlayId);
   try{ saveDraws(); await Promise.race([flushPendingPushFor(inst), timeoutAfter(ALERT_FLUSH_TIMEOUT_MS)]); }catch(_){}
   try{
@@ -142,7 +205,7 @@ async function createLineAlert(overlayId, cond){
     if(!r.ok){ toast('Could not create alert','error'); return null; }
     const a=await r.json();
     alerts.push({id:a.id, sym:a.instrument, price:a.price, triggeredAt:null, oid:null,
-      cond:a.cond, drawId:a.drawId, t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2});
+      cond:a.cond, drawId:a.drawId, t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2, pOff:a.pOff||0});
     track('alert',{inst, cond, from:'drawing'});
     renderAlertList(); return a;
   // Kegagalan jaringan (fetch menolak) dulu balik diam-diam padahal cabang !r.ok bertoast:
@@ -160,8 +223,10 @@ async function syncAlertAnchors(){
   for(const a of alerts.slice()){
     if(!a.drawId || a.sym!==inst) continue;
     const oid=byDid[a.drawId]; if(!oid) continue;          // objeknya tak ada di layar → urusan penyapuan
-    const an=lineAnchorsOf(oid); if(!an) continue;
-    if(a.t1===an.t1 && a.p1===an.p1 && a.t2===an.t2 && a.p2===an.p2) continue;   // tak berubah → jangan kirim
+    const an=anchorsOf(oid); if(!an) continue;
+    if(a.t1===an.t1 && a.p1===an.p1 && a.t2===an.t2 && a.p2===an.p2 && (a.pOff||0)===an.pOff) continue;   // tak berubah → jangan kirim
+                                             // pOff WAJIB ikut dibandingkan: menyeret SISI zona tak mengubah
+                                             // keempat anchor lain, jadi tanpa ia zona yang dilebarkan tak pernah tersinkron.
     Object.assign(a, an);
     try{ await fetch('/api/alerts/anchors',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.assign({id:a.id}, an))}); }catch(_){}

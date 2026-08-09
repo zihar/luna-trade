@@ -154,3 +154,36 @@ func TestUpdateAnchorsVertikalDitolak(t *testing.T) {
 		t.Fatalf("err = %v, mau ErrAlertVertical", err)
 	}
 }
+
+// Kondisi zona tanpa lebar zona = pita setinggi nol; "masuk ke dalamnya" tak pernah bermakna.
+func TestCreateAlertZonaTanpaPOffDitolak(t *testing.T) {
+	s := storeForLineAlerts(t)
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	an := LineAnchors{T1: t1, P1: 1.10, T2: t1 + 3*jam, P2: 1.20}
+	if _, err := s.CreateAlert(1, "EUR_USD", 0, 1000, "enter", "z-1", &an); !errors.Is(err, ErrAlertZonePair) {
+		t.Fatalf("err = %v, mau ErrAlertZonePair", err)
+	}
+}
+
+// Kebalikannya: kondisi GARIS pada anchor yang punya lebar zona juga tak sepadan.
+func TestCreateAlertGarisDenganPOffDitolak(t *testing.T) {
+	s := storeForLineAlerts(t)
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	an := LineAnchors{T1: t1, P1: 1.10, T2: t1 + 3*jam, P2: 1.20, POff: 0.05}
+	if _, err := s.CreateAlert(1, "EUR_USD", 0, 1000, "cross", "z-2", &an); !errors.Is(err, ErrAlertZonePair) {
+		t.Fatalf("err = %v, mau ErrAlertZonePair", err)
+	}
+}
+
+func TestCreateAlertZonaSah(t *testing.T) {
+	s := storeForLineAlerts(t)
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	an := LineAnchors{T1: t1, P1: 1.10, T2: t1 + 3*jam, P2: 1.20, POff: 0.05}
+	if _, err := s.CreateAlert(1, "EUR_USD", 0, 1000, "enter", "z-3", &an); err != nil {
+		t.Fatalf("alert zona sah ditolak: %v", err)
+	}
+	rows, _ := s.AllActiveAlerts()
+	if len(rows) != 1 || rows[0].An.POff != 0.05 || rows[0].Cond != "enter" {
+		t.Fatalf("pOff/cond tak tersimpan: %+v", rows)
+	}
+}

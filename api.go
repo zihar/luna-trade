@@ -147,6 +147,7 @@ type alertView struct {
 	P1          *float64 `json:"p1"`
 	T2          *int64   `json:"t2"`
 	P2          *float64 `json:"p2"`
+	POff        *float64 `json:"pOff"` // zona: jarak harga ke batas kedua; 0/absen = bukan zona
 }
 
 // toAlertView mengubah baris Alert (store) jadi alertView (JSON FE). Anchor garis
@@ -164,6 +165,7 @@ func toAlertView(a Alert) alertView {
 	}
 	if a.An != nil {
 		v.T1, v.P1, v.T2, v.P2 = &a.An.T1, &a.An.P1, &a.An.T2, &a.An.P2
+		v.POff = &a.An.POff
 	}
 	return v
 }
@@ -198,6 +200,7 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 		P1         *float64 `json:"p1"`
 		T2         *int64   `json:"t2"`
 		P2         *float64 `json:"p2"`
+		POff       *float64 `json:"pOff"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad json")
@@ -228,6 +231,9 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		an = &LineAnchors{T1: *req.T1, P1: *req.P1, T2: *req.T2, P2: *req.P2}
+		if req.POff != nil {
+			an.POff = *req.POff
+		}
 	} else if req.Price <= 0 {
 		writeErr(w, http.StatusBadRequest, "instrument & price required")
 		return
@@ -236,9 +242,16 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 	if cond == "" {
 		cond = "cross"
 	}
-	if cond != "cross" && cond != "up" && cond != "down" {
+	if cond != "cross" && cond != "up" && cond != "down" && cond != "enter" && cond != "exit" {
 		// Sama alasan: pesan store ("kondisi tak dikenal…") berbahasa Indonesia.
 		writeErr(w, http.StatusBadRequest, "unknown alert condition")
+		return
+	}
+	// Kondisi & bentuk harus sepadan. Dicek di sini (bukan cuma diandalkan ke store) supaya
+	// pesannya bahasa Inggris — alasan yang sama dengan penolakan vertikal & tanpa-waktu-dagang.
+	// `cond` yang dipakai, bukan req.Cond mentah, karena "" sudah dinormalkan jadi "cross" di atas.
+	if an != nil && (cond == "enter" || cond == "exit") != (an.POff != 0) {
+		writeErr(w, http.StatusBadRequest, "zone alerts need a zone; line alerts need a line")
 		return
 	}
 	now := time.Now().UnixMilli()
@@ -252,7 +265,8 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 		// bukan salah pemanggil dan tak boleh dijawab 400 "invalid alert parameters" — itu
 		// menyuruh klien memperbaiki permintaan yang sebenarnya sudah benar. Dua-duanya tetap
 		// menyembunyikan err.Error() (berbahasa Indonesia / bisa berisi SQL mentah) dari klien.
-		if errors.Is(err, ErrAlertCond) || errors.Is(err, ErrAlertVertical) || errors.Is(err, ErrAlertNoTradingSpan) {
+		if errors.Is(err, ErrAlertCond) || errors.Is(err, ErrAlertVertical) ||
+			errors.Is(err, ErrAlertNoTradingSpan) || errors.Is(err, ErrAlertZonePair) {
 			writeErr(w, http.StatusBadRequest, "invalid alert parameters")
 			return
 		}
@@ -293,11 +307,12 @@ func handleAlertDelete(w http.ResponseWriter, r *http.Request) {
 func handleAlertAnchors(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
 	var req struct {
-		ID int64   `json:"id"`
-		T1 int64   `json:"t1"`
-		P1 float64 `json:"p1"`
-		T2 int64   `json:"t2"`
-		P2 float64 `json:"p2"`
+		ID   int64   `json:"id"`
+		T1   int64   `json:"t1"`
+		P1   float64 `json:"p1"`
+		T2   int64   `json:"t2"`
+		P2   float64 `json:"p2"`
+		POff float64 `json:"pOff"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad json")
@@ -309,7 +324,7 @@ func handleAlertAnchors(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "line cannot be vertical")
 		return
 	}
-	if err := store.UpdateAlertAnchors(uid, req.ID, LineAnchors{T1: req.T1, P1: req.P1, T2: req.T2, P2: req.P2}); err != nil {
+	if err := store.UpdateAlertAnchors(uid, req.ID, LineAnchors{T1: req.T1, P1: req.P1, T2: req.T2, P2: req.P2, POff: req.POff}); err != nil {
 		writeErr(w, http.StatusBadRequest, "alert not found")
 		return
 	}
@@ -362,11 +377,12 @@ func handleDrawingsGet(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/drawings {instrument, payload, baseVersion}
-//   versi cocok → 200 {version}
-//   versi basi  → 409 {version, payload} MILIK SERVER, keduanya dari SATU pembacaan store yang
-//                  sama — klien memakai pasangan ini apa adanya untuk menawarkan Reload, jadi
-//                  version yang basi berpasangan dengan payload yang baru (TOCTOU) tak boleh terjadi
-//   kebesaran   → 413
+//
+//	versi cocok → 200 {version}
+//	versi basi  → 409 {version, payload} MILIK SERVER, keduanya dari SATU pembacaan store yang
+//	               sama — klien memakai pasangan ini apa adanya untuk menawarkan Reload, jadi
+//	               version yang basi berpasangan dengan payload yang baru (TOCTOU) tak boleh terjadi
+//	kebesaran   → 413
 func handleDrawingsSave(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
 	// ContentLength diperiksa lebih dulu: badan yang JAUH melebihi batas (mis. 3× lipat) akan

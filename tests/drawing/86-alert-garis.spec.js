@@ -7,8 +7,9 @@
 // anchornya dibaca dengan aturan BERBEDA: horizontal memaksa p1===p2 dari points[0], miring membaca
 // kedua titik sungguhan lalu menormalkannya jadi menaik.
 //
-// Zona (rect, parallelStraightLine, priceChannelLine) masih di luar — ia butuh kondisi enter/exit
-// dan level kedua, bukan sekadar basis waktu. Test rect di bawah menjaga batas itu.
+// Zona (rect, parallelStraightLine, priceChannelLine) dibuka di spec ketiga
+// (2026-08-10-alert-zona-design.md): ketiganya dinormalkan ke satu bentuk — garis batas pertama +
+// pOff — dan memakai kondisi TRANSISI (Entering/Exiting), bukan persilangan satu level.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
@@ -17,6 +18,7 @@ const { armTool, clickAt, overlays, drawTool, CLICK_GAP_MS } = require('../helpe
 
 const HLINE_TOOLS = ['horizontalStraightLine', 'horizontalRayLine', 'priceLine'];
 const SLOPED_TOOLS = ['trendline', 'rayLine', 'straightLine'];
+const ZONE_TOOLS = ['rect', 'parallelStraightLine', 'priceChannelLine'];
 
 async function drawRect(page, rect) {
   await armTool(page, 'rect');
@@ -103,12 +105,60 @@ test.describe('alert garis: tab & pembuatan', () => {
     assertNoPageErrors(page);
   });
 
-  test('tab Alert TIDAK muncul untuk rect (zona = spec kedua)', async ({ page }) => {
+  // Zona: tab Alert ada, dan dropdown-nya menawarkan TRANSISI (enter/exit) — bukan cross.
+  // Kalau suatu saat ia kembali menawarkan cross, artinya gerbang keluarga objeknya bocor.
+  for (const name of ZONE_TOOLS) {
+    test(`tab Alert muncul untuk ${name} dgn kondisi Entering/Exiting`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
+      await expect(page.locator('.dm-tab[data-tab="alert"]')).toBeVisible();
+      const opts = await page.$$eval('.dm-pane[data-pane="alert"] select option', (os) => os.map((o) => o.value));
+      expect(opts).toEqual(['enter', 'exit']);
+      assertNoPageErrors(page);
+    });
+  }
+
+  for (const name of ZONE_TOOLS) {
+    test(`${name}: anchor zona membawa pOff bukan nol`, async ({ page }) => {
+      await gotoApp(page);
+      const { obj } = await drawTool(page, name);
+      const an = await page.evaluate((id) => anchorsOf(id), obj.id);
+      expect(an, 'anchor zona harus terbentuk').not.toBeNull();
+      expect(an.t1).toBeLessThan(an.t2);
+      expect(Math.abs(an.pOff), 'zona harus punya tinggi').toBeGreaterThan(0);
+      assertNoPageErrors(page);
+    });
+  }
+
+  // priceChannelLine: garis yang DIGAMBAR pengguna adalah sumbu tengah, jadi anchor yang dikirim
+  // harus sudah digeser — kalau tidak, pita yang diawasi meleset setengah lebar dari yang terlihat.
+  test('priceChannelLine: garis yang digambar ada di TENGAH pita yang dikirim', async ({ page }) => {
     await gotoApp(page);
-    const rect = await chartRect(page);
-    const r = await drawRect(page, rect);
-    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'style'), r.id);
-    await expect(page.locator('.dm-tab[data-tab="alert"]')).toHaveCount(0);
+    const { obj } = await drawTool(page, 'priceChannelLine');
+    const cek = await page.evaluate((id) => {
+      const o = chart.getOverlayById(id), an = anchorsOf(id);
+      const i1 = fidxOf(o.points[0]), i2 = fidxOf(o.points[1]), i3 = fidxOf(o.points[2]);
+      const f = (i3 - i1) / (i2 - i1);
+      const tengahDigambar = o.points[0].value + (o.points[1].value - o.points[0].value) * f;
+      const tengahDikirim = an.p1 + (an.p2 - an.p1) * f + an.pOff / 2;
+      return { tengahDigambar, tengahDikirim };
+    }, obj.id);
+    expect(Math.abs(cek.tengahDikirim - cek.tengahDigambar)).toBeLessThan(1e-9);
+    assertNoPageErrors(page);
+  });
+
+  // POST zona: cond transisi + pOff ikut terkirim.
+  test('rect: POST alert membawa cond enter + pOff', async ({ page }) => {
+    await gotoApp(page);
+    const { obj } = await drawTool(page, 'rect');
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts')) posts.push(r.postDataJSON()); });
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), obj.id);
+    await page.click('.dm-pane[data-pane="alert"] .da-create');
+    await expect.poll(() => posts.length, { timeout: 5000 }).toBe(1);
+    expect(posts[0].cond).toBe('enter');
+    expect(Math.abs(posts[0].pOff)).toBeGreaterThan(0);
     assertNoPageErrors(page);
   });
 

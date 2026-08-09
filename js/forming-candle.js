@@ -193,14 +193,19 @@ async function alertPoll(){
     // yg tak ada hubungannya) mem-POST ulang anchor tiap alert garis di instrumen ini, sia-sia.
     const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt,
       oid:(byId[a.id]&&byId[a.id].oid)||null, cond:a.cond||'cross', drawId:a.drawId||'',
-      t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2}));
+      t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2, pOff:a.pOff||0}));
     // deteksi triggered baru → toast + Notification + ack (hapus)
     for(const a of rows){
       if(a.triggeredAt!=null && !shownTriggered.has(a.id)){
         shownTriggered.add(a.id);
         // Peta kondisi yang sama (COND_LABEL, js/draw-alert.js) — di kalimat ini bentuknya huruf
         // kecil, jadi diturunkan dari peta itu alih-alih ditulis ulang jadi salinan ketiga.
-        const msg = a.drawId ? `${dispSym(a.instrument)} — ${(COND_LABEL[a.cond||'cross']||COND_LABEL.cross).toLowerCase()} your line`
+        //
+        // Kondisi zona sudah memuat kata "zone" ("Entering zone"), jadi ia TAK boleh diakhiri
+        // "your line" — kalimatnya akan jadi "entering zone your line". Objeknya pun bukan garis.
+        const zonaCond = a.cond==='enter' || a.cond==='exit';
+        const condTxt = (COND_LABEL[a.cond||'cross']||COND_LABEL.cross).toLowerCase();
+        const msg = a.drawId ? `${dispSym(a.instrument)} — ${condTxt}${zonaCond?'':' your line'}`
                              : a.instrument+' crossed '+a.price;
         try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
         toast(msg,'success');
