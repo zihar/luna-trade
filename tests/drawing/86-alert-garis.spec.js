@@ -164,4 +164,27 @@ test.describe('alert garis: tab & pembuatan', () => {
     expect(created, 'alert garis tak boleh menghasilkan overlay alertLine — garisnya sudah ADA sbg objek gambar').toHaveLength(0);
     assertNoPageErrors(page);
   });
+
+  // Fix round 2 — review menemukan: `await flushPendingPushFor(inst)` polos bisa menggantung
+  // SELAMANYA kalau koneksi ke /api/drawings STALL (server diam, bukan menolak) — fetch di
+  // codebase ini tak pernah punya timeout sendiri. __setStallDrawings membuat stub MENAHAN
+  // route tanpa fulfill sama sekali, meniru itu. Race timer (ALERT_FLUSH_TIMEOUT_MS, ~2dtk di
+  // js/draw-alert.js) harus tetap membiarkan alert terbentuk dlm batas waktu wajar.
+  test('flush gambar yang STALL tak menyandera Create — alert tetap terbentuk dlm batas waktu', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await drawTrendline(page, rect);
+
+    await page.evaluate(() => __setStallDrawings(true));   // /api/drawings kini digantung stub, tak pernah fulfill
+
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 300, 'alert'), o.id);
+    await page.click('.dm-pane[data-pane="alert"] .da-create');
+
+    // Timeout di sini (6dtk) sengaja jauh di atas ALERT_FLUSH_TIMEOUT_MS (~2dtk) + overhead —
+    // marjin utk CI, bukan utk menutupi kemungkinan menggantung selamanya (kalau race-nya hilang,
+    // ini akan timeout 6dtk lalu tetap merah, bukan macet tanpa batas — Playwright sendiri yang
+    // membatasi expect.poll).
+    await expect.poll(async () => (await page.locator('#alertList .al-item').count()), { timeout: 6000 }).toBe(1);
+    assertNoPageErrors(page);
+  });
 });

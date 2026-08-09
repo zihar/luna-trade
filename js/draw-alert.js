@@ -65,18 +65,29 @@ function wireAlertPane(panel, o){
   if(del) del.onclick=async ()=>{ await deleteAlertsForDid(objDid[o.id]); refreshAlertPane(panel, o); };
 }
 
-// Membuat alert SELALU menyimpan gambar dulu & MENUNGGU dorongannya sampai server: did-nya harus
-// betul2 ada di server sebelum ada baris alert yang menunjuknya. saveDraws() sendiri cuma
-// MENJADWALKAN dorongan (debounce jaringan 1,5dtk, js/draw-sync.js) — tanpa menunggu, POST alert
-// di bawah bisa tiba duluan, dan kalau tab tertutup di jendela itu alert-nya menunjuk gambar yang
-// tak pernah tersimpan. flushPendingPushFor mem-flush ANTREAN ITU JUGA (bukan sekadar
-// menjadwalkannya lagi) & mengembalikan promise fetch-nya utk ditunggu di sini. Kegagalan
-// jaringan tetap lanjut membuat alert (drawId sudah pasti diminta lewat didOf) drpd memblokir
-// pengguna — jaring pengamannya (unload/visibilitychange) sudah ada di draw-sync.js.
+// Batas tunggu flush gambar (fix round 2): fetch() di codebase ini TAK PERNAH punya timeout, jadi
+// koneksi yang STALL (server diam, beda dari GAGAL cepat — itu sudah ditangani catch di bawah)
+// akan menggantung `await` selamanya kalau tak dibatasi — tombol Create diam tanpa toast, tanpa
+// alert, tanpa pemulihan selain reload. 2 dtk cukup longgar utk koneksi sehat (jauh di atas RTT
+// wajar) tapi cukup pendek supaya stall tak menyandera pengguna.
+const ALERT_FLUSH_TIMEOUT_MS=2000;
+function timeoutAfter(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+// Membuat alert SELALU menyimpan gambar dulu & MENUNGGU dorongannya sampai server, TAPI PALING
+// LAMA `ALERT_FLUSH_TIMEOUT_MS`: did-nya idealnya sudah ada di server sebelum ada baris alert yang
+// menunjuknya. saveDraws() sendiri cuma MENJADWALKAN dorongan (debounce jaringan 1,5dtk,
+// js/draw-sync.js) — tanpa menunggu, POST alert di bawah bisa tiba duluan, dan kalau tab tertutup
+// di jendela itu alert-nya menunjuk gambar yang tak pernah tersimpan. flushPendingPushFor mem-flush
+// ANTREAN ITU JUGA (bukan sekadar menjadwalkannya lagi) & mengembalikan promise fetch-nya, yang
+// di-race melawan timer di sini — bukan ditunggu telanjang, sebab fetch tanpa timeout + koneksi
+// yang stall (bukan menolak) akan menggantung selamanya kalau tak dibatasi. Kegagalan jaringan
+// ATAU timer yang menang keduanya tetap lanjut membuat alert (drawId sudah pasti diminta lewat
+// didOf) drpd memblokir pengguna — jaring pengamannya (unload/visibilitychange) sudah ada di
+// draw-sync.js.
 async function createLineAlert(overlayId, cond){
   const an=lineAnchorsOf(overlayId); if(!an){ toast('This line cannot be used for an alert','warn'); return null; }
   const did=didOf(overlayId);
-  try{ saveDraws(); await flushPendingPushFor(inst); }catch(_){}
+  try{ saveDraws(); await Promise.race([flushPendingPushFor(inst), timeoutAfter(ALERT_FLUSH_TIMEOUT_MS)]); }catch(_){}
   try{
     const r=await fetch('/api/alerts',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.assign({instrument:inst, cond, drawId:did}, an))});

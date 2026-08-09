@@ -234,6 +234,10 @@ async function installStubs(page) {
           const row = state.drawings[key] || { payload: [], version: 0 };
           return json(route, { payload: row.payload, version: row.version });
         }
+        // Simulasi koneksi STALL (server diam, beda dari menolak cepat): route SENGAJA tak
+        // pernah di-fulfill, jadi fetch()-nya menggantung sampai pemanggil menyerah sendiri.
+        // Dipakai utk menguji batas waktu flush gambar di createLineAlert (js/draw-alert.js).
+        if (state.stallDrawings) return;
         // Muatan di atas batas server (256 KB) → 413. Diaktifkan lewat flag supaya test tak perlu
         // benar-benar menggambar ratusan objek untuk menguji jalur penolakan permanennya.
         if (state.tooBigDrawings) return json(route, { error: 'drawings too large' }, 413);
@@ -268,6 +272,7 @@ async function installStubs(page) {
   });
   await page.exposeFunction('__drawingsVersion', (instrument) => (state.drawings[instrument] || { version: 0 }).version);
   await page.exposeFunction('__setFailDrawings', (on) => { state.failDrawings = !!on; });
+  await page.exposeFunction('__setStallDrawings', (on) => { state.stallDrawings = !!on; });
   await page.exposeFunction('__setMalformedDrawings', (on) => { state.malformedDrawings = !!on; });
   await page.exposeFunction('__setTooBigDrawings', (on) => { state.tooBigDrawings = !!on; });
   await page.exposeFunction('__drawingsPayload', (instrument) => (state.drawings[instrument] || { payload: [] }).payload);
