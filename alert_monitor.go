@@ -5,6 +5,7 @@ package main
 
 import (
 	"log"
+	"math"
 	"strings"
 	"time"
 )
@@ -46,6 +47,18 @@ func levelAt(r AlertRow, now int64) float64 {
 	}
 	f := float64(tradingElapsed(r.Instrument, an.T1, now)) / float64(span)
 	return an.P1 + (an.P2-an.P1)*f
+}
+
+// zoneBounds = batas bawah & atas pita pada waktu `now`.
+//
+// Batas pertama memakai levelAt apa adanya, jadi jam-dagang, ekstrapolasi ke kanan, normalisasi
+// anchor terbalik, dan penjagaan span-nol semuanya diwarisi tanpa satu baris pun kode baru — zona
+// miring bergerak persis seperti garis miring. Urutan dinormalkan supaya pOff negatif memberi pita
+// yang sama dengan pOff positif yang dinyatakan dari sisi seberangnya.
+func zoneBounds(r AlertRow, now int64) (lo, hi float64) {
+	base := levelAt(r, now)
+	other := base + r.An.POff
+	return math.Min(base, other), math.Max(base, other)
 }
 
 // sideHit memutuskan alert menyala atau tidak dari PERUBAHAN TANDA jarak harga-ke-level,

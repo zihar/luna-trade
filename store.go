@@ -80,6 +80,9 @@ func (s *Store) migrate() error {
 	s.addColumnIfMissing("price_alerts", "p1", "REAL")
 	s.addColumnIfMissing("price_alerts", "t2", "INTEGER")
 	s.addColumnIfMissing("price_alerts", "p2", "REAL")
+	// Zona: jarak harga dari garis anchor ke batas kedua. NULL/0 = bukan zona, jadi baris alert
+	// garis yang sudah ada tetap sah tanpa disentuh.
+	s.addColumnIfMissing("price_alerts", "p_off", "REAL")
 	return nil
 }
 
@@ -756,9 +759,20 @@ func (s *Store) UserActivities(sinceISO string) ([]UserActivity, error) {
 
 // LineAnchors = dua ujung garis yang jadi acuan alert: waktu wall-clock ms + harga.
 // Disimpan apa adanya (bukan dataIndex) supaya monitor tak perlu tahu timeframe atau data candle.
+//
+// POff mengubah garis jadi ZONA: jarak HARGA dari garis ini ke batas kedua (boleh negatif;
+// 0 = bukan zona). Ketiga tool zona (rect, parallel channel, price channel) dinormalkan ke bentuk
+// ini di frontend, jadi monitor tak perlu tahu tool apa yang membuatnya.
+//
+// POff sengaja float64 BERNILAI, bukan pointer: levelTracker.prevLevel menentukan kesegaran
+// baseline dengan membandingkan struct ini langsung (`e.an != an`), jadi mengubah lebar zona
+// otomatis membatalkan baseline — yang memang harus terjadi. Pointer akan membandingkan ALAMAT dan
+// diam-diam melewatkan perubahan itu, sehingga menyeret sisi zona bisa terbaca sebagai harga
+// masuk/keluar pita.
 type LineAnchors struct {
 	T1, T2 int64
 	P1, P2 float64
+	POff   float64
 }
 
 // Alert = baris tabel price_alerts yang ditampilkan ke user pemiliknya.
@@ -826,18 +840,18 @@ func (s *Store) CreateAlert(uid int64, instrument string, price float64, created
 		return 0, fmt.Errorf("%w: %s", ErrAlertCond, cond)
 	}
 	var t1, t2 any
-	var p1, p2 any
+	var p1, p2, pOff any
 	if an != nil {
 		// Anchor yang tak punya "harga pada waktu t" yang bermakna ditolak di pintu masuk,
 		// bukan dijaga diam-diam saat evaluasi.
 		if err := validAnchors(instrument, *an); err != nil {
 			return 0, err
 		}
-		t1, p1, t2, p2 = an.T1, an.P1, an.T2, an.P2
+		t1, p1, t2, p2, pOff = an.T1, an.P1, an.T2, an.P2, an.POff
 	}
-	res, err := s.db.Exec(`INSERT INTO price_alerts(user_id,instrument,price,active,created_at,cond,draw_id,t1,p1,t2,p2)
-		VALUES(?,?,?,1,?,?,?,?,?,?,?)`,
-		uid, instrument, price, createdAt, cond, nullIfEmpty(drawID), t1, p1, t2, p2)
+	res, err := s.db.Exec(`INSERT INTO price_alerts(user_id,instrument,price,active,created_at,cond,draw_id,t1,p1,t2,p2,p_off)
+		VALUES(?,?,?,1,?,?,?,?,?,?,?,?)`,
+		uid, instrument, price, createdAt, cond, nullIfEmpty(drawID), t1, p1, t2, p2, pOff)
 	if err != nil {
 		return 0, err
 	}
@@ -868,8 +882,8 @@ func (s *Store) UpdateAlertAnchors(uid, id int64, an LineAnchors) error {
 	if an.T1 == an.T2 {
 		return ErrAlertVertical
 	}
-	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
-		an.T1, an.P1, an.T2, an.P2, id, uid)
+	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=?,p_off=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
+		an.T1, an.P1, an.T2, an.P2, an.POff, id, uid)
 	if err != nil {
 		return err
 	}
@@ -899,7 +913,7 @@ func (s *Store) DeleteAlertsByDrawing(uid int64, instrument, drawID string) (int
 // triggered tapi belum di-ack (di-delete) oleh user.
 func (s *Store) ListAlerts(uid int64) ([]Alert, error) {
 	rows, err := s.db.Query(`SELECT id,instrument,price,active,created_at,triggered_at,
-		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2
+		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2,COALESCE(p_off,0)
 		FROM price_alerts WHERE user_id=? AND (active=1 OR triggered_at IS NOT NULL)
 		ORDER BY created_at DESC`, uid)
 	if err != nil {
@@ -913,14 +927,15 @@ func (s *Store) ListAlerts(uid int64) ([]Alert, error) {
 		var trig *int64
 		var t1, t2 *int64
 		var p1, p2 *float64
+		var pOff float64
 		if err := rows.Scan(&a.ID, &a.Instrument, &a.Price, &act, &a.CreatedAt, &trig,
-			&a.Cond, &a.DrawID, &t1, &p1, &t2, &p2); err != nil {
+			&a.Cond, &a.DrawID, &t1, &p1, &t2, &p2, &pOff); err != nil {
 			return nil, err
 		}
 		a.Active = act == 1
 		a.TriggeredAt = trig
 		if t1 != nil && t2 != nil && p1 != nil && p2 != nil {
-			a.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2}
+			a.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2, POff: pOff}
 		}
 		out = append(out, a)
 	}
@@ -943,7 +958,7 @@ func (s *Store) DeleteAlert(uid, id int64) error {
 // AllActiveAlerts mengembalikan semua alert aktif lintas-user, dipakai monitor harga.
 func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
 	rows, err := s.db.Query(`SELECT user_id,id,instrument,price,
-		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2 FROM price_alerts WHERE active=1`)
+		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2,COALESCE(p_off,0) FROM price_alerts WHERE active=1`)
 	if err != nil {
 		return nil, err
 	}
@@ -953,11 +968,12 @@ func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
 		var r AlertRow
 		var t1, t2 *int64
 		var p1, p2 *float64
-		if err := rows.Scan(&r.UserID, &r.ID, &r.Instrument, &r.Price, &r.Cond, &r.DrawID, &t1, &p1, &t2, &p2); err != nil {
+		var pOff float64
+		if err := rows.Scan(&r.UserID, &r.ID, &r.Instrument, &r.Price, &r.Cond, &r.DrawID, &t1, &p1, &t2, &p2, &pOff); err != nil {
 			return nil, err
 		}
 		if t1 != nil && t2 != nil && p1 != nil && p2 != nil {
-			r.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2}
+			r.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2, POff: pOff}
 		}
 		out = append(out, r)
 	}

@@ -375,3 +375,38 @@ func TestEvalAlertHidupSesudahT1(t *testing.T) {
 		t.Fatalf("alert tak menyala padahal harga melintasi level 1.15")
 	}
 }
+
+// Batas zona diwarisi dari levelAt: jam dagang, ekstrapolasi kanan, anchor terbalik — semuanya
+// tanpa kode baru. Yang diuji di sini cuma lapisan pOff-nya.
+func TestZoneBounds(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+
+	naik := AlertRow{Instrument: "EUR_USD",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}}
+	lo, hi := zoneBounds(naik, t1)
+	if math.Abs(lo-1.10) > 1e-9 || math.Abs(hi-1.15) > 1e-9 {
+		t.Fatalf("pOff positif: lo=%v hi=%v mau 1.10/1.15", lo, hi)
+	}
+
+	// pOff NEGATIF harus memberi pita yang sama, cuma dinyatakan dari sisi lain.
+	turun := AlertRow{Instrument: "EUR_USD",
+		An: &LineAnchors{T1: t1, P1: 1.15, T2: t1 + 10*jam, P2: 1.15, POff: -0.05}}
+	lo2, hi2 := zoneBounds(turun, t1)
+	if math.Abs(lo2-1.10) > 1e-9 || math.Abs(hi2-1.15) > 1e-9 {
+		t.Fatalf("pOff negatif: lo=%v hi=%v mau 1.10/1.15", lo2, hi2)
+	}
+}
+
+// Zona MIRING bergerak menurut jam dagang, sama seperti garis (#181).
+func TestZoneBoundsMiringLintasAkhirPekan(t *testing.T) {
+	kamis09 := nyMs(t, 2026, time.January, 8, 9, 0)
+	jumat09 := nyMs(t, 2026, time.January, 9, 9, 0)
+	senin09 := nyMs(t, 2026, time.January, 12, 9, 0)
+	r := AlertRow{Instrument: "EUR_USD",
+		An: &LineAnchors{T1: kamis09, P1: 1.1000, T2: jumat09, P2: 1.1024, POff: 0.0010}}
+	// 48 jam dagang → batas bawah 1.1048, atas 1.1058.
+	lo, hi := zoneBounds(r, senin09)
+	if math.Abs(lo-1.1048) > 1e-9 || math.Abs(hi-1.1058) > 1e-9 {
+		t.Fatalf("lo=%.6f hi=%.6f mau 1.104800/1.105800", lo, hi)
+	}
+}
