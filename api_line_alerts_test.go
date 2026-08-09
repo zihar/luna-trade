@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func reqUser(method, target, body string, uid int64) *http.Request {
@@ -136,5 +137,37 @@ func TestDeleteByDrawingViaAPI(t *testing.T) {
 	rows, _ := store.AllActiveAlerts()
 	if len(rows) != 1 || rows[0].DrawID != "d-2" {
 		t.Fatalf("salah baris terhapus: %+v", rows)
+	}
+}
+
+// Garis miring di akhir pekan ditolak 400, dan pesannya bahasa INGGRIS — pesan store
+// ("garis tak punya waktu dagang…") tak boleh sampai ke body HTTP.
+func TestSlopedLineNoTradingSpanRejected(t *testing.T) {
+	storeForLineAlertAPI(t)
+	sabtu := nyMs(t, 2026, time.January, 10, 8, 0)
+	body := `{"instrument":"EUR_USD","cond":"cross","drawId":"d-1"` +
+		`,"t1":` + strconv.FormatInt(sabtu, 10) + `,"p1":1.10` +
+		`,"t2":` + strconv.FormatInt(sabtu+3*jam, 10) + `,"p2":1.20}`
+	w := httptest.NewRecorder()
+	handleAlertCreate(w, reqUser("POST", "/api/alerts", body, 1))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("garis miring tanpa waktu dagang harus 400, dapat %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "no market time") {
+		t.Fatalf("pesan harus bahasa Inggris, dapat %q", w.Body.String())
+	}
+}
+
+// Regresi #180 lewat jalur HTTP: garis HORIZONTAL di akhir pekan tetap 200.
+func TestHorizontalLineNoTradingSpanAccepted(t *testing.T) {
+	storeForLineAlertAPI(t)
+	sabtu := nyMs(t, 2026, time.January, 10, 8, 0)
+	body := `{"instrument":"EUR_USD","cond":"cross","drawId":"d-2"` +
+		`,"t1":` + strconv.FormatInt(sabtu, 10) + `,"p1":1.10` +
+		`,"t2":` + strconv.FormatInt(sabtu+1, 10) + `,"p2":1.10}`
+	w := httptest.NewRecorder()
+	handleAlertCreate(w, reqUser("POST", "/api/alerts", body, 1))
+	if w.Code != http.StatusOK {
+		t.Fatalf("garis horizontal harus tetap 200, dapat %d body=%s", w.Code, w.Body.String())
 	}
 }

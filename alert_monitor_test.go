@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"math"
+	"testing"
+	"time"
+)
 
 func TestCrossed(t *testing.T) {
 	cases := []struct {
@@ -55,6 +59,61 @@ func TestLevelAtSloped(t *testing.T) {
 		if got := levelAt(r, c.now); got < c.want-1e-9 || got > c.want+1e-9 {
 			t.Fatalf("levelAt(%d)=%v mau %v", c.now, got, c.want)
 		}
+	}
+}
+
+// Regresi UTAMA spec garis miring: level tak boleh melompat sebesar akhir pekan.
+//
+// Anchor sengaja dipilih di dua hari kerja BERURUTAN (Kamis 09:00 → Jumat 09:00) supaya ruas
+// garisnya sendiri tak memuat jeda pasar: 24 jam dagang = 24 jam wall-clock, jadi kemiringannya
+// tepat 0,0001 per jam dagang dan angka harapan di bawah bisa dibaca langsung.
+func TestLevelAtSlopedLintasAkhirPekan(t *testing.T) {
+	kamis09 := nyMs(t, 2026, time.January, 8, 9, 0)
+	jumat09 := nyMs(t, 2026, time.January, 9, 9, 0)
+	senin09 := nyMs(t, 2026, time.January, 12, 9, 0)
+	r := AlertRow{
+		Instrument: "EUR_USD",
+		An:         &LineAnchors{T1: kamis09, P1: 1.1000, T2: jumat09, P2: 1.1024},
+	}
+	// Kamis 09:00 → Senin 09:00 = 24 (ke Jumat 09:00) + 8 (ke tutup Jumat 17:00) + 16 (dari buka
+	// Minggu 17:00) = 48 jam DAGANG, sementara wall-clock-nya 96 jam.
+	if got, want := levelAt(r, senin09), 1.1048; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("level Senin pagi = %.6f, mau %.6f (wall-clock keliru memberi 1.109600)", got, want)
+	}
+}
+
+// Crypto tak punya jeda: basis waktunya harus tetap wall-clock apa adanya.
+func TestLevelAtSlopedCrypto(t *testing.T) {
+	jumat16 := nyMs(t, 2026, time.January, 9, 16, 0)
+	r := AlertRow{
+		Instrument: "BTC_USD",
+		An:         &LineAnchors{T1: jumat16, P1: 100000, T2: jumat16 + 10*jam, P2: 100100},
+	}
+	if got, want := levelAt(r, jumat16+5*jam), 100050.0; math.Abs(got-want) > 1e-6 {
+		t.Fatalf("crypto level = %.4f, mau %.4f", got, want)
+	}
+}
+
+// Garis digambar KANAN KE KIRI (points[0] sesudah points[1]) adalah gestur yang sah.
+// Levelnya harus identik dengan garis yang sama digambar kiri ke kanan.
+func TestLevelAtAnchorTerbalik(t *testing.T) {
+	a := nyMs(t, 2026, time.January, 6, 9, 0)
+	b := nyMs(t, 2026, time.January, 6, 19, 0)
+	maju := AlertRow{Instrument: "EUR_USD", An: &LineAnchors{T1: a, P1: 1.10, T2: b, P2: 1.20}}
+	balik := AlertRow{Instrument: "EUR_USD", An: &LineAnchors{T1: b, P1: 1.20, T2: a, P2: 1.10}}
+	now := a + 5*jam
+	if got, want := levelAt(balik, now), levelAt(maju, now); math.Abs(got-want) > 1e-9 {
+		t.Fatalf("anchor terbalik = %.6f, mau %.6f", got, want)
+	}
+}
+
+// Kedua anchor di dalam akhir pekan yang sama → tak ada waktu dagang di antaranya.
+// Jangan membagi nol: bekukan level di anchor pertama.
+func TestLevelAtSpanNol(t *testing.T) {
+	sabtu := nyMs(t, 2026, time.January, 10, 8, 0)
+	r := AlertRow{Instrument: "EUR_USD", An: &LineAnchors{T1: sabtu, P1: 1.2345, T2: sabtu + 3*jam, P2: 1.9999}}
+	if got, want := levelAt(r, sabtu+jam), 1.2345; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("span nol = %.6f, mau %.6f (P1, bukan pembagian nol)", got, want)
 	}
 }
 
@@ -281,5 +340,38 @@ func TestLevelTrackerPruneRemovesInactiveAlerts(t *testing.T) {
 	}
 	if _, ok := lvlTrack[2]; ok {
 		t.Fatalf("alert 2 sudah tak aktif, entrinya harus dibuang")
+	}
+}
+
+// Garis yang SELURUHNYA di masa depan (kedua anchor sesudah now) tak boleh diawasi: levelnya
+// hanya bisa didapat dengan mengekstrapolasi ke KIRI, ke bagian garis yang tak seorang pun gambar.
+func TestEvalAlertGarisBelumMulai(t *testing.T) {
+	now := nyMs(t, 2026, time.January, 6, 9, 0)
+	besok := nyMs(t, 2026, time.January, 7, 9, 0)
+	a := AlertRow{
+		ID: 1, Instrument: "EUR_USD", Cond: "cross",
+		An: &LineAnchors{T1: besok, P1: 1.10, T2: besok + 10*jam, P2: 1.20},
+	}
+	lt := levelTracker{}
+	// Baseline sah lebih dulu, supaya yang diuji benar-benar penjagaan waktu — bukan sekadar
+	// "tick pertama selalu dilewati".
+	lt.record(a.ID, *a.An, 1.10)
+	if _, hit := evalAlert(a, 1.05, 1.15, now, lt); hit {
+		t.Fatalf("alert menyala padahal garisnya belum mulai")
+	}
+}
+
+// Begitu waktu melewati anchor pertama, alert hidup seperti biasa.
+func TestEvalAlertHidupSesudahT1(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{
+		ID: 2, Instrument: "EUR_USD", Cond: "cross",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.20},
+	}
+	now := t1 + 5*jam // level = 1.15
+	lt := levelTracker{}
+	lt.record(a.ID, *a.An, 1.15)
+	if _, hit := evalAlert(a, 1.14, 1.16, now, lt); !hit {
+		t.Fatalf("alert tak menyala padahal harga melintasi level 1.15")
 	}
 }

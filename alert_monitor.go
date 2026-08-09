@@ -16,17 +16,36 @@ func crossed(prev, cur, lvl float64) bool {
 }
 
 // levelAt = level alert pada waktu `now`.
-// Alert harga biasa (An nil) → kolom price. Alert garis → interpolasi dua anchor, dan sengaja
-// diekstrapolasi di luar ruasnya: trader menggambar trendline justru untuk mengawasi apa yang
-// terjadi SESUDAH titik terakhir, jadi alert yang mati di ujung ruas berhenti bekerja tepat saat
-// paling dibutuhkan. Garis horizontal (p1==p2) jatuh ke rumus yang sama dan memberi konstanta —
-// tak ada cabang "kalau horizontal maka…".
+//
+// Alert harga biasa (An nil) → kolom price. Alert garis → interpolasi dua anchor dalam JAM DAGANG
+// (session.go), bukan waktu kalender: sumbu-x chart linear dalam indeks bar, jadi menginterpolasi
+// dalam wall-clock membuat garis miring berjalan 28,6% lebih cepat daripada garis yang digambar.
+// Garis horizontal (p1==p2) jatuh ke rumus yang sama dan memberi konstanta apa pun basis waktunya —
+// itulah sebab v1 (#180) aman meski memakai wall-clock.
+//
+// Sengaja diekstrapolasi di luar ruas anchornya: trader menggambar trendline justru untuk mengawasi
+// apa yang terjadi SESUDAH titik terakhir, jadi alert yang mati di ujung ruas berhenti bekerja tepat
+// saat paling dibutuhkan. Penjagaan "garis yang belum mulai" ada di evalAlert, bukan di sini.
 func levelAt(r AlertRow, now int64) float64 {
 	if r.An == nil || r.An.T2 == r.An.T1 {
 		return r.Price
 	}
-	f := float64(now-r.An.T1) / float64(r.An.T2-r.An.T1)
-	return r.An.P1 + (r.An.P2-r.An.P1)*f
+	an := *r.An
+	// Garis boleh digambar kanan ke kiri. Frontend sudah menormalkan, tapi baris alert bisa datang
+	// dari muatan lama atau klien lain — monitor tak boleh bergantung pada disiplin pengirim untuk
+	// sesuatu yang sebiaya satu perbandingan.
+	if an.T2 < an.T1 {
+		an.T1, an.P1, an.T2, an.P2 = an.T2, an.P2, an.T1, an.P1
+	}
+	span := tradingElapsed(r.Instrument, an.T1, an.T2)
+	if span == 0 {
+		// Kedua anchor di dalam jendela pasar-tutup yang sama (mis. digambar di area future saat
+		// akhir pekan). Bekukan di anchor pertama: untuk garis horizontal itu jawaban yang benar,
+		// untuk garis miring itu yang paling tak berbahaya.
+		return an.P1
+	}
+	f := float64(tradingElapsed(r.Instrument, an.T1, now)) / float64(span)
+	return an.P1 + (an.P2-an.P1)*f
 }
 
 // sideHit memutuskan alert menyala atau tidak dari PERUBAHAN TANDA jarak harga-ke-level,
@@ -116,6 +135,13 @@ func evalAlert(a AlertRow, prev, cur float64, now int64, lvlTrack levelTracker) 
 	lvl = levelAt(a, now)
 	prevLvl := lvl
 	if a.An != nil {
+		// Garis yang seluruhnya masih di masa depan tak diawasi: satu-satunya cara mendapat
+		// levelnya sekarang adalah mengekstrapolasi ke KIRI, ke bagian garis yang tak digambar
+		// siapa pun. Bukan penonaktifan — begitu waktu melewati anchor pertama, ia hidup sendiri.
+		// Kedua anchor diperiksa (bukan cuma T1) supaya benar juga saat anchornya terbalik.
+		if now < a.An.T1 && now < a.An.T2 {
+			return lvl, false
+		}
 		pv, ok := lvlTrack.prevLevel(a.ID, *a.An)
 		lvlTrack.record(a.ID, *a.An, lvl) // dicatat lebih dulu: tick berikutnya butuh baseline ini juga saat tick INI dilewati
 		if !ok {

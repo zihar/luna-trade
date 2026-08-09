@@ -219,6 +219,14 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "line cannot be vertical")
 			return
 		}
+		// Garis MIRING yang kedua ujungnya di jendela pasar-tutup yang sama tak punya waktu dagang
+		// untuk diinterpolasi. Alasan yang sama seperti di atas: pesan store berbahasa Indonesia.
+		// Hanya berlaku bila p1 != p2 — garis horizontal levelnya konstan dan span tak relevan
+		// untuknya (alert horizontal memakai t2 = t1+1, jadi menolaknya akan meregresi #180).
+		if *req.P1 != *req.P2 && tradingElapsed(req.Instrument, *req.T1, *req.T2) == 0 {
+			writeErr(w, http.StatusBadRequest, "line has no market time between its two points")
+			return
+		}
 		an = &LineAnchors{T1: *req.T1, P1: *req.P1, T2: *req.T2, P2: *req.P2}
 	} else if req.Price <= 0 {
 		writeErr(w, http.StatusBadRequest, "instrument & price required")
@@ -239,12 +247,12 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 	// kebenaran (baris tersimpan vs respons) di satu titik panggil.
 	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, cond, req.DrawID, an)
 	if err != nil {
-		// Jaring pengaman: kedua penolakan VALIDASI store sudah dicegah di atas, tapi kalau ia
+		// Jaring pengaman: KETIGA penolakan VALIDASI store sudah dicegah di atas, tapi kalau ia
 		// tetap terjadi, itu memang salah pemanggil → 400. Kegagalan LAIN (mis. database mati)
 		// bukan salah pemanggil dan tak boleh dijawab 400 "invalid alert parameters" — itu
 		// menyuruh klien memperbaiki permintaan yang sebenarnya sudah benar. Dua-duanya tetap
 		// menyembunyikan err.Error() (berbahasa Indonesia / bisa berisi SQL mentah) dari klien.
-		if errors.Is(err, ErrAlertCond) || errors.Is(err, ErrAlertVertical) {
+		if errors.Is(err, ErrAlertCond) || errors.Is(err, ErrAlertVertical) || errors.Is(err, ErrAlertNoTradingSpan) {
 			writeErr(w, http.StatusBadRequest, "invalid alert parameters")
 			return
 		}
