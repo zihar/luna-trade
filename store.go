@@ -797,9 +797,12 @@ var (
 	ErrAlertNoTradingSpan = errors.New("garis tak punya waktu dagang di antara kedua ujungnya")
 )
 
-// validAnchors menolak dua bentuk anchor yang tak bisa dievaluasi. Dipakai CreateAlert dan
-// UpdateAlertAnchors — satu tempat, supaya penolakan saat create tak bisa dilewati dengan
-// membuat alert pada garis yang sah lalu menyeretnya ke akhir pekan.
+// validAnchors menolak dua bentuk anchor yang tak layak dipakai saat alert DIBUAT: vertikal (tak
+// punya "harga pada waktu t" sama sekali) dan garis miring yang kedua ujungnya jatuh di jendela
+// pasar-tutup yang sama.
+//
+// Hanya CreateAlert yang memakainya. UpdateAlertAnchors sengaja lebih longgar — alasannya ada di
+// sana, dan bukan kelalaian.
 func validAnchors(instrument string, an LineAnchors) error {
 	if an.T1 == an.T2 {
 		return ErrAlertVertical
