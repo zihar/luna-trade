@@ -43,6 +43,7 @@ function createFromDesc(desc, pts){
   const nid=chart.createOverlay(Object.assign(base, delHooks()));
   if(!nid) return null;
   drawIds.push(nid);
+  objDid[nid]=newDid();   // salinan adalah objek LAIN: did baru, jadi alert asalnya tak ikut
   // Jalur FULL-POINT ke-4 (bareng onDrawEnd, restore js/draw-persist.js, instant-drop di
   // js/draw-tools.js) — tanpa ini, garis built-in (rayLine/priceChannelLine/fibonacciLine/…) hasil
   // clone/paste menampilkan tag tanggal default sumbu-X klinecharts yang tak dipakai objek lain.
