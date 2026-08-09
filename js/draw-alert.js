@@ -120,13 +120,27 @@ async function syncAlertAnchors(){
 // tempat lain (perangkat lain, atau saat tab ini tertutup); penghapusan di sesi ini ditangani
 // seketika oleh onRemoved.
 //
-// HANYA boleh jalan sesudah instrumen ini selesai dimuat: selama memuat, drawIds kosong sesaat, dan
-// aturan naif "did tak ditemukan → hapus" akan memusnahkan SEMUA alert setiap kali chart dimuat.
+// Proteksi thd chart yang kosong sesaat saat memuat BUKAN datang dari cek suppressDrawSave di bawah:
+// di satu-satunya pemanggilnya (loadInit, js/load-chart.js), flag itu sudah direset ke false di
+// `finally` TEPAT SEBELUM sweep ini dipanggil, jadi baris itu tak pernah bisa true di sini. Proteksi
+// sungguhan datang dari URUTANnya: sweep baru dipanggil SESUDAH restoreDraws() selesai (drawIds sudah
+// terisi ulang), ditambah onRemoved yang menolak menghapus alert selama churn programatik
+// (suppressDrawSave true di situ, js/draw-tools.js). Baris di bawah dibiarkan sbg defense-in-depth
+// kalau kelak ada pemanggil lain yg tak menjaga urutan itu — jangan andalkan ia utk proteksi di atas.
 async function sweepAlertsForMissingDrawings(){
   if(suppressDrawSave) return;
+  const target=inst;   // instrumen & daftar did di bawah HARUS sepasang: loop ini `await`, dan inst
+                        // bisa berganti SINKRON di tengah jalan (user ganti instrumen via loadInit).
+                        // Snapshot `ada` yang terpisah dari instrumen yang dibandingkannya adalah
+                        // race: alert instrumen BARU bisa lolos filter sym (krn dibandingkan ke inst
+                        // yg sudah berganti) tapi diperiksa thd daftar did instrumen LAMA lalu
+                        // terhapus — alert yg sedang dilihat pengguna lenyap. Ikat keduanya ke `target`
+                        // supaya salah-pasang itu MUSTAHIL secara struktural, bukan sekadar dipersempit.
   const ada=new Set(drawIds.map(id=>objDid[id]).filter(Boolean));
   for(const a of alerts.slice()){
-    if(!a.drawId || a.sym!==inst) continue;
+    if(inst!==target) return;   // instrumen sudah berganti sejak sweep ini mulai → hentikan di sini,
+                                 // jangan periksa alert instrumen baru thd data instrumen lama
+    if(!a.drawId || a.sym!==target) continue;
     if(!ada.has(a.drawId)) await deleteAlertsForDid(a.drawId);
   }
 }

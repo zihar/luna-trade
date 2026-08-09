@@ -186,8 +186,14 @@ async function alertPoll(){
     const rows=await r.json();
     // sinkron list dasar (untuk panel) — pertahankan oid overlay bila id sama
     const byId={}; alerts.forEach(a=>byId[a.id]=a);
+    // t1/p1/t2/p2 IKUT dibawa (bukan cuma diabaikan): syncAlertAnchors (js/draw-alert.js) membanding-
+    // kan anchor CACHE di sini dgn anchor LIVE objeknya utk memutuskan perlu POST atau tidak. Kalau
+    // field ini dijatuhkan di sini, cache-nya jadi undefined tiap ~2dtk (interval poll ini) dan
+    // perbandingan itu SELALU dianggap "berubah" → tiap saveDraws() (termasuk yg dipicu gambar LAIN
+    // yg tak ada hubungannya) mem-POST ulang anchor tiap alert garis di instrumen ini, sia-sia.
     const next=(rows||[]).map(a=>({id:a.id, sym:a.instrument, price:a.price, triggeredAt:a.triggeredAt,
-      oid:(byId[a.id]&&byId[a.id].oid)||null, cond:a.cond||'cross', drawId:a.drawId||''}));
+      oid:(byId[a.id]&&byId[a.id].oid)||null, cond:a.cond||'cross', drawId:a.drawId||'',
+      t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2}));
     // deteksi triggered baru → toast + Notification + ack (hapus)
     for(const a of rows){
       if(a.triggeredAt!=null && !shownTriggered.has(a.id)){

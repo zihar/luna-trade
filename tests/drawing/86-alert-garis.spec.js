@@ -243,4 +243,84 @@ test.describe('alert garis: mengikuti objeknya', () => {
     expect(await page.evaluate(() => __alertCount()), 'alert tak boleh hilang saat memuat ulang').toBe(1);
     assertNoPageErrors(page);
   });
+
+  // Fix round 1 — review menemukan: sweepAlertsForMissingDrawings() nge-snapshot `ada` (daftar did
+  // di layar) sekali, tapi loopnya `await` dan membandingkan tiap alert ke `inst` yg LIVE. Kalau
+  // pengguna ganti instrumen SAAT sweep sedang menunggu satu delete, alert instrumen BARU lolos
+  // filter sym (krn dibandingkan ke inst yg sudah berganti) tapi diperiksa thd `ada` instrumen LAMA
+  // → dianggap yatim → terhapus, padahal objeknya ada di layar (instrumen yg sedang dilihat
+  // pengguna). Reproduksi lewat UI (drag chart sungguhan sambil ganti instrumen tepat di jendela
+  // await) tak deterministik, jadi test ini memanggil sweep langsung & memaksa interleaving-nya via
+  // monkey-patch deleteAlertsForDid (pola yg sama dgn drawAlertLines() di atas).
+  test('sweep berhenti begitu instrumen berganti — alert instrumen baru tak ikut diperiksa/dihapus', async ({ page }) => {
+    await gotoApp(page);
+
+    const hasil = await page.evaluate(async () => {
+      stopAlertPoll();   // cegah poll latar menimpa alert sintetis di bawah selama test berjalan
+      const A = inst, B = 'GBP_USD';
+      // Dua alert yatim (drawId-nya tak ada di `ada` manapun — chart kosong dari gambar): satu utk
+      // instrumen SEKARANG (A), satu "milik" instrumen LAIN (B) yg akan jadi instrumen aktif
+      // begitu sweep berpindah tengah-jalan — orphanB HARUS selamat, bukan diperiksa thd data A.
+      alerts.push({ id: 90001, sym: A, drawId: 'orphanA', t1: 1, p1: 1, t2: 2, p2: 2 });
+      alerts.push({ id: 90002, sym: B, drawId: 'orphanB', t1: 1, p1: 1, t2: 2, p2: 2 });
+
+      const calls = [];
+      const orig = deleteAlertsForDid;
+      deleteAlertsForDid = async (did) => {
+        calls.push(did);
+        if (did === 'orphanA') inst = B;   // simulasi: pengguna ganti instrumen SAAT sweep await
+        return orig(did);
+      };
+      try {
+        await sweepAlertsForMissingDrawings();
+      } finally {
+        deleteAlertsForDid = orig;
+        inst = A;
+        startAlertPoll();
+      }
+      return { calls, sisa: alerts.map((a) => a.id) };
+    });
+
+    expect(hasil.calls, 'hanya alert instrumen AWAL (target) yg boleh diperiksa/dihapus').toEqual(['orphanA']);
+    expect(hasil.sisa, 'alert instrumen BARU yg sedang dilihat pengguna harus selamat').toContain(90002);
+    assertNoPageErrors(page);
+  });
+
+  // Fix round 1 — review menemukan: alertPoll() (js/forming-candle.js) menjatuhkan t1/p1/t2/p2 saat
+  // menulis ulang `alerts` tiap ~2dtk, walau server mengembalikannya. Akibatnya cache anchor di
+  // client jadi undefined dlm 2dtk sejak alert dibuat, dan gerbang "tak berubah → jangan kirim" di
+  // syncAlertAnchors() SELALU menganggap berubah (undefined !== angka) → tiap saveDraws() (termasuk
+  // yg dipicu gambar LAIN yg tak ada hubungannya) mem-POST ulang anchor semua alert garis, sia-sia.
+  test('anchor tak berubah → saveDraws TIDAK mem-POST; anchor berubah → PERSIS satu POST', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const o = await buatAlert(page, rect);
+    // Paksa satu putaran poll (dan hentikan pollingnya) → cache anchor di client terisi dari
+    // respons server, meniru kondisi "sudah lewat >=1 siklus poll sejak alert dibuat" yg jadi
+    // pemicu bug ini di dunia nyata.
+    await page.evaluate(async () => { stopAlertPoll(); await alertPoll(); });
+
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/alerts/anchors')) posts.push(r.postDataJSON()); });
+
+    // Simpan tanpa menggerakkan apa pun — anchor objeknya tak berubah dari yg di-cache.
+    await page.evaluate(() => saveDraws());
+    await page.waitForTimeout(500);
+    expect(posts.length, 'anchor tak berubah → tak boleh mem-POST').toBe(0);
+
+    // Sekarang geser badan garis — anchornya SUNGGUH berubah.
+    const px = await page.evaluate((id) => {
+      const ov = chart.getOverlayById(id);
+      return ov.points.map((p) => { let c = chart.convertToPixel(p.timestamp != null ? { timestamp: p.timestamp, value: p.value } : { dataIndex: p.dataIndex, value: p.value }, { paneId: 'candle_pane', absolute: true }); if (Array.isArray(c)) c = c[0]; return { x: c.x, y: c.y }; });
+    }, o.id);
+    const spot = { x: px[0].x + (px[1].x - px[0].x) * 0.3, y: px[0].y + (px[1].y - px[0].y) * 0.3 };
+    await page.mouse.move(rect.x + spot.x, rect.y + spot.y, { steps: 4 });
+    await page.mouse.down();
+    await page.mouse.move(rect.x + spot.x, rect.y + spot.y + 70, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(1200);
+
+    expect(posts.length, 'anchor berubah → PERSIS satu POST, bukan nol atau lebih dari satu').toBe(1);
+    assertNoPageErrors(page);
+  });
 });
