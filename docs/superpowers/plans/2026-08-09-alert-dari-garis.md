@@ -448,30 +448,6 @@ Di loop evaluasi (`alert_monitor.go:60-72`), ganti cabang pemeriksaan menjadi:
 						continue
 					}
 					lvl := levelAt(a, now)
-					// Dua sebab sebuah alert menyala: harga menyeberangi level, ATAU level
-					// (garis miring) menyeberangi harga sementara harganya sendiri diam.
-					prevLvl := levelAt(a, lastAt[a.ID])
-					hitIt := condHit(a.Cond, prev, mid, lvl)
-					if !hitIt && a.An != nil && lastAt[a.ID] != 0 {
-						hitIt = crossedByLevelMove(prevLvl, lvl, mid) &&
-							condHit(a.Cond, prevLvl, lvl, mid) == false || crossedByLevelMove(prevLvl, lvl, mid)
-					}
-					lastAt[a.ID] = now
-					if hitIt {
-						…MarkAlertTriggered seperti sekarang…
-					}
-				}
-```
-
-Sederhanakan cabang itu menjadi bentuk yang bisa dibaca — **inilah bentuk yang harus ditulis**, bukan yang di atas:
-
-```go
-				now := time.Now().UnixMilli()
-				for _, a := range cache {
-					if !strings.EqualFold(a.Instrument, string(t.Instrument)) {
-						continue
-					}
-					lvl := levelAt(a, now)
 					hit := condHit(a.Cond, prev, mid, lvl)
 					// Garis miring: level bergerak sendiri, jadi ia bisa menyeberangi harga yang
 					// diam. Butuh level pada tick SEBELUMNYA untuk melihatnya.
