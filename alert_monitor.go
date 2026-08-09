@@ -90,8 +90,9 @@ func sideHit(cond string, dPrev, dCur float64) bool {
 // yang menghasilkannya. Anchor ikut disimpan supaya baseline basi tak pernah dipakai:
 // hanya level yang berasal dari anchor yang SAMA dgn yang berlaku sekarang yang valid.
 type lvlEntry struct {
-	an  LineAnchors
-	lvl float64
+	an     LineAnchors
+	lvl    float64
+	inside bool // keadaan pita pada tick itu; hanya berarti untuk alert zona (cond enter/exit)
 }
 
 // levelTracker adalah bookkeeping level SEBELUMNYA per-alert (bukan per-instrumen — dua
@@ -118,6 +119,24 @@ func (lt levelTracker) prevLevel(id int64, an LineAnchors) (float64, bool) {
 // harga biasa sengaja tak lewat sini — dipanggil hanya saat An != nil oleh evalAlert.
 func (lt levelTracker) record(id int64, an LineAnchors, lvl float64) {
 	lt[id] = lvlEntry{an: an, lvl: lvl}
+}
+
+// prevInside = keadaan "harga di dalam pita" pada tick sebelumnya, dengan syarat kesegaran yang
+// PERSIS sama dengan prevLevel: anchor harus belum berubah. Karena POff ikut di dalam LineAnchors,
+// mengubah lebar zona otomatis membatalkan baseline — kalau tidak, menyeret sisi zona bisa terbaca
+// sebagai harga masuk/keluar pita, cacat yang sama bentuknya dengan yang dibayar #180 untuk level.
+func (lt levelTracker) prevInside(id int64, an LineAnchors) (bool, bool) {
+	e, ok := lt[id]
+	if !ok || e.an != an {
+		return false, false
+	}
+	return e.inside, true
+}
+
+// recordZone menyimpan level DAN keadaan pita sekaligus. Alert zona tak memakai `lvl` untuk
+// memutuskan apa pun, tapi ia tetap dicatat supaya satu entry cukup untuk kedua keluarga alert.
+func (lt levelTracker) recordZone(id int64, an LineAnchors, lvl float64, inside bool) {
+	lt[id] = lvlEntry{an: an, lvl: lvl, inside: inside}
 }
 
 // prune membuang entry milik alert yang sudah tak aktif lagi (triggered atau dihapus
@@ -154,6 +173,27 @@ func evalAlert(a AlertRow, prev, cur float64, now int64, lvlTrack levelTracker) 
 		// Kedua anchor diperiksa (bukan cuma T1) supaya benar juga saat anchornya terbalik.
 		if now < a.An.T1 && now < a.An.T2 {
 			return lvl, false
+		}
+		// ZONA: yang diuji bukan persilangan satu level, melainkan perpindahan keadaan luar↔dalam
+		// pita. Bedanya nyata — harga bisa masuk pita lewat batas ATAS tanpa pernah menyentuh batas
+		// pertama, dan sebaliknya bisa melintasi batas pertama sambil tetap berada di luar pita.
+		//
+		// Keadaan sebelumnya diambil dari tracker, bukan dihitung ulang dari harga lama terhadap
+		// batas sekarang: pelajaran #180 — membandingkan harga lama dengan level baru mengarang
+		// lintasan setiap kali batasnya melompat (pengguna menyeret zonanya, proses lanjut sesudah
+		// jeda, perangkat lain memindahkannya).
+		if a.Cond == "enter" || a.Cond == "exit" {
+			lo, hi := zoneBounds(a, now)
+			inNow := cur >= lo && cur <= hi
+			prevIn, ok := lvlTrack.prevInside(a.ID, *a.An)
+			lvlTrack.recordZone(a.ID, *a.An, lvl, inNow)
+			if !ok {
+				return lvl, false
+			}
+			if a.Cond == "enter" {
+				return lvl, !prevIn && inNow
+			}
+			return lvl, prevIn && !inNow
 		}
 		pv, ok := lvlTrack.prevLevel(a.ID, *a.An)
 		lvlTrack.record(a.ID, *a.An, lvl) // dicatat lebih dulu: tick berikutnya butuh baseline ini juga saat tick INI dilewati

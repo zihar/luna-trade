@@ -410,3 +410,100 @@ func TestZoneBoundsMiringLintasAkhirPekan(t *testing.T) {
 		t.Fatalf("lo=%.6f hi=%.6f mau 1.104800/1.105800", lo, hi)
 	}
 }
+
+// Zona: harga masuk pita menyalakan `enter`.
+func TestEvalAlertZonaEnter(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 1, Instrument: "EUR_USD", Cond: "enter",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}} // pita 1.10–1.15
+	lt := levelTracker{}
+	now := t1 + jam
+	if _, hit := evalAlert(a, 1.05, 1.05, now, lt); hit {
+		t.Fatalf("tick pertama (baseline) tak boleh menyala")
+	}
+	if _, hit := evalAlert(a, 1.05, 1.12, now, lt); !hit {
+		t.Fatalf("harga masuk pita harus menyalakan enter")
+	}
+}
+
+func TestEvalAlertZonaTidakMenyalaDiDalamPita(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 2, Instrument: "EUR_USD", Cond: "enter",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}}
+	lt := levelTracker{}
+	now := t1 + jam
+	evalAlert(a, 1.12, 1.12, now, lt) // baseline: sudah DI DALAM
+	if _, hit := evalAlert(a, 1.12, 1.14, now, lt); hit {
+		t.Fatalf("bergerak di dalam pita bukan 'entering'")
+	}
+}
+
+func TestEvalAlertZonaExit(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 3, Instrument: "EUR_USD", Cond: "exit",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}}
+	lt := levelTracker{}
+	now := t1 + jam
+	evalAlert(a, 1.12, 1.12, now, lt) // baseline: di dalam
+	if _, hit := evalAlert(a, 1.12, 1.20, now, lt); !hit {
+		t.Fatalf("keluar pita harus menyalakan exit")
+	}
+}
+
+// Sejajar dgn TestSlopedLineCrossesWithoutPriceChange (#180): yang bergerak ZONA-nya, bukan harga.
+func TestEvalAlertZonaMiringMenyapuHargaDiam(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 4, Instrument: "EUR_USD", Cond: "enter",
+		An: &LineAnchors{T1: t1, P1: 1.00, T2: t1 + 10*jam, P2: 2.00, POff: 0.02}}
+	const price = 1.50
+	lt := levelTracker{}
+	// t1+4jam → pita 1.40–1.42 (harga di ATAS); t1+5jam → 1.50–1.52 (harga DI DALAM).
+	if _, hit := evalAlert(a, price, price, t1+4*jam, lt); hit {
+		t.Fatalf("baseline tak boleh menyala")
+	}
+	if _, hit := evalAlert(a, price, price, t1+5*jam, lt); !hit {
+		t.Fatalf("zona yang bergerak melewati harga DIAM harus menyalakan enter")
+	}
+}
+
+// Menyeret SISI zona (pOff berubah) tak boleh terbaca sebagai harga masuk/keluar.
+func TestEvalAlertZonaLebarBerubahTakMenyala(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	sempit := LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.01} // 1.10–1.11
+	a := AlertRow{ID: 5, Instrument: "EUR_USD", Cond: "enter", An: &sempit}
+	lt := levelTracker{}
+	now := t1 + jam
+	evalAlert(a, 1.12, 1.12, now, lt) // baseline: harga 1.12 DI LUAR pita sempit
+	lebar := LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05} // 1.10–1.15
+	a.An = &lebar
+	if _, hit := evalAlert(a, 1.12, 1.12, now, lt); hit {
+		t.Fatalf("melebarkan zona sendiri tak boleh menyalakan enter")
+	}
+}
+
+// Test DISKRIMINATIF: harga masuk pita dari ATAS, jadi batas PERTAMA (bawah) tak pernah dilintasi.
+// Jalur `cross` lama akan diam di sini; hanya evaluasi keadaan pita yang benar yang menyala.
+func TestEvalAlertZonaEnterDariAtas(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 6, Instrument: "EUR_USD", Cond: "enter",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}} // pita 1.10–1.15
+	lt := levelTracker{}
+	now := t1 + jam
+	evalAlert(a, 1.20, 1.20, now, lt) // baseline: di ATAS pita
+	if _, hit := evalAlert(a, 1.20, 1.13, now, lt); !hit {
+		t.Fatalf("masuk pita dari ATAS harus menyalakan enter (batas bawah tak dilintasi)")
+	}
+}
+
+// Kebalikannya: bergerak di LUAR pita, di atasnya, tak boleh menyala.
+func TestEvalAlertZonaGerakDiLuarTakMenyala(t *testing.T) {
+	t1 := nyMs(t, 2026, time.January, 6, 9, 0)
+	a := AlertRow{ID: 7, Instrument: "EUR_USD", Cond: "enter",
+		An: &LineAnchors{T1: t1, P1: 1.10, T2: t1 + 10*jam, P2: 1.10, POff: 0.05}}
+	lt := levelTracker{}
+	now := t1 + jam
+	evalAlert(a, 1.20, 1.20, now, lt)
+	if _, hit := evalAlert(a, 1.20, 1.25, now, lt); hit {
+		t.Fatalf("bergerak di luar pita tak boleh menyalakan enter")
+	}
+}
