@@ -200,7 +200,12 @@ async function alertPoll(){
         shownTriggered.add(a.id);
         // Peta kondisi yang sama (COND_LABEL, js/draw-alert.js) — di kalimat ini bentuknya huruf
         // kecil, jadi diturunkan dari peta itu alih-alih ditulis ulang jadi salinan ketiga.
-        const msg = a.drawId ? `${dispSym(a.instrument)} — ${(COND_LABEL[a.cond||'cross']||COND_LABEL.cross).toLowerCase()} your line`
+        //
+        // Kondisi zona sudah memuat kata "zone" ("Entering zone"), jadi ia TAK boleh diakhiri
+        // "your line" — kalimatnya akan jadi "entering zone your line". Objeknya pun bukan garis.
+        const zonaCond = a.cond==='enter' || a.cond==='exit';
+        const condTxt = (COND_LABEL[a.cond||'cross']||COND_LABEL.cross).toLowerCase();
+        const msg = a.drawId ? `${dispSym(a.instrument)} — ${condTxt}${zonaCond?'':' your line'}`
                              : a.instrument+' crossed '+a.price;
         try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
         toast(msg,'success');
