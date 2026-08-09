@@ -114,13 +114,13 @@ function drawAlertLines(){
 }
 // Judul satu baris alert. Alert biasa tetap "Crossing <harga>"; alert garis menyebut kondisi dan
 // asal objeknya — tanpa ini tiga kondisi baru tak terbedakan di satu-satunya tempat pengguna
-// melihat alertnya.
+// melihat alertnya. Kedua peta (kondisi & judul objek) hidup di SATU tempat masing-masing:
+// COND_LABEL & drawAlertLabel() di js/draw-alert.js. Peta judul yang dulu ditulis ulang di sini
+// bahkan sudah berselisih isinya dgn OBJ_TITLE ("Line" vs "Extended Line").
 function alertTitle(a){
-  const cond=({cross:'Crossing', up:'Crossing up', down:'Crossing down'})[a.cond||'cross'];
+  const cond=COND_LABEL[a.cond||'cross']||COND_LABEL.cross;
   if(!a.drawId) return `${dispSym(a.sym)} ${cond} ${a.price}`;
-  const src=({trendline:'Trend line', rayLine:'Ray', straightLine:'Line',
-    horizontalStraightLine:'Horizontal line', horizontalRayLine:'Horizontal ray', priceLine:'Price line'})[a.name]||'Drawing';
-  return `${dispSym(a.sym)} · ${src} · ${cond}`;
+  return `${dispSym(a.sym)} · ${drawAlertLabel(a.drawId)} · ${cond}`;
 }
 function renderAlertList(){
   const el=$('#alertList'); if(!el) return;
@@ -198,7 +198,9 @@ async function alertPoll(){
     for(const a of rows){
       if(a.triggeredAt!=null && !shownTriggered.has(a.id)){
         shownTriggered.add(a.id);
-        const msg = a.drawId ? `${dispSym(a.instrument)} — ${({cross:'crossing',up:'crossing up',down:'crossing down'})[a.cond||'cross']} your line`
+        // Peta kondisi yang sama (COND_LABEL, js/draw-alert.js) — di kalimat ini bentuknya huruf
+        // kecil, jadi diturunkan dari peta itu alih-alih ditulis ulang jadi salinan ketiga.
+        const msg = a.drawId ? `${dispSym(a.instrument)} — ${(COND_LABEL[a.cond||'cross']||COND_LABEL.cross).toLowerCase()} your line`
                              : a.instrument+' crossed '+a.price;
         try{ if(typeof Notification!=='undefined' && Notification.permission==='granted') new Notification('Luna Trade — Alert', {body:msg}); }catch(e){}
         toast(msg,'success');

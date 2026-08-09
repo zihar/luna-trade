@@ -1,32 +1,60 @@
 // [alert-garis] Alert yang terikat objek gambar: levelnya mengikuti garisnya, bukan satu harga
 // tetap. Rancangan & keputusannya: docs/superpowers/specs/2026-08-09-alert-dari-garis-design.md
 
-// Enam objek keluarga garis. Channel & rectangle sengaja TIDAK di sini — semantik zona
-// (Entering/Exiting) butuh state per-alert di monitor, dan itu spec kedua.
-const ALERTABLE_LINE=new Set(['trendline','rayLine','straightLine',
-  'horizontalStraightLine','horizontalRayLine','priceLine']);
+// v1 HANYA garis HORIZONTAL. Ini penyempitan sadar dari enam anggota keluarga garis, bukan
+// kelalaian: anchor alert adalah waktu WALL-CLOCK dan monitor mengekstrapolasi level secara linear
+// dalam waktu KALENDER, sementara chart menggambar sumbu-x linear dalam INDEKS BAR. Keduanya cuma
+// sepakat pada instrumen tanpa jeda sesi. Forex libur ~48 dari 168 jam tiap pekan, saham ~17,5 dari
+// 24 jam tiap hari — jadi garis MIRING yang diekstrapolasi berlari jauh mendahului garis yang
+// digambar pengguna (untuk forex bisa hitungan hari sesudah akhir pekan, dan monitor tetap hidup
+// melewati akhir pekan itu). Garis horizontal levelnya KONSTAN, jadi basis waktunya tak berpengaruh
+// sama sekali dan kode hari ini sudah benar untuknya. Garis miring menyusul di spec kedua, bersama
+// zona (channel & rectangle), setelah basis waktunya dirancang benar.
+//
+// Sengaja TIDAK ada jalur "terima tool miring kalau kebetulan datar (p1===p2)": pengguna lalu bisa
+// membuat alert pada trendline datar lalu menyeret salah satu ujungnya — dan diam-diam mendapat
+// persis kasus miring yang baru saja ditunda.
+const ALERTABLE_LINE=new Set(['horizontalStraightLine','horizontalRayLine','priceLine']);
 
 // Dua anchor objek sebagai {t1,p1,t2,p2} waktu wall-clock — bentuk yang dipahami server.
-// Garis horizontal punya dua titik dgn harga sama, jadi ia lewat jalur yang sama persis.
 //
-// `horizontalStraightLine` & `priceLine` cuma py 1 TITIK (TOOL_SPEC: clicks:1, pointsAfter:1) —
-// dua dari enam anggota ALERTABLE_LINE. Levelnya konstan sepanjang waktu, jadi t1/t2 boleh anchor
-// APA SAJA asal beda (server menolak t1===t2 sbg "garis vertikal"); intervalnya sendiri tak
-// bermakna karena p1===p2 membuat level(t) konstan utk interval mana pun. +1ms dipilih krn itu
-// pembeda PALING KECIL yg mungkin — menegaskan "cuma perlu beda", bukan durasi yang "benar".
+// HARGA diambil dari points[0] untuk KEDUA anchor, bukan dibaca dari titik kedua: `p1===p2` jadi
+// benar SECARA KONSTRUKSI, bukan kebetulan. `horizontalRayLine` punya dua titik dan nilai titik
+// keduanya tak selalu ikut tersinkron ke titik pertama (muatan lama terutama) — "garis horizontal"
+// yang anchornya berselisih adalah alert MIRING berkostum horizontal, persis yang ditunda di atas.
+//
+// WAKTU: `horizontalStraightLine` & `priceLine` cuma punya 1 TITIK (TOOL_SPEC: clicks:1), jadi t2
+// dibuat t1+1. Interval itu sendiri tak bermakna — p1===p2 membuat level(t) konstan untuk interval
+// APA PUN; yang penting hanya t1!==t2 karena server menolak "garis vertikal". +1ms dipilih karena
+// itu pembeda PALING KECIL yang mungkin. Titik kedua yang waktunya hilang/kembar jatuh ke fallback
+// yang sama, bukan ditolak: menolaknya cuma akan membuat ray horizontal yang sah gagal jadi alert
+// padahal levelnya jelas dan konstan.
 function lineAnchorsOf(overlayId){
   const o=chart.getOverlayById(overlayId); if(!o||!o.points||!o.points.length) return null;
   const a=o.points[0];
   const t1=tsOf(a); if(t1==null||a.value==null) return null;
-  if(o.points.length<2) return {t1, p1:a.value, t2:t1+1, p2:a.value};
-  const b=o.points[1];
-  const t2=tsOf(b);
-  if(t2==null||t1===t2) return null;   // vertikal / tanpa anchor waktu → tak bisa jadi alert
-  if(b.value==null) return null;
-  return {t1, p1:a.value, t2, p2:b.value};
+  let t2=t1+1;
+  if(o.points.length>1){ const tb=tsOf(o.points[1]); if(tb!=null && tb!==t1) t2=tb; }
+  return {t1, p1:a.value, t2, p2:a.value};
 }
 
+// Label kondisi alert — SATU tempat. Sebelumnya ditulis ulang tiga kali di dua berkas (di sini,
+// alertTitle & alertPoll di js/forming-candle.js) dan sudah sempat berbeda isinya.
 const COND_LABEL={cross:'Crossing', up:'Crossing up', down:'Crossing down'};
+
+// Label asal alert untuk daftar alert. Diambil dari objek yang HIDUP di chart lewat `did`, bukan
+// dari field yang dititipkan saat alert dibuat: alertPoll() menulis ulang `alerts` tiap ~2 detik
+// dari respons server, dan server TAK menyimpan tipe objeknya — apa pun yang cuma dititipkan lokal
+// akan lenyap dalam 2 detik dan selalu hilang sesudah reload. OBJ_TITLE (js/draw-style-modal.js)
+// dipakai ulang supaya judul di daftar alert & di header modal objek tak bisa berselisih.
+// Alert yang objeknya tak ada di chart ini (mis. milik instrumen lain) jatuh ke 'Drawing'.
+function drawAlertLabel(did){
+  if(!did) return 'Drawing';
+  const oid=drawIds.find(id=>objDid[id]===did);
+  if(oid==null) return 'Drawing';
+  try{ const o=chart.getOverlayById(oid); if(o&&OBJ_TITLE[o.name]) return OBJ_TITLE[o.name]; }catch(_){}
+  return 'Drawing';
+}
 
 // Alert milik objek ini (dari daftar alert yang sudah disinkron alertPoll).
 function alertForDid(did){ return did ? alerts.find(a=>a.drawId===did) : null; }
@@ -47,7 +75,15 @@ function alertPaneHTML(o){
 // terus menampilkan form Create — klik kedua mengirim POST /api/alerts KEDUA utk drawId yg sama.
 // outerHTML diganti dgn markup terbaru (alertPaneHTML membaca ulang `alerts`), lalu di-wire ulang
 // karena tombolnya adalah node DOM baru.
+//
+// Gerbang di baris pertama: `panel` adalah SATU node modal yang dipakai ulang untuk objek apa pun,
+// sedangkan `o` ditangkap saat klik Create — dan jalur create bisa makan beberapa detik (flush
+// gambar + POST). Tutup modal, buka setelan garis LAIN di jendela itu, lalu refresh yang tertunda
+// mendarat: pane objek BARU ditimpa keadaan objek LAMA, dan tombol Delete-nya terikat ke objek lama
+// — "hapus alert garis ini" menghapus alert garis lain. Jadi: batalkan kalau modal sudah tak
+// menampilkan objek yang refresh ini dibuat untuknya.
 function refreshAlertPane(panel, o){
+  if(!drawModal.classList.contains('show') || !dmTarget || !o || dmTarget.id!==o.id) return;
   const cur=panel.querySelector('.dm-pane[data-pane="alert"]'); if(!cur) return;
   const hidden=cur.hidden, minH=cur.style.minHeight;
   cur.outerHTML=alertPaneHTML(o);
@@ -94,15 +130,19 @@ async function createLineAlert(overlayId, cond){
     if(!r.ok){ toast('Could not create alert','error'); return null; }
     const a=await r.json();
     alerts.push({id:a.id, sym:a.instrument, price:a.price, triggeredAt:null, oid:null,
-      cond:a.cond, drawId:a.drawId, name:(chart.getOverlayById(overlayId)||{}).name||''});
+      cond:a.cond, drawId:a.drawId, t1:a.t1, p1:a.p1, t2:a.t2, p2:a.p2});
     track('alert',{inst, cond, from:'drawing'});
     renderAlertList(); return a;
-  }catch(e){ return null; }
+  // Kegagalan jaringan (fetch menolak) dulu balik diam-diam padahal cabang !r.ok bertoast:
+  // tombol utama tampak tak melakukan apa-apa. Satu pesan yang sama untuk kedua kegagalan.
+  }catch(e){ toast('Could not create alert','error'); return null; }
 }
 
 // Anchor alert diperbarui dari objeknya. Menumpang irama simpan gambar, BUKAN hook per-gestur:
-// dengan begitu drag, undo/redo, kunci sudut Shift, dan magnet semuanya ikut benar tanpa masing-
-// masing perlu diingat.
+// dengan begitu drag, kunci sudut Shift, dan magnet ikut benar tanpa masing-masing perlu diingat.
+// Undo/redo TIDAK lewat saveDraws() (applyDrawsSnapshot memanggil lapisan sync langsung), jadi ia
+// memanggil fungsi ini sendiri — lihat js/draw-undo.js. Tanpa itu, undo mengembalikan garisnya tapi
+// alertnya tetap mengawasi posisi yang barusan di-undo.
 async function syncAlertAnchors(){
   const byDid={}; drawIds.forEach(id=>{ const d=objDid[id]; if(d) byDid[d]=id; });
   for(const a of alerts.slice()){
@@ -122,11 +162,20 @@ async function syncAlertAnchors(){
 //
 // Proteksi thd chart yang kosong sesaat saat memuat BUKAN datang dari cek suppressDrawSave di bawah:
 // di satu-satunya pemanggilnya (loadInit, js/load-chart.js), flag itu sudah direset ke false di
-// `finally` TEPAT SEBELUM sweep ini dipanggil, jadi baris itu tak pernah bisa true di sini. Proteksi
-// sungguhan datang dari URUTANnya: sweep baru dipanggil SESUDAH restoreDraws() selesai (drawIds sudah
-// terisi ulang), ditambah onRemoved yang menolak menghapus alert selama churn programatik
-// (suppressDrawSave true di situ, js/draw-tools.js). Baris di bawah dibiarkan sbg defense-in-depth
-// kalau kelak ada pemanggil lain yg tak menjaga urutan itu — jangan andalkan ia utk proteksi di atas.
+// `finally` TEPAT SEBELUM sweep ini dipanggil, jadi baris itu tak pernah bisa true di sini. Baris itu
+// dibiarkan sbg defense-in-depth kalau kelak ada pemanggil lain — jangan andalkan ia utk proteksi.
+//
+// Proteksi sungguhan ada DUA:
+//  (1) URUTAN — sweep baru dipanggil SESUDAH restoreDraws() selesai (drawIds sudah terisi ulang),
+//      ditambah onRemoved yang menolak menghapus alert selama churn programatik (js/draw-tools.js);
+//  (2) `drawVer[target]==null` → keadaan server TAK DIKETAHUI, jangan menyapu. "Pemuatan selesai"
+//      tidak sama dengan "pemuatan OTORITATIF": kalau GET /api/drawings gagal, loadDrawsFor() jatuh
+//      ke cermin localStorage — yang KOSONG di browser baru, jendela private, atau sesudah data situs
+//      dibersihkan. drawIds lalu kosong, sweep menyimpulkan SEMUA alert kehilangan objeknya, dan
+//      menghapusnya di server tanpa bisa dikembalikan. Predikat null ini persis yang sudah dipakai
+//      jalur dorong untuk MENOLAK mendorong (js/draw-sync.js) — jadi ini konsisten dgn kontrak sync,
+//      bukan konsep baru: kalau kita tak boleh MENULIS gambar saat versi tak diketahui, kita jelas
+//      tak boleh MENGHAPUS alert atas dasar keadaan gambar yang sama-sama tak diketahui itu.
 async function sweepAlertsForMissingDrawings(){
   if(suppressDrawSave) return;
   const target=inst;   // instrumen & daftar did di bawah HARUS sepasang: loop ini `await`, dan inst
@@ -136,6 +185,7 @@ async function sweepAlertsForMissingDrawings(){
                         // yg sudah berganti) tapi diperiksa thd daftar did instrumen LAMA lalu
                         // terhapus — alert yg sedang dilihat pengguna lenyap. Ikat keduanya ke `target`
                         // supaya salah-pasang itu MUSTAHIL secara struktural, bukan sekadar dipersempit.
+  if(drawVer[target]==null) return;   // keadaan server tak diketahui → lihat (2) di komentar atas
   const ada=new Set(drawIds.map(id=>objDid[id]).filter(Boolean));
   for(const a of alerts.slice()){
     if(inst!==target) return;   // instrumen sudah berganti sejak sweep ini mulai → hentikan di sini,

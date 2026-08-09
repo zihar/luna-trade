@@ -22,7 +22,15 @@ function applyDrawsSnapshot(arr){
   // persis keadaan yang baru saja dipasang, bukan hasil pembacaan ulang kanvas yang bisa berbeda.
   // Gerbang suppressDrawSave dihormati persis seperti saveDraws(): saat clear/restore programatik
   // sedang berjalan, tak ada satu pun jalur yang boleh mendorong ke server.
+  // Alert yang terikat objek ikut kembali ke posisi hasil undo/redo. Undo TIDAK lewat saveDraws()
+  // (lihat dua paragraf di atas: snapshotnya sendiri yang didorong), padahal saveDraws() adalah
+  // satu-satunya pemanggil syncAlertAnchors — tanpa baris ini, seret garis ber-alert lalu Ctrl+Z
+  // mengembalikan garisnya sementara alertnya tetap mengawasi posisi yang barusan di-undo.
+  // Dipanggil di sini, SESUDAH suppressDrawSave dipulihkan & objek-objeknya sudah terpasang ulang,
+  // supaya lineAnchorsOf() membaca geometri yang baru — dan di bawah gerbang yang sama dgn dorongan
+  // gambar: saat clear/restore programatik berjalan, tak ada jalur yang boleh menyentuh server.
   if(!suppressDrawSave) try{ scheduleSyncDraws(inst, arr); }catch(_){}
+  if(!suppressDrawSave) try{ syncAlertAnchors(); }catch(_){}
 }
 function undoDraw(){
   if(!drawUndo.length) return;
