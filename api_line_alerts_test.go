@@ -54,6 +54,29 @@ func TestCreatePlainAlertViaAPIUnchanged(t *testing.T) {
 	}
 }
 
+// Pin kontrak normalisasi: cond diabaikan (omit) di request → tersimpan sebagai "cross",
+// bukan "" — baik di baris DB maupun di respons, keduanya harus sepakat.
+func TestCreateAlertOmittedCondPersistsAsCross(t *testing.T) {
+	storeForLineAlertAPI(t)
+	w := httptest.NewRecorder()
+	handleAlertCreate(w, reqUser("POST", "/api/alerts",
+		`{"instrument":"EUR_USD","drawId":"d-1","t1":1000,"p1":1.10,"t2":2000,"p2":1.20}`, 1))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Cond string `json:"cond"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &got)
+	if got.Cond != "cross" {
+		t.Fatalf("respons: cond seharusnya \"cross\", dapat %q", got.Cond)
+	}
+	rows, _ := store.AllActiveAlerts()
+	if len(rows) != 1 || rows[0].Cond != "cross" {
+		t.Fatalf("baris DB: cond seharusnya \"cross\": %+v", rows)
+	}
+}
+
 func TestVerticalLineRejected(t *testing.T) {
 	storeForLineAlertAPI(t)
 	w := httptest.NewRecorder()

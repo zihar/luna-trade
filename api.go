@@ -232,7 +232,10 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().UnixMilli()
-	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, req.Cond, req.DrawID, an)
+	// `cond` (bukan req.Cond mentah) — store menormalkan "" jadi "cross" juga, jadi hasilnya
+	// sama, tapi memakai satu variabel yang sudah tervalidasi menghindari kesan ada dua sumber
+	// kebenaran (baris tersimpan vs respons) di satu titik panggil.
+	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, cond, req.DrawID, an)
 	if err != nil {
 		// Jaring pengaman: kedua kondisi penolakan store sudah dicegah di atas, tapi kalau
 		// store menolak karena alasan lain, tetap jangan forward err.Error() (Indonesia) ke FE.

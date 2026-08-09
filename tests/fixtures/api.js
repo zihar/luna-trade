@@ -185,12 +185,19 @@ async function installStubs(page) {
         state.alerts = state.alerts.filter((a) => a.id !== body.id);
         return json(route, { ok: true });
       }
+      // Kedua rute di bawah SENGAJA meniru status HTTP handler Go asli (400 di jalur gagal),
+      // bukan cuma bentuk body — FE membedakan sukses/gagal lewat response.ok (status), bukan
+      // field body. Stub yang selalu 200 bikin setiap test jalur-gagal jadi green palsu: lolos
+      // di stub, gagal di server sungguhan.
       case '/api/alerts/anchors': {
         const a = state.alerts.find((x) => x.id === body.id);
-        if (a) Object.assign(a, { t1: body.t1, p1: body.p1, t2: body.t2, p2: body.p2 });
-        return json(route, { ok: !!a });
+        if (body.t1 === body.t2) return json(route, { error: 'line cannot be vertical' }, 400);
+        if (!a) return json(route, { error: 'alert not found' }, 400);
+        Object.assign(a, { t1: body.t1, p1: body.p1, t2: body.t2, p2: body.p2 });
+        return json(route, { ok: true });
       }
       case '/api/alerts/by-drawing/delete': {
+        if (!body.instrument || !body.drawId) return json(route, { error: 'instrument & drawId required' }, 400);
         const before = state.alerts.length;
         state.alerts = state.alerts.filter((x) => !(x.instrument === body.instrument && x.drawId === body.drawId));
         return json(route, { deleted: before - state.alerts.length });
