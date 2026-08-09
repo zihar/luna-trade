@@ -37,6 +37,8 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/alerts", requireUser(handleAlertsList))
 	mux.HandleFunc("POST /api/alerts", requireUser(handleAlertCreate))
 	mux.HandleFunc("POST /api/alerts/delete", requireUser(handleAlertDelete))
+	mux.HandleFunc("POST /api/alerts/anchors", requireUser(handleAlertAnchors))
+	mux.HandleFunc("POST /api/alerts/by-drawing/delete", requireUser(handleAlertDeleteByDrawing))
 	mux.HandleFunc("GET /api/drawings", requireUser(handleDrawingsGet))
 	mux.HandleFunc("POST /api/drawings", requireUser(handleDrawingsSave))
 }
@@ -131,12 +133,37 @@ func handleAnalytics(w http.ResponseWriter, r *http.Request) {
 
 // alertView = tampilan JSON satu price alert untuk FE.
 type alertView struct {
-	ID          int64   `json:"id"`
-	Instrument  string  `json:"instrument"`
-	Price       float64 `json:"price"`
-	Active      bool    `json:"active"`
-	CreatedAt   int64   `json:"createdAt"`
-	TriggeredAt *int64  `json:"triggeredAt"`
+	ID          int64    `json:"id"`
+	Instrument  string   `json:"instrument"`
+	Price       float64  `json:"price"`
+	Active      bool     `json:"active"`
+	CreatedAt   int64    `json:"createdAt"`
+	TriggeredAt *int64   `json:"triggeredAt"`
+	Cond        string   `json:"cond"`
+	DrawID      string   `json:"drawId"`
+	T1          *int64   `json:"t1"`
+	P1          *float64 `json:"p1"`
+	T2          *int64   `json:"t2"`
+	P2          *float64 `json:"p2"`
+}
+
+// toAlertView mengubah baris Alert (store) jadi alertView (JSON FE). Anchor garis
+// (t1/p1/t2/p2) hanya terisi kalau alert-nya terikat garis (An != nil).
+func toAlertView(a Alert) alertView {
+	v := alertView{
+		ID:          a.ID,
+		Instrument:  a.Instrument,
+		Price:       a.Price,
+		Active:      a.Active,
+		CreatedAt:   a.CreatedAt,
+		TriggeredAt: a.TriggeredAt,
+		Cond:        a.Cond,
+		DrawID:      a.DrawID,
+	}
+	if a.An != nil {
+		v.T1, v.P1, v.T2, v.P2 = &a.An.T1, &a.An.P1, &a.An.T2, &a.An.P2
+	}
+	return v
 }
 
 // handleAlertsList mengembalikan price alert milik user (aktif atau sudah
@@ -150,33 +177,78 @@ func handleAlertsList(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]alertView, 0, len(rows))
 	for _, a := range rows {
-		out = append(out, alertView{a.ID, a.Instrument, a.Price, a.Active, a.CreatedAt, a.TriggeredAt})
+		out = append(out, toAlertView(a))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleAlertCreate membuat price alert baru untuk instrumen & harga target.
+// handleAlertCreate membuat price alert baru: alert biasa (instrument+price) atau alert
+// garis (drawId+anchor). Validasi harga hanya berlaku untuk alert biasa — alert garis tak
+// memakai kolom price, levelnya dihitung dari anchor tiap tick.
 func handleAlertCreate(w http.ResponseWriter, r *http.Request) {
 	uid, _ := userIDFromCtx(r)
 	var req struct {
-		Instrument string  `json:"instrument"`
-		Price      float64 `json:"price"`
+		Instrument string   `json:"instrument"`
+		Price      float64  `json:"price"`
+		Cond       string   `json:"cond"`
+		DrawID     string   `json:"drawId"`
+		T1         *int64   `json:"t1"`
+		P1         *float64 `json:"p1"`
+		T2         *int64   `json:"t2"`
+		P2         *float64 `json:"p2"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad json")
 		return
 	}
-	if req.Instrument == "" || req.Price <= 0 {
+	if req.Instrument == "" {
+		writeErr(w, http.StatusBadRequest, "instrument required")
+		return
+	}
+	var an *LineAnchors
+	if req.DrawID != "" {
+		if req.T1 == nil || req.P1 == nil || req.T2 == nil || req.P2 == nil {
+			writeErr(w, http.StatusBadRequest, "line alert needs t1,p1,t2,p2")
+			return
+		}
+		// Cek vertikal di sini (bukan cuma andalkan penolakan store) supaya pesannya bahasa
+		// Inggris — pesan store ("garis vertikal…") berbahasa Indonesia & tak boleh sampai ke body HTTP.
+		if *req.T1 == *req.T2 {
+			writeErr(w, http.StatusBadRequest, "line cannot be vertical")
+			return
+		}
+		an = &LineAnchors{T1: *req.T1, P1: *req.P1, T2: *req.T2, P2: *req.P2}
+	} else if req.Price <= 0 {
 		writeErr(w, http.StatusBadRequest, "instrument & price required")
 		return
 	}
-	now := time.Now().UnixMilli()
-	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, "", "", nil)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+	cond := req.Cond
+	if cond == "" {
+		cond = "cross"
+	}
+	if cond != "cross" && cond != "up" && cond != "down" {
+		// Sama alasan: pesan store ("kondisi tak dikenal…") berbahasa Indonesia.
+		writeErr(w, http.StatusBadRequest, "unknown alert condition")
 		return
 	}
-	writeJSON(w, http.StatusOK, alertView{id, req.Instrument, req.Price, true, now, nil})
+	now := time.Now().UnixMilli()
+	id, err := store.CreateAlert(uid, req.Instrument, req.Price, now, req.Cond, req.DrawID, an)
+	if err != nil {
+		// Jaring pengaman: kedua kondisi penolakan store sudah dicegah di atas, tapi kalau
+		// store menolak karena alasan lain, tetap jangan forward err.Error() (Indonesia) ke FE.
+		writeErr(w, http.StatusBadRequest, "invalid alert parameters")
+		return
+	}
+	writeJSON(w, http.StatusOK, toAlertView(Alert{
+		ID:         id,
+		Instrument: req.Instrument,
+		Price:      req.Price,
+		Active:     true,
+		CreatedAt:  now,
+		Cond:       cond,
+		DrawID:     req.DrawID,
+		An:         an,
+	}))
 }
 
 // handleAlertDelete menghapus (ack) satu price alert milik user.
@@ -194,6 +266,56 @@ func handleAlertDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// POST /api/alerts/anchors — pengguna menggeser garisnya, alertnya ikut pindah.
+func handleAlertAnchors(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		ID int64   `json:"id"`
+		T1 int64   `json:"t1"`
+		P1 float64 `json:"p1"`
+		T2 int64   `json:"t2"`
+		P2 float64 `json:"p2"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if req.T1 == req.T2 {
+		// Sama alasan seperti di handleAlertCreate: pesan store berbahasa Indonesia,
+		// jangan sampai ke body HTTP.
+		writeErr(w, http.StatusBadRequest, "line cannot be vertical")
+		return
+	}
+	if err := store.UpdateAlertAnchors(uid, req.ID, LineAnchors{T1: req.T1, P1: req.P1, T2: req.T2, P2: req.P2}); err != nil {
+		writeErr(w, http.StatusBadRequest, "alert not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// POST /api/alerts/by-drawing/delete — objek gambarnya dihapus, alertnya ikut.
+func handleAlertDeleteByDrawing(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	var req struct {
+		Instrument string `json:"instrument"`
+		DrawID     string `json:"drawId"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad json")
+		return
+	}
+	if req.Instrument == "" || req.DrawID == "" {
+		writeErr(w, http.StatusBadRequest, "instrument & drawId required")
+		return
+	}
+	n, err := store.DeleteAlertsByDrawing(uid, req.Instrument, req.DrawID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"deleted": n})
 }
 
 // GET /api/drawings?instrument=EUR_USD → {payload:[…], version:N}

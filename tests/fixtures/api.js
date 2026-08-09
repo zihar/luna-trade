@@ -168,10 +168,13 @@ async function installStubs(page) {
           const a = {
             id: state.nextId++,
             instrument: body.instrument || 'EUR_USD',
-            price: body.price,
+            price: body.price || 0,
             active: true,
             createdAt: Date.now(),
             triggeredAt: null,
+            cond: body.cond || 'cross',
+            drawId: body.drawId || '',
+            t1: body.t1 ?? null, p1: body.p1 ?? null, t2: body.t2 ?? null, p2: body.p2 ?? null,
           };
           state.alerts.push(a);
           return json(route, a);
@@ -181,6 +184,16 @@ async function installStubs(page) {
       case '/api/alerts/delete': {
         state.alerts = state.alerts.filter((a) => a.id !== body.id);
         return json(route, { ok: true });
+      }
+      case '/api/alerts/anchors': {
+        const a = state.alerts.find((x) => x.id === body.id);
+        if (a) Object.assign(a, { t1: body.t1, p1: body.p1, t2: body.t2, p2: body.p2 });
+        return json(route, { ok: !!a });
+      }
+      case '/api/alerts/by-drawing/delete': {
+        const before = state.alerts.length;
+        state.alerts = state.alerts.filter((x) => !(x.instrument === body.instrument && x.drawId === body.drawId));
+        return json(route, { deleted: before - state.alerts.length });
       }
 
       case '/api/news/calendar':
