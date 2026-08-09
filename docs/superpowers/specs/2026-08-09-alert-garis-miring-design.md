@@ -34,6 +34,11 @@ level := an.P1 + (an.P2-an.P1)*f
 jaringan, tanpa data candle, tanpa state — bisa diuji seluruhnya offline, bentuk bukti yang sama
 dengan yang dipakai #180 (`alert_monitor_test.go` dengan tick sintetis).
 
+Nilainya **bertanda**: `a > b` memberi hasil negatif, bukan nol. Dengan begitu `levelAt` tetap
+fungsi linear penuh terhadap waktu dagang (dan test ekstrapolasi-ke-belakang milik #180 tetap
+bermakna), sementara keputusan "jangan awasi garis yang belum mulai" berada di satu tempat yang
+jelas — `evalAlert`, lihat Keputusan 2 — bukan tersembunyi sebagai efek samping clamp.
+
 **Dua alternatif yang ditolak, beserta alasannya:**
 
 - *Indeks bar dari data candle server* (paling akurat: menangani libur bursa dan jam ganjil secara
@@ -150,9 +155,18 @@ Ini yang membuat PR-nya kecil:
 ## Mode gagal & penanganannya
 
 1. **Pembagian nol: `tradingElapsed(t1,t2) == 0` padahal `t1 != t2`.** Terjadi kalau kedua anchor
-   jatuh di dalam jendela pasar-tutup yang sama (bisa dengan anchor di area future, atau muatan
-   lama/rusak). Ditangani DUA tempat: ditolak saat create (HTTP 400, pesan Inggris seperti penolakan
-   vertikal yang sudah ada) dan dilewati saat evaluasi (`return level p1, tanpa hit`).
+   jatuh di dalam jendela pasar-tutup yang sama — bukan kasus teoretis: anchor bisa berada di **area
+   future** (kanan bar terakhir), dan menggambar di akhir pekan menaruh keduanya di sana.
+
+   Ditangani dua tempat, dengan satu syarat yang wajib diikuti:
+
+   - **Penolakan saat create/update anchor hanya berlaku bila `P1 != P2`.** Menolak semua span nol
+     akan **meregresi #180**: alert garis horizontal memakai `t2 = t1+1`, jadi garis horizontal yang
+     digambar di area future pada akhir pekan punya span dagang nol — dan hari ini ia sah. Level
+     garis horizontal konstan, jadi span memang tak relevan untuknya.
+   - **Saat evaluasi, `span == 0` → `level = P1`** (bukan pembagian, bukan `r.Price`). Untuk garis
+     horizontal itu jawaban yang benar; untuk garis miring yang lolos lewat jalur lain itu jawaban
+     paling tak berbahaya — level membeku di anchor pertama alih-alih meledak.
 2. **`now < t1`** → lewati evaluasi (Keputusan 2).
 3. **Instrumen tak dikenal** → jatuh ke model `24/5`, bukan error. Model salah lebih baik daripada
    alert yang diam-diam mati, dan 24/5 adalah tebakan teraman untuk instrumen OANDA apa pun.
@@ -167,7 +181,8 @@ Ini yang membuat PR-nya kecil:
 
 - `tradingElapsed`: (a) dalam satu hari kerja; (b) melintasi satu akhir pekan; (c) melintasi beberapa
   pekan; (d) kedua ujung di dalam akhir pekan yang sama → 0; (e) melintasi transisi DST Maret dan
-  November; (f) model 24/7 = selisih wall-clock apa adanya; (g) `a > b` → 0, tak pernah negatif.
+  November; (f) model 24/7 = selisih wall-clock apa adanya; (g) `a > b` → **negatif simetris**,
+  `tradingElapsed(x,y) == -tradingElapsed(y,x)`.
 - Anchor terbalik: garis kanan-ke-kiri memberi level **identik** dengan garis yang sama digambar
   kiri-ke-kanan — diuji di `levelAt` (lapis 2) dan di E2E lewat gestur gambar mundur (lapis 1).
 - Kasus jangkar konkret yang wajib lulus: **Jumat 16:00 NY → Senin 09:00 NY = 17 jam dagang**
