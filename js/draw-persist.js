@@ -23,7 +23,7 @@ function serializeDraws(){
     if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
     const pts=o.points.map(p=>({vt:tsOf(p), value:p.value}));
     if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
-    out.push({ name:o.name, points:pts, lock:o.lock?1:0,
+    out.push({ name:o.name, points:pts, lock:o.lock?1:0, did:didOf(id),
       extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
   }catch(e){} });
   return out;
@@ -35,6 +35,7 @@ function saveDraws(){ if(suppressDrawSave) return;
   // Muatan + instrumen diserahkan BERSAMAAN ke lapisan sync (js/draw-sync.js) supaya dorongan yang
   // tertunda tak pernah perlu membaca ulang `inst` yang mungkin sudah berganti.
   try{ scheduleSyncDraws(inst, arr); }catch(_){}
+  try{ syncAlertAnchors(); }catch(_){}   // alert ikut pindah bila objeknya bergeser (js/draw-alert.js)
 }
 function scheduleSaveDraws(){ if(suppressDrawSave) return; clearTimeout(drawSaveTimer); drawSaveTimer=setTimeout(saveDraws,350); }
 // Sumbernya kini SERVER (js/draw-sync.js); localStorage hanya jalur penyelamat saat request gagal.
@@ -64,6 +65,9 @@ function buildDrawsFromArray(arr){
     if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
     const id=chart.createOverlay(Object.assign(base,delHooks()));
     if(id){ drawIds.push(id);
+      // did dari muatan bila ada; objek lama (sebelum fitur alert-garis) dapat did baru di sini,
+      // dan ia ikut tersimpan pada penyimpanan berikutnya.
+      objDid[id]= (typeof d.did==='string' && d.did) ? d.did : newDid();
       try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // restore full-point tak picu onDrawEnd → set flag di sini
       if(d.lock) try{ applyLockVisual(id,true); }catch(_){}        // muncul tanpa handle sejak awal
       if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }

@@ -168,10 +168,13 @@ async function installStubs(page) {
           const a = {
             id: state.nextId++,
             instrument: body.instrument || 'EUR_USD',
-            price: body.price,
+            price: body.price || 0,
             active: true,
             createdAt: Date.now(),
             triggeredAt: null,
+            cond: body.cond || 'cross',
+            drawId: body.drawId || '',
+            t1: body.t1 ?? null, p1: body.p1 ?? null, t2: body.t2 ?? null, p2: body.p2 ?? null,
           };
           state.alerts.push(a);
           return json(route, a);
@@ -181,6 +184,23 @@ async function installStubs(page) {
       case '/api/alerts/delete': {
         state.alerts = state.alerts.filter((a) => a.id !== body.id);
         return json(route, { ok: true });
+      }
+      // Kedua rute di bawah SENGAJA meniru status HTTP handler Go asli (400 di jalur gagal),
+      // bukan cuma bentuk body — FE membedakan sukses/gagal lewat response.ok (status), bukan
+      // field body. Stub yang selalu 200 bikin setiap test jalur-gagal jadi green palsu: lolos
+      // di stub, gagal di server sungguhan.
+      case '/api/alerts/anchors': {
+        const a = state.alerts.find((x) => x.id === body.id);
+        if (body.t1 === body.t2) return json(route, { error: 'line cannot be vertical' }, 400);
+        if (!a) return json(route, { error: 'alert not found' }, 400);
+        Object.assign(a, { t1: body.t1, p1: body.p1, t2: body.t2, p2: body.p2 });
+        return json(route, { ok: true });
+      }
+      case '/api/alerts/by-drawing/delete': {
+        if (!body.instrument || !body.drawId) return json(route, { error: 'instrument & drawId required' }, 400);
+        const before = state.alerts.length;
+        state.alerts = state.alerts.filter((x) => !(x.instrument === body.instrument && x.drawId === body.drawId));
+        return json(route, { deleted: before - state.alerts.length });
       }
 
       case '/api/news/calendar':
@@ -214,6 +234,10 @@ async function installStubs(page) {
           const row = state.drawings[key] || { payload: [], version: 0 };
           return json(route, { payload: row.payload, version: row.version });
         }
+        // Simulasi koneksi STALL (server diam, beda dari menolak cepat): route SENGAJA tak
+        // pernah di-fulfill, jadi fetch()-nya menggantung sampai pemanggil menyerah sendiri.
+        // Dipakai utk menguji batas waktu flush gambar di createLineAlert (js/draw-alert.js).
+        if (state.stallDrawings) return;
         // Muatan di atas batas server (256 KB) → 413. Diaktifkan lewat flag supaya test tak perlu
         // benar-benar menggambar ratusan objek untuk menguji jalur penolakan permanennya.
         if (state.tooBigDrawings) return json(route, { error: 'drawings too large' }, 413);
@@ -248,9 +272,12 @@ async function installStubs(page) {
   });
   await page.exposeFunction('__drawingsVersion', (instrument) => (state.drawings[instrument] || { version: 0 }).version);
   await page.exposeFunction('__setFailDrawings', (on) => { state.failDrawings = !!on; });
+  await page.exposeFunction('__setStallDrawings', (on) => { state.stallDrawings = !!on; });
   await page.exposeFunction('__setMalformedDrawings', (on) => { state.malformedDrawings = !!on; });
   await page.exposeFunction('__setTooBigDrawings', (on) => { state.tooBigDrawings = !!on; });
   await page.exposeFunction('__drawingsPayload', (instrument) => (state.drawings[instrument] || { payload: [] }).payload);
+  await page.exposeFunction('__alertCount', () => state.alerts.length);
+  await page.exposeFunction('__alertRow', (i) => state.alerts[i] || null);
 
   return state;
 }

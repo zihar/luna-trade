@@ -15,6 +15,117 @@ func crossed(prev, cur, lvl float64) bool {
 	return (prev < lvl && cur >= lvl) || (prev > lvl && cur <= lvl)
 }
 
+// levelAt = level alert pada waktu `now`.
+// Alert harga biasa (An nil) → kolom price. Alert garis → interpolasi dua anchor, dan sengaja
+// diekstrapolasi di luar ruasnya: trader menggambar trendline justru untuk mengawasi apa yang
+// terjadi SESUDAH titik terakhir, jadi alert yang mati di ujung ruas berhenti bekerja tepat saat
+// paling dibutuhkan. Garis horizontal (p1==p2) jatuh ke rumus yang sama dan memberi konstanta —
+// tak ada cabang "kalau horizontal maka…".
+func levelAt(r AlertRow, now int64) float64 {
+	if r.An == nil || r.An.T2 == r.An.T1 {
+		return r.Price
+	}
+	f := float64(now-r.An.T1) / float64(r.An.T2-r.An.T1)
+	return r.An.P1 + (r.An.P2-r.An.P1)*f
+}
+
+// sideHit memutuskan alert menyala atau tidak dari PERUBAHAN TANDA jarak harga-ke-level,
+// d = harga − level. Satu uji untuk dua gerakan sekaligus: harga bergerak melewati garis yang diam,
+// DAN garis bergerak melewati harga yang diam — keduanya sama-sama membalik tanda d.
+//
+// Ini menggantikan dua predikat lama (condHit + crossedByLevelMove) yang masing-masing salah:
+//   - condHit membandingkan harga SEBELUMNYA terhadap level SEKARANG. Saat level melompat antar
+//     tick (pengguna menyeret garisnya, proses lanjut sesudah jeda, perangkat lain memindahkannya),
+//     itu mengarang persilangan yang tak pernah terjadi;
+//   - jalur "level bergerak" menyalakan alert tanpa melihat a.Cond sama sekali, jadi alert `up`
+//     menyala saat garis bergerak TURUN melewati harga yang diam (dan sebaliknya) — dan karena
+//     alert bersifat one-shot, persilangan yang sungguhan lalu tak pernah bisa menyala lagi.
+//
+// `cross` sengaja memakai ulang crossed() dgn ambang 0: "d berpindah sisi" adalah persilangan yang
+// sama persis, cuma dinyatakan pada sumbu selisih.
+func sideHit(cond string, dPrev, dCur float64) bool {
+	switch cond {
+	case "up":
+		return dPrev < 0 && dCur >= 0
+	case "down":
+		return dPrev > 0 && dCur <= 0
+	default:
+		return crossed(dPrev, dCur, 0)
+	}
+}
+
+// lvlEntry menyimpan level yang pernah dihitung utk sebuah alert garis BESERTA anchor
+// yang menghasilkannya. Anchor ikut disimpan supaya baseline basi tak pernah dipakai:
+// hanya level yang berasal dari anchor yang SAMA dgn yang berlaku sekarang yang valid.
+type lvlEntry struct {
+	an  LineAnchors
+	lvl float64
+}
+
+// levelTracker adalah bookkeeping level SEBELUMNYA per-alert (bukan per-instrumen — dua
+// alert pada instrumen yang sama bisa punya garis berbeda). Dipisah jadi tipe kecil
+// dgn fungsinya sendiri supaya bisa dites langsung tanpa menyentuh goroutine monitor.
+type levelTracker map[int64]lvlEntry
+
+// prevLevel mengembalikan level tersimpan utk alert `id`, HANYA bila anchor yang
+// menghasilkannya (saat direkam) masih SAMA dgn `an` sekarang. Anchor berbeda berarti
+// garis sudah digeser sejak tick terakhir — men-drag garis adalah interaksi UTAMA fitur
+// ini, dan level dari posisi lama tak boleh dibandingkan seakan itu posisi yang sama;
+// kalau tidak, reposisi garis oleh pengguna sendiri bisa terbaca sbg "level menyeberangi
+// harga" yang palsu.
+func (lt levelTracker) prevLevel(id int64, an LineAnchors) (float64, bool) {
+	e, ok := lt[id]
+	if !ok || e.an != an {
+		return 0, false
+	}
+	return e.lvl, true
+}
+
+// record menyimpan level alert garis beserta anchor sumbernya, supaya tick berikutnya
+// bisa memverifikasi anchor belum berubah sebelum memakainya (lihat prevLevel). Alert
+// harga biasa sengaja tak lewat sini — dipanggil hanya saat An != nil oleh evalAlert.
+func (lt levelTracker) record(id int64, an LineAnchors, lvl float64) {
+	lt[id] = lvlEntry{an: an, lvl: lvl}
+}
+
+// prune membuang entry milik alert yang sudah tak aktif lagi (triggered atau dihapus
+// user), supaya peta tak tumbuh tanpa batas — proses ini didesain hidup lama tanpa
+// browser sama sekali terbuka.
+func (lt levelTracker) prune(active map[int64]bool) {
+	for id := range lt {
+		if !active[id] {
+			delete(lt, id)
+		}
+	}
+}
+
+// evalAlert mengevaluasi satu alert pada satu tick: menghitung levelnya sekarang, membandingkan
+// SISI harga terhadap level di tick sebelumnya vs sekarang, lalu memperbarui bookkeeping level
+// per-alert. Dipisah dari loop goroutine supaya bisa dites langsung tanpa Hub/DB.
+//
+// Sisi SEBELUMNYA dihitung terhadap level SEBELUMNYA (dari tracker, anchor yang sama), bukan
+// terhadap level sekarang: itulah satu-satunya cara "harga bergerak" dan "garis bergerak" jadi satu
+// pertanyaan yang jujur. Alert harga biasa punya prevLvl == lvl == price, jadi perilakunya identik
+// dgn sebelumnya.
+//
+// Tanpa baseline yang sah (belum ada entry, atau anchornya berubah sejak tick terakhir) evaluasi
+// DILEWATI sama sekali. Menebak dgn memakai level sekarang sbg pengganti level sebelumnya persis
+// yang membuat reposisi garis oleh pengguna sendiri terbaca sbg persilangan; tak menyalakan apa pun
+// pada satu tick adalah jawaban yang jujur — tick berikutnya sudah punya baseline.
+func evalAlert(a AlertRow, prev, cur float64, now int64, lvlTrack levelTracker) (lvl float64, hit bool) {
+	lvl = levelAt(a, now)
+	prevLvl := lvl
+	if a.An != nil {
+		pv, ok := lvlTrack.prevLevel(a.ID, *a.An)
+		lvlTrack.record(a.ID, *a.An, lvl) // dicatat lebih dulu: tick berikutnya butuh baseline ini juga saat tick INI dilewati
+		if !ok {
+			return lvl, false
+		}
+		prevLvl = pv
+	}
+	return lvl, sideHit(a.Cond, prev-prevLvl, cur-lvl)
+}
+
 // startAlertMonitor menjalankan goroutine tunggal yang memantau harga & menandai
 // price alert triggered (one-shot). Aman dipanggil sekali saat startup (lihat main.go).
 func startAlertMonitor() {
@@ -27,6 +138,7 @@ func startAlertMonitor() {
 
 		// Cache alert aktif di-refresh berkala supaya tak query DB tiap tick.
 		var cache []AlertRow
+		lvlTrack := levelTracker{}
 		reload := func() {
 			rows, err := store.AllActiveAlerts()
 			if err != nil {
@@ -34,6 +146,11 @@ func startAlertMonitor() {
 				return
 			}
 			cache = rows
+			active := make(map[int64]bool, len(rows))
+			for _, r := range rows {
+				active[r.ID] = true
+			}
+			lvlTrack.prune(active) // alert yg triggered/dihapus sejak reload terakhir: buang bookkeeping-nya
 		}
 		reload()
 		refresh := time.NewTicker(2 * time.Second)
@@ -58,19 +175,21 @@ func startAlertMonitor() {
 				if !seen {
 					continue // tick pertama instrumen ini: belum ada prev utk deteksi cross
 				}
-				hit := false
+				hitAny := false
+				now := time.Now().UnixMilli()
 				for _, a := range cache {
 					if !strings.EqualFold(a.Instrument, string(t.Instrument)) {
 						continue
 					}
-					if crossed(prev, mid, a.Price) {
-						if err := store.MarkAlertTriggered(a.ID, time.Now().UnixMilli()); err == nil {
-							log.Printf("alert monitor: triggered #%d %s @ %.5f (level %.5f)", a.ID, a.Instrument, mid, a.Price)
-							hit = true
+					lvl, hit := evalAlert(a, prev, mid, now, lvlTrack)
+					if hit {
+						if err := store.MarkAlertTriggered(a.ID, now); err == nil {
+							log.Printf("alert monitor: triggered #%d %s @ %.5f (level %.5f, cond %s)", a.ID, a.Instrument, mid, lvl, a.Cond)
+							hitAny = true
 						}
 					}
 				}
-				if hit {
+				if hitAny {
 					reload() // ada yg triggered → segarkan cache (one-shot)
 				}
 			}

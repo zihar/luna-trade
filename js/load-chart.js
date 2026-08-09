@@ -113,6 +113,7 @@ async function loadInit(latest){
     suppressDrawSave=false; clearTimeout(drawSaveTimer);
   }
   try{ resetDrawHistory(); }catch(e){}   // history undo/redo bersifat per-instrumen → reset
+  try{ sweepAlertsForMissingDrawings(); }catch(_){}   // objek yang hilang di tempat lain → alertnya ikut
 }
 
 async function fetchCandles(tf,{count,to,from}){

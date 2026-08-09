@@ -96,6 +96,7 @@ const SENTINEL = {
   'draw-copy-paste.js': 'copyOverlay',
   'draw-tools.js': 'hoverName',
   'draw-persist.js': 'PERSIST_DRAW',
+  'draw-did.js': 'objDid',
   'draw-sync.js': 'loadDrawsFor',
   'draw-undo.js': 'DRAW_HISTORY_MAX',
   // Dipecah dari draw-undo.js (2026-07-28): file itu dulu memuat LIMA domain, cuma 38 baris
@@ -133,6 +134,7 @@ const SENTINEL = {
   'replay-ui.js': 'pickMode',
   'draw-style-modal.js': 'PALETTE',
   'chart-settings.js': 'CHART_DEFAULT',
+  'draw-alert.js': 'ALERTABLE_LINE',
   'indicators.js': 'IND_DEFS',
   'context-menu.js': 'ctxMenu',
   'chart-type.js': {

@@ -17,7 +17,7 @@ func mustTestStore(t *testing.T) *Store {
 
 func TestAlertsCRUD(t *testing.T) {
 	s := mustTestStore(t) // helper: buka Store di file temp + migrate (lihat Step 2)
-	id, err := s.CreateAlert(1, "EUR_USD", 1.2345, 1000)
+	id, err := s.CreateAlert(1, "EUR_USD", 1.2345, 1000, "", "", nil)
 	if err != nil || id == 0 {
 		t.Fatalf("create: id=%d err=%v", id, err)
 	}

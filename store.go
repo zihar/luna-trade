@@ -72,6 +72,14 @@ func (s *Store) migrate() error {
 	s.addColumnIfMissing("users", "picture", "TEXT")
 	s.addColumnIfMissing("journal", "sl", "REAL") // SL/TP paper (server-side)
 	s.addColumnIfMissing("journal", "tp", "REAL")
+	// Alert yang terikat objek gambar: level-nya bukan satu harga tetap melainkan garis antara dua
+	// anchor. Kolom nullable + addColumnIfMissing supaya baris alert lama tetap sah tanpa migrasi.
+	s.addColumnIfMissing("price_alerts", "cond", "TEXT")    // '' / 'cross' | 'up' | 'down'
+	s.addColumnIfMissing("price_alerts", "draw_id", "TEXT") // did objek gambar; NULL = alert harga biasa
+	s.addColumnIfMissing("price_alerts", "t1", "INTEGER")
+	s.addColumnIfMissing("price_alerts", "p1", "REAL")
+	s.addColumnIfMissing("price_alerts", "t2", "INTEGER")
+	s.addColumnIfMissing("price_alerts", "p2", "REAL")
 	return nil
 }
 
@@ -746,6 +754,13 @@ func (s *Store) UserActivities(sinceISO string) ([]UserActivity, error) {
 	return out, nil
 }
 
+// LineAnchors = dua ujung garis yang jadi acuan alert: waktu wall-clock ms + harga.
+// Disimpan apa adanya (bukan dataIndex) supaya monitor tak perlu tahu timeframe atau data candle.
+type LineAnchors struct {
+	T1, T2 int64
+	P1, P2 float64
+}
+
 // Alert = baris tabel price_alerts yang ditampilkan ke user pemiliknya.
 type Alert struct {
 	ID          int64
@@ -754,6 +769,9 @@ type Alert struct {
 	Active      bool
 	CreatedAt   int64
 	TriggeredAt *int64
+	Cond        string       // 'cross' | 'up' | 'down'
+	DrawID      string       // did objek gambar; "" untuk alert harga biasa
+	An          *LineAnchors // nil untuk alert harga biasa
 }
 
 // AlertRow = baris alert aktif lintas-user, dipakai monitor harga.
@@ -762,22 +780,97 @@ type AlertRow struct {
 	ID         int64
 	Instrument string
 	Price      float64
+	Cond       string       // 'cross' | 'up' | 'down'
+	DrawID     string       // did objek gambar; "" untuk alert harga biasa
+	An         *LineAnchors // nil untuk alert harga biasa
 }
 
-// CreateAlert membuat price alert baru untuk user, aktif sejak dibuat.
-func (s *Store) CreateAlert(uid int64, instrument string, price float64, createdAt int64) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO price_alerts(user_id,instrument,price,active,created_at) VALUES(?,?,?,1,?)`,
-		uid, instrument, price, createdAt)
+// Dua penolakan VALIDASI dari CreateAlert, dijadikan sentinel supaya pemanggil HTTP bisa
+// membedakannya dari kegagalan lain (mis. database mati). Tanpa pembeda ini, kegagalan DB
+// terjawab 400 "invalid alert parameters" — menyalahkan pemanggil atas kesalahan server.
+var (
+	ErrAlertCond     = errors.New("kondisi alert tak dikenal")
+	ErrAlertVertical = errors.New("garis vertikal tak bisa dijadikan alert")
+)
+
+// CreateAlert membuat alert baru untuk user, aktif sejak dibuat.
+// `an` nil → alert harga biasa (level tetap = price). `an` terisi → alert terikat garis:
+// level-nya dihitung dari dua anchor, dan `price` tak dipakai.
+// cond kosong dinormalkan jadi "cross" supaya pemanggil lama tak perlu tahu soal kondisi.
+func (s *Store) CreateAlert(uid int64, instrument string, price float64, createdAt int64,
+	cond, drawID string, an *LineAnchors) (int64, error) {
+	if cond == "" {
+		cond = "cross"
+	}
+	if cond != "cross" && cond != "up" && cond != "down" {
+		return 0, fmt.Errorf("%w: %s", ErrAlertCond, cond)
+	}
+	var t1, t2 any
+	var p1, p2 any
+	if an != nil {
+		// Garis vertikal tak punya "harga pada waktu t" yang bermakna → tolak di pintu masuk,
+		// bukan dijaga diam-diam saat evaluasi.
+		if an.T1 == an.T2 {
+			return 0, ErrAlertVertical
+		}
+		t1, p1, t2, p2 = an.T1, an.P1, an.T2, an.P2
+	}
+	res, err := s.db.Exec(`INSERT INTO price_alerts(user_id,instrument,price,active,created_at,cond,draw_id,t1,p1,t2,p2)
+		VALUES(?,?,?,1,?,?,?,?,?,?,?)`,
+		uid, instrument, price, createdAt, cond, nullIfEmpty(drawID), t1, p1, t2, p2)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
+// nullIfEmpty menyimpan string kosong sebagai NULL supaya "bukan alert garis" punya SATU
+// representasi di DB, bukan dua ('' dan NULL) yang harus dicek dua-duanya di setiap query.
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// UpdateAlertAnchors memindahkan acuan garis sebuah alert (dipakai saat pengguna menggeser
+// objeknya). Alert-nya tetap alert yang sama — id, kondisi, dan status triggered tak tersentuh.
+func (s *Store) UpdateAlertAnchors(uid, id int64, an LineAnchors) error {
+	if an.T1 == an.T2 {
+		return ErrAlertVertical
+	}
+	res, err := s.db.Exec(`UPDATE price_alerts SET t1=?,p1=?,t2=?,p2=? WHERE id=? AND user_id=? AND draw_id IS NOT NULL`,
+		an.T1, an.P1, an.T2, an.P2, id, uid)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("alert not found")
+	}
+	return nil
+}
+
+// DeleteAlertsByDrawing menghapus semua alert milik uid yang terikat objek gambar tertentu.
+// Berkunci (instrument, draw_id): `did` unik per objek, tapi menyertakan instrumen membuat
+// penyapuan saat memuat satu instrumen tak mungkin menyentuh alert instrumen lain.
+func (s *Store) DeleteAlertsByDrawing(uid int64, instrument, drawID string) (int, error) {
+	if drawID == "" {
+		return 0, fmt.Errorf("drawID kosong")
+	}
+	res, err := s.db.Exec(`DELETE FROM price_alerts WHERE user_id=? AND instrument=? AND draw_id=?`,
+		uid, instrument, drawID)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
 // ListAlerts mengembalikan alert milik user: yang masih aktif, atau yang sudah
 // triggered tapi belum di-ack (di-delete) oleh user.
 func (s *Store) ListAlerts(uid int64) ([]Alert, error) {
-	rows, err := s.db.Query(`SELECT id,instrument,price,active,created_at,triggered_at
+	rows, err := s.db.Query(`SELECT id,instrument,price,active,created_at,triggered_at,
+		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2
 		FROM price_alerts WHERE user_id=? AND (active=1 OR triggered_at IS NOT NULL)
 		ORDER BY created_at DESC`, uid)
 	if err != nil {
@@ -789,11 +882,17 @@ func (s *Store) ListAlerts(uid int64) ([]Alert, error) {
 		var a Alert
 		var act int
 		var trig *int64
-		if err := rows.Scan(&a.ID, &a.Instrument, &a.Price, &act, &a.CreatedAt, &trig); err != nil {
+		var t1, t2 *int64
+		var p1, p2 *float64
+		if err := rows.Scan(&a.ID, &a.Instrument, &a.Price, &act, &a.CreatedAt, &trig,
+			&a.Cond, &a.DrawID, &t1, &p1, &t2, &p2); err != nil {
 			return nil, err
 		}
 		a.Active = act == 1
 		a.TriggeredAt = trig
+		if t1 != nil && t2 != nil && p1 != nil && p2 != nil {
+			a.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2}
+		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
@@ -814,7 +913,8 @@ func (s *Store) DeleteAlert(uid, id int64) error {
 
 // AllActiveAlerts mengembalikan semua alert aktif lintas-user, dipakai monitor harga.
 func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
-	rows, err := s.db.Query(`SELECT user_id,id,instrument,price FROM price_alerts WHERE active=1`)
+	rows, err := s.db.Query(`SELECT user_id,id,instrument,price,
+		COALESCE(cond,'cross'),COALESCE(draw_id,''),t1,p1,t2,p2 FROM price_alerts WHERE active=1`)
 	if err != nil {
 		return nil, err
 	}
@@ -822,8 +922,13 @@ func (s *Store) AllActiveAlerts() ([]AlertRow, error) {
 	var out []AlertRow
 	for rows.Next() {
 		var r AlertRow
-		if err := rows.Scan(&r.UserID, &r.ID, &r.Instrument, &r.Price); err != nil {
+		var t1, t2 *int64
+		var p1, p2 *float64
+		if err := rows.Scan(&r.UserID, &r.ID, &r.Instrument, &r.Price, &r.Cond, &r.DrawID, &t1, &p1, &t2, &p2); err != nil {
 			return nil, err
+		}
+		if t1 != nil && t2 != nil && p1 != nil && p2 != nil {
+			r.An = &LineAnchors{T1: *t1, T2: *t2, P1: *p1, P2: *p2}
 		}
 		out = append(out, r)
 	}
