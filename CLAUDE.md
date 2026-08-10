@@ -75,8 +75,9 @@ di atas.
   sumbu harga di dalam `#chart`, titik overlay tak selalu di atas bentuknya, jumlah titik
   mengembang setelah objek jadi). Temuan yang masih merah: `docs/e2e-drawing-findings.md`.
 - **Sebelum push, cukup smoke:** `npx playwright test tests/smoke --project=hermetic`
-  (22 test, ~40s lokal) — itu juga yang dijalankan CI di PR. Suite penuh diserahkan ke CI
-  saat push ke `main`; jangan bakar 5–7 menit lokal untuk sesuatu yang sudah otomatis.
+  (**59 test / 12 file, ~1,6 menit lokal** — diukur 2026-08-10; angka lama "22 test, ~40s" sudah
+  ketinggalan) — itu juga yang dijalankan CI di PR. Suite penuh (408 test / 33 file) diserahkan ke
+  CI saat push ke `main`; jangan bakar 5–7 menit lokal untuk sesuatu yang sudah otomatis.
 - Sisanya verifikasi manual via browser. Server lokal:
   `PORT=8765 ./luna-trade` (butuh `.env`: `OANDA_TOKEN`, dll). Serve dari disk (no-cache),
   jadi edit `index.html` langsung tampil saat reload.
