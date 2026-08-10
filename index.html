@@ -11,20 +11,27 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<!-- Open Graph — preview kartu saat link dibagikan. Saat domain produksi final: pakai URL absolut + tambah <meta property="og:url">. -->
+<!-- Open Graph — preview kartu saat link dibagikan.
+     URL gambar WAJIB absolut: scraper (LinkedIn, WhatsApp, Slack, Facebook) mengambil halaman ini
+     tanpa konteks origin, jadi "/assets/og-image.png" tak bisa mereka resolve dan kartunya keluar
+     tanpa gambar. Domain di sini karena itu di-hardcode — halaman ini disajikan dari satu origin
+     (nginx EC2), dan meta tag tak bisa dibuat relatif-tapi-absolut. Kalau domainnya pindah, keempat
+     URL di blok ini ikut berubah. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Luna Trade">
+<meta property="og:url" content="https://lunatrade.domudame.com/">
 <meta property="og:title" content="Luna Trade — Forex Charting, Replay & Paper Trading">
 <meta property="og:description" content="Professional-grade charting with live prices, drawing tools, bar replay, and economic news — all in one calm workspace.">
-<meta property="og:image" content="/assets/og-image.png">
+<meta property="og:image" content="https://lunatrade.domudame.com/assets/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Luna Trade — forex charting workspace">
-<!-- Twitter / X -->
+<!-- Twitter / X — twitter:image ikut diabsolutkan: masalahnya sama persis dgn og:image, cuma
+     scraper-nya berbeda. -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Luna Trade — Forex Charting, Replay & Paper Trading">
 <meta name="twitter:description" content="Professional-grade charting with live prices, drawing tools, bar replay, and economic news — all in one calm workspace.">
-<meta name="twitter:image" content="/assets/og-image.png">
+<meta name="twitter:image" content="https://lunatrade.domudame.com/assets/og-image.png">
 <!-- Font self-hosted (assets/fonts) — Modern Distinct: Sora (display) · Inter Tight (UI) · Chivo Mono (angka). Tak bergantung Google Fonts CDN. -->
 <!-- Styling dipecah ke modul css/ (Fase 1 pemecahan index.html monolitik).
      URUTAN link = urutan blok style lama → cascade identik. JANGAN diacak. -->
