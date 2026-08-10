@@ -132,6 +132,7 @@ const SENTINEL = {
 
   // PR-2 — potongan 5699-6447 (749 baris) ke tujuh file.
   'replay-ui.js': 'pickMode',
+  'draw-coords.js': 'COORD_SPEC',
   'draw-style-modal.js': 'PALETTE',
   'chart-settings.js': 'CHART_DEFAULT',
   'draw-alert.js': 'ALERTABLE_LINE',

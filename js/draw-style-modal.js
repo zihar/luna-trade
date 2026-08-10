@@ -38,7 +38,8 @@ function openDrawModal(o, tab){
   const name=o.name, st=dstyle(o), isFib=(name==='fib3');
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
   const hasAlert=ALERTABLE.has(name);
-  const active=(tab==='text'&&hasText)?'text':(tab==='alert'&&hasAlert)?'alert':'style';
+  const coordsPane=coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js
+  const active=(tab==='text'&&hasText)?'text':(tab==='coords'&&hasCoords)?'coords':(tab==='alert'&&hasAlert)?'alert':'style';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
@@ -61,14 +62,15 @@ function openDrawModal(o, tab){
   const alertPane=hasAlert?alertPaneHTML(o):'';
   const panel=drawModal.querySelector('.dmodal');
   panel.innerHTML=`<div class="dm-head">${OBJ_ICON[name]?`<span class="dm-ico">${OBJ_ICON[name]}</span>`:''}<span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
-    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
-    +`<div class="dm-body">${stylePane}${textPane}${alertPane}</div>`
+    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasCoords?`<button class="dm-tab" data-tab="coords">Coordinates</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
+    +`<div class="dm-body">${stylePane}${textPane}${coordsPane}${alertPane}</div>`
     +`<div class="dm-foot"><button class="dm-lock"></button><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
   const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
   const dmSwitch=(t)=>{ panel.querySelectorAll('.dm-tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
     panel.querySelectorAll('.dm-pane').forEach(p=>{ p.hidden=(p.dataset.pane!==t); }); };
   panel.querySelectorAll('.dm-tab').forEach(b=>b.onclick=()=>dmSwitch(b.dataset.tab));
   if(hasAlert) wireAlertPane(panel, o);
+  if(hasCoords) wireCoordsPane(panel, o);
   panel.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); mark('[data-col]',b); });
   panel.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); mark('[data-w]',b); });
   panel.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); mark('[data-st]',b); });
@@ -86,6 +88,8 @@ function openDrawModal(o, tab){
     lockBtn.classList.toggle('on',on);
     const del=panel.querySelector('.dm-del');
     del.disabled=on; del.title = on?'Unlock to delete':'';
+    // Koordinat ikut mati saat terkunci: menggeser objek lewat angka sama saja dengan menyeretnya.
+    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co').forEach(inp=>{ inp.disabled=on; });
   };
   lockBtn.onclick=()=>{ toggleDrawLock(o.id); syncLock(); };
   syncLock();
