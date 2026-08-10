@@ -142,6 +142,17 @@
     margin-bottom:16px; transition:border-color .12s, box-shadow .12s; }
   .dm-ta::placeholder{ color:var(--muted); }
   .dm-ta:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
+  /* tab Coordinates: harga + nomor bar per titik (js/draw-coords.js) */
+  .dm-co-row{ display:flex; align-items:center; gap:8px; margin:0 0 18px; }
+  .dm-co-row:last-child{ margin-bottom:0; }
+  .dm-co{ flex:1 1 0; min-width:0; box-sizing:border-box; background:var(--btn); color:var(--txt);
+    border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:13px;
+    font-family:var(--mono, inherit); font-variant-numeric:tabular-nums; transition:border-color .12s, box-shadow .12s; }
+  .dm-co:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
+  .dm-co:disabled{ opacity:.5; cursor:not-allowed; }
+  .dm-co.bad{ border-color:var(--red); box-shadow:0 0 0 3px rgba(242,54,69,.16); }
+  .dm-co-x{ flex:0 0 auto; color:var(--muted); font-size:10px; font-weight:600;
+    text-transform:uppercase; letter-spacing:.07em; }
   .dm-foot{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
   .dm-del{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--border);
     color:var(--muted); font-size:12px; padding:6px 12px; border-radius:8px; cursor:pointer; transition:color .12s, border-color .12s; }

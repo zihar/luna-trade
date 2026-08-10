@@ -74,9 +74,22 @@ dulu, dan tiap lompatan itu ikut tercatat sebagai riwayat undo serta masuk antre
 
 ### 6. Validasi
 
-Kosong / NaN / Infinity → nilai lama dikembalikan + border merah sekejap. Angka ekstrem (mis. bar
+Kosong / bukan angka → nilai lama dikembalikan + border merah (bertahan sampai diketik ulang,
+lihat butir 7). Angka ekstrem (mis. bar
 `41237`) **diterima apa adanya**: objeknya hanya keluar layar, dan Ctrl+Z sudah jadi jaringnya.
 Menjepit diam-diam justru menyembunyikan salah ketik dari pengguna.
+
+### 7. Field `type=text`, bukan `type=number` (ditemukan saat implementasi)
+
+Chrome menampilkan **dan** mem-parse `input[type=number]` menurut locale browser: di locale
+koma-desimal (id-ID, de-DE, …) nilai kita tampil `1,08900` dan pengguna yang mengetik `1.09`
+ditolak diam-diam. Terlihat langsung di screenshot verifikasi. Jadi field-nya teks +
+`inputmode="decimal"`, dengan parser sendiri yang menerima titik maupun koma. Pemisah ribuan
+tidak diterima — `1,090` ambigu (seribu sembilan puluh vs 1,09).
+
+Konsekuensi lain dari koreksi ini: border merah **bertahan sampai pengguna mengetik lagi**, bukan
+hilang sendiri setelah beberapa ratus milidetik. Penanda yang menghilang sendiri membuat "kenapa
+angkaku tak masuk" jadi tebakan, dan membuat testnya bergantung pada timer.
 
 ## Modul
 
