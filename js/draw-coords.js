@@ -66,12 +66,23 @@ function coordRows(o){
   }));
 }
 
+// Panah stepper digambar sebagai SVG (bukan karakter ▲▼) supaya ukuran & ketajamannya tak
+// bergantung font yang kebetulan terpasang.
+const CO_UP_SVG='<svg viewBox="0 0 8 5" aria-hidden="true"><path d="M4 0 8 5H0z" fill="currentColor"/></svg>';
+const CO_DN_SVG='<svg viewBox="0 0 8 5" aria-hidden="true"><path d="M4 5 0 0h8z" fill="currentColor"/></svg>';
+
 function coordsPaneHTML(o){
   const rows=coordRows(o); if(!rows.length) return '';
+  const field=(f)=>`<span class="dm-co-f">`
+    +`<input class="dm-co" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" data-cf="${f.cf}"`
+    +` value="${f.text}" data-base="${f.text}" aria-label="${dmEsc(f.aria)}">`
+    // tabindex=-1: Tab tetap melompat antar FIELD, bukan tersendat di enam tombol panah.
+    +`<span class="dm-co-sp">`
+    +`<button type="button" class="dm-co-st" data-cf="${f.cf}" data-dir="1" tabindex="-1" aria-label="${dmEsc(f.aria)} up">${CO_UP_SVG}</button>`
+    +`<button type="button" class="dm-co-st" data-cf="${f.cf}" data-dir="-1" tabindex="-1" aria-label="${dmEsc(f.aria)} down">${CO_DN_SVG}</button>`
+    +`</span></span>`;
   const body=rows.map(r=>`<div class="pp-lbl">${dmEsc(r.label)}</div><div class="dm-co-row">`
-    +r.fields.map(f=>(f.kind==='bar'&&r.fields.length>1?`<span class="dm-co-x">Bar</span>`:'')
-      +`<input class="dm-co" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" data-cf="${f.cf}"`
-      +` value="${f.text}" data-base="${f.text}" aria-label="${dmEsc(f.aria)}">`).join('')
+    +r.fields.map(f=>(f.kind==='bar'&&r.fields.length>1?`<span class="dm-co-x">Bar</span>`:'')+field(f)).join('')
     +`</div>`).join('');
   return `<div class="dm-pane" data-pane="coords">${body}</div>`;
 }
@@ -125,11 +136,50 @@ function refreshCoordsPane(panel, o){
 
 function markCoordBad(inp){ inp.classList.add('bad'); }
 
+// `panel` adalah SATU node modal yang dipakai ulang untuk objek apa pun (alasan yang sama dengan
+// penjaga di refreshAlertPane): blur / repeat tombol bisa datang setelah modal berpindah ke objek
+// lain, dan menulis di situ akan memindahkan objek yang salah.
+function coordLive(o){ return drawModal.classList.contains('show') && !!dmTarget && !!o && dmTarget.id===o.id; }
+
+// Langkah ▲▼ / ↑↓ = satuan digit paling KANAN yang ditampilkan, jadi tiap instrumen otomatis benar
+// (0.00001 di EUR/USD, 0.001 di USD/JPY, 0.01 di XAU/USD) tanpa daftar khusus. Shift = 10×
+// (di pasangan 5 desimal itu persis 1 pip). Nomor bar: 1 bar, pecahan sub-bar ikut terbawa.
+const coordKindOf=(cf)=>(cf&&cf[0]==='b')?'bar':'price';
+const coordDecimals=(kind)=>kind==='bar'?2:priceDecimals();
+const coordStep=(kind,shift)=>(kind==='bar'?1:Math.pow(10,-priceDecimals()))*(shift?10:1);
+
+function stepCoord(panel, o, inp, dir, shift){
+  if(!coordLive(o)||inp.disabled) return;
+  const kind=coordKindOf(inp.dataset.cf), dec=coordDecimals(kind);
+  // Kalau field sedang berisi ketikan tak valid, melangkah dari nilai objek yang sekarang —
+  // bukan diam — supaya tombol panah tak ikut mati gara-gara salah ketik.
+  let cur=parseCoordNum(inp.value);
+  if(!isFinite(cur)) cur=parseCoordNum(inp.dataset.base);
+  if(!isFinite(cur)) return;
+  const v=+((cur + dir*coordStep(kind,shift)).toFixed(dec));   // toFixed membuang debu float (0.1+0.2)
+  inp.classList.remove('bad');
+  if(!applyCoord(o, inp.dataset.cf, v)){ markCoordBad(inp); return; }
+  refreshCoordsPane(panel, o);
+  scheduleSaveDraws();
+}
+
+// Tahan tombol = melangkah berulang, seperti stepper mana pun. Timer dimatikan oleh pointerup di
+// mana pun (bukan cuma di atas tombolnya) DAN oleh tick yang mendapati modal sudah pindah/tertutup
+// — dua jalur, supaya tak ada interval yang hidup sesudah modalnya hilang.
+const COORD_HOLD_DELAY=380, COORD_HOLD_MS=60;
+function startCoordHold(panel, o, inp, dir, shift){
+  let iv=null;
+  const stop=()=>{ clearTimeout(to); if(iv){ clearInterval(iv); iv=null; }
+    window.removeEventListener('pointerup', stop, true);
+    window.removeEventListener('pointercancel', stop, true); };
+  const tick=()=>{ if(!coordLive(o)||inp.disabled){ stop(); return; } stepCoord(panel,o,inp,dir,shift); };
+  const to=setTimeout(()=>{ iv=setInterval(tick, COORD_HOLD_MS); }, COORD_HOLD_DELAY);
+  window.addEventListener('pointerup', stop, true);
+  window.addEventListener('pointercancel', stop, true);
+}
+
 function commitCoord(panel, o, inp){
-  // `panel` adalah SATU node modal yang dipakai ulang untuk objek apa pun (alasan yang sama
-  // dengan penjaga di refreshAlertPane): blur bisa datang setelah modal berpindah ke objek lain,
-  // dan menulis di situ akan memindahkan objek yang salah.
-  if(!drawModal.classList.contains('show')||!dmTarget||!o||dmTarget.id!==o.id) return;
+  if(!coordLive(o)) return;
   if(inp.disabled) return;
   if(inp.value===inp.dataset.base) return;      // tak diedit → tak ditulis (lihat catatan di spec)
   const v=parseCoordNum(inp.value);
@@ -145,7 +195,22 @@ function wireCoordsPane(panel, o){
   pane.querySelectorAll('input.dm-co').forEach(inp=>{
     inp.disabled=locked;   // terkunci = tak bisa digeser, termasuk lewat angka
     inp.oninput=()=>inp.classList.remove('bad');
-    inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); commitCoord(panel,o,inp); } };
+    inp.onkeydown=(e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); commitCoord(panel,o,inp); return; }
+      // ↑/↓ melangkah seperti tombol ▲▼. preventDefault supaya kursor tak lompat ke ujung teks.
+      if(e.key==='ArrowUp'||e.key==='ArrowDown'){ e.preventDefault();
+        stepCoord(panel,o,inp, e.key==='ArrowUp'?1:-1, e.shiftKey); }
+    };
     inp.onblur=()=>commitCoord(panel,o,inp);
+  });
+  pane.querySelectorAll('button.dm-co-st').forEach(btn=>{
+    const inp=pane.querySelector(`input.dm-co[data-cf="${btn.dataset.cf}"]`);
+    btn.disabled=locked;
+    if(!inp) return;
+    // pointerdown, bukan click: langkah pertama terasa seketika & jadi awal auto-repeat. Fokus
+    // dijaga tetap di field supaya blur-nya tak ikut men-commit teks setengah jadi.
+    btn.onpointerdown=(e)=>{ e.preventDefault(); const dir=+btn.dataset.dir;
+      stepCoord(panel,o,inp,dir,e.shiftKey);
+      startCoordHold(panel,o,inp,dir,e.shiftKey); };
   });
 }

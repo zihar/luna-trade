@@ -197,6 +197,75 @@ test.describe('tab Coordinates: menulis balik ke objek', () => {
     assertNoPageErrors(page);
   });
 
+  test('stepper: klik ▲ menaikkan satu digit terakhir, Shift = 10×', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    const modal = await openCoords(page, obj, rect);
+    const dec = await page.evaluate(() => priceDecimals());
+    const step = Math.pow(10, -dec);
+
+    // Stepper melangkah dari nilai yang DITAMPILKAN (sudah dibulatkan ke digit terakhir), jadi
+    // langkah pertama sekaligus merapikan harga hasil gambar-bebas ke grid tick. Kalau ia
+    // melangkah dari nilai mentah, isi field & nilai objek akan berbeda satu pembulatan.
+    const shown = +(await overlays(page))[0].points[0].value.toFixed(dec);
+    await modal.locator('.dm-pane[data-pane="coords"] .dm-co-st[data-cf="p0"][data-dir="1"]').click();
+    expect((await overlays(page))[0].points[0].value).toBeCloseTo(shown + step, dec + 1);
+
+    await modal.locator('.dm-pane[data-pane="coords"] .dm-co-st[data-cf="p0"][data-dir="-1"]').click({ modifiers: ['Shift'] });
+    expect((await overlays(page))[0].points[0].value).toBeCloseTo(shown + step - step * 10, dec + 1);
+    assertNoPageErrors(page);
+  });
+
+  test('stepper: ↑/↓ di field melangkah sama seperti tombol', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    const modal = await openCoords(page, obj, rect);
+    const dec = await page.evaluate(() => priceDecimals());
+    const step = Math.pow(10, -dec);
+
+    const shown = +(await overlays(page))[0].points[0].value.toFixed(dec);   // stepper bekerja di grid tick
+    const inp = modal.locator('.dm-pane[data-pane="coords"] input[data-cf="p0"]');
+    await inp.focus();
+    await inp.press('ArrowUp');
+    expect((await overlays(page))[0].points[0].value).toBeCloseTo(shown + step, dec + 1);
+    await inp.press('Shift+ArrowDown');
+    expect((await overlays(page))[0].points[0].value).toBeCloseTo(shown + step - step * 10, dec + 1);
+    // Field ikut menampilkan nilai baru, bukan hanya objeknya.
+    expect(parseFloat(await inp.inputValue())).toBeCloseTo(shown + step - step * 10, dec + 1);
+    assertNoPageErrors(page);
+  });
+
+  test('stepper nomor bar: satu bar per langkah, pecahan sub-bar terbawa', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    const modal = await openCoords(page, obj, rect);
+
+    // Mulai dari pecahan yang jelas supaya "terbawa" benar-benar teruji.
+    const base = Math.floor(await page.evaluate((id) => fidxOf(chart.getOverlayById(id).points[0]), obj.id));
+    await setField(modal, 'b0', base + 0.25);
+    await modal.locator('.dm-pane[data-pane="coords"] .dm-co-st[data-cf="b0"][data-dir="1"]').click();
+
+    const after = await page.evaluate((id) => fidxOf(chart.getOverlayById(id).points[0]), obj.id);
+    expect(after).toBeCloseTo(base + 1.25, 2);
+    assertNoPageErrors(page);
+  });
+
+  test('stepper tetap jalan walau field berisi ketikan tak valid', async ({ page }) => {
+    await gotoApp(page);
+    const { obj, rect } = await drawTool(page, 'trendline');
+    const modal = await openCoords(page, obj, rect);
+    const dec = await page.evaluate(() => priceDecimals());
+    const step = Math.pow(10, -dec);
+
+    const shown = +(await overlays(page))[0].points[0].value.toFixed(dec);
+    const inp = modal.locator('.dm-pane[data-pane="coords"] input[data-cf="p0"]');
+    await inp.fill('abc');
+    await modal.locator('.dm-pane[data-pane="coords"] .dm-co-st[data-cf="p0"][data-dir="1"]').click();
+    // Melangkah dari nilai objek yang sekarang, bukan dari teks sampah.
+    expect((await overlays(page))[0].points[0].value).toBeCloseTo(shown + step, dec + 1);
+    assertNoPageErrors(page);
+  });
+
   test('objek terkunci: field koordinat mati', async ({ page }) => {
     await gotoApp(page);
     const { obj, rect } = await drawTool(page, 'trendline');
@@ -211,6 +280,11 @@ test.describe('tab Coordinates: menulis balik ke objek', () => {
     const n = await inputs.count();
     expect(n).toBeGreaterThan(0);
     for (let i = 0; i < n; i++) await expect(inputs.nth(i)).toBeDisabled();
+    // Tombol ▲▼ ikut mati — kalau tidak, objek terkunci masih bisa digeser lewat stepper.
+    const steppers = modal.locator('.dm-pane[data-pane="coords"] button.dm-co-st');
+    const m = await steppers.count();
+    expect(m).toBe(n * 2);
+    for (let i = 0; i < m; i++) await expect(steppers.nth(i)).toBeDisabled();
     assertNoPageErrors(page);
   });
 

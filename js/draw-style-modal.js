@@ -89,7 +89,8 @@ function openDrawModal(o, tab){
     const del=panel.querySelector('.dm-del');
     del.disabled=on; del.title = on?'Unlock to delete':'';
     // Koordinat ikut mati saat terkunci: menggeser objek lewat angka sama saja dengan menyeretnya.
-    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co').forEach(inp=>{ inp.disabled=on; });
+    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co, .dm-pane[data-pane="coords"] button.dm-co-st')
+      .forEach(el=>{ el.disabled=on; });
   };
   lockBtn.onclick=()=>{ toggleDrawLock(o.id); syncLock(); };
   syncLock();
