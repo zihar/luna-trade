@@ -91,6 +91,25 @@ Konsekuensi lain dari koreksi ini: border merah **bertahan sampai pengguna menge
 hilang sendiri setelah beberapa ratus milidetik. Penanda yang menghilang sendiri membuat "kenapa
 angkaku tak masuk" jadi tebakan, dan membuat testnya bergantung pada timer.
 
+### 8. Stepper ▲▼ / ↑↓ (susulan, PR #186)
+
+Karena field-nya `type=text` (butir 7), spinner bawaan browser hilang — jadi tombol ▲▼-nya digambar
+sendiri, dan tombol panah keyboard melakukan hal yang sama.
+
+- **Langkah = satuan digit paling kanan yang ditampilkan**: `10^-priceDecimals()` untuk harga
+  (0.00001 di EUR/USD, 0.001 di USD/JPY, 0.01 di XAU/USD — otomatis benar per instrumen, tanpa
+  daftar khusus) dan 1 untuk nomor bar. **Shift = 10×**; di pasangan 5 desimal itu tepat 1 pip.
+  Pecahan sub-bar ikut terbawa (412,25 → ▲ → 413,25).
+- **Melangkah dari nilai yang DITAMPILKAN**, bukan nilai mentah objek. Konsekuensinya langkah
+  pertama sekaligus merapikan harga hasil gambar-bebas ke grid tick (1,0890086… → ▲ → 1,08901).
+  Melangkah dari nilai mentah akan membuat isi field dan nilai objek berbeda satu pembulatan.
+- Tahan tombol = melangkah berulang (380 ms lalu tiap 60 ms). Timernya dimatikan oleh `pointerup`
+  di mana pun **dan** oleh tick yang mendapati modal sudah tertutup/pindah objek — dua jalur,
+  supaya tak ada interval yang hidup sesudah modalnya hilang.
+- Ketikan tak valid di field tak mematikan tombol: stepper jatuh ke nilai objek yang sekarang.
+- Objek terkunci mematikan tombol ▲▼ juga, bukan hanya field — kalau tidak, objek terkunci masih
+  bisa digeser lewat stepper.
+
 ## Modul
 
 `js/draw-coords.js` baru:

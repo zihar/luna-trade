@@ -145,9 +145,20 @@
   /* tab Coordinates: harga + nomor bar per titik (js/draw-coords.js) */
   .dm-co-row{ display:flex; align-items:center; gap:8px; margin:0 0 18px; }
   .dm-co-row:last-child{ margin-bottom:0; }
+  .dm-co-f{ flex:1 1 0; min-width:0; position:relative; display:flex; }
   .dm-co{ flex:1 1 0; min-width:0; box-sizing:border-box; background:var(--btn); color:var(--txt);
-    border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:13px;
+    border:1px solid var(--border); border-radius:8px; padding:7px 22px 7px 10px; font-size:13px;
     font-family:var(--mono, inherit); font-variant-numeric:tabular-nums; transition:border-color .12s, box-shadow .12s; }
+  /* stepper ▲▼ (field-nya type=text, jadi spinner bawaan tak ada — lihat js/draw-coords.js) */
+  .dm-co-sp{ position:absolute; right:5px; top:0; bottom:0; display:flex; flex-direction:column;
+    justify-content:center; gap:1px; }
+  .dm-co-st{ display:flex; align-items:center; justify-content:center; width:15px; height:11px; padding:0;
+    border:0; border-radius:3px; background:transparent; color:var(--muted); cursor:pointer;
+    transition:color .12s, background .12s; }
+  .dm-co-st svg{ width:7px; height:5px; display:block; }
+  .dm-co-st:hover:not(:disabled){ color:var(--txt); background:var(--btn-hover); }
+  .dm-co-st:disabled{ opacity:.4; cursor:not-allowed; }
+  .dm-co-f:focus-within .dm-co-st{ color:var(--txt); }
   .dm-co:focus{ outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--luna-glow); }
   .dm-co:disabled{ opacity:.5; cursor:not-allowed; }
   .dm-co.bad{ border-color:var(--red); box-shadow:0 0 0 3px rgba(242,54,69,.16); }
