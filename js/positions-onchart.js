@@ -88,16 +88,22 @@ function onPosLayerClick(e){
 function stageLevel(id,k,on){ if(editingPosId!==id) openPositionEditor(id); if(!editPos) return;
   editPos[k+'On']=on; drawStagedLines(); renderPosEdit(); renderPosDom(posById(id)); }
 let posConfirmEl=null;
+// konfirmasi kecil = dialog .dmodal di tengah (scrim .live: chart & garis preview tetap terlihat). `anchor` tak dipakai lagi.
 function miniConfirm(msg,yesLabel,onYes,onNo,anchor){
-  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='objpop pos-confirm'; document.body.appendChild(posConfirmEl); makeDraggable(posConfirmEl,'.pp-grip'); }
-  posConfirmEl.innerHTML=GRIP+`<div class="pc-msg">${msg}</div><div class="pc-act"><button class="pc-no">Cancel</button><button class="pc-yes">${yesLabel}</button></div>`;
+  if(!posConfirmEl){ posConfirmEl=document.createElement('div'); posConfirmEl.className='dmodal-scrim live pos-confirm'; document.body.appendChild(posConfirmEl);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&posConfirmEl.classList.contains('show')){ const n=posConfirmEl.querySelector('.pc-no'); if(n) n.click(); } }); }
+  const title=yesLabel==='Save'?'Confirm change':'Confirm close';
+  posConfirmEl.innerHTML=`<div class="dmodal pc-box" role="alertdialog" aria-modal="true" aria-label="${title}">`
+    +`<div class="dm-head"><span class="dm-title">${title}</span><button class="dm-x pc-no-x" title="Cancel" aria-label="Cancel">✕</button></div>`
+    +`<div class="dm-body"><div class="pc-msg">${msg}</div></div>`
+    +`<div class="dm-foot"><button class="pc-no">Cancel</button><button class="pc-yes">${yesLabel}</button></div></div>`;
   const hide=()=>posConfirmEl.classList.remove('show');
-  posConfirmEl.querySelector('.pc-no').onclick=()=>{ hide(); if(onNo) onNo(); };
+  const no=()=>{ hide(); if(onNo) onNo(); };
+  posConfirmEl.querySelector('.pc-no').onclick=no; posConfirmEl.querySelector('.pc-no-x').onclick=no;
   posConfirmEl.querySelector('.pc-yes').onclick=()=>{ hide(); if(onYes) onYes(); };
-  const r=anchor?anchor.getBoundingClientRect():null;
-  posConfirmEl.style.left=Math.max(8,Math.min(r?r.left:lastPtr.x, innerWidth-190))+'px';
-  posConfirmEl.style.top=((r?r.bottom:lastPtr.y)+6)+'px';
+  posConfirmEl.onmousedown=e=>{ if(e.target===posConfirmEl) no(); };
   posConfirmEl.classList.add('show');
+  posConfirmEl.querySelector('.pc-yes').focus();
 }
 function confirmClosePos(id,anchor){
   if(isReplayId(id)){ const t=tradeById(id); if(!t) return;
@@ -284,14 +290,14 @@ function buildPosEditPanel(){
     `<div class="pe-head"><span class="pe-pen">✎</span><span class="pe-title">Edit Open Position</span><span class="pe-dir" id="peDir">—</span><button class="op-chev op-x" id="peClose" title="Close">✕</button></div>`+
     `<div class="pe-inst"><span class="pe-inst-l"><span class="pe-flag" id="peFlag"></span> <b id="peSym">—</b></span><span class="pe-inst-r" id="peInstR">—</span></div>`+
     `<div class="tl-sltp"><div class="tl-head">`+
-      `<button type="button" class="tl-trail" id="peTrail" title="Trailing (segera)">Trail</button>`+
+      `<button type="button" class="tl-trail" id="peTrail" title="Trailing (coming soon)">Trail</button>`+
       `<label class="tl-toggle" id="peSLtog">Stop Loss<input type="checkbox" id="peSLon"></label>`+
       `<label class="tl-toggle" id="peTPtog">Take Profit<input type="checkbox" id="peTPon"></label></div>`+
     `<div class="tl-grid">`+
       // Price — satu-satunya field editable; Ticks & P&L dihitung balik sbg readout
-      `<div class="tl-cell sl"><input class="tl-in" id="peSLprice" type="text" inputmode="decimal" placeholder="—" title="Harga Stop Loss"></div>`+
+      `<div class="tl-cell sl"><input class="tl-in" id="peSLprice" type="text" inputmode="decimal" placeholder="—" title="Stop Loss price"></div>`+
       `<div class="tl-lbl">Price</div>`+
-      `<div class="tl-cell tp"><input class="tl-in" id="peTPprice" type="text" inputmode="decimal" placeholder="—" title="Harga Take Profit"></div>`+
+      `<div class="tl-cell tp"><input class="tl-in" id="peTPprice" type="text" inputmode="decimal" placeholder="—" title="Take Profit price"></div>`+
       // Ticks (readout)
       `<div class="tl-cell sl ro"><input class="tl-in" id="peSLticks" type="text" readonly tabindex="-1" placeholder="—"></div>`+
       `<div class="tl-lbl">Ticks</div>`+
