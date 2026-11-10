@@ -22,8 +22,8 @@ const COORD_SPEC={
   horizontalRayLine:'hray',                            // satu harga (dua titik) + dua nomor bar
   rect:'box', fib3:'box',                              // 2 sudut, turunan dari 8 titik (writeBox)
 };
-// longPosition/shortPosition sengaja TIDAK di sini: setelannya dialihkan ke showPosPopup,
-// bukan modal ini.
+// longPosition/shortPosition sengaja TIDAK di sini: tab-nya sendiri ("Levels": TP & SL saja,
+// Entry tak boleh digeser lewat angka) — lihat posLevelsPaneHTML di js/draw-style-modal.js.
 
 const coordPriceText=(v)=>(v==null||!isFinite(v))?'':(+v).toFixed(priceDecimals());
 const coordBarText=(v)=>(v==null||!isFinite(v))?'':String(+(+v).toFixed(2));

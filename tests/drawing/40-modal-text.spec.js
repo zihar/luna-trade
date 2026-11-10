@@ -3,7 +3,7 @@
 // Aturan yang diuji, sesuai TOOL_SPEC.settings / .text:
 //   settings 'modal'    → double-click membuka modal; tab awal = Text untuk objek bisa-teks
 //                         (DM_TEXT_OBJS), Style untuk sisanya
-//   settings 'pospopup' → long/shortPosition dialihkan ke popup posisi (index.html pra-Fase-2:5573)
+//   settings 'pospopup' → long/shortPosition memakai modal yang sama, tab Style|Levels
 //   settings null       → tak punya panel setting (sejak simpleAnnotation/simpleTag ditarik dari
 //                         rail — Temuan 3 — tak ada lagi tool berkategori ini; kolomnya disimpan
 //                         karena tool baru bisa masuk kategori itu lagi)
@@ -87,12 +87,13 @@ test.describe('modal setting objek', () => {
 
 test.describe('objek tanpa modal', () => {
   for (const spec of TOOL_SPEC.filter((t) => t.settings === 'pospopup')) {
-    test(`${spec.name}: double-click membuka popup posisi, bukan modal`, async ({ page }) => {
+    test(`${spec.name}: double-click membuka modal posisi (tab Style|Levels, tanpa Text)`, async ({ page }) => {
       await gotoApp(page);
       const { obj, rect } = await drawTool(page, spec.name);
       await dblclickObject(page, obj, rect);
-      await expect(page.locator('.objpop.show').first()).toBeVisible();
-      await expect(page.locator('.dmodal-scrim.show')).toHaveCount(0);
+      await expect(page.locator('.dmodal-scrim.show .dmodal')).toBeVisible();
+      await expect(page.locator('.dmodal .dm-tab')).toHaveText(['Style', 'Levels']);
+      await expect(page.locator('.objpop.show')).toHaveCount(0);
       assertNoPageErrors(page);
     });
   }

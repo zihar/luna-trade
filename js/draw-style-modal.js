@@ -1,7 +1,5 @@
 // ===================== setting objek gambar: modal Style/Text (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
-const objPop=document.createElement('div'); objPop.className='objpop'; document.body.appendChild(objPop);   // dipakai popup posisi (showPosPopup)
-makeDraggable(objPop, '.pp-grip');
 // objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
 const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline']);
 const DM_ALIGN_OBJS=new Set(['text','rect','trendline']);   // callout selalu kiri-atas → tanpa chip align
@@ -27,23 +25,78 @@ function closeDrawModal(){
     if(ov && o.name==='text' && (ov.extendData==null||String(ov.extendData).trim()==='')) chart.removeOverlay(o.id); }catch(e){} }
   scheduleSaveDraws();
 }
-// dispatcher: posisi long/short pakai popup zona sendiri, sisanya modal Style/Text
+// dispatcher: semua objek (termasuk long/short) kini memakai modal yang sama; isi tab-nya yang beda
 function openObjSettings(o, cx, cy, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
-  if(o.name==='longPosition'||o.name==='shortPosition'){ showPosPopup(o, cx, cy); return; }
   openDrawModal(o, tab);
+}
+const POS_OBJS=new Set(['longPosition','shortPosition']);
+// swatch zona Profit & Stop: default TradingView-ish di urutan pertama, sisanya turunan palet Luna
+const POS_TGT_COLORS=['#089981','#54c88c','#22d3ee','#4a71ff','#a78bfa','#f5a623'];
+const POS_STOP_COLORS=['#f23645','#ff6f6f','#f5a623','#a78bfa','#89898b','#ffffff'];
+// satu zona (Profit/Stop): swatch warna + slider transparansi. kind: 'tgt' | 'stop'
+function posZoneHTML(st, kind){
+  const tgt=kind==='tgt', key=tgt?'tgtColor':'stopColor', akey=tgt?'tgtAlpha':'stopAlpha';
+  const cur=(st[key]||(tgt?'#089981':'#f23645')).toLowerCase();
+  const alpha=st[akey]!=null?st[akey]:12;
+  const list=tgt?POS_TGT_COLORS:POS_STOP_COLORS, inList=list.includes(cur);
+  const sw=list.map(c=>`<button class="sw ${cur===c?'on':''}" data-pcol="${kind}" data-pc="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
+  return `<div class="pp-lbl">${tgt?'Profit zone':'Stop zone'}</div>`
+    +`<div class="pp-row">${sw}<label class="sw sw-custom ${inList?'':'on'}" title="Custom color"><input type="color" data-pcol-in="${kind}" value="${cur}" aria-label="Custom color"></label></div>`
+    +`<div class="dm-slider"><span>Opacity</span><input type="range" data-palpha="${kind}" min="0" max="100" value="${alpha}" aria-label="${tgt?'Profit':'Stop'} zone opacity"><span class="dm-sval">${alpha}%</span></div>`;
+}
+function posStylePaneHTML(o){
+  const st=dstyle(o);
+  return `<div class="dm-pane" data-pane="style">${posZoneHTML(st,'tgt')}<div class="dm-gap"></div>${posZoneHTML(st,'stop')}</div>`;
+}
+// tab Levels: Take Profit & Stop Loss sebagai harga (Entry hanya baca — menggesernya = memindahkan posisi)
+function posLevelsPaneHTML(o){
+  const lv=posLevels(o); if(!lv) return '';
+  const f=(id,label,val,ro)=>`<div class="pp-lbl">${label}</div><div class="dm-co-row"><span class="dm-co-f">`
+    +`<input class="dm-co" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="${id}" value="${coordPriceText(val)}" data-base="${coordPriceText(val)}" aria-label="${label} price"${ro?' readonly tabindex="-1"':''}></span></div>`;
+  return `<div class="dm-pane" data-pane="levels">${f('ppTp','Take profit',lv.tp)}${f('ppSl','Stop loss',lv.sl)}</div>`;
+}
+// kabel tab Style & Levels khusus posisi
+function wirePosPanes(panel, o){
+  const kinds={tgt:['tgtColor','tgtAlpha'],stop:['stopColor','stopAlpha']};
+  panel.querySelectorAll('[data-pcol]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.pcol; setObjStyle(o.id,{[kinds[k][0]]:b.dataset.pc});
+    panel.querySelectorAll(`[data-pcol="${k}"], [data-pcol-in="${k}"]`).forEach(x=>(x.closest('.sw')||x).classList.remove('on')); b.classList.add('on'); });
+  panel.querySelectorAll('[data-pcol-in]').forEach(i=>i.oninput=()=>{
+    const k=i.dataset.pcolIn; setObjStyle(o.id,{[kinds[k][0]]:i.value});
+    panel.querySelectorAll(`[data-pcol="${k}"]`).forEach(x=>x.classList.remove('on')); i.closest('.sw').classList.add('on'); });
+  panel.querySelectorAll('[data-palpha]').forEach(r=>r.oninput=()=>{
+    r.parentElement.querySelector('.dm-sval').textContent=r.value+'%'; setObjStyle(o.id,{[kinds[r.dataset.palpha][1]]:+r.value}); });
+  // Enter / blur = tulis. Tak valid (bukan angka, atau menyeberangi Entry) → field merah & kembali
+  // ke nilai objek; objek tak bergerak.
+  [['#ppTp','tp'],['#ppSl','sl']].forEach(([sel,which])=>{
+    const inp=panel.querySelector(sel); if(!inp) return;
+    const commit=()=>{
+      if(inp.value===inp.dataset.base) return;
+      const ok=applyPosLevel(o, which, parseCoordNum(inp.value));
+      const cur=posLevels(o);
+      if(ok){ inp.classList.remove('bad'); scheduleSaveDraws(); }
+      else inp.classList.add('bad');
+      if(cur){ const t=coordPriceText(cur[which]); inp.value=t; inp.dataset.base=t; }
+    };
+    inp.oninput=()=>inp.classList.remove('bad');
+    inp.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation();   // hotkey chart (digit→interval, Delete) tak boleh ikut; Esc tetap menutup modal
+      if(e.key==='Enter'){ e.preventDefault(); commit(); } };
+    inp.onblur=commit;
+  });
 }
 function openDrawModal(o, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
   const name=o.name, st=dstyle(o), isFib=(name==='fib3');
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
-  const hasAlert=ALERTABLE.has(name);
-  const coordsPane=coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js
-  const active=(tab==='text'&&hasText)?'text':(tab==='coords'&&hasCoords)?'coords':(tab==='alert'&&hasAlert)?'alert':'style';
+  const hasAlert=ALERTABLE.has(name), isPos=POS_OBJS.has(name);
+  const coordsPane=isPos?posLevelsPaneHTML(o):coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js (posisi: tab Levels)
+  const coordsTab=isPos?'levels':'coords', coordsLabel=isPos?'Levels':'Coordinates';
+  const active=(tab==='text'&&hasText)?'text':((tab==='coords'||tab==='levels')&&hasCoords)?coordsTab:(tab==='alert'&&hasAlert)?'alert':'style';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  const stylePane=`<div class="dm-pane" data-pane="style">`
+  const stylePane=isPos?posStylePaneHTML(o):`<div class="dm-pane" data-pane="style">`
     +(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
@@ -62,7 +115,7 @@ function openDrawModal(o, tab){
   const alertPane=hasAlert?alertPaneHTML(o):'';
   const panel=drawModal.querySelector('.dmodal');
   panel.innerHTML=`<div class="dm-head">${OBJ_ICON[name]?`<span class="dm-ico">${OBJ_ICON[name]}</span>`:''}<span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
-    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasCoords?`<button class="dm-tab" data-tab="coords">Coordinates</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
+    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasCoords?`<button class="dm-tab" data-tab="${coordsTab}">${coordsLabel}</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
     +`<div class="dm-body">${stylePane}${textPane}${coordsPane}${alertPane}</div>`
     +`<div class="dm-foot"><button class="dm-lock"></button><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
   const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
@@ -70,7 +123,7 @@ function openDrawModal(o, tab){
     panel.querySelectorAll('.dm-pane').forEach(p=>{ p.hidden=(p.dataset.pane!==t); }); };
   panel.querySelectorAll('.dm-tab').forEach(b=>b.onclick=()=>dmSwitch(b.dataset.tab));
   if(hasAlert) wireAlertPane(panel, o);
-  if(hasCoords) wireCoordsPane(panel, o);
+  if(isPos) wirePosPanes(panel, o); else if(hasCoords) wireCoordsPane(panel, o);
   panel.querySelectorAll('[data-col]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{color:b.dataset.col}); mark('[data-col]',b); });
   panel.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{size:+b.dataset.w}); mark('[data-w]',b); });
   panel.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); mark('[data-st]',b); });
@@ -89,7 +142,7 @@ function openDrawModal(o, tab){
     const del=panel.querySelector('.dm-del');
     del.disabled=on; del.title = on?'Unlock to delete':'';
     // Koordinat ikut mati saat terkunci: menggeser objek lewat angka sama saja dengan menyeretnya.
-    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co, .dm-pane[data-pane="coords"] button.dm-co-st')
+    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co, .dm-pane[data-pane="coords"] button.dm-co-st, .dm-pane[data-pane="levels"] input.dm-co')
       .forEach(el=>{ el.disabled=on; });
   };
   lockBtn.onclick=()=>{ toggleDrawLock(o.id); syncLock(); };
@@ -106,51 +159,6 @@ function openDrawModal(o, tab){
   dmSwitch(active);
   if(active==='text'&&ta){ ta.focus(); const L=ta.value.length; try{ta.setSelectionRange(L,L);}catch(e){} }
 }
-// popup khusus Long/Short Position: warna & transparansi zona Profit & Stop terpisah (per objek)
-function showPosPopup(o, cx, cy){
-  const st=dstyle(o);
-  const tA=st.tgtAlpha!=null?st.tgtAlpha:12, sA=st.stopAlpha!=null?st.stopAlpha:12;
-  const lv=posLevels(o), lockedPos=(()=>{ try{ return isLocked(o.id); }catch(e){ return false; } })();
-  const lvInput=(id,label,val)=>`<label class="pp-lvl"><span>${label}</span>`
-    +`<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" class="pp-price" id="${id}" value="${coordPriceText(val)}" data-base="${coordPriceText(val)}" aria-label="${label} price"${lockedPos?' disabled':''}></label>`;
-  objPop.innerHTML=GRIP+
-     (lv?`<div class="pp-lbl">Levels</div><div class="pp-levels">${lvInput('ppTp','Take Profit',lv.tp)}${lvInput('ppSl','Stop Loss',lv.sl)}</div>`:'')
-    +`<div class="pp-lbl">Profit / Target</div>`
-    +`<div class="pp-row"><input type="color" class="pp-color" id="ppTgtC" value="${st.tgtColor||'#089981'}"></div>`
-    +`<div class="pp-slider"><input type="range" id="ppTgtA" min="0" max="100" value="${tA}"><span class="pp-sval" id="ppTgtAV">${tA}%</span></div>`
-    +`<div class="pp-lbl">Stop / Loss</div>`
-    +`<div class="pp-row"><input type="color" class="pp-color" id="ppStopC" value="${st.stopColor||'#f23645'}"></div>`
-    +`<div class="pp-slider"><input type="range" id="ppStopA" min="0" max="100" value="${sA}"><span class="pp-sval" id="ppStopAV">${sA}%</span></div>`
-    +`<div class="pp-act"><button id="ppDel">🗑 Delete</button></div>`;
-  objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
-  objPop.style.top =Math.min(cy,window.innerHeight-330)+'px';
-  objPop.classList.add('show');
-  objPop.querySelector('#ppTgtC').oninput =e=>setObjStyle(o.id,{tgtColor:e.target.value});
-  objPop.querySelector('#ppStopC').oninput=e=>setObjStyle(o.id,{stopColor:e.target.value});
-  objPop.querySelector('#ppTgtA').oninput =e=>{ objPop.querySelector('#ppTgtAV').textContent=e.target.value+'%'; setObjStyle(o.id,{tgtAlpha:+e.target.value}); };
-  objPop.querySelector('#ppStopA').oninput=e=>{ objPop.querySelector('#ppStopAV').textContent=e.target.value+'%'; setObjStyle(o.id,{stopAlpha:+e.target.value}); };
-  // Enter / blur = tulis. Tak valid (bukan angka, atau menyeberangi Entry) → field merah & kembali
-  // ke nilai objek; objek tak bergerak.
-  [['#ppTp','tp'],['#ppSl','sl']].forEach(([sel,which])=>{
-    const inp=objPop.querySelector(sel); if(!inp) return;
-    const commit=()=>{
-      if(inp.value===inp.dataset.base) return;
-      const ok=applyPosLevel(o, which, parseCoordNum(inp.value));
-      const cur=posLevels(o);
-      if(ok){ inp.classList.remove('bad'); scheduleSaveDraws(); }
-      else inp.classList.add('bad');
-      if(cur){ const t=coordPriceText(cur[which]); inp.value=t; inp.dataset.base=t; }
-    };
-    inp.oninput=()=>inp.classList.remove('bad');
-    inp.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation();   // hotkey chart (digit→interval, Delete) tak boleh ikut; Esc tetap menutup popup
-      if(e.key==='Enter'){ e.preventDefault(); commit(); } };
-    inp.onblur=commit;
-  });
-  objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
-}
-function hideObjPopup(){ objPop.classList.remove('show'); }
-document.addEventListener('mousedown',e=>{ if(objPop.classList.contains('show')&&!objPop.contains(e.target)) hideObjPopup(); }, true);
-
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
 const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
 makeDraggable(fibPop, '.pp-grip');
@@ -174,5 +182,5 @@ function showFibPop(cx,cy){
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
 document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); hideObjPopup(); hideFibPop(); chartSet.classList.remove('show'); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); hideFibPop(); chartSet.classList.remove('show'); } });
 

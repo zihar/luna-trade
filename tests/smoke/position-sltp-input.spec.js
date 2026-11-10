@@ -1,4 +1,4 @@
-// Popup Long/Short Position (double-click): SL & TP bisa diketik sebagai harga.
+// Modal Long/Short Position (double-click, tab Levels): SL & TP bisa diketik sebagai harga.
 // Di smoke karena ia MENULIS ke points objek posisi (titik 1,3 = TP; 2,4 = SL).
 
 const { test, expect } = require('@playwright/test');
@@ -7,8 +7,8 @@ const { drawTool, overlays } = require('../helpers/draw');
 
 async function openPopup(page, name) {
   const { obj } = await drawTool(page, name);
-  await page.evaluate((id) => showPosPopup(chart.getOverlayById(id), 300, 200), obj.id);
-  await expect(page.locator('.objpop.show #ppTp')).toBeVisible();
+  await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 200, 'levels'), obj.id);
+  await expect(page.locator('.dmodal-scrim.show #ppTp')).toBeVisible();
   return obj;
 }
 
@@ -45,5 +45,31 @@ test('level yang menyeberangi Entry ditolak, objek tak bergerak', async ({ page 
   await expect(inp).toHaveClass(/bad/);
   expect(await inp.inputValue()).toBe(shown);
   expect((await overlays(page))[0].points[1].value).toBeCloseTo(before[1].value, 6);
+  assertNoPageErrors(page);
+});
+
+test('modal posisi: warna & opacity zona Profit/Stop tertulis ke style objek', async ({ page }) => {
+  await gotoApp(page);
+  const { obj } = await drawTool(page, 'longPosition');
+  await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 200), obj.id);
+  const m = page.locator('.dmodal');
+  await m.locator('[data-pcol="tgt"][data-pc="#4a71ff"]').click();
+  await m.locator('[data-pcol="stop"][data-pc="#a78bfa"]').click();
+  await m.locator('[data-palpha="tgt"]').fill('40');
+  const st = await page.evaluate((id) => dstyle(chart.getOverlayById(id)), obj.id);
+  expect(st.tgtColor).toBe('#4a71ff'); expect(st.stopColor).toBe('#a78bfa'); expect(st.tgtAlpha).toBe(40);
+  await expect(m.locator('.dm-sval').first()).toHaveText('40%');
+  assertNoPageErrors(page);
+});
+
+test('modal posisi: Delete menghapus objek, Lock mematikan field level', async ({ page }) => {
+  await gotoApp(page);
+  const { obj } = await drawTool(page, 'shortPosition');
+  await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 200, 'levels'), obj.id);
+  await page.locator('.dm-lock').click();
+  await expect(page.locator('#ppTp')).toBeDisabled();
+  await page.locator('.dm-lock').click();
+  await page.locator('.dm-del').click();
+  await expect.poll(async () => (await overlays(page)).length).toBe(0);
   assertNoPageErrors(page);
 });
