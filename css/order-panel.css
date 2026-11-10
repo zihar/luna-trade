@@ -187,6 +187,15 @@
   .dm-slider input[type=range]{ flex:1; min-width:0; accent-color:var(--accent); }
   .dm-sval{ width:34px; text-align:right; font-variant-numeric:tabular-nums; color:var(--txt); }
   .dm-gap{ height:20px; }
+
+  /* modal Chart settings: baris label + swatch warna */
+  .cs-group{ display:flex; flex-direction:column; margin:0 0 18px; border:1px solid var(--border); border-radius:9px; overflow:hidden; }
+  .cs-group:last-child{ margin-bottom:0; }
+  .cs-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px; font-size:12.5px; color:var(--txt); cursor:pointer; }
+  .cs-row + .cs-row{ border-top:1px solid var(--border); }
+  .cs-row:hover{ background:var(--btn-hover); }
+  .cs-sw{ position:relative; width:26px; height:18px; border-radius:5px; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
+  .cs-sw input{ position:absolute; inset:-6px; width:40px; height:30px; padding:0; border:0; cursor:pointer; background:none; }
   .pp-levels{ display:grid; grid-template-columns:1fr; gap:6px; margin-bottom:10px; }
   .pp-lvl{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:var(--muted); }
   .pp-price{ width:88px; font:inherit; font-variant-numeric:tabular-nums; text-align:right; color:var(--txt); background:var(--btn);

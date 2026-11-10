@@ -65,7 +65,7 @@ $('#chart').addEventListener('contextmenu',e=>{
   // sini: ia jalur internal tanpa syarat utk undo snapshot & ganti instrumen (js/draw-lock.js).
   if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:removeAllDrawings}); }
   items.push({label:'↺ Reset chart view', fn:resetChartView});
-  items.push({label:'⚙ Setting chart', fn:()=>{ track('chart_settings'); showChartSet(e.clientX, e.clientY); }});   // paling bawah
+  items.push({label:'⚙ Chart settings', fn:()=>{ track('chart_settings'); showChartSet(); }});   // paling bawah
   showCtx(e.clientX, e.clientY, items);
 });
 window.addEventListener('click',hideCtx);
