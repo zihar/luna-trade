@@ -110,8 +110,12 @@ function openDrawModal(o, tab){
 function showPosPopup(o, cx, cy){
   const st=dstyle(o);
   const tA=st.tgtAlpha!=null?st.tgtAlpha:12, sA=st.stopAlpha!=null?st.stopAlpha:12;
+  const lv=posLevels(o), lockedPos=(()=>{ try{ return isLocked(o.id); }catch(e){ return false; } })();
+  const lvInput=(id,label,val)=>`<label class="pp-lvl"><span>${label}</span>`
+    +`<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" class="pp-price" id="${id}" value="${coordPriceText(val)}" data-base="${coordPriceText(val)}" aria-label="${label} price"${lockedPos?' disabled':''}></label>`;
   objPop.innerHTML=GRIP+
-     `<div class="pp-lbl">Profit / Target</div>`
+     (lv?`<div class="pp-lbl">Levels</div><div class="pp-levels">${lvInput('ppTp','Take Profit',lv.tp)}${lvInput('ppSl','Stop Loss',lv.sl)}</div>`:'')
+    +`<div class="pp-lbl">Profit / Target</div>`
     +`<div class="pp-row"><input type="color" class="pp-color" id="ppTgtC" value="${st.tgtColor||'#089981'}"></div>`
     +`<div class="pp-slider"><input type="range" id="ppTgtA" min="0" max="100" value="${tA}"><span class="pp-sval" id="ppTgtAV">${tA}%</span></div>`
     +`<div class="pp-lbl">Stop / Loss</div>`
@@ -119,12 +123,29 @@ function showPosPopup(o, cx, cy){
     +`<div class="pp-slider"><input type="range" id="ppStopA" min="0" max="100" value="${sA}"><span class="pp-sval" id="ppStopAV">${sA}%</span></div>`
     +`<div class="pp-act"><button id="ppDel">🗑 Delete</button></div>`;
   objPop.style.left=Math.min(cx,window.innerWidth-204)+'px';
-  objPop.style.top =Math.min(cy,window.innerHeight-240)+'px';
+  objPop.style.top =Math.min(cy,window.innerHeight-330)+'px';
   objPop.classList.add('show');
   objPop.querySelector('#ppTgtC').oninput =e=>setObjStyle(o.id,{tgtColor:e.target.value});
   objPop.querySelector('#ppStopC').oninput=e=>setObjStyle(o.id,{stopColor:e.target.value});
   objPop.querySelector('#ppTgtA').oninput =e=>{ objPop.querySelector('#ppTgtAV').textContent=e.target.value+'%'; setObjStyle(o.id,{tgtAlpha:+e.target.value}); };
   objPop.querySelector('#ppStopA').oninput=e=>{ objPop.querySelector('#ppStopAV').textContent=e.target.value+'%'; setObjStyle(o.id,{stopAlpha:+e.target.value}); };
+  // Enter / blur = tulis. Tak valid (bukan angka, atau menyeberangi Entry) → field merah & kembali
+  // ke nilai objek; objek tak bergerak.
+  [['#ppTp','tp'],['#ppSl','sl']].forEach(([sel,which])=>{
+    const inp=objPop.querySelector(sel); if(!inp) return;
+    const commit=()=>{
+      if(inp.value===inp.dataset.base) return;
+      const ok=applyPosLevel(o, which, parseCoordNum(inp.value));
+      const cur=posLevels(o);
+      if(ok){ inp.classList.remove('bad'); scheduleSaveDraws(); }
+      else inp.classList.add('bad');
+      if(cur){ const t=coordPriceText(cur[which]); inp.value=t; inp.dataset.base=t; }
+    };
+    inp.oninput=()=>inp.classList.remove('bad');
+    inp.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation();   // hotkey chart (digit→interval, Delete) tak boleh ikut; Esc tetap menutup popup
+      if(e.key==='Enter'){ e.preventDefault(); commit(); } };
+    inp.onblur=commit;
+  });
   objPop.querySelector('#ppDel').onclick=()=>{ const id=o.id; hideObjPopup(); try{chart.removeOverlay(id);}catch(e){} };
 }
 function hideObjPopup(){ objPop.classList.remove('show'); }

@@ -79,5 +79,27 @@ function posPressedMove(t){
   scheduleSaveDraws();
 }
 
+// ---- ketik level TP/SL di popup posisi (double-click) ----
+// Aturan sisi sama dgn clamp posPressedMove: Long → TP di atas Entry & SL di bawah; Short sebaliknya.
+// Level yang menyeberangi Entry DITOLAK (bukan di-clamp diam-diam) supaya angka yang diketik tak
+// berubah tanpa sepengetahuan pengguna. Titik 1,3 = TP; 2,4 = SL (lihat expandPosition).
+function posLevels(o){
+  let ov=null; try{ ov=chart.getOverlayById(o.id); }catch(e){}
+  const pts=ov&&ov.points; if(!pts||pts.length<6) return null;
+  return {entry:pts[0].value, tp:pts[1].value, sl:pts[2].value};
+}
+function applyPosLevel(o, which, v){
+  if(!isFinite(v)) return false;
+  let ov=null; try{ ov=chart.getOverlayById(o.id); }catch(e){}
+  if(!ov||!ov.points||ov.points.length<6) return false;
+  const pts=ov.points.map(p=>Object.assign({},p)), entry=pts[0].value, long=o.name==='longPosition';
+  const above=(which==='tp')===long;               // tp-long & sl-short ada di ATAS entry
+  if(above ? !(v>entry) : !(v<entry)) return false;
+  const idx=which==='tp'?[1,3]:[2,4];
+  idx.forEach(i=>{ pts[i]=Object.assign({},pts[i],{value:v}); });
+  try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(e){ return false; }
+  return true;
+}
+
 // Drawing tools dikelompokkan ke kategori ala TradingView. Tiap kategori 1 ikon di rail;
 // klik → flyout ke kanan berisi tool-nya. Grup `cursor:true` mengubah mode kursor (bukan overlay).
