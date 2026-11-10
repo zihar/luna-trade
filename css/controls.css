@@ -90,23 +90,12 @@
   .an-chip{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted)}
   .an-chip b{color:var(--txt);font-weight:600;margin-left:2px}
   /* price alert: create dialog */
-  .alert-modal{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
-  .alert-modal.open{display:flex}
-  .am-card{width:min(440px,92vw);background:var(--panel);border:1px solid var(--border);border-radius:12px;
-           box-shadow:var(--shadow);padding:16px}
-  .am-head{display:flex;align-items:center;font-size:16px;color:var(--txt);margin-bottom:12px}
-  .am-row{display:flex;align-items:center;gap:12px;margin:10px 0}
-  .am-lbl{width:84px;color:var(--muted);font-size:13px}
-  .am-cond{flex:1;padding:8px 10px;background:var(--btn);border:1px solid var(--border);border-radius:8px;color:var(--txt)}
-  #amPrice{flex:1;padding:8px 10px;background:var(--btn);border:1px solid var(--accent);border-radius:8px;
-           color:var(--txt);font-variant-numeric:tabular-nums;font-family:var(--mono)}
-  .am-act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
-  .am-act button{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--btn);
-                 color:var(--txt);font-size:12px;cursor:pointer}
-  .am-act button:hover{background:var(--btn-hover)}
-  .am-act button.primary:hover{background:var(--accent);opacity:.9}
-  .am-x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px}
-  .am-x:hover{color:var(--txt)}
+  /* dialog Create alert: pakai kerangka .dmodal (css/order-panel.css); hanya isi khasnya di sini */
+  .am-cond{padding:8px 10px;background:var(--btn);border:1px solid var(--border);border-radius:8px;color:var(--txt);font-size:12.5px}
+  .am-gap{margin-top:18px}
+  #amPrice{width:100%;box-sizing:border-box;padding:8px 10px;background:var(--btn);border:1px solid var(--accent);border-radius:8px;
+           color:var(--txt);font-size:13px;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  #amPrice:focus{outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
   .auth-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
                 background:rgba(8,8,11,.72);backdrop-filter:blur(6px)}
   .auth-card{width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--border);

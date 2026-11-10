@@ -202,12 +202,16 @@
     <div class="ap-head">Alerts<span class="grow"></span><button class="al-add" id="alertAddBtn" title="Create alert">+</button><button class="ap-x" id="alertsClose" title="Close">✕</button></div>
     <div class="ap-body"><div id="alertList"></div></div>
   </div>
-  <div class="alert-modal" id="alertModal" role="dialog" aria-modal="true">
-    <div class="am-card">
-      <div class="am-head">Create alert on <b id="amInst">—</b><span class="grow"></span><button class="am-x" id="amClose" title="Close">✕</button></div>
-      <div class="am-row"><span class="am-lbl">Condition</span><div class="am-cond">Price · Crossing</div></div>
-      <div class="am-row"><span class="am-lbl">Price</span><input type="number" step="0.0001" id="amPrice"></div>
-      <div class="am-act"><button id="amCancel">Cancel</button><button class="primary" id="amCreate">Create</button></div>
+  <div class="dmodal-scrim" id="alertModal">
+    <div class="dmodal" role="dialog" aria-modal="true" aria-label="Create alert">
+      <div class="dm-head"><span class="dm-title">Create alert on <b id="amInst">—</b></span><button class="dm-x" id="amClose" title="Close" aria-label="Close">✕</button></div>
+      <div class="dm-body">
+        <div class="pp-lbl">Condition</div>
+        <div class="am-cond">Price crossing</div>
+        <div class="pp-lbl am-gap">Price</div>
+        <input type="number" step="0.0001" id="amPrice" aria-label="Alert price">
+      </div>
+      <div class="dm-foot"><button class="dm-lock" id="amCancel">Cancel</button><button class="dm-close" id="amCreate">Create</button></div>
     </div>
   </div>
   <div class="watchlist hidden" id="newspanel">
