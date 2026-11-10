@@ -179,6 +179,12 @@
   .dm-close{ margin-left:auto; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:12px;
     font-weight:600; padding:6px 18px; border-radius:8px; cursor:pointer; transition:filter .12s; }
   .dm-close:hover{ filter:brightness(1.07); }
+  .pp-levels{ display:grid; grid-template-columns:1fr; gap:6px; margin-bottom:10px; }
+  .pp-lvl{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:var(--muted); }
+  .pp-price{ width:88px; font:inherit; font-variant-numeric:tabular-nums; text-align:right; color:var(--txt); background:var(--btn);
+    border:1px solid var(--border); border-radius:6px; padding:4px 6px; }
+  .pp-price:focus{ outline:none; border-color:var(--accent); }
+  .pp-price.bad{ border-color:var(--sell, #f23645); }
   .pp-color{ width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; padding:2px; transition:border-color .12s; }
   .pp-color:hover{ border-color:var(--btn-border-hover); }
   .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }
