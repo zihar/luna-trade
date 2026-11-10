@@ -207,21 +207,22 @@
   .pp-slider{ display:flex; align-items:center; gap:7px; margin:-3px 0 9px; font-size:11px; }
   .pp-slider input[type=range]{ flex:1; min-width:0; }
   .pp-slider .pp-sval{ flex:0 0 auto; color:var(--muted); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
-  /* editor level Fibonacci */
-  .fibpop{ position:fixed; z-index:1300; background:var(--panel); border:1px solid var(--border);
-           border-radius:10px; padding:11px 12px; box-shadow:var(--shadow); display:none; min-width:170px; max-height:60vh; overflow:auto; }
+  /* modal editor level Fibonacci (kerangka .dmodal + scrim .live) */
+  .fp-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+  .fp-row{ display:flex; align-items:center; gap:6px; }
+  .fib-modal input[type=number]{ flex:1; min-width:0; box-sizing:border-box; font:inherit; font-size:12.5px; font-variant-numeric:tabular-nums;
+    color:var(--txt); background:var(--btn); border:1px solid var(--border); border-radius:7px; padding:6px 8px; }
+  .fib-modal input[type=number]:focus{ outline:none; border-color:var(--accent); }
+  .fp-color{ flex:0 0 auto; width:30px; height:28px; padding:2px; border:1px solid var(--border); border-radius:6px; background:var(--btn); cursor:pointer; }
   .fp-color:hover,.fp-x:hover{ border-color:var(--btn-border-hover); }
-  .fibpop.show{ display:block; }
-  .fibpop .pp-lbl{ color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:0 0 7px; }
-  .fp-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-  .fp-row input[type=number]{ flex:1; width:100%; }
-  .fp-color{ flex:0 0 auto; width:28px; height:26px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--btn); cursor:pointer; }
-  .fp-x{ width:26px; padding:5px 0; font-size:12px; color:var(--muted); }
-  .fp-bg{ display:flex; align-items:center; gap:7px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; font-size:11px; }
-  .fp-bg label{ display:flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
-  .fp-bg input[type=range]{ flex:1; min-width:0; }
-  .fp-bg #fpBgVal{ flex:0 0 auto; color:var(--muted); width:32px; text-align:right; }
-  .fp-act{ display:flex; gap:6px; border-top:1px solid var(--border); padding-top:9px; margin-top:4px; }
+  .fp-x{ flex:0 0 auto; width:28px; height:28px; padding:0; font-size:12px; color:var(--muted); background:transparent; border:1px solid transparent; border-radius:6px; cursor:pointer; }
+  .fp-add{ width:100%; font-size:12px; padding:7px 0; color:var(--accent); background:transparent; border:1px dashed var(--border); border-radius:7px; cursor:pointer; }
+  .fp-add:hover{ border-color:var(--accent); }
+  .fp-gap{ margin-top:18px; }
+  .fp-bg{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--txt); }
+  .fp-bg label{ display:flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; }
+  .fp-bg input[type=range]{ flex:1; min-width:0; accent-color:var(--accent); }
+  .fp-bg #fpBgVal{ flex:0 0 auto; color:var(--muted); width:34px; text-align:right; font-variant-numeric:tabular-nums; }
   /* editor parameter indikator (numpang chrome .objpop) */
   /* modal editor parameter indikator: scrim "live" tak menggelapkan/mengaburkan chart (efek param terlihat langsung) */
   .dmodal-scrim.live{ background:transparent; backdrop-filter:none; }
