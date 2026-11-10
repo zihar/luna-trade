@@ -175,9 +175,9 @@
   /* Delete dimatikan selama objek terkunci → buka kunci dulu (lihat js/draw-lock.js) */
   .dm-del:disabled{ opacity:.45; cursor:not-allowed; }
   /* toggle Lock objek: gaya sama dgn Delete, menyala (aksen) saat terkunci */
-  .dm-lock{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:12px;
+  .dm-lock, .dm-ghost{ background:transparent; border:1px solid var(--border); color:var(--muted); font-size:12px;
     padding:6px 12px; border-radius:8px; cursor:pointer; transition:color .12s, border-color .12s; }
-  .dm-lock:hover{ color:var(--fg); border-color:var(--btn-border-hover); }
+  .dm-lock:hover, .dm-ghost:hover{ color:var(--fg); border-color:var(--btn-border-hover); }
   .dm-lock.on{ color:var(--accent); border-color:var(--accent); }
   .dm-close{ margin-left:auto; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:12px;
     font-weight:600; padding:6px 18px; border-radius:8px; cursor:pointer; transition:filter .12s; }

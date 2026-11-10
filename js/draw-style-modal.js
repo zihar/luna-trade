@@ -172,7 +172,7 @@ function showFibPop(){
     +`<div class="dm-body"><div class="pp-lbl">Levels</div><div class="fp-list">${rows}</div><button class="fp-add" id="fpAdd">+ Add level</button>`
     +`<div class="pp-lbl fp-gap">Background</div><div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Fill between levels</label>`
     +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div></div>`
-    +`<div class="dm-foot"><button class="dm-lock" id="fpReset">Reset to default</button><button class="dm-close">Close</button></div>`;
+    +`<div class="dm-foot"><button class="dm-ghost" id="fpReset">Reset to default</button><button class="dm-close">Close</button></div>`;
   fibPop.classList.add('show');
   panel.querySelector('.dm-x').onclick=panel.querySelector('.dm-close').onclick=hideFibPop;
   panel.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });

@@ -207,7 +207,7 @@ function closeIndEditor(){ if(indEditorScrim) indEditorScrim.classList.remove('s
 function ieShell(def,body){
   indEditorEl.setAttribute('aria-label',def.label+' settings');
   indEditorEl.innerHTML=`<div class="dm-head"><span class="dm-title">${def.label}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
-    +`<div class="dm-body">${body}</div><div class="dm-foot"><button class="dm-lock ie-reset">Reset to default</button><button class="dm-close">Close</button></div>`;
+    +`<div class="dm-body">${body}</div><div class="dm-foot"><button class="dm-ghost ie-reset">Reset to default</button><button class="dm-close">Close</button></div>`;
   indEditorEl.querySelector('.dm-x').onclick=indEditorEl.querySelector('.dm-close').onclick=closeIndEditor;
 }
 function renderIndEditor(){
