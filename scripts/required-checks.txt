@@ -10,5 +10,10 @@
 #
 # CATATAN: yang didaftar adalah "E2E gate", BUKAN nama per-shard ("E2E hermetik 1/3"). Nama shard
 # ikut berubah bersama jumlah shard & kedalaman suite; nama gate tidak.
-Go — build, vet, test
-E2E gate
+#
+# [2026-11-10] CI GitHub dimatikan (`gh workflow disable CI`) → daftar SENGAJA KOSONG, artinya tak ada
+# check wajib: merge-pr.sh & workflow Release tidak menuntut check. Verifikasi jadi tanggung jawab
+# lokal (`npx playwright test tests/smoke --project=hermetic`, `go test ./...`).
+# Nyalakan CI lagi: `gh workflow enable CI`, lalu pulihkan dua baris ini:
+#   Go — build, vet, test
+#   E2E gate
