@@ -21,7 +21,7 @@ garis aksen 2px di atas, header ikon+judul+✕, tab bergaris-bawah, footer Lock/
 | # | Dialog | Lokasi |
 |---|--------|--------|
 | 6 | ~~Create alert~~ — SELESAI (index.html + css/controls.css, kerangka .dmodal) |
-| 7 | Analytics | `.an-modal` — js/analytics.js |
+| 7 | ~~Analytics~~ — SELESAI (js/analytics.js, kerangka .dmodal, teks Inggris) |
 | 8 | ~~Indicators picker~~ — SELESAI (index.html + css/controls.css, kerangka .dmodal) |
 
 ## Lain-lain (bukan modal, dicatat)
