@@ -41,7 +41,7 @@ test('timeframe: tombol bar + dropdown semua TF', async ({ page }) => {
 
   await page.locator('#tfMore').click();
   await page.locator('#tfMenu.open').waitFor();
-  expect(await page.locator('#tfMenu .tf-row').count(), 'dropdown harus memuat seluruh TF_LIST').toBe(17);
+  expect(await page.locator('#tfMenu .tf-row').count(), 'dropdown harus memuat seluruh TF_LIST').toBe(18);
 
   await page.locator('#tfMenu .tf-row .tf-lbl', { hasText: /^H1$/ }).click();
   await page.waitForFunction(() => currentTF === 'H1' && chart.getDataList().length > 0, null, { timeout: 20000 });

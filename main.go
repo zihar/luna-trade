@@ -134,7 +134,7 @@ func main() {
 	registerAuth(mux)
 	registerGoogleOAuth(mux)
 	// /api/candles butuh login (data harga historis di-gate sesi).
-	mux.HandleFunc("/api/candles", requireUser(candlesHandler(token)))
+	mux.HandleFunc("/api/candles", requireUser(withM3(candlesHandler(token))))
 	registerAPI(mux)
 
 	log.Printf("Luna Trade (OANDA %s) → http://localhost%s", oandaEnv(), addr)
