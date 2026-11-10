@@ -147,9 +147,9 @@ function openAlertDialog(){
   $('#amInst').textContent=dispSym(inst);
   const m=liveMid?liveMid():null, cur=currentCandle();
   $('#amPrice').value=(m!=null?m:(cur?cur.close:'')) || '';
-  $('#alertModal').classList.add('open'); setTimeout(()=>$('#amPrice').focus(),0);
+  $('#alertModal').classList.add('show'); setTimeout(()=>$('#amPrice').focus(),0);
 }
-function closeAlertDialog(){ $('#alertModal').classList.remove('open'); }
+function closeAlertDialog(){ $('#alertModal').classList.remove('show'); }
 async function removeAlert(i){
   const a=alerts[i]; if(!a) return;
   try{ await fetch('/api/alerts/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:a.id})}); }catch(e){}
@@ -240,3 +240,4 @@ $('#amCreate').onclick=async()=>{ const p=+$('#amPrice').value; if(!(p>0)){ setS
   if(a){ closeAlertDialog(); toast('Alert created @ '+fmt(a.price),'success'); }
   else { setStatus('Could not create alert. Try again.',true); } };
 $('#alertModal').addEventListener('mousedown',e=>{ if(e.target===$('#alertModal')) closeAlertDialog(); });
+$('#amPrice').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#amCreate').click(); else if(e.key==='Escape') closeAlertDialog(); });

@@ -20,7 +20,7 @@ garis aksen 2px di atas, header ikon+judul+✕, tab bergaris-bawah, footer Lock/
 ## Modal lama berbeda dari `.dmodal` (kartu sendiri, tanpa aksen/blur/animasi)
 | # | Dialog | Lokasi |
 |---|--------|--------|
-| 6 | Create alert | `.alert-modal`/`.am-card` — index.html + css/controls.css |
+| 6 | ~~Create alert~~ — SELESAI (index.html + css/controls.css, kerangka .dmodal) |
 | 7 | Analytics | `.an-modal` — js/analytics.js |
 | 8 | Indicators picker | `.ind-modal` — css/controls.css (z-index 80, di bawah modal lain) |
 
