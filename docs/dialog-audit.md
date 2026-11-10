@@ -22,7 +22,7 @@ garis aksen 2px di atas, header ikon+judul+✕, tab bergaris-bawah, footer Lock/
 |---|--------|--------|
 | 6 | ~~Create alert~~ — SELESAI (index.html + css/controls.css, kerangka .dmodal) |
 | 7 | Analytics | `.an-modal` — js/analytics.js |
-| 8 | Indicators picker | `.ind-modal` — css/controls.css (z-index 80, di bawah modal lain) |
+| 8 | ~~Indicators picker~~ — SELESAI (index.html + css/controls.css, kerangka .dmodal) |
 
 ## Lain-lain (bukan modal, dicatat)
 - Banner bentrok sync (`.sync-conflict`), `.user-pop`, `.nmk-pop` (kartu marker news) — popover, bukan dialog.
