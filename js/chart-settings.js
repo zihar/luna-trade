@@ -39,7 +39,7 @@ function showChartSet(){
   panel.innerHTML=`<div class="dm-head"><span class="dm-ico">${typeof GEAR_SVG!=='undefined'?GEAR_SVG:''}</span><span class="dm-title">Chart settings</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
     +`<div class="dm-body"><div class="pp-lbl">Candles</div><div class="cs-group">${row('Up body','up')}${row('Down body','down')}${row('Up border','upBorder')}${row('Down border','downBorder')}</div>`
     +`<div class="pp-lbl">Canvas (${thm} theme)</div><div class="cs-group">${row('Background',bgKey)}${row('Grid',gridKey)}</div></div>`
-    +`<div class="dm-foot"><button class="dm-lock" id="csReset">Reset to default</button><button class="dm-close">Close</button></div>`;
+    +`<div class="dm-foot"><button class="dm-ghost" id="csReset">Reset to default</button><button class="dm-close">Close</button></div>`;
   chartSet.classList.add('show');
   panel.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
   panel.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(); };
