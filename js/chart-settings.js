@@ -24,22 +24,26 @@ function applyChartCfg(){
   if(c) c.style.background=bg; if(ch) ch.style.background=bg;
 }
 function saveChartCfg(){ try{localStorage.setItem('br_chartcfg',JSON.stringify(chartCfg));}catch(e){} applyChartCfg(); }
-// Setting chart dibuka dari menu klik-kanan canvas (lihat handler contextmenu), di posisi kursor.
-const chartSet=document.createElement('div'); chartSet.className='objpop'; document.body.appendChild(chartSet);
-makeDraggable(chartSet, '.pp-grip');
-function showChartSet(cx,cy){
-  const row=(label,key)=>`<div class="pp-lbl">${label}</div><div class="pp-row"><input type="color" data-k="${key}" value="${chartCfg[key]}" class="pp-color"></div>`;
-  // bg & grid → edit kunci tema yang sedang aktif
-  const light=document.body.classList.contains('light'), thm=light?'light':'dark';
+// Setting chart dibuka dari menu klik-kanan canvas (lihat handler contextmenu). Modal di tengah (gaya .dmodal,
+// sama dgn setelan objek gambar), live-apply. `chartSet` = elemen scrim: Esc di draw-style-modal.js menutupnya
+// lewat chartSet.classList.remove('show').
+const chartSet=document.createElement('div'); chartSet.className='dmodal-scrim';
+chartSet.innerHTML='<div class="dmodal" role="dialog" aria-modal="true" aria-label="Chart settings"></div>';
+document.body.appendChild(chartSet);
+chartSet.addEventListener('mousedown',e=>{ if(e.target===chartSet) chartSet.classList.remove('show'); });   // klik scrim = tutup
+function showChartSet(){
+  const light=document.body.classList.contains('light'), thm=light?'Light':'Dark';
   const bgKey=light?'bgLight':'bgDark', gridKey=light?'gridLight':'gridDark';
-  chartSet.innerHTML=GRIP+`<div class="pp-lbl" style="font-weight:600;color:var(--txt)">⚙ Setting chart</div>`
-    +row('Candle naik','up')+row('Candle turun','down')+row('Border naik','upBorder')+row('Border turun','downBorder')+row('Background ('+thm+')',bgKey)+row('Grid ('+thm+')',gridKey)+`<div class="pp-act"><button id="csReset">Reset default</button></div>`;
-  chartSet.style.left=Math.min(cx,window.innerWidth-220)+'px';
-  chartSet.style.top=Math.max(8,Math.min(cy,window.innerHeight-320))+'px';
+  const row=(label,key)=>`<label class="cs-row"><span>${label}</span><span class="cs-sw"><input type="color" data-k="${key}" value="${chartCfg[key]}" aria-label="${label}"></span></label>`;
+  const panel=chartSet.querySelector('.dmodal');
+  panel.innerHTML=`<div class="dm-head"><span class="dm-ico">${typeof GEAR_SVG!=='undefined'?GEAR_SVG:''}</span><span class="dm-title">Chart settings</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
+    +`<div class="dm-body"><div class="pp-lbl">Candles</div><div class="cs-group">${row('Up body','up')}${row('Down body','down')}${row('Up border','upBorder')}${row('Down border','downBorder')}</div>`
+    +`<div class="pp-lbl">Canvas (${thm} theme)</div><div class="cs-group">${row('Background',bgKey)}${row('Grid',gridKey)}</div></div>`
+    +`<div class="dm-foot"><button class="dm-lock" id="csReset">Reset to default</button><button class="dm-close">Close</button></div>`;
   chartSet.classList.add('show');
-  chartSet.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
-  chartSet.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(chartSet.offsetLeft,chartSet.offsetTop); };
+  panel.querySelectorAll('input[data-k]').forEach(inp=>inp.oninput=()=>{ chartCfg[inp.dataset.k]=inp.value; saveChartCfg(); });
+  panel.querySelector('#csReset').onclick=()=>{ chartCfg=Object.assign({},CHART_DEFAULT); saveChartCfg(); showChartSet(); };
+  panel.querySelector('.dm-close').onclick=panel.querySelector('.dm-x').onclick=()=>chartSet.classList.remove('show');
 }
-document.addEventListener('mousedown',e=>{ if(chartSet.classList.contains('show')&&!chartSet.contains(e.target)) chartSet.classList.remove('show'); }, true);
 applyChartCfg();   // terapkan cfg tersimpan saat startup
 
