@@ -46,14 +46,14 @@ while IFS= read -r baris || [ -n "$baris" ]; do
   case "$baris" in \#*) continue ;; esac
   WAJIB+=("$baris")
 done < "$CHECKS_FILE"
-[ "${#WAJIB[@]}" -gt 0 ] || { echo "$CHECKS_FILE kosong — tak ada check wajib yang bisa diperiksa." >&2; exit 1; }
+[ "${#WAJIB[@]}" -gt 0 ] || echo "PERINGATAN: $CHECKS_FILE kosong (CI dimatikan) — tak ada check wajib; hanya check gagal/konflik/BEHIND yang menahan." >&2
 
 echo "== check PR #$pr"
 checks=$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || echo '[]')
 printf '%s' "$checks" | jq -r '.[] | "  \(.bucket=="pass" and true | if . then "✓" else "·" end) \(.name): \(.state)"' 2>/dev/null || true
 
 gagal=0
-for nama in "${WAJIB[@]}"; do
+for nama in ${WAJIB[@]+"${WAJIB[@]}"}; do
   bucket=$(printf '%s' "$checks" | jq -r --arg n "$nama" '[.[] | select(.name==$n)] | if length==0 then "TIDAK-ADA" else (.[0].bucket) end')
   case "$bucket" in
     pass) ;;
