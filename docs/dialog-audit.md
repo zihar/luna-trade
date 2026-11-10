@@ -12,7 +12,7 @@ garis aksen 2px di atas, header ikon+judul+✕, tab bergaris-bawah, footer Lock/
 | # | Dialog | Lokasi | Catatan |
 |---|--------|--------|---------|
 | 1 | Setting chart (⚙) | js/chart-settings.js | Label **Indonesia** ("Candle naik/turun", "Border naik/turun") — melanggar aturan teks UI Inggris |
-| 2 | Editor Fibonacci levels | `.fibpop` — js/draw-style-modal.js | Dibuka dari tombol di modal Fib; layak jadi tab/sub-panel modal |
+| 2 | ~~Fibonacci levels~~ — SELESAI (js/draw-style-modal.js, kerangka .dmodal, scrim "live") |
 | 3 | ~~Indicator editor~~ — SELESAI (js/indicators.js, kerangka .dmodal, scrim "live") |
 | 4 | Konfirmasi tutup posisi | `.objpop.pos-confirm` — js/positions-onchart.js | Kecil; cukup disamakan token (radius/shadow/tombol) |
 | 5 | Edit Open Position | `.objpop.pos-edit2` — js/positions-onchart.js | Sengaja meniru TradeLocker; teks Indonesia ("Harga Stop Loss", "Trailing (segera)") |

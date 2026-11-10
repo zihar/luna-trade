@@ -131,7 +131,7 @@ function openDrawModal(o, tab){
   panel.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); mark('[data-va]',b); });
   const ta=panel.querySelector('.dm-ta');
   if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
-  const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(Math.round(window.innerWidth/2-90), 90); };
+  const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(); };
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
   // Lock objek: terkunci = tak bisa digeser & tak bisa terhapus (js/draw-lock.js). Delete dimatikan
   // selama terkunci supaya "buka kunci" jadi langkah sadar, bukan klik yang sama dua kali.
@@ -160,27 +160,30 @@ function openDrawModal(o, tab){
   if(active==='text'&&ta){ ta.focus(); const L=ta.value.length; try{ta.setSelectionRange(L,L);}catch(e){} }
 }
 // ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
-const fibPop=document.createElement('div'); fibPop.className='fibpop'; document.body.appendChild(fibPop);
-makeDraggable(fibPop, '.pp-grip');
-function showFibPop(cx,cy){
-  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Level color"><input type="number" step="0.001" value="${lv.value}" data-i="${i}"><button class="fp-x" data-i="${i}" title="Delete level">✕</button></div>`).join('');
-  fibPop.innerHTML=GRIP+`<div class="pp-lbl">Fibonacci Levels</div>${rows}`
-    +`<div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Background</label>`
-    +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div>`
-    +`<div class="fp-act"><button id="fpAdd">+ Add</button><button id="fpReset">Reset</button></div>`;
-  fibPop.style.left=Math.min(cx,window.innerWidth-190)+'px';
-  fibPop.style.top =Math.min(Math.max(cy,8),window.innerHeight-300)+'px';
+// modal gaya .dmodal (scrim "live": tanpa blur supaya efek level ke chart terlihat). fibPop = scrim; Esc via handler di bawah.
+const fibPop=document.createElement('div'); fibPop.className='dmodal-scrim live';
+fibPop.innerHTML='<div class="dmodal fib-modal" role="dialog" aria-modal="true" aria-label="Fibonacci levels"></div>';
+document.body.appendChild(fibPop);
+fibPop.addEventListener('mousedown',e=>{ if(e.target===fibPop) hideFibPop(); });
+function showFibPop(){
+  const panel=fibPop.querySelector('.dmodal');
+  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Level color" aria-label="Level color"><input type="number" step="0.001" value="${lv.value}" data-i="${i}" aria-label="Level value"><button class="fp-x" data-i="${i}" title="Delete level" aria-label="Delete level">✕</button></div>`).join('');
+  panel.innerHTML=`<div class="dm-head"><span class="dm-title">Fibonacci levels</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
+    +`<div class="dm-body"><div class="pp-lbl">Levels</div><div class="fp-list">${rows}</div><button class="fp-add" id="fpAdd">+ Add level</button>`
+    +`<div class="pp-lbl fp-gap">Background</div><div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Fill between levels</label>`
+    +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div></div>`
+    +`<div class="dm-foot"><button class="dm-lock" id="fpReset">Reset to default</button><button class="dm-close">Close</button></div>`;
   fibPop.classList.add('show');
-  fibPop.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
-  fibPop.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
-  fibPop.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); });
-  const bgOn=fibPop.querySelector('#fpBgOn'), bgOp=fibPop.querySelector('#fpBgOp'), bgVal=fibPop.querySelector('#fpBgVal');
+  panel.querySelector('.dm-x').onclick=panel.querySelector('.dm-close').onclick=hideFibPop;
+  panel.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
+  panel.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
+  panel.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(); });
+  const bgOn=panel.querySelector('#fpBgOn'), bgOp=panel.querySelector('#fpBgOp'), bgVal=panel.querySelector('#fpBgVal');
   bgOn.onchange=()=>{ fibBg.on=bgOn.checked; bgOp.disabled=!fibBg.on; saveFibBg(); };
   bgOp.oninput=()=>{ fibBg.opacity=+bgOp.value; bgVal.textContent=fibBg.opacity+'%'; saveFibBg(); };
-  fibPop.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
-  fibPop.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(fibPop.offsetLeft,fibPop.offsetTop); };
+  panel.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(); };
+  panel.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(); };
 }
 function hideFibPop(){ fibPop.classList.remove('show'); }
-document.addEventListener('mousedown',e=>{ if(fibPop.classList.contains('show')&&!fibPop.contains(e.target)) hideFibPop(); }, true);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); hideFibPop(); chartSet.classList.remove('show'); } });
 
