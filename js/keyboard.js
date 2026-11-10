@@ -2,7 +2,7 @@
 // Hotkey timeframe ala TradingView: ketik DIGIT di chart → buka dialog "Change interval"
 // (konfirmasi eksplisit, TIDAK langsung ganti TF). Enter apply, Esc/klik-luar batal.
 const MIN_TO_TF={}; for(const k in DUR){ const mn=DUR[k]/6e4; if(Number.isInteger(mn)) MIN_TO_TF[mn]=k; }
-const TF_HUMAN={M1:'1 minute',M2:'2 minutes',M4:'4 minutes',M5:'5 minutes',M10:'10 minutes',M15:'15 minutes',M30:'30 minutes',H1:'1 hour',H2:'2 hours',H3:'3 hours',H4:'4 hours',H6:'6 hours',H8:'8 hours',H12:'12 hours',D:'1 day',W:'1 week',MN:'1 month'};
+const TF_HUMAN={M1:'1 minute',M2:'2 minutes',M3:'3 minutes',M4:'4 minutes',M5:'5 minutes',M10:'10 minutes',M15:'15 minutes',M30:'30 minutes',H1:'1 hour',H2:'2 hours',H3:'3 hours',H4:'4 hours',H6:'6 hours',H8:'8 hours',H12:'12 hours',D:'1 day',W:'1 week',MN:'1 month'};
 // string interval → kode TF (atau null bila tak tersedia). menit / Nm = menit, Nh = jam, Nd/Nw = day/week, NM (kapital) = month.
 function parseInterval(s){
   s=(s||'').trim(); let m;
