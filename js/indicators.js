@@ -187,19 +187,29 @@ try{ const host=document.getElementById('chart');
 }catch(e){}
 try{ chart.subscribeAction('onScroll', ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
 try{ chart.subscribeAction('onZoom',   ()=>{ try{ positionIndLegends(); updateIndLegendValues(null); }catch(e){} }); }catch(e){}
-// editor parameter per-indikator (popup mengambang tunggal). Buka via gear ⚙ di legend on-chart.
-let indEditorEl=null, indEditorName=null;
+// editor parameter per-indikator: modal gaya .dmodal (scrim "live" = tanpa blur/gelap supaya efek ke chart terlihat).
+// Buka via gear ⚙ di legend on-chart. indEditorEl = panel .dmodal di dalam scrim indEditorScrim.
+let indEditorEl=null, indEditorScrim=null, indEditorName=null;
 function openIndEditor(name){
   const def=indDef(name); if(!def||!def.params) return;
   if(!activeInd[name]){ addInd(name); persistInd(); renderIndModalState(); updateIndBadge(); }
-  if(!indEditorEl){ indEditorEl=document.createElement('div'); indEditorEl.className='objpop ind-editor'; document.body.appendChild(indEditorEl); makeDraggable(indEditorEl,'.pp-grip'); }
+  if(!indEditorEl){
+    indEditorScrim=document.createElement('div'); indEditorScrim.className='dmodal-scrim live';
+    indEditorScrim.innerHTML='<div class="dmodal ind-editor" role="dialog" aria-modal="true"></div>';
+    document.body.appendChild(indEditorScrim); indEditorEl=indEditorScrim.firstChild;
+    indEditorScrim.addEventListener('mousedown',e=>{ if(e.target===indEditorScrim) closeIndEditor(); });
+  }
   indEditorName=name; renderIndEditor();
-  const b=$('#indBtn').getBoundingClientRect();
-  indEditorEl.style.left=Math.max(8,Math.min(b.left, innerWidth-208))+'px';
-  indEditorEl.style.top=(b.bottom+6)+'px';
-  indEditorEl.classList.add('show');
+  indEditorScrim.classList.add('show');
 }
-function closeIndEditor(){ if(indEditorEl) indEditorEl.classList.remove('show'); indEditorName=null; }
+function closeIndEditor(){ if(indEditorScrim) indEditorScrim.classList.remove('show'); indEditorName=null; }
+// kerangka modal: header (judul+✕) + body + footer (Reset kiri, Close kanan); handler Reset/Close dipasang di sini.
+function ieShell(def,body){
+  indEditorEl.setAttribute('aria-label',def.label+' settings');
+  indEditorEl.innerHTML=`<div class="dm-head"><span class="dm-title">${def.label}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
+    +`<div class="dm-body">${body}</div><div class="dm-foot"><button class="dm-lock ie-reset">Reset to default</button><button class="dm-close">Close</button></div>`;
+  indEditorEl.querySelector('.dm-x').onclick=indEditorEl.querySelector('.dm-close').onclick=closeIndEditor;
+}
 function renderIndEditor(){
   const name=indEditorName, def=indDef(name), p=def.params; const cp=(effParams(name)||[]).slice();
   if(p.kind==='controls'){
@@ -216,7 +226,7 @@ function renderIndEditor(){
       }
       return `<div class="pp-lbl">${c.label}</div><div class="pp-row"><input type="number" class="ie-ctrl" data-i="${i}" min="${c.min}" max="${c.max}" step="${c.step||1}" value="${v}"></div>`;
     }).join('');
-    indEditorEl.innerHTML=GRIP+`<div class="pp-lbl ie-title">${def.label}</div>${rows}<div class="pp-act"><button class="ie-reset">Reset to default</button></div>`;
+    ieShell(def,rows);
     indEditorEl.querySelectorAll('.ie-ctrl').forEach(el=>{
       const i=+el.dataset.i, c=p.controls[i];
       if(c.type==='select'){
@@ -242,7 +252,7 @@ function renderIndEditor(){
     const rows=cp.map((v,i)=>`<div class="pp-row ie-listrow"><input type="number" class="ie-num" data-i="${i}" min="${p.min}" max="${p.max}" step="${p.step||1}" value="${v}"><button class="ie-x" data-i="${i}" title="Remove"${cp.length<=1?' disabled':''}>×</button></div>`).join('');
     body=`<div class="pp-lbl">${p.label}</div>${rows}<div class="pp-row"><button class="ie-add">+ Add</button></div>`;
   }
-  indEditorEl.innerHTML=GRIP+`<div class="pp-lbl ie-title">${def.label}</div>${body}<div class="pp-act"><button class="ie-reset">Reset to default</button></div>`;
+  ieShell(def,body);
   const readNums=()=>[...indEditorEl.querySelectorAll('.ie-num')].map(inp=>parseFloat(inp.value));
   const clampField=(i,val)=>{ const f=(p.kind==='fixed')?p.fields[i]:p; return Math.min(f.max,Math.max(f.min,val)); };
   // basis array TERKINI dari input DOM (bukan closure cp yg basi setelah edit) → +Add/remove tak buang edit.
@@ -262,8 +272,7 @@ function renderIndEditor(){
   }
   indEditorEl.querySelector('.ie-reset').onclick=()=>{ setIndParams(name, defParams(name)); renderIndEditor(); };
 }
-document.addEventListener('mousedown',e=>{ if(indEditorEl&&indEditorEl.classList.contains('show') && !indEditorEl.contains(e.target) && !e.target.closest('#indBtn')) closeIndEditor(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape' && indEditorEl&&indEditorEl.classList.contains('show')) closeIndEditor(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && indEditorScrim&&indEditorScrim.classList.contains('show')) closeIndEditor(); });
 // ===== modal Indicators (search + kategori) — pengganti dropdown ƒx lama =====
 let indModalCat='All', indModalQ='';
 function indCatOf(d){ return d.overlay?'Overlays':'Oscillators'; }
