@@ -68,6 +68,22 @@ di atas.
 
 ## Verifikasi
 
+> **CI GitHub dimatikan sejak 2026-11-10** (`gh workflow disable CI`; daftar `scripts/required-checks.txt`
+> kosong). Aturan 8 & bagian "dua kedalaman CI" di bawah/atas hanya berlaku bila CI dinyalakan lagi.
+> Selama mati, verifikasi **lokal** adalah satu-satunya gerbang — ikuti aturan ini:
+
+- **Tes wajib sebelum push, kedalamannya ikut ukuran tugas:**
+  - **Tugas kecil** (satu fitur/fix terbatas, satu-dua modul): jalankan **tes terkait saja** —
+    spec yang menyentuh area itu (`npx playwright test tests/smoke/<file> --project=hermetic`,
+    `go test -run <Nama> .`) + `tests/smoke/module-hygiene.spec.js` bila menambah/menggeser file JS.
+    Tambahkan tes baru untuk perilaku baru. Jangan jalankan suite penuh.
+  - **Perubahan besar** (menyentuh banyak modul, alur inti chart/replay/order, refactor/pemecahan
+    file, skema data/API, atau mengubah helper bersama): jalankan **tes menyeluruh** —
+    seluruh smoke (`npx playwright test tests/smoke --project=hermetic`) + `go test ./...`, dan
+    suite penuh (`--project=hermetic`, ~7 mnt; pakai `timeout` Bash maksimal) bila menyentuh
+    drawing/chart.
+  - Ragu kecil atau besar? Anggap besar. Laporkan di PR tes mana yang dijalankan & hasilnya.
+
 - **E2E UI (Playwright)** — `npm test` (hermetik: stub semua `/api` + fixture candle, tak
   butuh `.env`/OANDA/binary Go). Drawing tergarap penuh atas `TOOL_SPEC`; menambah tool
   drawing = satu baris tabel di `tests/helpers/spec.js`. Baca `tests/README.md` sebelum
