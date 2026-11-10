@@ -152,17 +152,13 @@
   .ind-check{width:13px;font-size:12px;color:var(--accent);opacity:0}
   .ind-item.on .ind-check{opacity:1}
   .ind-item.on{color:var(--accent)}
-  /* modal Indicators (search + kategori) — pengganti dropdown ƒx lama */
-  .ind-modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
-    background:rgba(0,0,0,.5); }
+  /* modal Indicators (search + kategori) — kerangka .dmodal (css/order-panel.css), hanya ukuran & isi khas di sini */
+  .ind-modal{ position:fixed; inset:0; z-index:1400; display:flex; align-items:center; justify-content:center;
+    background:rgba(4,6,12,.55); backdrop-filter:blur(3px); }
   .ind-modal[hidden]{ display:none; }
-  .ind-modal-box{ width:min(560px,92vw); max-height:min(70vh,560px); display:flex; flex-direction:column;
-    background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
-  .ind-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px 8px; }
-  .ind-modal-title{ font:700 14px/1 var(--font-sans); color:var(--txt); }
-  .ind-modal-x{ background:transparent; border:0; color:var(--muted); font-size:20px; cursor:pointer;
-    line-height:1; padding:2px 6px; border-radius:6px; }
-  .ind-modal-x:hover{ color:var(--txt); background:var(--btn-hover); }
+  .dmodal.ind-modal-box{ width:min(560px,92vw); max-height:min(70vh,560px); }
+  .ind-modal-box .dm-head{ border-bottom:0; padding-bottom:8px; }
+  .ind-modal-box .dm-x{ margin-left:auto; }
   .ind-modal-search{ padding:0 14px 10px; }
   .ind-modal-search input{ width:100%; height:34px; padding:0 10px; border-radius:8px;
     border:1px solid var(--border); background:var(--bg,transparent); color:var(--txt); font-size:13px; }
