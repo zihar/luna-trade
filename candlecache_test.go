@@ -114,3 +114,40 @@ func TestCandleCacheEvictFIFO(t *testing.T) {
 		t.Fatalf("'c' should be present")
 	}
 }
+
+// Upstream 5xx / error jaringan sesudah TTL habis → sajikan respons BAGUS terakhir (stale-if-error)
+// alih-alih meneruskan "error code: 504" ke browser. Produksi 2026-11-18: ~950× 504 dari OANDA
+// dalam 3 jam, kebanyakan polling watchlist yang datanya cukup segar dari beberapa menit lalu.
+func TestCandleCacheStaleIfError(t *testing.T) {
+	c := newCandleCache(8)
+	good := func() ([]byte, int, error) { return []byte(`{"candles":[]}`), 200, nil }
+	if _, _, err := c.fetch("k", time.Millisecond, good); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(5 * time.Millisecond) // TTL lewat
+
+	for _, bad := range []func() ([]byte, int, error){
+		func() ([]byte, int, error) { return []byte("error code: 504"), 504, nil },
+		func() ([]byte, int, error) { return nil, 0, errors.New("timeout") },
+	} {
+		body, status, err := c.fetch("k", time.Millisecond, bad)
+		if err != nil || status != 200 || string(body) != `{"candles":[]}` {
+			t.Fatalf("mau stale 200, dapat status=%d err=%v body=%q", status, err, body)
+		}
+	}
+	// 4xx BUKAN gangguan sementara (mis. instrumen tak valid) → diteruskan apa adanya.
+	if _, status, _ := c.fetch("k", time.Millisecond, func() ([]byte, int, error) { return []byte(`{}`), 400, nil }); status != 400 {
+		t.Fatalf("4xx tak boleh diganti stale, status=%d", status)
+	}
+}
+
+// Stale terlalu tua tak disajikan: lebih jujur gagal daripada menampilkan harga basi berjam-jam.
+func TestCandleCacheStaleTooOld(t *testing.T) {
+	c := newCandleCache(8)
+	c.staleMax = 2 * time.Millisecond
+	c.fetch("k", time.Millisecond, func() ([]byte, int, error) { return []byte(`{}`), 200, nil })
+	time.Sleep(5 * time.Millisecond)
+	if _, status, _ := c.fetch("k", time.Millisecond, func() ([]byte, int, error) { return []byte("x"), 504, nil }); status != 504 {
+		t.Fatalf("stale kedaluwarsa tak boleh disajikan, status=%d", status)
+	}
+}

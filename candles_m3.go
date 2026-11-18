@@ -37,14 +37,12 @@ func withM3(next http.HandlerFunc) http.HandlerFunc {
 		rec := httptest.NewRecorder()
 		next(rec, r2)
 		if rec.Code != http.StatusOK {
-			w.Header().Set("Content-Type", rec.Header().Get("Content-Type"))
-			w.WriteHeader(rec.Code)
-			w.Write(rec.Body.Bytes())
+			writeCandleBody(w, rec.Code, rec.Body.Bytes())
 			return
 		}
 		var in oandaCandles
 		if err := json.Unmarshal(rec.Body.Bytes(), &in); err != nil {
-			http.Error(w, "respons M1 tak terbaca", http.StatusBadGateway)
+			writeCandleErr(w, http.StatusBadGateway, "respons M1 tak terbaca")
 			return
 		}
 		out := aggregateM3(in.Candles, ask)

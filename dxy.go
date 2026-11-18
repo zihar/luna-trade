@@ -13,6 +13,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -97,7 +98,7 @@ func fetchOandaCandles(token, inst string, p url.Values) (*oandaCandles, error) 
 	req, _ := http.NewRequest(http.MethodGet, target, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept-Datetime-Format", "RFC3339")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oandaHTTP.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +156,8 @@ func handleDXYCandles(w http.ResponseWriter, token string, gran string, p url.Va
 
 	for _, r := range results {
 		if r.err != nil {
-			writeErr(w, http.StatusBadGateway, "DXY: gagal ambil "+dxyComps[r.idx].inst+": "+r.err.Error())
+			log.Printf("DXY: gagal ambil %s: %v", dxyComps[r.idx].inst, r.err)
+			writeCandleErr(w, http.StatusBadGateway, "DXY: gagal ambil "+dxyComps[r.idx].inst)
 			return
 		}
 	}
