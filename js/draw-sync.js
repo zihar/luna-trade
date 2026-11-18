@@ -145,9 +145,32 @@ function hideDrawConflict(instrument){
 const KEEPALIVE_MAX_BYTES=60000;
 function bodyBytes(s){ try{ return new TextEncoder().encode(s).length; }catch(_){ return s.length; } }
 
+// Dorongan yang sedang di jalan per instrumen (instrument → Promise) & muatan yang menunggu
+// gilirannya (instrument → {payload, opts}). Dorongan per instrumen WAJIB berurutan: baseVersion
+// baru diketahui dari respons dorongan sebelumnya. Versi lama menembak paralel — begitu server
+// lebih lambat dari debounce 1,5 dtk (terjadi di produksi 2026-11-18 saat beban naik), dorongan
+// kedua berangkat dgn baseVersion yang sama, kena 409 dari DIRINYA SENDIRI, dan pengguna dengan
+// satu perangkat melihat "changed on another device". Muatan antre cukup SATU (yang terbaru):
+// tiap muatan adalah snapshot penuh, jadi yang lebih tua tak perlu dikirim.
+const drawInflight={};
+const drawQueued={};
+
 // Dorongan satu tembakan. `opts.keepalive` HANYA dari handler unload/hidden — bukan dari flush
 // rekonsiliasi biasa, yang jalan saat halaman masih hidup & fetch polos tak punya batas ukuran.
+// Janji yang dikembalikan selesai SESUDAH antrean instrumen itu kosong, jadi pemanggil yang
+// menunggunya (flushPendingPushFor sebelum GET) melihat server yang sudah menerima muatan terakhir.
+//
+// Kompromi sadar: muatan yang antre di belakang dorongan yang masih jalan TIDAK ikut dikirim kalau
+// tab ditutup sebelum respons tiba. Mengirimnya paralel justru memunculkan 409 palsu tiap kali tab
+// sekadar disembunyikan (visibilitychange), yang jauh lebih sering daripada tab ditutup dalam
+// jendela respons itu.
 function pushDrawsNow(instrument, payload, opts){
+  if(drawInflight[instrument]){
+    const prev=drawQueued[instrument];
+    const keepalive=!!((opts&&opts.keepalive)||(prev&&prev.opts&&prev.opts.keepalive));
+    drawQueued[instrument]={payload, opts: keepalive?{keepalive:true}:undefined};
+    return drawInflight[instrument];
+  }
   const base=drawVer[instrument];
   if(base==null) return;                   // GET belum pernah sukses → tak tahu baseVersion
   if(drawTooBig[instrument]) return;        // ditolak permanen (413) → mengulang cuma membakar request
@@ -162,7 +185,7 @@ function pushDrawsNow(instrument, payload, opts){
   // selesai kalau tab benar2 ditutup paksa, tapi keepalive yang ditolak browser tak punya peluang
   // sama sekali.
   if(opts&&opts.keepalive&&bodyBytes(body)<=KEEPALIVE_MAX_BYTES) init.keepalive=true;
-  return fetch('/api/drawings', init)
+  const p=fetch('/api/drawings', init)
     .then(async r=>{
       if(r.status===409){                       // perangkat lain menyimpan duluan
         const d=await r.json().catch(()=>null);
@@ -185,7 +208,16 @@ function pushDrawsNow(instrument, payload, opts){
       const d=await r.json().catch(()=>null);
       if(d&&d.version!=null) drawVer[instrument]=d.version|0;
     })
-    .catch(()=>{});
+    .catch(()=>{})
+    .then(()=>{
+      // Giliran berikutnya memakai drawVer yang baru saja disegarkan. Sesudah 409, gerbang
+      // drawConflict di atas menangkap muatan antre sbg `mine` alih2 menembak lagi.
+      delete drawInflight[instrument];
+      const q=drawQueued[instrument]; delete drawQueued[instrument];
+      if(q) return pushDrawsNow(instrument, q.payload, q.opts);
+    });
+  drawInflight[instrument]=p;
+  return p;
 }
 
 const DRAW_PUSH_MS=1500;        // debounce JARINGAN, di atas debounce lokal 350ms (draw-persist)
@@ -224,6 +256,7 @@ function flushSyncDraws(opts){
 // menggantikan muatan itu — entah dgn salinan server (Reload) atau dgn muatan yang lebih baru
 // (Keep mine). Di luar dua kasus itu, membuang dorongan = membuang pekerjaan pengguna (temuan I7).
 function dropPendingPushFor(instrument){
+  delete drawQueued[instrument];   // antrean di belakang dorongan yg masih jalan ikut tergantikan keputusan yg sama
   if(drawPushPending && drawPushPending.instrument===instrument){
     clearTimeout(drawPushTimer); drawPushTimer=null; drawPushPending=null;
   }
