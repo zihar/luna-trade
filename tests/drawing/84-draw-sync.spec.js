@@ -689,3 +689,32 @@ test.describe('draw-sync: keputusan bentrok vs antrean debounce', () => {
     assertNoPageErrors(page);
   });
 });
+
+// Produksi 2026-11-18: banner "changed on another device" muncul padahal hanya SATU perangkat. Saat
+// server lambat (> debounce 1,5 dtk), dorongan kedua berangkat sebelum respons pertama tiba → memakai
+// baseVersion yang sama → 409 dari dirinya sendiri. Dorongan per instrumen harus berurutan.
+test.describe('draw-sync: dorongan berurutan per instrumen', () => {
+  test('server lambat: dua dorongan beruntun dari satu perangkat TIDAK bentrok, isi terakhir yang tersimpan', async ({ page }) => {
+    const { state } = await gotoApp(page);
+    await page.route('**/api/drawings', async (route) => {
+      if (route.request().method() === 'POST') await new Promise((r) => setTimeout(r, 2500));
+      await route.fallback();
+    });
+    const statuses = [];
+    page.on('response', (r) => {
+      if (new URL(r.url()).pathname === '/api/drawings' && r.request().method() === 'POST') statuses.push(r.status());
+    });
+    await page.evaluate(() => {
+      const ts = chart.getDataList().at(-1).timestamp;
+      const obj = (v) => [{ name: 'trendline', points: [{ vt: ts - 3600000, value: v }, { vt: ts, value: v + 0.01 }], lock: 0, extendData: null, style: null }];
+      scheduleSyncDraws(inst, obj(1.1));
+      setTimeout(() => scheduleSyncDraws(inst, obj(1.2)), 1800);
+    });
+    await expect.poll(() => statuses.length, { timeout: 12000 }).toBe(2);
+    expect(statuses, 'dorongan kedua harus menunggu respons pertama').toEqual([200, 200]);
+    await expect(page.locator('#syncConflict.show')).toHaveCount(0);
+    const saved = state.drawings.EUR_USD;
+    expect(saved && saved.payload[0].points[0].value, 'isi TERAKHIR yang harus menang').toBe(1.2);
+    assertNoPageErrors(page);
+  });
+});
