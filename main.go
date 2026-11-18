@@ -12,6 +12,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -62,6 +64,33 @@ var store *Store
 // & docs/candle-cache-plan.md). Meredam thundering-herd ke OANDA saat banyak user
 // membuka instrumen+TF sama berbarengan. ~(instrumen × TF) key → cap 80 aman.
 var candles = newCandleCache(80)
+
+// oandaHTTP = client untuk ambil candle OANDA. http.DefaultClient tak punya timeout sama sekali:
+// saat OANDA tersendat, request menggantung sampai upstream memutus sendiri — handler, singleflight,
+// dan browser ikut menunggu. 30 dtk cukup lapang untuk count=5000.
+var oandaHTTP = &http.Client{Timeout: 30 * time.Second}
+
+// writeCandleBody meneruskan respons upstream. Body non-JSON (mis. "error code: 504" berformat
+// Cloudflare dari OANDA saat gangguan, 2026-11-18) dibungkus jadi {"errorMessage":…} — dulu body
+// mentah itu dikirim dgn Content-Type JSON, dan browser menampilkan
+// "Unexpected token 'e', "error code: 504" is not valid JSON" ke pengguna.
+func writeCandleBody(w http.ResponseWriter, status int, body []byte) {
+	if !json.Valid(body) {
+		body, _ = json.Marshal(map[string]string{
+			"errorMessage": fmt.Sprintf("market data provider error (HTTP %d)", status),
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write(body)
+}
+
+// writeCandleErr = kegagalan yang lahir di server ini (jaringan/timeout/parse), format sama dgn
+// error OANDA supaya klien cukup membaca satu kunci.
+func writeCandleErr(w http.ResponseWriter, status int, msg string) {
+	body, _ := json.Marshal(map[string]string{"errorMessage": msg})
+	writeCandleBody(w, status, body)
+}
 
 func main() {
 	loadDotEnv(".env")
@@ -175,7 +204,7 @@ func candlesHandler(token string) http.HandlerFunc {
 		inst := q.Get("instrument")
 		gran := q.Get("granularity")
 		if inst == "" || gran == "" {
-			http.Error(w, "instrument & granularity wajib", http.StatusBadRequest)
+			writeCandleErr(w, http.StatusBadRequest, "instrument & granularity wajib")
 			return
 		}
 		count := q.Get("count")
@@ -214,7 +243,7 @@ func candlesHandler(token string) http.HandlerFunc {
 			req, _ := http.NewRequest(http.MethodGet, target, nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("Accept-Datetime-Format", "RFC3339")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := oandaHTTP.Do(req)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -241,12 +270,13 @@ func candlesHandler(token string) http.HandlerFunc {
 			body, status, err = loader()
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			log.Printf("candles %s %s: %v", inst, gran, err)
+			writeCandleErr(w, http.StatusBadGateway, "market data provider unreachable")
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
-		w.Write(body)
+		if status >= 500 {
+			log.Printf("candles %s %s: upstream HTTP %d", inst, gran, status)
+		}
+		writeCandleBody(w, status, body)
 	}
 }

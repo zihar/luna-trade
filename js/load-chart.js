@@ -120,7 +120,15 @@ async function fetchCandles(tf,{count,to,from}){
   let u=`/api/candles?instrument=${encodeURIComponent(inst)}&granularity=${GRAN[tf]||tf}&count=${count||5000}`;
   if(to)   u+=`&to=${encodeURIComponent(to)}`;
   if(from) u+=`&from=${encodeURIComponent(from)}`;
-  const r=await fetch(u); const j=await r.json();
+  // 5xx = gangguan SEMENTARA penyedia data (OANDA) → coba ulang sekali. Status dicek SEBELUM
+  // parse: dulu body teks "error code: 504" langsung di-r.json() dan pengguna melihat
+  // "Unexpected token 'e' … is not valid JSON" (produksi 2026-11-18).
+  let r=await fetch(u);
+  if(r.status>=500){ await new Promise(res=>setTimeout(res,1200)); r=await fetch(u); }
+  const j=await r.json().catch(()=>null);
+  if(r.status>=500) throw new Error('market data temporarily unavailable, please try again');
+  if(!r.ok) throw new Error((j&&(j.errorMessage||j.error))||('HTTP '+r.status));
+  if(!j) throw new Error('unexpected response from server');
   if(j.errorMessage) throw new Error(j.errorMessage);
   if(!j.candles) throw new Error('respons tak terduga');
   return j.candles.filter(c=>c.complete).map(c=>({
