@@ -44,7 +44,7 @@ function render(full){
   if(live) pushFormingCandle();   // re-append candle berjalan setelah data di-redraw
   updatePriceTimer();
   try{ repositionNewsMarkers(); }catch(e){}   // marker ikut pan/zoom/TF/playback
-  try{ updateChartLegend(); }catch(e){}       // baris info instrumen match data yg dimuat (inst/TF)
+  try{ updateChartLegendIfChanged(); }catch(e){}   // baris info instrumen match data yg dimuat (inst/TF); murah bila tak berubah
 }
 // ---- sizing berbasis lot (ala TradeLocker), Risk% sebagai kalkulator ----
 // logam (XAU/XAG): 1 lot = 100 oz (konvensi TradeLocker). units di-kawat tetap = oz (1 oz = 1 unit).

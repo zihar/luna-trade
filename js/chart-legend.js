@@ -43,6 +43,19 @@ function updateChartLegend(){
     if(w) chart.setStyles({ candle:{ tooltip:{ offsetLeft: legLeft+marL+w+6 } } });
   }catch(e){}
 }
+// Jalur render(): dipanggil TIAP frame saat Play replay (~25×/dtk). updateChartLegend penuh menulis
+// innerHTML, memaksa layout (getComputedStyle/offsetWidth) dan memanggil chart.setStyles — yang
+// membuat klinecharts menggambar ulang seluruh chart. Terukur ~14 ms/frame = ±60% biaya render, sumber
+// utama Play "patah-patah". Isinya hanya bergantung inst & TF → kerjakan ulang hanya bila keduanya
+// berubah. Pemanggil yang memang butuh pasang ulang (theme.js setelah setStyles tema, tf-bar.js)
+// tetap memanggil updateChartLegend() langsung.
+let chartLegendKey=null;
+function updateChartLegendIfChanged(){
+  const key=inst+'|'+currentTF;
+  if(key===chartLegendKey) return;
+  chartLegendKey=key;
+  updateChartLegend();
+}
 (function initChartLegend(){
   const btn=$('#clInst');
   // stopPropagation: cegah listener outside-click global (#ipick) langsung menutup picker yg baru dibuka
@@ -50,5 +63,8 @@ function updateChartLegend(){
     btn.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); openIpick(); } }; }
   // populate awal ditunda: IPK_META (const) dideklarasi setelah blok ini → hindari TDZ saat parse
   setTimeout(()=>{ try{ updateChartLegend(); }catch(e){} }, 0);
+  // lebar blok nama berubah begitu font self-hosted selesai dimuat → offsetLeft OHLC dihitung ulang
+  // sekali (dulu "tersembuhkan" diam-diam oleh render berikutnya, kini render tak lagi menghitungnya).
+  try{ document.fonts.ready.then(()=>{ try{ updateChartLegend(); }catch(e){} }); }catch(e){}
 })();
 

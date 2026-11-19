@@ -37,8 +37,10 @@ function play(){
   if(playing) return;   // sudah Play → jangan mulai loop frame kedua (anti re-entrancy)
   if(!replayMode){ stopLive(); setReplayUI(true); }
   playing=true; $('#playBtn').textContent='⏸'; try{syncReplayPill();}catch(e){}
+  playLastAt=performance.now();
   playFrame();
 }
+let playLastAt=0;   // performance.now() frame Play sebelumnya → kemajuan T berbasis waktu nyata
 // Loop frame halus: majukan T proporsional speed (bar/detik), render forming bar tiap frame.
 async function playFrame(){
   if(!playing) return;
@@ -46,7 +48,12 @@ async function playFrame(){
   const rev=revealed(currentTF);
   if(rev.length>=arr.length){ autoExtend(currentTF); pauseIfNoData(); return; }   // ujung data → pause (tekan Play lagi setelah extend)
   const dur=DUR[currentTF], speed=+$('#speed').value||1;
-  T += Math.max(1, dur*speed*REPLAY_FRAME_MS/1000);   // maju proporsional speed (frame ~fixed)
+  // Maju sebesar waktu NYATA sejak frame lalu, bukan REPLAY_FRAME_MS tetap. Jeda antar-frame =
+  // timer + lama kerja frame (render, fetch) yang naik-turun; dengan langkah tetap, frame lambat =
+  // chart melambat dan frame cepat = ngebut → gerak tersendat. Clamp 250ms: jeda panjang (tab di
+  // latar, fetch macet) tak boleh berubah jadi lompatan besar.
+  const now=performance.now(), elapsed=Math.min(250, Math.max(0, now-playLastAt)); playLastAt=now;
+  T += Math.max(1, dur*speed*elapsed/1000);
   const after=revealed(currentTF);
   // Lompati gap mati (weekend/libur): jika bar berikutnya baru buka setelah T, jangan merangkak lewat
   // waktu kosong — langsung ke pembukaannya. Tanpa ini, Jumat→Senin bisa puluhan detik chart diam.

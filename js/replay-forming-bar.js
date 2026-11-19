@@ -14,10 +14,31 @@ async function ensureFineWindow(fineTF, open, end){
     const slice=loaded.filter(b=>b.timestamp>=open && b.timestamp<end);
     if(slice.length){ fineWinCache[key]=slice; return slice; }
   }
+  // Dedup in-flight: buildReplayPartial, evalFills & prefetch bisa meminta jendela yang sama
+  // bersamaan → satu fetch, bukan tiga.
+  if(fineWinInflight[key]) return fineWinInflight[key];
   const count=Math.min(5000, Math.ceil((end-open)/DUR[fineTF])+3);
-  try{ const data=await fetchCandles(fineTF,{from:new Date(open).toISOString(), count});
-       const slice=data.filter(b=>b.timestamp>=open && b.timestamp<end); fineWinCache[key]=slice; return slice; }
-  catch(e){ return null; }
+  const p=(async()=>{
+    try{ const data=await fetchCandles(fineTF,{from:new Date(open).toISOString(), count});
+         const slice=data.filter(b=>b.timestamp>=open && b.timestamp<end); fineWinCache[key]=slice; return slice; }
+    catch(e){ return null; }
+    finally{ delete fineWinInflight[key]; }
+  })();
+  fineWinInflight[key]=p;
+  return p;
+}
+const fineWinInflight={};   // key sama dgn fineWinCache → Promise fetch yang sedang berjalan
+// Saat Play, tiap pergantian bar kasar dulu menunggu satu round-trip /api/candles DI DALAM loop frame
+// (playFrame meng-await buildReplayPartial) → chart diam sejenak tiap bar = "stuck". Ambil jendela
+// sub-bar beberapa bar ke depan selagi bar sekarang masih tumbuh; fire-and-forget, hasilnya masuk cache.
+const FINE_PREFETCH_BARS=2;
+function prefetchFineWindows(tf, fromIdx){
+  const arr=tfData[tf]; if(!arr) return;
+  for(let i=fromIdx;i<fromIdx+FINE_PREFETCH_BARS && i<arr.length;i++){
+    const open=arr[i].timestamp, end=barEndAt(tf,i,arr);
+    const f=pickFineTF(tf, end-open); if(!f) continue;
+    ensureFineWindow(f, open, end).catch(()=>{});
+  }
 }
 // Susun candle partial TF `tf` @ cursor T. Return {timestamp,open,high,low,close} atau null.
 async function buildReplayPartial(tf){
@@ -30,6 +51,7 @@ async function buildReplayPartial(tf){
   if(open>=T) return null;                        // T di boundary/gap → tak ada partial
   const end=barEndAt(tf, rev.length, arr);
   const fineTF=pickFineTF(tf, end-open); if(!fineTF) return null;
+  if(playing) prefetchFineWindows(tf, rev.length+1);   // bar sesudah forming bar → siap sebelum dibutuhkan
   // window sub-bar = rentang PENUH bar kasar [open,end) → kunci cache STABIL antar-frame saat Play
   // (fetch sekali per bar, bukan tiap frame). Anti-lookahead tetap dijaga loop di bawah (b.timestamp+fdur>T).
   const fine=await ensureFineWindow(fineTF, open, end); if(!fine||!fine.length) return null;
