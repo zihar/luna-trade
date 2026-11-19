@@ -142,6 +142,33 @@ function tsToFracIndex(vt){
   const i=Math.max(0,lo-1), t0=a[i].timestamp, t1=a[Math.min(i+1,li)].timestamp;
   const fr=(t1>t0)?(vt-t0)/(t1-t0):0; return i+fr;
 }
+// ---- pemetaan SLOT: anchor X durable untuk tool sub-bar (simpan & ganti TF) ----
+// fidxToTs/tsToFracIndex memetakan pusat bar k = open_k, linear antar waktu-buka. Lintas TF itu
+// salah: separuh-KIRI slot candle B berwaktu < open_B = periode candle SEBELUMNYA, jadi kotak yang
+// digambar di Monthly tepat di kiri candle B mundur ke tengah bulan A saat dibuka di Daily (keluhan
+// 2026-11-19). Di sini bar k menempati indeks [k-½, k+½) ↔ waktu [open_k, open_{k+1}): apa yang
+// tampak di bawah kursor pada TF mana pun = periode waktu yang sama di TF lain. Bar terakhir &
+// area future lewat tsAfterSteps/barStepsFrom (MN ikut kalender). `a` = array bar TF `tf`.
+// Hanya untuk anchor tersimpan; label/durasi tetap memakai fidxToTs (pusat bar = waktu bar).
+function slotTs(a, tf, idx){
+  if(!a||!a.length||idx==null||!isFinite(idx)) return null;
+  const li=a.length-1, k=Math.floor(idx+0.5);
+  if(k>=li) return Math.round(tsAfterSteps(tf, a[li].timestamp, idx-li+0.5));
+  if(idx<=-0.5) return a[0].timestamp;
+  const t0=a[k].timestamp, t1=a[k+1].timestamp;
+  return Math.round(t0 + (idx+0.5-k)*(t1-t0));
+}
+function slotIdx(a, tf, vt){
+  if(!a||!a.length||vt==null) return null;
+  const li=a.length-1, lt=a[li].timestamp;
+  if(vt>=lt) return li-0.5 + barStepsFrom(tf, lt, vt);
+  if(vt<=a[0].timestamp) return -0.5;
+  let lo=0,hi=li; while(lo<hi){ const m=(lo+hi)>>1; if(a[m].timestamp<=vt) lo=m+1; else hi=m; }
+  const k=lo-1, t0=a[k].timestamp, t1=a[k+1].timestamp;
+  return k-0.5 + (t1>t0 ? (vt-t0)/(t1-t0) : 0);
+}
+function fidxToSlotTs(idx){ return slotTs(revealed(currentTF), currentTF, idx); }
+function slotTsToFidx(vt){ return slotIdx(revealed(currentTF), currentTF, vt); }
 // timestamp (virtual bila future) — untuk label/durasi/anchor teks
 function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
   if(p.dataIndex!=null) return fidxToTs(p.dataIndex); return null; }

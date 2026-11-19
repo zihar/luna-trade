@@ -21,9 +21,17 @@ function serializeDraws(){
   const out=[];
   drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id);
     if(!o||!o.points||!PERSIST_DRAW[o.name]) return;
-    const pts=o.points.map(p=>({vt:tsOf(p), value:p.value}));
+    // Tool sub-bar disimpan dlm format SLOT (xm:1, lihat slotTs di js/util.js): titik dataIndex →
+    // waktu periode yang tampak di bawahnya; titik timestamp (magnet) ditandai ts:1 supaya pulih
+    // sbg timestamp lagi → terkunci di candle yg memuatnya, spt saat digambar. BAR_ANCHOR tetap lama.
+    const sb=subBar(o.name);
+    const pts=o.points.map(p=>{
+      if(sb && p && p.timestamp!=null) return {vt:p.timestamp, value:p.value, ts:1};
+      if(sb && p && p.dataIndex!=null) return {vt:fidxToSlotTs(p.dataIndex), value:p.value};
+      return {vt:tsOf(p), value:p.value};
+    });
     if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
-    out.push({ name:o.name, points:pts, lock:o.lock?1:0, did:didOf(id),
+    out.push({ name:o.name, points:pts, lock:o.lock?1:0, did:didOf(id), ...(sb?{xm:1}:{}),
       extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
   }catch(e){} });
   return out;
@@ -52,7 +60,12 @@ function buildDrawsFromArray(arr){
     if(d.points.some(pt=>pt.vt==null)) return;   // lewati gambar rusak lama (titik anchorless → far-left)
     const pts=d.points.map(pt=>{
       if(pt.vt==null) return {value:pt.value};
-      if(subBar(d.name)){ const fi=tsToFracIndex(pt.vt);   // tool sub-bar: SELALU dataIndex pecahan (presisi)
+      if(subBar(d.name)){
+        // xm:1 = format slot (js/util.js slotTs). Muatan LAMA tanpa xm tetap dibaca dgn pemetaan
+        // lama (pusat bar = open) → tampil persis spt dulu; ia pindah ke format slot dgn sendirinya
+        // pada penyimpanan berikutnya, diukur dari posisi di TF yang sedang dibuka saat itu.
+        if(d.xm && pt.ts) return {timestamp:pt.vt, value:pt.value};
+        const fi = d.xm ? slotTsToFidx(pt.vt) : tsToFracIndex(pt.vt);   // tool sub-bar: dataIndex pecahan (presisi)
         return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
       // BAR_ANCHOR: future → dataIndex. Lewat tsToFracIndex (bukan (vt-lt)/DUR sendiri) supaya
       // rumus future hidup di SATU tempat & ikut benar untuk MN yang panjang barnya tak seragam.
