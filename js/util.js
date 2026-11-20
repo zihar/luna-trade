@@ -121,6 +121,14 @@ function fracAnchorFromPx(x){
   if(xi==null||!bs) return {dataIndex:i};
   return {dataIndex: i + (x-xi)/bs};
 }
+// [X = pusat candle] Anchor X tool gambar SELALU di pusat candle — saat menggambar, menyeret
+// ujung, maupun menggeser badan objek; hanya sumbu Y (harga) yang bebas. Permintaan pengguna
+// 2026-11-20, perilaku TradingView. Membalik kebijakan "X presisi sub-bar" PR #24: fraksi kursor
+// dibulatkan ke indeks bar terdekat (area future = pusat bar virtual). fracAnchorFromPx tetap ada
+// untuk penggaris (measure.js) yang memang mengukur posisi kursor apa adanya.
+function barAnchorFromPx(x){ const fa=fracAnchorFromPx(x); return fa&&isFinite(fa.dataIndex)?{dataIndex:Math.round(fa.dataIndex)}:fa; }
+// pixel-x → pixel-x pusat candle terdekat (dipakai Shift-lock supaya sudut tetap pas sesudah snap).
+function snapPxToBar(x){ const a=barAnchorFromPx(x); const p=a?idxToPx(a.dataIndex):null; return p!=null?p:x; }
 // fractional dataIndex → wall-clock ms. In-data: interpolasi antar 2 bar tetangga (anti-gap
 // weekend). Future (idx>=li): ekstrapolasi linear DUR. Kebalikan dari tsToFracIndex.
 function fidxToTs(idx){
@@ -169,6 +177,39 @@ function slotIdx(a, tf, vt){
 }
 function fidxToSlotTs(idx){ return slotTs(revealed(currentTF), currentTF, idx); }
 function slotTsToFidx(vt){ return slotIdx(revealed(currentTF), currentTF, vt); }
+// ---- anchor PUSAT candle (kontrak sejak 2026-11-20: X tool sub-bar selalu di tengah candle) ----
+// Dibawa lintas TF lewat WAKTU-BUKA bar-nya, bukan tengah periodenya (slotTs): candle H1 10:00 →
+// candle M5 10:00 (ala TradingView), bukan 10:30 yang di M5 malah jatuh di BATAS dua candle.
+// Kebalikannya = bar yang MEMUAT waktu itu: M5 10:35 → candle H1 10:00. Hasilnya selalu indeks
+// bulat (= tengah candle) di TF mana pun. Titik pecahan (gambar lama) tetap lewat slotTs.
+function isCenterIdx(idx){ return idx!=null && isFinite(idx) && Math.abs(idx-Math.round(idx))<1e-6; }
+function barOpenTs(a, tf, k){
+  if(!a||!a.length||k==null||!isFinite(k)) return null;
+  const li=a.length-1; k=Math.round(k);
+  if(k<=0) return a[0].timestamp;
+  if(k<=li) return a[k].timestamp;
+  return Math.round(tsAfterSteps(tf, a[li].timestamp, k-li));
+}
+function barIdxAt(a, tf, vt){
+  if(!a||!a.length||vt==null) return null;
+  const li=a.length-1, lt=a[li].timestamp;
+  if(vt>=lt) return li + Math.floor(barStepsFrom(tf, lt, vt) + 1e-6);
+  if(vt<=a[0].timestamp) return 0;
+  let lo=0,hi=li; while(lo<hi){ const m=(lo+hi)>>1; if(a[m].timestamp<=vt) lo=m+1; else hi=m; }
+  return lo-1;
+}
+function barOpenTsToIdx(vt){ return barIdxAt(revealed(currentTF), currentTF, vt); }
+// Waktu ASLI tiap titik pusat candle, per objek. Tanpa ini M5 10:10→10:40 dibuka di H1 (keduanya
+// candle 10:00) lalu balik ke M5 jadi 10:00→10:00 — menit aslinya hilang karena posisi dihitung
+// ulang dari candle H1. Ingatan dipakai hanya selama candle yang tampak MASIH memuat waktu itu:
+// begitu titik digeser ke candle lain, ia gugur sendiri dan waktu-buka candle baru yang berlaku.
+const centerVt=new Map();   // overlay id → {indeks titik: waktu asli}
+function rememberCenterTs(id, i, vt){ if(id==null||vt==null) return; let m=centerVt.get(id); if(!m) centerVt.set(id, m={}); m[i]=vt; }
+function centerTsOf(id, i, idx){
+  const a=revealed(currentTF), m=centerVt.get(id), vt=m?m[i]:null;
+  if(vt!=null && barIdxAt(a, currentTF, vt)===Math.round(idx)) return vt;
+  return barOpenTs(a, currentTF, idx);
+}
 // timestamp (virtual bila future) — untuk label/durasi/anchor teks
 function tsOf(p){ if(!p) return null; if(p.timestamp!=null) return p.timestamp;
   if(p.dataIndex!=null) return fidxToTs(p.dataIndex); return null; }
@@ -198,7 +239,7 @@ function snapTimeToBar(t){
 // pasteOverlayAt (js/draw-copy-paste.js) sama-sama memakainya, dan menyimpang dari kebijakan ini
 // membuat titik "loncat" saat objek dibuat.
 function anchorFromPx(name, x, v){
-  const xa = subBar(name) ? fracAnchorFromPx(x) : xAnchorFromPx(x); if(!xa) return null;
+  const xa = subBar(name) ? barAnchorFromPx(x) : xAnchorFromPx(x); if(!xa) return null;
   const np=Object.assign({value:v}, xa);
   if(name==='verticalStraightLine' && np.timestamp!=null) np.timestamp=snapTimeToBar(np.timestamp);
   return np;

@@ -47,3 +47,13 @@ function constrainPx(ax, ay, x, y){
   const t=dx*ux + dy*uy;
   return {x: ax+ux*t, y: ay+uy*t};
 }
+
+// constrainPx + X di pusat candle (js/util.js barAnchorFromPx). X dibulatkan ke pusat bar, lalu Y
+// dihitung ulang di SINAR yang sama → sudut tetap persis kelipatan 45°. Sinar vertikal dibiarkan
+// (X-nya = X jangkar, yang sudah di pusat candle).
+function lockPx(ax, ay, x, y){
+  const c=constrainPx(ax, ay, x, y), dx=c.x-ax;
+  if(Math.abs(dx)<1e-6) return c;
+  const xs=snapPxToBar(c.x);
+  return {x:xs, y: ay + (c.y-ay)*(xs-ax)/dx};
+}

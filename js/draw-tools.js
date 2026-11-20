@@ -80,8 +80,8 @@ function delHooks(){ return {
     // bermakna kalau sudutnya persis, dan magnet yang ikut menarik membuatnya miring lagi.
     let ex=e.x, ey=e.y, locked=false;
     if(m===1 && angleLockOn(o.name)){ const a=anchorPx(o.points[0]);
-      if(a){ const c=constrainPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
-    const fa=fracAnchorFromPx(ex); let v=pxToValue(ey);
+      if(a){ const c=lockPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
+    const fa=barAnchorFromPx(ex); let v=pxToValue(ey);
     if(magnetActive() && !locked && v!=null){ const xa=xAnchorFromPx(ex);
       if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ex, ey);
         if(s){ o.points[m]={timestamp:s.timestamp, value:s.value}; return false; } } }
@@ -126,8 +126,8 @@ function delHooks(){ return {
     const fk=e.figureKey||'';
     if(fk.indexOf('overlay_figure_point_')===0 && angleLockOn(o.name) && e.figureIndex<2 && o.points.length>=2){
       const a=anchorPx(o.points[e.figureIndex===0?1:0]);
-      if(a){ const c=constrainPx(a.x, a.y, ex, ey); ex=c.x; ey=c.y; locked=true; } }
-    const xa=fracAnchorFromPx(ex), v=pxToValue(ey);
+      if(a){ const c=lockPx(a.x, a.y, ex, ey); ex=c.x; ey=c.y; locked=true; } }
+    const xa=barAnchorFromPx(ex), v=pxToValue(ey);
     if(!xa || v==null) return false;
     const pts=o.points.map(p=>Object.assign({},p));
     const key=e.figureKey||'';
@@ -164,12 +164,13 @@ function delHooks(){ return {
       // titik baru. Clone hanya di cabang BADAN: menyeret handle titik tetap mengedit titik,
       // sesuai TV yang memperlakukan clone sebagai operasi seluruh objek.
       if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneOverlay(o.id, dragBase.pts); }catch(_){} }
-      const sx=fracAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
+      const sx=barAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
       if(!sx || sv==null) return false;
       const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
       for(let i=0;i<pts.length;i++){ const sp=dragBase.pts[i]; if(!sp) continue;
         const bi=(sp.dataIndex!=null)?sp.dataIndex:fidxOf(sp);
-        pts[i]={dataIndex: bi+dIdx, value: (sp.value!=null?sp.value:v)+dV}; }
+        // Math.round: objek lama (anchor pecahan, sebelum X=pusat candle) ikut ter-snap begitu digeser.
+        pts[i]={dataIndex: Math.round(bi+dIdx), value: (sp.value!=null?sp.value:v)+dV}; }
     }
     try{ chart.overrideOverlay({id:o.id, points:pts}); }catch(_){}
     return true;                                        // lewati snap bawaan klinecharts
@@ -229,7 +230,7 @@ function delHooks(){ return {
         const idx = (pc && isFinite(pc.fidx)) ? pc.fidx
                   : (p.dataIndex!=null && isFinite(p.dataIndex)) ? p.dataIndex
                   : fidxOf(p);
-        return {dataIndex: idx, value: p.value}; }); }
+        return {dataIndex: Math.round(idx), value: p.value}; }); }   // X = pusat candle (util.js barAnchorFromPx)
       o.points.forEach((pt,i)=>{ if(pt && pt.timestamp==null && (pt.dataIndex==null || !isFinite(pt.dataIndex))){
         const a=xAnchorFromPx(lastPtr.x-rect.left); const val=(pt.value!=null)?pt.value:pxToValue(lastPtr.y-rect.top);
         if(a && val!=null) o.points[i]=Object.assign({value:val}, a); }});

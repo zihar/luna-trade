@@ -2,10 +2,11 @@
 // mendarat DI SINI". Janji itu hanya benar bila ia memakai anchor yang IDENTIK dengan yang
 // di-commit onDrawEnd. Sebelum anchor sub-bar digeneralisasi, reticle memakai xAnchorFromPx
 // (timestamp → snap ke pusat bar) untuk semua tool kecuali trendline → meleset ½ bar.
+// Sejak 2026-11-20 anchor-nya sendiri = tengah candle (barAnchorFromPx); reticle tetap harus IDENTIK.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { chartRect } = require('../helpers/chart');
+const { chartRect, barGrid, nearestCenterX } = require('../helpers/chart');
 const { armTool, setCursor, CLICK_GAP_MS } = require('../helpers/draw');
 
 // Satu per geometri: garis 2-titik custom, kotak yang mengembang, dan overlay BUILT-IN
@@ -25,7 +26,7 @@ async function dotAt(page) {
 
 test.describe('reticle preview', () => {
   for (const name of SAMPLES) {
-    test(`${name}: dot mendarat tepat di kursor (bukan di pusat bar)`, async ({ page }) => {
+    test(`${name}: dot di tengah candle terdekat (X), Y di kursor`, async ({ page }) => {
       await gotoApp(page);
       const rect = await chartRect(page);
 
@@ -40,7 +41,9 @@ test.describe('reticle preview', () => {
 
       const dot = await dotAt(page);
       expect(dot, `${name}: reticle harus tampil saat menggambar di mode cursor 'dot'`).not.toBeNull();
-      expect(Math.abs(dot.x - target.x), `${name}: reticle X harus di kursor, bukan pusat bar`).toBeLessThanOrEqual(1);
+      // Sejak 2026-11-20 (kontrak 'center'): X anchor = tengah candle terdekat → reticle ikut.
+      const grid = await barGrid(page);
+      expect(Math.abs(dot.x - nearestCenterX(grid, target.x)), `${name}: reticle X harus di tengah candle`).toBeLessThanOrEqual(1);
       expect(Math.abs(dot.y - target.y), `${name}: reticle Y harus di kursor`).toBeLessThanOrEqual(1);
 
       await page.keyboard.press('Escape');

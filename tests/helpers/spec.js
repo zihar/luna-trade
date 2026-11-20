@@ -15,7 +15,13 @@
 //               titik (expandBox, index.html pra-Fase-2:796), posisi → 6 titik (expandPosition,
 //               index.html pra-Fase-2:3397). Karena itu parity/landing dibandingkan lewat pencocokan
 //               titik TERDEKAT, bukan per-indeks.
-// anchor      = 'subbar' (wajib ≤1px dari titik klik) | 'bar' (boleh snap ke bar terdekat)
+// anchor      = 'center' (X WAJIB tepat di tengah candle terdekat dari titik klik, ≤1px; Y bebas ≤1px)
+//               | 'bar' (boleh snap ke bar terdekat, toleransi longgar ½ bar)
+//               | 'subbar' (≤1px dari titik klik — kontrak lama, kini tak dipakai tool mana pun)
+//               PEMBALIKAN KEBIJAKAN 2026-11-20: atas permintaan pengguna (perilaku ala TradingView),
+//               semua tool yang dulu 'subbar' kini men-snap X ke tengah candle — saat menggambar,
+//               menyeret ujung, maupun menggeser badan (barAnchorFromPx/lockPx, js/util.js &
+//               js/draw-constrain.js). Y tetap bebas.
 // text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, index.html pra-Fase-2:5546)
 // autoEditor  = true bila editor teks inline terbuka sendiri setelah objek jadi
 //               (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306) → test wajib menutupnya.
@@ -31,46 +37,46 @@
 
 const TOOL_SPEC = [
   // ---- Trend Lines ----
-  { name: 'trendline', group: 'trend', groupTitle: 'Trend Lines', title: 'Trend Line', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: 'modal+inline', settings: 'modal', coords: 'points', persist: true, sc: 'T' },
-  { name: 'rayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
-  { name: 'straightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
-  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'H' },
+  { name: 'trendline', group: 'trend', groupTitle: 'Trend Lines', title: 'Trend Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'points', persist: true, sc: 'T' },
+  { name: 'rayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
+  { name: 'straightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
+  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'H' },
   // Horizontal Ray: klik ke-2 hanya menentukan arah/panjang di sumbu X — Y-nya WAJIB diabaikan,
   // kalau tidak garisnya tak lagi horizontal. Jadi landing Y klik ke-2 memang tak dinilai.
-  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'subbar', clickAxes: ['xy', 'x'], text: null, settings: 'modal', coords: 'hray', persist: true, builtin: true },
+  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'center', clickAxes: ['xy', 'x'], text: null, settings: 'modal', coords: 'hray', persist: true, builtin: true },
   { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: null, settings: 'modal', coords: 'bar', persist: true, sc: 'V' },
-  { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
+  { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
 
   // ---- Channels ----
-  { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
-  { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
 
   // ---- Fibonacci ----
-  { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'subbar', text: null, settings: 'modal', coords: 'box', persist: true, sc: 'F' },
-  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: null, settings: 'modal', coords: 'box', persist: true, sc: 'F' },
+  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
 
   // ---- Shapes ----
-  { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'subbar', text: 'modal+inline', settings: 'modal', coords: 'box', persist: true, sc: 'R' },
-  { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
-  { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'A' },
-  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'box', persist: true, sc: 'R' },
+  { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
+  { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'A' },
+  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
 
   // ---- Positions ----
   { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
   { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
-  { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
 
   // ---- Measure ----
   // Ephemeral: tak tersimpan (persist:false), tak punya panel setting (tak ada di DRAW_DEFAULT),
   // dan dibuang oleh Esc / klik lain / arm tool lain / ganti TF-instrumen. Flag `ephemeral`
   // menandai itu untuk test yang mensyaratkan objek tetap hidup setelah gestur lain.
-  { name: 'measure', group: 'measure', groupTitle: 'Measure', title: 'Measure', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: null, settings: null, coords: null, persist: false, ephemeral: true, sc: 'M' },
+  { name: 'measure', group: 'measure', groupTitle: 'Measure', title: 'Measure', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: null, coords: null, persist: false, ephemeral: true, sc: 'M' },
 
   // ---- Text ----
-  { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'subbar', text: 'modal', autoEditor: true, settings: 'modal', coords: 'points', persist: true, sc: 'X' },
-  { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'subbar', text: 'modal+inline', autoEditor: true, settings: 'modal', coords: 'points', persist: true },
+  { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'modal', autoEditor: true, settings: 'modal', coords: 'points', persist: true, sc: 'X' },
+  { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', autoEditor: true, settings: 'modal', coords: 'points', persist: true },
   // simpleAnnotation ("Annotation") & simpleTag ("Tag") DITARIK dari rail 2026-07-27 (Temuan 3),
   // jadi keduanya keluar dari tabel ini — bukan karena testnya rewel, tapi karena tool-nya tak ada
   // lagi di UI. Keduanya overlay bawaan klinecharts yang menandai semua figure-nya
@@ -102,6 +108,9 @@ function tolX(spec, barSpacePx) {
   return spec.anchor === 'bar' ? barSpacePx / 2 + 1 : TOL_SUBBAR_PX;
 }
 
+/** Tool yang X-nya wajib mendarat TEPAT di tengah candle (target ukur = center terdekat). */
+const snapsCenter = (spec) => spec.anchor === 'center';
+
 /** Sumbu klik ke-i yang bermakna: 'xy' (default), 'x', atau 'y'. */
 function axisOf(spec, i) {
   return (spec.clickAxes && spec.clickAxes[i]) || 'xy';
@@ -112,4 +121,4 @@ const inGroup = (g) => TOOL_SPEC.filter((t) => t.group === g);
 const withShortcut = () => TOOL_SPEC.filter((t) => t.sc);
 const multiPoint = () => TOOL_SPEC.filter((t) => t.clicks > 1);
 
-module.exports = { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, axisOf, byName, inGroup, withShortcut, multiPoint };
+module.exports = { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, snapsCenter, axisOf, byName, inGroup, withShortcut, multiPoint };

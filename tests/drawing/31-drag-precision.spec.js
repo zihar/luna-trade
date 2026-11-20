@@ -15,15 +15,19 @@
 // meleset ~0-2px dan sebuah tool bisa "lolos" walau jelas men-snap. Di tengah dua bar, tool yang
 // men-snap PASTI meleset ½ barSpace — kegagalan jadi deterministik dan sebesar mungkin.
 //
-// Toleransi mengikuti TOOL_SPEC: ≤1px untuk tool sub-bar, ½ barSpace + 1 untuk tool yang
-// snap-per-bar-nya disengaja (verticalStraightLine; long/shortPosition tak diuji di sini —
-// lihat DRAG_SKIP).
+// Toleransi mengikuti TOOL_SPEC: ½ barSpace + 1 untuk tool 'bar' (verticalStraightLine;
+// long/shortPosition tak diuji di sini — lihat DRAG_SKIP).
+//
+// SEJAK 2026-11-20 (anchor 'center', permintaan pengguna): X yang diseret WAJIB mendarat TEPAT
+// di tengah candle terdekat dari kursor (≤1px), Y tetap di kursor. Target lalu ditaruh ¼ bar dari
+// center (`quarterOffX`) — bukan di tengah antara dua bar — supaya "center terdekat" tak ambigu;
+// tool yang TIDAK men-snap pasti meleset ¼ barSpace dan tertangkap toleransi 1px.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { toPixels, toPixel, barSpace, plotWidth } = require('../helpers/chart');
+const { toPixels, toPixel, barSpace, plotWidth, barGrid, nearestCenterX, quarterOffX } = require('../helpers/chart');
 const { drawTool, overlays, hoverableSpot, clickAt } = require('../helpers/draw');
-const { TOOL_SPEC, tolX, TOL_Y_PX } = require('../helpers/spec');
+const { TOOL_SPEC, tolX, snapsCenter, TOL_Y_PX } = require('../helpers/spec');
 
 // Tool yang memang TAK diuji di sini, masing-masing dengan alasannya. Bukan daftar
 // "yang gagal" — daftar "yang jalur drag-nya bukan jalur ini".
@@ -135,8 +139,11 @@ test.describe('drag setelah objek jadi — titik', () => {
 
       const from = before[cornerIndex(before)];
       const sp = await barSpace(page);
-      const to = { x: await halfBarOffX(page, from.x + 84, sp), y: from.y + 52 };
+      const center = snapsCenter(spec);
+      const grid = center ? await barGrid(page) : null;
+      const to = { x: center ? quarterOffX(grid, from.x + 84) : await halfBarOffX(page, from.x + 84, sp), y: from.y + 52 };
       await drag(page, rect, from, to);
+      const wantX = center ? nearestCenterX(grid, to.x) : to.x;
 
       const after = await toPixels(page, (await overlays(page))[0].points);
       // Titik mana yang benar-benar diseret: yang paling jauh bergeser dari posisi awal.
@@ -150,7 +157,7 @@ test.describe('drag setelah objek jadi — titik', () => {
       expect(best, `${spec.name}: tak ada titik yang bergerak — drag tak tertangkap`).toBeGreaterThan(20);
 
       const tx = tolX(spec, sp);
-      expect(Math.abs(after[moved].x - to.x), `${spec.name}: titik tak mendarat di kursor (X, toleransi ${tx}px, ½bar=${sp / 2}px)`).toBeLessThanOrEqual(tx);
+      expect(Math.abs(after[moved].x - wantX), `${spec.name}: titik tak mendarat di ${center ? 'tengah candle' : 'kursor'} (X, toleransi ${tx}px, ½bar=${sp / 2}px)`).toBeLessThanOrEqual(tx);
       expect(Math.abs(after[moved].y - to.y), `${spec.name}: titik tak mendarat di kursor (Y)`).toBeLessThanOrEqual(TOL_Y_PX);
       assertNoPageErrors(page);
     });
@@ -176,8 +183,13 @@ test.describe('drag setelah objek jadi — badan', () => {
       // setengah-bar; hasilnya beda-beda antara fixture & server nyata semata karena grab.x
       // berbeda — bukan karena aplikasinya berbeda.)
       const sp = await barSpace(page);
-      const move = { dx: Math.round(70 / sp) * sp + sp / 2, dy: 44 };
+      // Tool 'center': Δx = bar bulat + ¼ bar, dan geseran yang diharapkan = selisih CENTER
+      // terdekat dari titik grab & titik lepas (translasi per bar utuh, titik tetap di center).
+      const center = snapsCenter(spec);
+      const grid = center ? await barGrid(page) : null;
+      const move = { dx: Math.round(70 / sp) * sp + (center ? sp / 4 : sp / 2), dy: 44 };
       await drag(page, rect, grab, { x: grab.x + move.dx, y: grab.y + move.dy });
+      const wantDx = center ? nearestCenterX(grid, grab.x + move.dx) - nearestCenterX(grid, grab.x) : move.dx;
 
       const after = await toPixels(page, (await overlays(page))[0].points);
       const tx = tolX(spec, sp);
@@ -186,7 +198,7 @@ test.describe('drag setelah objek jadi — badan', () => {
         if (!before[k] || !after[k]) continue;
         const dx = after[k].x - before[k].x, dy = after[k].y - before[k].y;
         if (Math.abs(dx) + Math.abs(dy) > 20) anyMoved = true;
-        expect(Math.abs(dx - move.dx), `${spec.name}: titik #${k} tak bergeser sebesar kursor (X, toleransi ${tx}px)`).toBeLessThanOrEqual(tx);
+        expect(Math.abs(dx - wantDx), `${spec.name}: titik #${k} tak bergeser sebesar kursor (X, toleransi ${tx}px)`).toBeLessThanOrEqual(tx);
         expect(Math.abs(dy - move.dy), `${spec.name}: titik #${k} tak bergeser sebesar kursor (Y)`).toBeLessThanOrEqual(TOL_Y_PX);
       }
       expect(anyMoved, `${spec.name}: badan diseret tapi tak ada titik yang pindah`).toBe(true);
