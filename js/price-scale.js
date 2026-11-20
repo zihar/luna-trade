@@ -93,3 +93,37 @@ function attachPriceScale(el, c){
   },{passive:false,capture:true});
 }
 attachPriceScale($('#chart'), chart);
+
+// ===================== lebar sumbu harga stabil (grow-only) =====================
+//
+// KLineCharts menghitung ulang lebar sumbu-Y di SETIAP layout (`YAxis.getAutoSize`) dari label
+// tick terlebar yang sedang tampak + label crosshair `range.to`. Dua hal membuatnya goyang:
+// font sumbu proporsional (Inter Tight: "1.1111" lebih sempit dari "1.0800") dan jumlah desimal
+// tick yang ikut interval zoom. Hasilnya terukur 47↔53px, ~80 loncatan per 30 dtk zoom/geser —
+// dan tiap loncatan menggeser SELURUH area plot (candle + gambar) ke samping = "layar bergetar".
+//
+// Penawarnya meniru TradingView: dalam satu instrumen sumbu hanya boleh MEMBESAR. Memo disimpan
+// per instance sumbu (pane indikator punya sumbunya sendiri; lebar akhir = maks semua pane, jadi
+// tetap grow-only). Prototipe dipatch sekali → berlaku juga untuk panel multi-chart.
+// `resetPriceAxisWidth` dipanggil saat ganti instrumen/presisi supaya simbol berdigit lebih
+// sedikit tak mewarisi sumbu lebar simbol sebelumnya.
+function stabilizePriceAxisWidth(c){
+  const pane = c.getAllDrawPanes().find(p => p.getId() === 'candle_pane');
+  const proto = pane && Object.getPrototypeOf(pane.getAxisComponent());
+  if(!proto || typeof proto.getAutoSize !== 'function' || proto.__lunaGrowOnly) return;
+  const orig = proto.getAutoSize;
+  proto.getAutoSize = function(){
+    const w = orig.call(this);
+    if(typeof w !== 'number' || !isFinite(w)) return w;
+    if(this.__lunaMaxW == null || w > this.__lunaMaxW) this.__lunaMaxW = w;
+    return this.__lunaMaxW;
+  };
+  proto.__lunaGrowOnly = true;
+}
+function resetPriceAxisWidth(c){
+  try{
+    let xId = null; try{ xId = c.getXAxisPane().getId(); }catch(e){}
+    c.getAllDrawPanes().forEach(p => { if(p.getId() !== xId){ const ax = p.getAxisComponent(); if(ax) ax.__lunaMaxW = null; } });
+  }catch(e){}
+}
+try{ stabilizePriceAxisWidth(chart); }catch(e){}

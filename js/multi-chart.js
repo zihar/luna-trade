@@ -68,7 +68,7 @@ function makeSecondary(slot){
         const r=await fetch(u); const j=await r.json();
         if(!j.candles) return;
         this.data=j.candles.filter(x=>x.complete).map(x=>({timestamp:Date.parse(x.time),open:+x.mid.o,high:+x.mid.h,low:+x.mid.l,close:+x.mid.c,volume:+(x.volume||0)})).sort((a,b)=>a.timestamp-b.timestamp);
-        try{ this.chart.setPriceVolumePrecision(decimalsFor(this.sym),0); }catch(e){}
+        try{ this.chart.setPriceVolumePrecision(decimalsFor(this.sym),0); resetPriceAxisWidth(this.chart); }catch(e){}
         this.chart.applyNewData(this.data);
       }catch(e){}
     },
