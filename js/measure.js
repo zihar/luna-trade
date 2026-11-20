@@ -101,7 +101,7 @@ $('#chart').addEventListener('mousedown',(e)=>{ if(!e.shiftKey) clearMeasure(); 
   function ptFromEvent(e){
     const r=el.getBoundingClientRect();
     const px=e.clientX-r.left, py=e.clientY-r.top;
-    const xa=fracAnchorFromPx(px);
+    const xa=barAnchorFromPx(px);   // X = pusat candle, sama dgn jalur klik tool (onDrawing)
     let v=pxToValue(py);
     if(!xa || v==null) return null;
     // magnet dihormati di jalur ini juga — kalau tidak, dua pintu masuk bisa memberi angka

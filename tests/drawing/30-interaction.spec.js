@@ -6,25 +6,28 @@
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { chartRect, toPixels } = require('../helpers/chart');
+const { chartRect, toPixels, barGrid, nearestCenterX, quarterOffX } = require('../helpers/chart');
 const { drawTool, overlays, dragPoint, armTool, clickAt, setCursor, hoverableSpot, CLICK_GAP_MS } = require('../helpers/draw');
 const { byName, TOL_Y_PX } = require('../helpers/spec');
 
 const SAMPLES = ['trendline', 'rect', 'horizontalStraightLine'];
 
 test.describe('drag', () => {
-  test('drag satu titik: titik itu ikut kursor, titik lain tak bergeming', async ({ page }) => {
+  test('drag satu titik: titik itu ikut kursor (X di tengah candle), titik lain tak bergeming', async ({ page }) => {
     await gotoApp(page);
     const { obj, targets, rect } = await drawTool(page, 'trendline');
     expect(obj.points).toHaveLength(2);
 
     const before = await toPixels(page, obj.points);
     const from = before[1];
-    const to = { x: from.x + 90, y: from.y + 60 };
+    // X mendarat di TENGAH candle terdekat dari kursor (kontrak 'center' sejak 2026-11-20);
+    // target ¼ bar dari center supaya "terdekat" tak ambigu. Y tetap di kursor.
+    const grid = await barGrid(page);
+    const to = { x: quarterOffX(grid, from.x + 90), y: from.y + 60 };
     await dragPoint(page, rect, from, to);
 
     const after = await toPixels(page, (await overlays(page))[0].points);
-    expect(Math.abs(after[1].x - to.x), 'titik yang di-drag harus mendarat di kursor (X)').toBeLessThanOrEqual(1);
+    expect(Math.abs(after[1].x - nearestCenterX(grid, to.x)), 'titik yang di-drag harus mendarat di tengah candle (X)').toBeLessThanOrEqual(1);
     expect(Math.abs(after[1].y - to.y), 'titik yang di-drag harus mendarat di kursor (Y)').toBeLessThanOrEqual(1);
     expect(Math.abs(after[0].x - before[0].x), 'titik lain tak boleh bergeser (X)').toBeLessThanOrEqual(1);
     expect(Math.abs(after[0].y - before[0].y), 'titik lain tak boleh bergeser (Y)').toBeLessThanOrEqual(1);

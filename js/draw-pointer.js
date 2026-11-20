@@ -16,12 +16,12 @@ $('#chart').addEventListener('mousedown', (ev)=>{
       // biasa menggeser jangkar s/d ½ bar, dan garis "vertikal" meleset beberapa piksel.
       const pc=pendingClicks[0];
       const a=anchorPx(pc.mag||!isFinite(pc.fidx) ? pc : {dataIndex:pc.fidx, value:pc.value});
-      if(a){ const c=constrainPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } } }
+      if(a){ const c=lockPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } } }
   const xa=xAnchorFromPx(px), v=pxToValue(py);
   if(!xa||v==null) return;
   // fidx = fractional dataIndex PRESISI di piksel klik (utk trendline; tsToPx meng-snap timestamp
   // jadi tak bisa direkonstruksi dari timestamp di onDrawEnd). Field ekstra → tool lain mengabaikan.
-  const fa=fracAnchorFromPx(px), fidx=fa?fa.dataIndex:undefined;
+  const fa=barAnchorFromPx(px), fidx=fa?fa.dataIndex:undefined;
   // magnet HANYA utk titik di dalam data (punya timestamp). Titik di area future (dataIndex,
   // tanpa candle) tak boleh di-snap: magnetSnap akan menariknya ke bar TERAKHIR → garis
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
@@ -55,7 +55,7 @@ function updateMagDot(ev){
   const o0=chart.getOverlayById(inProgressId);
   let locked=false;
   if(o0 && o0.points && o0.points.length===2 && angleLockOn(o0.name)){ const a=anchorPx(o0.points[0]);
-    if(a){ const c=constrainPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } }
+    if(a){ const c=lockPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } }
   const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
   // Reticle WAJIB memakai anchor yg IDENTIK dgn titik yg akan di-commit, lalu dirender lewat
   // convertToPixel yg SAMA dgn mesin render → dijamin mendarat tepat di posisi titik sebenarnya.
@@ -70,7 +70,7 @@ function updateMagDot(ev){
     const o=chart.getOverlayById(inProgressId), name=o&&o.name;
     // name falsy (overlay tak ketemu) → jatuh ke cabang BAR_ANCHOR (perilaku lama): subBar(undefined)
     // sendiri bernilai true (bukan anggota BAR_ANCHOR), jadi name dicek eksplisit lebih dulu.
-    if(name && subBar(name)){ const fa=fracAnchorFromPx(px); if(fa) anchor={dataIndex:fa.dataIndex, value:v}; }   // presisi sub-bar (fidx)
+    if(name && subBar(name)){ const fa=barAnchorFromPx(px); if(fa) anchor={dataIndex:fa.dataIndex, value:v}; }   // X = pusat candle (fidx bulat)
     else { const xa=xAnchorFromPx(px); if(xa) anchor=Object.assign({value:v}, xa); }                             // BAR_ANCHOR: timestamp (ikut snap render)
   }
   if(!anchor){ hideMagDot(); return; }

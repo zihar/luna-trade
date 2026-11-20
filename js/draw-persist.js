@@ -25,8 +25,11 @@ function serializeDraws(){
     // waktu periode yang tampak di bawahnya; titik timestamp (magnet) ditandai ts:1 supaya pulih
     // sbg timestamp lagi → terkunci di candle yg memuatnya, spt saat digambar. BAR_ANCHOR tetap lama.
     const sb=subBar(o.name);
-    const pts=o.points.map(p=>{
+    const pts=o.points.map((p,i)=>{
       if(sb && p && p.timestamp!=null) return {vt:p.timestamp, value:p.value, ts:1};
+      // Pusat candle (indeks bulat) → waktu-buka bar + bc:1 (js/util.js barOpenTs): H1 10:00 pulih
+      // di candle M5 10:00. Titik pecahan (gambar lama) tetap format slot.
+      if(sb && p && p.dataIndex!=null && isCenterIdx(p.dataIndex)) return {vt:centerTsOf(id,i,p.dataIndex), value:p.value, bc:1};
       if(sb && p && p.dataIndex!=null) return {vt:fidxToSlotTs(p.dataIndex), value:p.value};
       return {vt:tsOf(p), value:p.value};
     });
@@ -65,6 +68,7 @@ function buildDrawsFromArray(arr){
         // lama (pusat bar = open) → tampil persis spt dulu; ia pindah ke format slot dgn sendirinya
         // pada penyimpanan berikutnya, diukur dari posisi di TF yang sedang dibuka saat itu.
         if(d.xm && pt.ts) return {timestamp:pt.vt, value:pt.value};
+        if(d.xm && pt.bc){ const k=barOpenTsToIdx(pt.vt); return k!=null ? {dataIndex:k, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
         const fi = d.xm ? slotTsToFidx(pt.vt) : tsToFracIndex(pt.vt);   // tool sub-bar: dataIndex pecahan (presisi)
         return fi!=null ? {dataIndex:fi, value:pt.value} : {timestamp:pt.vt, value:pt.value}; }
       // BAR_ANCHOR: future → dataIndex. Lewat tsToFracIndex (bukan (vt-lt)/DUR sendiri) supaya
@@ -78,6 +82,8 @@ function buildDrawsFromArray(arr){
     if(BUILTIN_LINE[d.name]) base.styles=klineLineStyles(Object.assign({},DRAW_DEFAULT[d.name],d.style||{}));
     const id=chart.createOverlay(Object.assign(base,delHooks()));
     if(id){ drawIds.push(id);
+      // waktu asli titik pusat candle diingat → simpan ulang di TF kasar tak membuang menitnya
+      if(subBar(d.name) && d.xm) d.points.forEach((pt,i)=>{ if(pt.bc) rememberCenterTs(id,i,pt.vt); });
       // did dari muatan bila ada; objek lama (sebelum fitur alert-garis) dapat did baru di sini,
       // dan ia ikut tersimpan pada penyimpanan berikutnya.
       objDid[id]= (typeof d.did==='string' && d.did) ? d.did : newDid();

@@ -9,6 +9,10 @@
 // kode (verticalStraightLine, long/shortPosition — lihat TOOL_SPEC.anchorWhy); untuk itu
 // toleransi X = ½ barSpace + 1.
 //
+// Tool anchor 'center' (semua tool lain, sejak 2026-11-20): klik digeser ¼ bar dari center dan
+// Δlanding/Δpreview diukur terhadap CENTER candle terdekat (measureParity) — X wajib tepat di
+// tengah candle ≤1px, Y tetap di titik klik.
+//
 // Kartu galeri ditulis untuk SETIAP tool (lolos maupun gagal) — preview.png / final.png /
 // diff.png + angka Δ — supaya yang tak bisa diassert (garis tak kelihatan, arrowhead salah
 // arah, warna default aneh) masih tertangkap mata di report/gallery.html.

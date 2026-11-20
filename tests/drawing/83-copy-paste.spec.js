@@ -3,7 +3,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
-const { chartRect, toPixels } = require('../helpers/chart');
+const { chartRect, toPixels, barGrid, nearestCenterX, quarterOffX } = require('../helpers/chart');
 const { armTool, clickAt, overlays, CLICK_GAP_MS } = require('../helpers/draw');
 const { dataList } = require('../helpers/chart');
 
@@ -64,13 +64,14 @@ test.describe('copy/paste objek: API', () => {
 
     expect(await page.evaluate(() => copyOverlay()), 'copyOverlay harus true untuk objek terpilih').toBe(true);
 
-    const target = { x: Math.round(rect.width * 0.2), y: Math.round(rect.height * 0.7) };
+    const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+    const target = { x: quarterOffX(grid, Math.round(rect.width * 0.2)), y: Math.round(rect.height * 0.7) };
     await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
     await page.waitForTimeout(150);
 
     expect(await overlays(page), 'paste harus menambah satu objek').toHaveLength(2);
     const baru = await otherThan(page, obj.id);
-    expect(Math.abs(baru.px[0].x - target.x), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
+    expect(Math.abs(baru.px[0].x - nearestCenterX(grid, target.x)), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
     expect(Math.abs(baru.px[0].y - target.y), 'titik-1 tak mendarat di Y titik paste').toBeLessThanOrEqual(1);
     // Bentuk = jarak antar titik dalam PIKSEL, persis yang direkam saat copy.
     expect(Math.abs((baru.px[1].x - baru.px[0].x) - (px[1].x - px[0].x)), 'lebar bentuk berubah').toBeLessThanOrEqual(1);
@@ -161,14 +162,15 @@ test.describe('copy/paste objek: API', () => {
     await page.evaluate((id) => chart.removeOverlay(id), obj.id);
     await expect.poll(async () => (await overlays(page)).length).toBe(0);
 
-    const target = { x: 80, y: 80 };
+    const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+    const target = { x: quarterOffX(grid, 80), y: 80 };
     const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
     expect(nid, 'paste harus tetap berhasil walau objek sumber sudah tak ada').toBeTruthy();
 
     const all = await overlays(page);
     expect(all, 'paste harus menghasilkan tepat satu objek').toHaveLength(1);
     const px = await toPixels(page, all[0].points);
-    expect(Math.abs(px[0].x - target.x), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
+    expect(Math.abs(px[0].x - nearestCenterX(grid, target.x)), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
     expect(Math.abs(px[0].y - target.y), 'titik-1 tak mendarat di Y titik paste').toBeLessThanOrEqual(1);
     assertNoPageErrors(page);
   });
@@ -222,14 +224,15 @@ test.describe('copy/paste objek: hotkey', () => {
       await page.keyboard.press(`${mod}+c`);
       expect(await page.evaluate(() => drawClip != null), `${mod}+C tak mengisi clipboard`).toBe(true);
 
-      const target = { x: Math.round(rect.width * 0.22), y: Math.round(rect.height * 0.72) };
+      const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+      const target = { x: quarterOffX(grid, Math.round(rect.width * 0.22)), y: Math.round(rect.height * 0.72) };
       await page.mouse.move(rect.x + target.x, rect.y + target.y, { steps: 4 });
       await page.keyboard.press(`${mod}+v`);
       await page.waitForTimeout(200);
 
       expect(await overlays(page), `${mod}+V harus menambah satu objek`).toHaveLength(2);
       const baru = await otherThan(page, obj.id);
-      expect(Math.abs(baru.px[0].x - target.x), 'tak mendarat di X kursor').toBeLessThanOrEqual(1);
+      expect(Math.abs(baru.px[0].x - nearestCenterX(grid, target.x)), 'tak mendarat di X kursor').toBeLessThanOrEqual(1);
       expect(Math.abs(baru.px[0].y - target.y), 'tak mendarat di Y kursor').toBeLessThanOrEqual(1);
       expect(Math.abs((baru.px[1].x - baru.px[0].x) - (px[1].x - px[0].x)), 'bentuk berubah').toBeLessThanOrEqual(1);
       assertNoPageErrors(page);
@@ -265,7 +268,7 @@ test.describe('copy/paste objek: hotkey', () => {
 
     expect(await overlays(page)).toHaveLength(2);
     const baru = await otherThan(page, obj.id);
-    expect(Math.abs(baru.px[0].x - rect.width / 2), 'tak mendarat di tengah X').toBeLessThanOrEqual(2);
+    expect(Math.abs(baru.px[0].x - nearestCenterX(await barGrid(page), rect.width / 2)), 'tak mendarat di tengah X').toBeLessThanOrEqual(2);
     expect(Math.abs(baru.px[0].y - rect.height / 2), 'tak mendarat di tengah Y').toBeLessThanOrEqual(2);
     assertNoPageErrors(page);
   });
@@ -334,7 +337,8 @@ test.describe('copy/paste objek: menu klik-kanan', () => {
     const { obj } = await drawLine(page, rect);
     await page.keyboard.press('Control+c');
 
-    const titik = { x: Math.round(rect.width * 0.14), y: Math.round(rect.height * 0.2) };
+    const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+    const titik = { x: quarterOffX(grid, Math.round(rect.width * 0.14)), y: Math.round(rect.height * 0.2) };
     await page.mouse.click(rect.x + titik.x, rect.y + titik.y, { button: 'right' });
     await page.waitForTimeout(200);
     const idx = await page.$$eval('.ctxmenu .ctxitem', (els) => els.findIndex((el) => /paste/i.test(el.textContent)));
@@ -344,7 +348,7 @@ test.describe('copy/paste objek: menu klik-kanan', () => {
 
     expect(await overlays(page), 'Paste dari menu harus menambah objek').toHaveLength(2);
     const baru = await otherThan(page, obj.id);
-    expect(Math.abs(baru.px[0].x - titik.x), 'tak mendarat di X titik klik-kanan').toBeLessThanOrEqual(1);
+    expect(Math.abs(baru.px[0].x - nearestCenterX(grid, titik.x)), 'tak mendarat di X titik klik-kanan').toBeLessThanOrEqual(1);
     expect(Math.abs(baru.px[0].y - titik.y), 'tak mendarat di Y titik klik-kanan').toBeLessThanOrEqual(1);
     assertNoPageErrors(page);
   });
@@ -360,7 +364,8 @@ test.describe('copy/paste objek: cabang anchor yang belum tersentuh', () => {
     const { obj } = await drawVLine(page, rect);
 
     expect(await page.evaluate(() => copyOverlay())).toBe(true);
-    const target = { x: Math.round(rect.width * 0.65), y: Math.round(rect.height * 0.3) };
+    const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+    const target = { x: quarterOffX(grid, Math.round(rect.width * 0.65)), y: Math.round(rect.height * 0.3) };
     const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
     expect(nid).toBeTruthy();
 
@@ -389,13 +394,14 @@ test.describe('copy/paste objek: cabang anchor yang belum tersentuh', () => {
     expect(px.length, 'prasyarat: channel harus punya 3 titik').toBe(3);
 
     expect(await page.evaluate(() => copyOverlay())).toBe(true);
-    const target = { x: Math.round(rect.width * 0.15), y: Math.round(rect.height * 0.2) };
+    const grid = await barGrid(page);   // X snap ke tengah candle (kontrak 'center', 2026-11-20)
+    const target = { x: quarterOffX(grid, Math.round(rect.width * 0.15)), y: Math.round(rect.height * 0.2) };
     const nid = await page.evaluate(([x, y]) => pasteOverlayAt(x, y), [target.x, target.y]);
     expect(nid).toBeTruthy();
 
     const baru = await otherThan(page, obj.id);
     expect(baru.px.length, 'jumlah titik channel harus tetap 3 setelah paste').toBe(3);
-    expect(Math.abs(baru.px[0].x - target.x), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
+    expect(Math.abs(baru.px[0].x - nearestCenterX(grid, target.x)), 'titik-1 tak mendarat di X titik paste').toBeLessThanOrEqual(1);
     expect(Math.abs(baru.px[0].y - target.y), 'titik-1 tak mendarat di Y titik paste').toBeLessThanOrEqual(1);
     for (let i = 1; i < px.length; i++) {
       expect(Math.abs((baru.px[i].x - baru.px[0].x) - (px[i].x - px[0].x)), `offset X titik #${i} berubah`).toBeLessThanOrEqual(1);

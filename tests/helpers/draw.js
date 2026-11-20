@@ -5,8 +5,8 @@
 // yang mau diuji (rail → pickTool → createDraw → onDrawing → onDrawEnd). Semua input
 // lewat page.mouse / page.keyboard (trusted input).
 
-const { chartRect, toPixels, barSpace } = require('./chart');
-const { byName } = require('./spec');
+const { chartRect, toPixels, barSpace, barGrid, nearestCenterX, quarterOffX } = require('./chart');
+const { byName, snapsCenter } = require('./spec');
 
 // Jeda antar klik untuk jalur "normal".
 //
@@ -171,7 +171,12 @@ async function measureParity(page, name, opts = {}) {
   const spec = byName(name);
   const mode = opts.mode || 'normal';
   const rect = await chartRect(page);
-  const targets = opts.targets || defaultTargets(rect, spec.clicks);
+  const center = snapsCenter(spec);
+  const grid = center ? await barGrid(page) : null;
+  // Tool 'center': klik digeser ke ¼ bar dari center (pembulatan tak ambigu), dan Δlanding /
+  // Δpreview diukur terhadap CENTER terdekat — bukan titik klik mentah.
+  const targets = opts.targets || defaultTargets(rect, spec.clicks).map((t) => (center ? { x: quarterOffX(grid, t.x), y: t.y } : t));
+  const expectAt = center ? targets.map((t) => ({ x: nearestCenterX(grid, t.x), y: t.y })) : targets;
   const shoot = opts.shots !== false;
 
   // Crosshair dimatikan supaya foto preview & final hanya berisi objeknya → diff PNG
@@ -253,8 +258,8 @@ async function measureParity(page, name, opts = {}) {
   }
 
   const deltaLanding = [];
-  for (let i = 0; i < targets.length; i++) {
-    const d = nearestDelta(targets[i], finalPx);
+  for (let i = 0; i < expectAt.length; i++) {
+    const d = nearestDelta(expectAt[i], finalPx);
     if (d) deltaLanding.push({ i, ...d });
   }
 
@@ -262,8 +267,8 @@ async function measureParity(page, name, opts = {}) {
   //   preview tepat di kursor + final geser  → "objek LONCAT saat klik terakhir"
   //   preview sudah geser + final sama       → "rubber-band-nya sendiri sudah snap per-bar"
   const deltaPreview = [];
-  for (let i = 0; i < targets.length; i++) {
-    const d = nearestDelta(targets[i], previewPx);
+  for (let i = 0; i < expectAt.length; i++) {
+    const d = nearestDelta(expectAt[i], previewPx);
     if (d) deltaPreview.push({ i, ...d });
   }
 

@@ -77,12 +77,13 @@ test('persist: format baru (xm) round-trip presisi; gambar lama tanpa xm tetap d
     clear();
     buildDrawsFromArray(saved);
     const again = chart.getOverlayById(drawIds[0]).points.map((p) => p.dataIndex);
-    return { legacy, again, xm: saved[0].xm, vt0: saved[0].points[0].vt, open10: a[10].timestamp, open11: a[11].timestamp };
+    return { legacy, again, xm: saved[0].xm, bc: saved[0].points[0].bc, vt0: saved[0].points[0].vt, open10: a[10].timestamp };
   });
   expect(r.legacy[0]).toBeCloseTo(10, 6);
   expect(r.legacy[1]).toBeCloseTo(20, 6);
   expect(r.xm, 'serialize menandai format slot').toBe(1);
-  expect(r.vt0, 'pusat bar 10 disimpan sbg tengah periodenya').toBeCloseTo((r.open10 + r.open11) / 2, -3);
+  expect(r.bc, 'pusat candle ditandai bc').toBe(1);
+  expect(r.vt0, 'pusat bar 10 disimpan sbg WAKTU-BUKA bar itu').toBe(r.open10);
   expect(r.again[0]).toBeCloseTo(10, 6);
   expect(r.again[1]).toBeCloseTo(20, 6);
   assertNoPageErrors(page);
@@ -104,5 +105,61 @@ test('persist: titik magnet (timestamp) tetap terkunci di candle setelah reload'
   expect(r.ts).toBe(1);
   expect(r.p0, 'titik magnet pulih sbg timestamp candle yg sama').toBe(r.open5);
   expect(r.i1).toBeCloseTo(12.3, 6);
+  assertNoPageErrors(page);
+});
+
+// Keluhan 2026-11-20: "di H1 aku bikin di candle jam 10:00, saat ke M5 harus presisi di jam 10:00".
+// Pusat candle dibawa lewat WAKTU-BUKA bar (barOpenTs), bukan tengah periodenya (slotTs → 10:30, yang
+// di M5 malah jatuh di batas dua candle).
+const H = 36e5;
+const T0 = ms('2026-03-02T00:00:00Z');
+const H1 = Array.from({ length: 48 }, (_, i) => ({ timestamp: T0 + i * H }));
+const M5 = Array.from({ length: 48 * 12 }, (_, i) => ({ timestamp: T0 + i * 3e5 }));
+
+test('lintas TF: pusat candle H1 10:00 → pusat candle M5 10:00, dan sebaliknya', async ({ page }) => {
+  await gotoApp(page);
+  const r = await page.evaluate(([h1, m5]) => {
+    const vt = barOpenTs(h1, 'H1', 10);
+    const iM5 = barIdxAt(m5, 'M5', vt);
+    // M5 10:35 (indeks 127) kembali ke candle H1 10:00.
+    const back = barIdxAt(h1, 'H1', barOpenTs(m5, 'M5', 127));
+    // Area future (bar 50 > bar terakhir 47): round-trip tetap bulat di indeks yang sama.
+    const fut = barIdxAt(h1, 'H1', barOpenTs(h1, 'H1', 50));
+    return { vt, iM5, m5Open: m5[iM5].timestamp, back, fut };
+  }, [H1, M5]);
+  expect(r.vt).toBe(T0 + 10 * H);
+  expect(Number.isInteger(r.iM5), 'di M5 harus tepat di tengah candle (indeks bulat)').toBe(true);
+  expect(r.m5Open, 'candle M5 yang dituju = 10:00').toBe(T0 + 10 * H);
+  expect(r.back).toBe(10);
+  expect(r.fut).toBe(50);
+  assertNoPageErrors(page);
+});
+
+// Keluhan 2026-11-21: M5 10:10→10:40 dibuka di H1 (keduanya candle 10:00) lalu balik ke M5 tak boleh
+// jadi 10:00→10:00. Waktu asli titik diingat (rememberCenterTs) selama candle yang tampak masih
+// memuatnya; digeser ke candle lain → ingatan gugur, waktu-buka candle baru yang berlaku.
+test('waktu asli titik pusat candle tak hilang saat disimpan dari TF kasar', async ({ page }) => {
+  await gotoApp(page);
+  const r = await page.evaluate(() => {
+    const a = revealed(currentTF);
+    const clear = () => { drawIds.slice().forEach((id) => chart.removeOverlay(id)); drawIds.length = 0; };
+    clear();
+    const inside = (k) => a[k].timestamp + Math.floor((a[k + 1].timestamp - a[k].timestamp) / 3);   // "10:10" di dalam candle k
+    // Muatan dari TF halus: kedua titik jatuh DI DALAM candle 10 dan 20, bukan di waktu-bukanya.
+    buildDrawsFromArray([{ name: 'rect', xm: 1, points: [{ vt: inside(10), value: 1.1, bc: 1 }, { vt: inside(20), value: 1.2, bc: 1 }] }]);
+    const id = drawIds[0];
+    const shown = chart.getOverlayById(id).points.map((p) => p.dataIndex);
+    const saved = serializeDraws()[0].points.map((p) => p.vt);
+    // Geser titik-1 ke candle 12 → ingatannya gugur, yang tersimpan waktu-buka candle 12.
+    const pts = chart.getOverlayById(id).points.map((p) => ({ ...p }));
+    pts[0].dataIndex = 12;
+    chart.overrideOverlay({ id, points: pts });
+    const moved = serializeDraws()[0].points.map((p) => p.vt);
+    return { shown, saved, moved, want: [inside(10), inside(20)], open12: a[12].timestamp };
+  });
+  expect(r.shown, 'tampil di tengah candle yang memuat waktunya').toEqual([10, 20]);
+  expect(r.saved, 'tersimpan dgn waktu ASLI, bukan waktu-buka candle').toEqual(r.want);
+  expect(r.moved[0], 'digeser ke candle lain → waktu-buka candle itu').toBe(r.open12);
+  expect(r.moved[1], 'titik yg tak disentuh tetap waktu aslinya').toBe(r.want[1]);
   assertNoPageErrors(page);
 });

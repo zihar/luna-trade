@@ -8,7 +8,10 @@ function snapshotFuturePoints(){
     // Tool sub-bar lewat pemetaan SLOT (js/util.js slotTs) — titik di kiri candle B tetap di periode
     // B pada TF baru. BAR_ANCHOR (titik future posisi/vline) tetap pemetaan lama.
     const slot=subBar(o.name);
-    o.points.forEach((p,i)=>{ if(p&&p.timestamp==null&&p.dataIndex!=null){ const vt=slot?fidxToSlotTs(p.dataIndex):tsOf(p); if(vt!=null) snap.push({id,i,vt,slot}); } });
+    // Pusat candle (indeks bulat) lewat WAKTU-BUKA bar (js/util.js barOpenTs): H1 10:00 → M5 10:00.
+    o.points.forEach((p,i)=>{ if(p&&p.timestamp==null&&p.dataIndex!=null){
+      const bc=slot&&isCenterIdx(p.dataIndex);
+      const vt=bc?centerTsOf(id,i,p.dataIndex):slot?fidxToSlotTs(p.dataIndex):tsOf(p); if(vt!=null) snap.push({id,i,vt,slot,bc}); } });
   }catch(e){} });
   return snap;
 }
@@ -23,8 +26,9 @@ function reanchorFuturePoints(snap){
     // jarak antar-bar seragam; utk titik in-data (mis. trendline) yg melewati gap weekend, tiap jam
     // gap dihitung sbg 1 bar hantu → "kegeser jauh". tsToFracIndex bisection ke bar nyata = presisi.
     // Titik future (vt>=lt): tsToFracIndex jatuh ke ekstrapolasi linear yg sama → tanpa regresi.
-    byId[id].forEach(s=>{ if(pts[s.i]){ const fi=s.slot?slotTsToFidx(s.vt):tsToFracIndex(s.vt);
-      pts[s.i].dataIndex = (fi!=null)?fi:(li+barStepsFrom(currentTF,lt,s.vt)); delete pts[s.i].timestamp; } });
+    byId[id].forEach(s=>{ if(pts[s.i]){ const fi=s.bc?barOpenTsToIdx(s.vt):s.slot?slotTsToFidx(s.vt):tsToFracIndex(s.vt);
+      pts[s.i].dataIndex = (fi!=null)?fi:(li+barStepsFrom(currentTF,lt,s.vt)); delete pts[s.i].timestamp;
+      if(s.bc) rememberCenterTs(id, s.i, s.vt); } });   // M5 10:10 → H1 10:00 → M5 10:10 lagi
     chart.overrideOverlay({id, points:pts});
   }catch(e){} });
 }

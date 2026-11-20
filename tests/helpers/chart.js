@@ -70,6 +70,22 @@ async function barSpaceApi(page) {
   return page.evaluate(() => chart.getBarSpace());
 }
 
+/**
+ * Geometri tengah-candle, dihitung INDEPENDEN dari kode yang diuji (bukan lewat
+ * barAnchorFromPx): satu center acuan + barSpace API → center terdekat = ref + round((x-ref)/bs)·bs.
+ * x container-relative, sama dengan target klik.
+ */
+async function barGrid(page) {
+  return page.evaluate(() => {
+    let a = chart.convertToPixel({ dataIndex: 40, value: 0 }, { paneId: 'candle_pane', absolute: true });
+    if (Array.isArray(a)) a = a[0];
+    return { ref: a.x, bs: chart.getBarSpace() };
+  });
+}
+const nearestCenterX = (g, x) => g.ref + Math.round((x - g.ref) / g.bs) * g.bs;
+/** Geser x ke center terdekat + ¼ bar: titik klik yang pembulatannya tak ambigu. */
+const quarterOffX = (g, x) => Math.round(nearestCenterX(g, x) + g.bs / 4);
+
 /** Data bar yang sedang dirender chart. */
 async function dataList(page) {
   return page.evaluate(() => chart.getDataList().map((d) => ({ timestamp: d.timestamp, open: d.open, high: d.high, low: d.low, close: d.close })));
@@ -118,4 +134,4 @@ function toViewport(rect, p) {
   return { x: rect.x + p.x, y: rect.y + p.y };
 }
 
-module.exports = { chartRect, toPixel, toPixels, fromPixel, barSpace, barSpaceApi, plotWidth, dataList, barAt, visibleValueRange, toViewport };
+module.exports = { barGrid, nearestCenterX, quarterOffX, chartRect, toPixel, toPixels, fromPixel, barSpace, barSpaceApi, plotWidth, dataList, barAt, visibleValueRange, toViewport };
