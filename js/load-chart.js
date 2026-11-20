@@ -98,6 +98,9 @@ async function loadInit(latest){
   const a=tfData[currentTF];
   T = cursorAtNewest(currentTF, a);
   lastLen=-1;
+  // Sumbu harga grow-only (js/price-scale.js): lupakan lebar instrumen lama TEPAT sebelum data
+  // baru di-render — kalau lebih awal, layout selama fetch mengunci lagi lebar simbol lama.
+  resetPriceAxisWidth(chart);
   setStatus(`Loaded ${currentTF}. Next/Play to advance (auto-extend forward). Change TF above the chart.`);
   render(true);
   chartLoad.hide(loadTok);   // data ter-render → tutup overlay lunar (hanya bila panggilan terbaru)
