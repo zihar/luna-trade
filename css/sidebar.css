@@ -67,10 +67,29 @@
                         color:var(--txt);font-size:16px;line-height:1;cursor:pointer }
   #alertsPane .al-add:hover{ background:var(--btn-hover) }
   /* tombol close panel Alerts: ghost (samar) di sebelah +, terang saat hover */
-  #alertsPane .ap-x{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
+  #alertsPane .ap-x, #objTreePane .ap-x{ width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;
                       border-radius:6px;background:transparent;border:1px solid transparent;
                       color:var(--muted);font-size:13px;line-height:1;cursor:pointer }
-  #alertsPane .ap-x:hover{ background:var(--btn-hover);color:var(--txt) }
+  #alertsPane .ap-x:hover, #objTreePane .ap-x:hover{ background:var(--btn-hover);color:var(--txt) }
+  /* Object Tree (js/draw-object-tree.js): baris objek gambar; tombol aksi muncul saat hover,
+     Lock/Hide yang AKTIF selalu tampak (perilaku TV) */
+  .ot-count{ font-family:var(--mono); font-size:11px; font-weight:400; color:var(--muted); letter-spacing:0; }
+  .ot-row{ display:flex; align-items:center; gap:6px; margin:0 4px; padding:5px 6px; border-radius:6px;
+           cursor:pointer; color:var(--txt); font-size:12.5px; }
+  .ot-row:hover{ background:var(--btn-hover); }
+  .ot-row.sel{ background:color-mix(in srgb, var(--accent, #4f8cff) 18%, transparent); }
+  .ot-row.is-hidden .ot-ico, .ot-row.is-hidden .ot-name{ opacity:.45; }
+  .ot-ico{ width:18px; height:18px; flex:none; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+  .ot-ico svg{ width:18px; height:18px; }
+  .ot-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ot-btn{ width:22px; height:22px; padding:0; flex:none; display:flex; align-items:center; justify-content:center;
+           border:0; border-radius:5px; background:transparent; color:var(--muted); cursor:pointer; visibility:hidden; }
+  .ot-btn svg{ width:15px; height:15px; }
+  .ot-row:hover .ot-btn, .ot-row:focus-within .ot-btn, .ot-btn.on{ visibility:visible; }
+  .ot-btn:hover{ background:var(--btn); color:var(--txt); }
+  .ot-btn.on{ color:var(--txt); }
+  .ot-del:hover{ color:var(--red); }
+  .ot-empty{ padding:18px 12px; color:var(--muted); font-size:12.5px; text-align:center; }
   .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
   .al-item:hover{ background:var(--btn-hover); }
   .al-main{ font-weight:600; color:var(--txt); font-size:13px; }
