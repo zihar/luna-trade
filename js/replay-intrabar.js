@@ -13,13 +13,21 @@ async function evalFills(toT){
     if(fineTF && arr && arr.length){
       const fdur=DUR[fineTF], acc=[];
       let lo=0,h=arr.length; while(lo<h){const m=(lo+h)>>1; if(arr[m].timestamp<=toT) lo=m+1; else h=m;}
+      const bars=[];
       for(let i=lo-1;i>=0;i--){                            // bar kasar beririsan (from,toT] — telusuri mundur
         const bOpen=arr[i].timestamp, bEnd=barEndAt(currentTF,i,arr);
         if(bEnd<=from) break;                               // sudah sepenuhnya sebelum frontier → stop
-        const win=await ensureFineWindow(fineTF,bOpen,bEnd);
+        bars.push({i,bEnd,win:ensureFineWindow(fineTF,bOpen,bEnd)});
+      }
+      // Jendela yang belum ter-cache di-fetch PARALEL — dulu di-await satu per satu, jadi di speed
+      // tinggi (beberapa bar per frame) satu frame menunggu N round-trip berurutan. Tetap DI-await:
+      // fill harus terjadi sebelum harga yang melewati SL/TP tampil (prefetch Play membuat ini jarang).
+      const wins=await Promise.all(bars.map(x=>x.win));
+      bars.forEach(({i,bEnd},k)=>{
+        const win=wins[k];
         if(win && win.length){ for(const b of win){ const c=b.timestamp+fdur; if(c>from && c<=toT) acc.push({b,close:c}); } }
         else if(bEnd>from && bEnd<=toT) acc.push({b:arr[i],close:bEnd});   // fetch sub-bar gagal → fallback bar kasar (tutup penuh ≤ toT, tanpa lookahead) drpd drop diam-diam
-      }
+      });
       acc.sort((x,y)=>x.b.timestamp-y.b.timestamp); subs=acc;
     }
     if(subs==null){                                         // fallback: bar currentTF sendiri (≤M5 / fetch gagal)

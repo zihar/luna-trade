@@ -58,10 +58,19 @@ async function playFrame(){
   // Lompati gap mati (weekend/libur): jika bar berikutnya baru buka setelah T, jangan merangkak lewat
   // waktu kosong — langsung ke pembukaannya. Tanpa ini, Jumat→Senin bisa puluhan detik chart diam.
   const nb=tfData[currentTF][after.length]; if(nb && nb.timestamp>T) T=nb.timestamp;
+  // Siapkan jendela sub-bar bar sekarang + beberapa ke depan (jangkauan ikut speed) SEBELUM evalFills
+  // & forming bar memintanya → di jalur normal keduanya dilayani cache, frame tak menunggu jaringan.
+  prefetchFineWindows(currentTF, revealed(currentTF).length, T + dur*speed*FINE_PREFETCH_SEC);
   await evalFills(T);   // fill SL/TP/pending & alert intra-bar via sub-bar halus (pakai T final setelah gap-skip)
   if(after.length-1 > arr.length-30) autoExtend(currentTF);
-  replayPartial=null;
-  try{ const c=await buildReplayPartial(currentTF); if(c) replayPartial={tf:currentTF,candle:c}; }catch(e){}
+  // Forming bar TAK menunggu fetch: jendela belum siap → pertahankan partial lama selama masih bar
+  // yang sama (OHLC-nya dari sub-bar ≤ T lama → tanpa lookahead), lalu tumbuh begitu data tiba.
+  const prev=replayPartial; replayPartial=null;
+  try{ const c=await buildReplayPartial(currentTF,{wait:false}); if(c) replayPartial={tf:currentTF,candle:c}; }catch(e){}
+  if(!replayPartial && prev && prev.tf===currentTF){
+    const f=tfData[currentTF][revealed(currentTF).length];
+    if(f && f.timestamp===prev.candle.timestamp && f.timestamp<T) replayPartial=prev;
+  }
   render();
   if(playing) playTimer=setTimeout(playFrame, REPLAY_FRAME_MS);
 }
