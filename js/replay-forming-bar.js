@@ -7,13 +7,20 @@ function pickFineTF(coarseTF, spanMs){
   return null;   // coarseTF sudah cukup halus → forming bar tak perlu
 }
 // Hybrid: pakai data ter-load bila menutupi [open,end); kalau tidak fetch on-demand (di-cache).
-async function ensureFineWindow(fineTF, open, end){
+// Versi SINKRON: jendela yang sudah siap (cache / data ter-load), atau null bila harus di-fetch dulu.
+// Dipakai loop frame Play untuk memutuskan tanpa menunggu jaringan.
+function fineWindowNow(fineTF, open, end){
   const key=inst+'|'+fineTF+'|'+open+'|'+end; if(fineWinCache[key]) return fineWinCache[key];
   const loaded=tfData[fineTF];
   if(loaded && loaded.length && loaded[0].timestamp<=open && loaded[loaded.length-1].timestamp+DUR[fineTF]>=end){
     const slice=loaded.filter(b=>b.timestamp>=open && b.timestamp<end);
     if(slice.length){ fineWinCache[key]=slice; return slice; }
   }
+  return null;
+}
+async function ensureFineWindow(fineTF, open, end){
+  const now=fineWindowNow(fineTF, open, end); if(now) return now;
+  const key=inst+'|'+fineTF+'|'+open+'|'+end;
   // Dedup in-flight: buildReplayPartial, evalFills & prefetch bisa meminta jendela yang sama
   // bersamaan → satu fetch, bukan tiga.
   if(fineWinInflight[key]) return fineWinInflight[key];
@@ -29,19 +36,26 @@ async function ensureFineWindow(fineTF, open, end){
 }
 const fineWinInflight={};   // key sama dgn fineWinCache → Promise fetch yang sedang berjalan
 // Saat Play, tiap pergantian bar kasar dulu menunggu satu round-trip /api/candles DI DALAM loop frame
-// (playFrame meng-await buildReplayPartial) → chart diam sejenak tiap bar = "stuck". Ambil jendela
-// sub-bar beberapa bar ke depan selagi bar sekarang masih tumbuh; fire-and-forget, hasilnya masuk cache.
-const FINE_PREFETCH_BARS=2;
-function prefetchFineWindows(tf, fromIdx){
+// → chart diam sejenak tiap bar = "stuck". Ambil jendela sub-bar beberapa bar ke depan selagi bar
+// sekarang masih tumbuh; fire-and-forget, hasilnya masuk cache.
+// Jangkauan IKUT speed, diukur dalam WAKTU: Play maju `speed`×DUR per detik, jadi jangkauan tetap
+// 2 bar habis dalam 0,2 dtk di 10× — kurang dari satu round-trip, dan TIAP frame jadi cache-miss
+// (terukur ±2 fps). Dalam waktu, bukan jumlah bar: bar bisa lebih rapat dari DUR (data tak rata,
+// fixture hermetic M15 di semua TF) dan T bisa meloncati gap. FINE_PREFETCH_SEC = latensi terburuk
+// yang masih ditutup prefetch; FINE_PREFETCH_MAX = batas jendela per panggilan (anti banjir fetch).
+const FINE_PREFETCH_BARS=2, FINE_PREFETCH_SEC=1, FINE_PREFETCH_MAX=24;
+function prefetchFineWindows(tf, fromIdx, untilTs=-Infinity){
   const arr=tfData[tf]; if(!arr) return;
-  for(let i=fromIdx;i<fromIdx+FINE_PREFETCH_BARS && i<arr.length;i++){
+  for(let i=fromIdx;i<arr.length && i<fromIdx+FINE_PREFETCH_MAX && (i<fromIdx+FINE_PREFETCH_BARS || arr[i].timestamp<untilTs);i++){
     const open=arr[i].timestamp, end=barEndAt(tf,i,arr);
     const f=pickFineTF(tf, end-open); if(!f) continue;
     ensureFineWindow(f, open, end).catch(()=>{});
   }
 }
 // Susun candle partial TF `tf` @ cursor T. Return {timestamp,open,high,low,close} atau null.
-async function buildReplayPartial(tf){
+// {wait:false} (loop frame Play): jendela sub-bar belum siap → fetch jalan di latar & return null
+// SEKETIKA, bukan menunggu round-trip; frame berikutnya mengambilnya dari cache.
+async function buildReplayPartial(tf, {wait=true}={}){
   if(!replayMode || T==null) return null;
   const arr=tfData[tf]; if(!arr||!arr.length) return null;
   const rev=revealed(tf);                       // bar tutup penuh ≤ T
@@ -51,10 +65,12 @@ async function buildReplayPartial(tf){
   if(open>=T) return null;                        // T di boundary/gap → tak ada partial
   const end=barEndAt(tf, rev.length, arr);
   const fineTF=pickFineTF(tf, end-open); if(!fineTF) return null;
-  if(playing) prefetchFineWindows(tf, rev.length+1);   // bar sesudah forming bar → siap sebelum dibutuhkan
   // window sub-bar = rentang PENUH bar kasar [open,end) → kunci cache STABIL antar-frame saat Play
   // (fetch sekali per bar, bukan tiap frame). Anti-lookahead tetap dijaga loop di bawah (b.timestamp+fdur>T).
-  const fine=await ensureFineWindow(fineTF, open, end); if(!fine||!fine.length) return null;
+  let fine;
+  if(wait) fine=await ensureFineWindow(fineTF, open, end);
+  else { fine=fineWindowNow(fineTF, open, end); if(!fine){ ensureFineWindow(fineTF, open, end).catch(()=>{}); return null; } }
+  if(!fine||!fine.length) return null;
   let o=null,h=-Infinity,l=Infinity,c=null, fdur=DUR[fineTF];
   for(const b of fine){
     if(b.timestamp<open) continue;
