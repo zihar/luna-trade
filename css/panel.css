@@ -52,6 +52,7 @@
   .ctxitem{padding:7px 12px;border-radius:5px;cursor:pointer;font-size:13px;color:var(--txt);
            display:flex;align-items:center;gap:8px}
   .ctxitem:hover{background:var(--btn-hover)}
+  .ctxkbd{margin-left:auto;padding-left:18px;color:var(--muted);font-size:11.5px}
   .ctxitem.disabled{color:var(--muted);opacity:.45;cursor:default;pointer-events:none}
   .ctxsep{height:1px;background:var(--border);margin:4px 6px}
   /* editor teks inline di chart (WYSIWYG: tanpa kotak/border — hanya teks + caret, natural;

@@ -55,6 +55,9 @@ window.addEventListener('keydown',e=>{
       if(sel.trim()) return;
       if(copyOverlay()) e.preventDefault(); return; }
     if(k==='v'){ const p=pastePoint(); if(p && pasteOverlayAt(p.x,p.y)) e.preventDefault(); return; }
+    // Group / Ungroup (js/draw-groups.js). Hanya dicegat bila berlaku — selain itu tetap
+    // "find next/previous" milik browser.
+    if(k==='g'){ if(grpHotkey(e.shiftKey)) e.preventDefault(); return; }
   }
   // Ketik DIGIT → buka dialog "Change interval" (konfirmasi, bukan ganti TF langsung).
   // Ketik HURUF / '/' → symbol search. Digit vs huruf → tak ada tabrakan namespace.
