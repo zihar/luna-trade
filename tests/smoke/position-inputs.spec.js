@@ -186,3 +186,43 @@ for (const name of ['longPosition', 'shortPosition']) {
     assertNoPageErrors(page);
   });
 }
+
+// ---------- setelan terkunci per objek (temuan review I1/I2/fallback) ----------
+test('setelan terkunci per objek: edit A / ubah #balance tak menggeser B', async ({ page }) => {
+  const a = await place(page);
+  const { obj: b } = await drawTool(page, 'shortPosition');
+  const r = await page.evaluate(({ a, b }) => {
+    const B = chart.getOverlayById(b), before = posSettings(B);
+    setPosSettings(chart.getOverlayById(a), { account: 777, risk: 3 });
+    $('#balance').value = '123456';
+    return { before, after: posSettings(B) };
+  }, { a: a.id, b: b.id });
+  expect(r.after).toEqual(r.before);
+});
+
+test('risk & riskUnit disimpan berpasangan ke default (tak jadi 200%)', async ({ page }) => {
+  const obj = await place(page);
+  const r = await page.evaluate((id) => { const o = chart.getOverlayById(id);
+    // objek ini ber-unit USD, default masih '%' (mis. posisi lain terakhir diedit dalam %)
+    setObjStyle(o.id, { posRiskUnit: 'USD', posRisk: 200 });
+    localStorage.setItem('luna_pos_defaults', JSON.stringify({ risk: 1, riskUnit: '%' }));
+    setPosSettings(o, { risk: 150 });          // patch risk saja → default harus ikut membawa unit USD
+    const d = JSON.parse(localStorage.getItem('luna_pos_defaults') || '{}');
+    return { risk: d.risk, unit: d.riskUnit }; }, obj.id);
+  expect(r).toEqual({ risk: 150, unit: 'USD' });
+});
+
+test('fallback tak valid (default korup) diabaikan, render tak melempar', async ({ page }) => {
+  await gotoApp(page);
+  await page.evaluate(() => localStorage.setItem('luna_pos_defaults',
+    JSON.stringify({ account: -5, risk: 'x', riskUnit: 'EUR', qtyPrec: 99, lot: { EUR_USD: 0 } })));
+  const { obj } = await drawTool(page, 'longPosition');
+  const r = await page.evaluate((id) => { const o = chart.getOverlayById(id); return { s: posSettings(o), t: posPillTexts(o) }; }, obj.id);
+  expect(r.s.account).toBeGreaterThan(0);
+  expect(r.s.risk).toBeGreaterThan(0);
+  expect(r.s.riskUnit).toBe('%');
+  expect(r.s.qtyPrec).toBe(2);
+  expect(r.s.lot).toBe(100000);
+  expect(r.t).toBeTruthy();
+  assertNoPageErrors(page);
+});

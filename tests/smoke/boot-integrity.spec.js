@@ -109,6 +109,7 @@ const SENTINEL = {
   'draw-pointer.js': 'lastPtr',
   'draw-text-editor.js': 'applyTextInput',
   'draw-position-tool.js': 'posPressedMove',
+  'draw-position-inputs.js': 'snapshotPosSettings',
   'draw-catalog.js': 'DRAW_GROUPS',
   // Dipecah dari ekor ny-time.js: klinecharts.init memang bukan util waktu NY.
   'chart-init.js': 'chart',

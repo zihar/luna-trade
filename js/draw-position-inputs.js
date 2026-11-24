@@ -23,32 +23,46 @@ function posDefaults(){
   if(raw!==posDefRaw){ posDefRaw=raw; try{ posDefObj=JSON.parse(raw||'{}')||{}; }catch(e){ posDefObj={}; } }
   return JSON.parse(JSON.stringify(posDefObj));
 }
-function posSettings(o){
-  const st=(o&&objStyle[o.id])||{}, d=posDefaults();
-  const pick=(a,b,c)=> a!=null?a : b!=null?b : c;
-  return {
-    account: pick(st.posAccount, d.account, +$('#balance').value||10000),
-    lot:     pick(st.posLot, d.lot&&d.lot[inst], posDefaultLot()),
-    risk:    pick(st.posRisk, d.risk, +$('#riskPct').value||1),
-    riskUnit:pick(st.posRiskUnit, d.riskUnit, '%'),
-    qtyPrec: pick(st.posQtyPrec, d.qtyPrec, 2),
-  };
-}
 const POS_FIELD={account:'posAccount', lot:'posLot', risk:'posRisk', riskUnit:'posRiskUnit', qtyPrec:'posQtyPrec'};
 function posValid(k,v){
   if(k==='riskUnit') return v==='%'||v==='USD';
   if(k==='qtyPrec') return Number.isInteger(v) && v>=0 && v<=8;
   return typeof v==='number' && isFinite(v) && v>0;
 }
-// tulis patch setelan; satu field tak valid → tolak SELURUHNYA (false), tak ada yang ditulis
+// kandidat pertama yang VALID menang (default korup / #balance negatif tak boleh sampai ke render)
+function posSettings(o){
+  const st=(o&&objStyle[o.id])||{}, d=posDefaults();
+  const pick=(k,...c)=>c.find(v=>posValid(k,v));
+  const unit=pick('riskUnit', st.posRiskUnit, d.riskUnit, '%');
+  // risk tak boleh lepas dari unitnya: ambil dari sumber yang sama dengan unit
+  const riskSrc=[st.posRiskUnit===unit?st.posRisk:null, d.riskUnit===unit?d.risk:null];
+  return {
+    account: pick('account', st.posAccount, d.account, +$('#balance').value, 10000),
+    lot:     pick('lot', st.posLot, d.lot&&d.lot[inst], posDefaultLot()),
+    risk:    pick('risk', ...riskSrc, unit==='%' ? +$('#riskPct').value : null, unit==='%' ? 1 : 100),
+    riskUnit:unit,
+    qtyPrec: pick('qtyPrec', st.posQtyPrec, d.qtyPrec, 2),
+  };
+}
+// kunci setelan ke objek (dipanggil saat posisi baru dibuat): sesudahnya edit posisi lain /
+// ubah #balance tak lagi menggeser Qty-nya. Objek lama tanpa snapshot tetap ikut default.
+function snapshotPosSettings(o){
+  if(!o || (objStyle[o.id]||{}).posAccount!=null) return;
+  const s=posSettings(o), sp={}; Object.keys(POS_FIELD).forEach(k=>{ sp[POS_FIELD[k]]=s[k]; });
+  setObjStyle(o.id, sp);
+}
+// tulis patch setelan; satu field tak valid → tolak SELURUHNYA (false), tak ada yang ditulis.
+// Yang ditulis = setelan PENUH sesudah patch (objek & default), jadi risk selalu berpasangan dgn unitnya.
 function setPosSettings(o, patch){
   if(!o||!patch) return false;
   const keys=Object.keys(patch);
   if(!keys.length || keys.some(k=>!POS_FIELD[k] || !posValid(k,patch[k]))) return false;
-  const sp={}; keys.forEach(k=>{ sp[POS_FIELD[k]]=patch[k]; });
+  const full=Object.assign(posSettings(o), patch), sp={};
+  Object.keys(POS_FIELD).forEach(k=>{ sp[POS_FIELD[k]]=full[k]; });
   setObjStyle(o.id, sp);
   const d=posDefaults();
-  keys.forEach(k=>{ if(k==='lot'){ d.lot=Object.assign({}, d.lot||{}, {[inst]:patch.lot}); } else d[k]=patch[k]; });
+  Object.assign(d, {account:full.account, risk:full.risk, riskUnit:full.riskUnit, qtyPrec:full.qtyPrec});
+  d.lot=Object.assign({}, d.lot||{}, {[inst]:full.lot});
   try{ localStorage.setItem(POS_DEF_KEY, JSON.stringify(d)); }catch(e){}
   return true;
 }

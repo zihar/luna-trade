@@ -40,6 +40,7 @@ function expandPosition(o){
     Object.assign({value:entry},Lxa), Object.assign({value:tp},Rxa), Object.assign({value:sl},Rxa),
     Object.assign({value:tp},Lxa),    Object.assign({value:sl},Lxa),  Object.assign({value:entry},Rxa) ] }); }
   catch(e){ setStatus('Position expand error: '+e.message,true); }
+  try{ snapshotPosSettings(o); }catch(_){}
 }
 // Pojok TP/SL = drag VERTIKAL saja (ubah level, lebar kotak tetap), level di-clamp tak
 // melewati Entry (titik tengah). Handle tengah (Entry kiri/kanan) = HORIZONTAL saja
