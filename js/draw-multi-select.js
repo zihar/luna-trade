@@ -110,10 +110,11 @@ function msDeleteSelected(){
 }
 
 // ---- seret bersama ----
-// Dipanggil onPressedMoveStart SETELAH cloneArmed dihitung: Ctrl/⌘+seret tetap clone satu objek.
+// Dipanggil onPressedMoveStart. Saat cloneArmed, `others` tetap dihitung: Ctrl/⌘+seret seleksi ganda
+// menyalin SEMUA anggota (cloneSet, js/draw-clone.js) dan aslinya ikut bergeser bersama.
 function msDragStart(o, e){
   msDrag=null;
-  if(!o || cloneArmed || MS_NO_GROUP_DRAG[o.name]) return;
+  if(!o || MS_NO_GROUP_DRAG[o.name]) return;
   if((e.figureKey||'').indexOf('overlay_figure_point_')===0) return;   // handle titik = edit satu objek
   // Seleksi ganda yang memuat objek ini; bila tidak, grupnya (js/draw-groups.js) — menyeret anggota
   // grup yang belum terpilih tetap membawa seluruh grup, spt TV.

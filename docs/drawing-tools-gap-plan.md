@@ -46,7 +46,25 @@ per objek, persist per instrumen (`br_draws_<inst>`, `index.html:3323`).
 
 - **Price Range** & **Date & Price Range** (saudara measure yang persist).
 - **Anchored VWAP** — standar untuk anchor dari swing/news; nyambung dgn marker news yang sudah ada.
-- **Object Tree / panel daftar objek** — hide, lock, rename, hapus per objek (0 hit di kode).
+- ~~**Object Tree / panel daftar objek**~~ — ✅ **SELESAI** 2026-11-24: Object Tree #207, multi-select
+  Ctrl/⌘+klik #208, Group/Ungroup #209 (go-live 090a7c7). Sisa gap vs TV → bagian berikut.
+
+### Follow-up Object Tree / seleksi / grup (sisa gap vs TV, dicatat 2026-11-24)
+
+Urutan = saran (nilai/effort; data produksi median 0, maks 33 objek per chart). Rancangan dasar &
+alasan tiap penundaan: `docs/superpowers/specs/2026-11-24-object-tree-design.md`.
+
+1. **Kotak seleksi (marquee)** — seret di area kosong untuk memilih banyak objek; kini hanya
+   Ctrl/⌘+klik. Jebakan: seret area kosong = pan chart di klinecharts → perlu modifier atau mode.
+2. **Copy/paste & clone banyak objek sekaligus** — Ctrl/⌘+C/V (#178) dan Ctrl+seret (#175) masih
+   per objek; perluas ke `multiSel` (offset piksel sama untuk semua, grup ikut tersalin sbg grup baru).
+3. **Rename objek satuan** — kini hanya grup yang bisa diganti nama; butuh field payload baru
+   (pola `gname`), ikut tersinkron ke server.
+4. **Drag & drop baris di Object Tree** — pindah objek masuk/keluar grup dan ubah urutan z
+   (klinecharts 9.8.10 tak punya API z-order eksplisit → urutan = urutan buat; perlu riset).
+5. **Grup bertingkat (nested)** — grup kini datar; butuh `grp` jadi path/parent + render pohon.
+6. **Hotkey Group/Ungroup** — sengaja belum: Ctrl+G bentrok dengan browser (find next); cari kombinasi lain.
+7. **Pencarian & daftar lintas instrumen** di Object Tree — kini hanya instrumen aktif.
 - **Drawing templates / default style per tool** — `DRAW_DEFAULT` (`index.html:738+`) masih
   hard-coded; user belum bisa simpan gaya sendiri.
 - **Visibility per timeframe** — drawings tersimpan per instrumen dan muncul di semua TF;

@@ -37,7 +37,18 @@ function drawToolSvg(name){
   for(const g of DRAW_GROUPS) for(const t of g.tools) if(t.name===name && !g.cursor) return t.svg;
   return '';
 }
+// Nama pilihan pengguna per objek (klik dua kali nama di Object Tree, spt TV). Ikut payload
+// (field `oname`, js/draw-persist.js); absen = nama otomatis di bawah.
+let objName={};
+function setDrawName(id,name){
+  if(id==null || !drawIds.includes(id)) return;
+  name=(name||'').trim().slice(0,60);
+  if(name) objName[id]=name; else delete objName[id];   // kosong = kembali ke nama otomatis
+  try{ scheduleSaveDraws(); }catch(_){}
+  objTreeDirty();
+}
 function drawLabel(o){
+  if(objName[o.id]) return objName[o.id];
   const base=drawToolTitle(o.name);
   const t=(typeof o.extendData==='string') ? o.extendData.trim() : '';
   return t ? base+': '+(t.length>28 ? t.slice(0,28)+'…' : t) : base;
@@ -58,7 +69,7 @@ function otObjRow(id, depth){
   const sel=msIsSel(id);
   row.className='ot-row'+(depth?' ot-child':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
   row.dataset.id=id; row.draggable=true; if(depth) row.style.setProperty('--d', depth); row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
-  row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name"></span>'+otBtns(locked,hidden,'');
+  row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name" title="Double-click to rename"></span>'+otBtns(locked,hidden,'');
   row.querySelector('.ot-name').textContent=drawLabel(o);
   return row;
 }
@@ -194,6 +205,29 @@ $('#objTreeList').addEventListener('click',(e)=>{
   if(e.shiftKey){ msTreeRange(id, [...e.currentTarget.querySelectorAll('.ot-row[data-id]')].map(r=>r.dataset.id)); return; }
   try{ msSelectOnly(id); _msAnchor=id; }catch(_){}
   objTreeDirty();
+});
+
+// Ganti nama inline (grup & objek): span .ot-name diganti input. Enter/blur = simpan, Esc = batal.
+// _grpEditing menahan render ulang tree selama input terbuka (render akan membuang input-nya).
+function otInlineRename(span, value, label, onSave){
+  _grpEditing=true;
+  const inp=document.createElement('input');
+  inp.className='ot-rename'; inp.value=value||''; inp.setAttribute('aria-label',label); inp.maxLength=60;
+  span.replaceWith(inp); inp.focus(); inp.select();
+  let done=false;
+  const end=(save)=>{ if(done) return; done=true; _grpEditing=false;
+    if(save) onSave(inp.value); renderObjTree(); };
+  inp.addEventListener('keydown',ev=>{ ev.stopPropagation();
+    if(ev.key==='Enter'){ ev.preventDefault(); end(true); } else if(ev.key==='Escape'){ ev.preventDefault(); end(false); } });
+  inp.addEventListener('blur',()=>end(true));
+  inp.addEventListener('click',ev=>ev.stopPropagation());
+  inp.addEventListener('mousedown',ev=>ev.stopPropagation());
+}
+$('#objTreeList').addEventListener('dblclick',(e)=>{
+  const span=e.target.closest('.ot-name'), row=e.target.closest('.ot-row[data-id]');
+  if(!span || !row) return;
+  const id=row.dataset.id, o=chart.getOverlayById(id); if(!o) return;
+  otInlineRename(span, drawLabel(o), 'Drawing name', (v)=>setDrawName(id, v));
 });
 
 // ---- buka/tutup panel (pola sama dgn panel Alerts; keduanya menempati slot kanan yang sama,

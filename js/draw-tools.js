@@ -115,7 +115,8 @@ function delHooks(){ return {
     //
     // `!o.lock` cuma sabuk pengaman: klinecharts sendiri tak memanggil pressed-move untuk objek
     // terkunci, jadi jalur ini tak pernah tercapai — tapi mengandalkan itu diam-diam mahal.
-    cloneArmed = !!(cloneModHeld && o && !o.lock && selectedId===o.id); cloneDone=false;
+    // Anggota seleksi ganda juga sah (selectedId = primer, belum tentu objek yang diseret).
+    cloneArmed = !!(cloneModHeld && o && !o.lock && (selectedId===o.id || (multiSel.size>=2 && multiSel.has(o.id)))); cloneDone=false;
     try{ msDragStart(o,e); }catch(_){}   // seleksi ganda → anggota lain ikut (js/draw-multi-select.js)
     return false; },
   onPressedMoving:(e)=>{ try{ msDragMove(e); }catch(_){}   // SEBELUM guard subBar: vertical line pun boleh memimpin
@@ -165,7 +166,7 @@ function delHooks(){ return {
       // memang harus ditinggalkan, dan ia tak bergantung pada apakah drag sudah sempat menulis
       // titik baru. Clone hanya di cabang BADAN: menyeret handle titik tetap mengedit titik,
       // sesuai TV yang memperlakukan clone sebagai operasi seluruh objek.
-      if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneOverlay(o.id, dragBase.pts); }catch(_){} }
+      if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneSet(o.id, dragBase.pts, msDrag && msDrag.others); }catch(_){} }
       const sx=barAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
       if(!sx || sv==null) return false;
       const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
@@ -298,7 +299,7 @@ function delHooks(){ return {
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; try{ zApply(); }catch(_){} posRerender(e.overlay); return false; },   // zApply: hover klinecharts menaikkan zLevel ke MAX selamanya (js/draw-zorder.js)
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
-    try{ delete objHidden[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
+    try{ delete objHidden[e.overlay.id]; delete objName[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
     try{ msForget(e.overlay.id); }catch(_){}           // js/draw-multi-select.js
     try{ grpForget(e.overlay.id); }catch(_){}          // js/draw-groups.js
     // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.
