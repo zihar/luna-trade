@@ -51,19 +51,21 @@ function msReconcile(){
   const c=_msClick; _msClick=null;
   if(c!=null && drawIds.includes(c)){
     if(msModClick()){
+      // Objek bergrup (js/draw-groups.js) masuk/keluar seleksi SEBAGAI SATU grup.
       const set=new Set([...multiSel].filter(msLive));
       const prev=_msDown && _msDown.prev;
-      if(!set.size && prev!=null && prev!==c && msLive(prev)) set.add(prev);
-      if(set.has(c)) set.delete(c); else set.add(c);
+      if(!set.size && prev!=null && prev!==c && msLive(prev)) grpExpand(prev).forEach(x=>set.add(x));
+      const unit=grpExpand(c), had=set.has(c);
+      unit.forEach(x=>{ if(had) set.delete(x); else set.add(x); });
       multiSel=set;
       msSetPrimary(set.has(c) ? c : ([...set].pop() ?? null));
     } else {
-      multiSel=new Set([c]);
+      multiSel=new Set(grpExpand(c));   // klik anggota grup = seluruh grup
     }
   } else if(selectedId==null){
     multiSel.clear();
   } else if(multiSel.size<2 || !multiSel.has(selectedId)){
-    multiSel=new Set([selectedId]);
+    multiSel=new Set(grpExpand(selectedId));
   }
   msRender();
 }
@@ -111,10 +113,14 @@ function msDeleteSelected(){
 // Dipanggil onPressedMoveStart SETELAH cloneArmed dihitung: Ctrl/⌘+seret tetap clone satu objek.
 function msDragStart(o, e){
   msDrag=null;
-  if(!o || multiSel.size<2 || !multiSel.has(o.id) || cloneArmed || MS_NO_GROUP_DRAG[o.name]) return;
+  if(!o || cloneArmed || MS_NO_GROUP_DRAG[o.name]) return;
   if((e.figureKey||'').indexOf('overlay_figure_point_')===0) return;   // handle titik = edit satu objek
+  // Seleksi ganda yang memuat objek ini; bila tidak, grupnya (js/draw-groups.js) — menyeret anggota
+  // grup yang belum terpilih tetap membawa seluruh grup, spt TV.
+  const set=(multiSel.size>=2 && multiSel.has(o.id)) ? multiSel : new Set(grpExpand(o.id));
+  if(set.size<2 || !set.has(o.id)) return;
   const others=[];
-  multiSel.forEach(id=>{ if(id===o.id) return;
+  set.forEach(id=>{ if(id===o.id) return;
     const m=chart.getOverlayById(id);
     if(!m || m.lock || MS_NO_GROUP_DRAG[m.name] || !m.points) return;
     others.push({id, pts:m.points.map(p=>Object.assign({},p))}); });
@@ -143,6 +149,7 @@ $('#chart').appendChild(msLayer);
 let _msRaf=0;
 function msRender(){
   try{ objTreeDirty(); }catch(_){}
+  try{ grpSyncBtn(); }catch(_){}
   if(multiSel.size<2){ if(_msRaf){ cancelAnimationFrame(_msRaf); _msRaf=0; } msLayer.style.display='none'; return; }
   msLayer.style.display='block';
   if(!_msRaf) _msRaf=requestAnimationFrame(msPaint);

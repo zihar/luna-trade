@@ -65,3 +65,32 @@ klinecharts (handle-nya digambar klinecharts). Anggota lain diberi handle tiruan
 
 Copy/paste & clone banyak objek sekaligus, kotak seleksi (marquee), dan Ctrl+klik di macOS
 (itu klik kanan di macOS — pakai ⌘).
+
+## PR3: grup — keputusan
+
+Modul `js/draw-groups.js`, dibangun di atas multi-select PR2: memilih grup = mengisi `multiSel`
+dengan seluruh anggotanya, jadi seret badan, Delete, dan handle tiruan langsung berlaku.
+
+- **Membuat:** ≥2 objek terpilih → tombol folder+ di header Object Tree, atau "Group N drawings"
+  di menu klik kanan area kosong (klik kanan badan objek tetap membuka modal setelannya). Nama
+  default "Group N" (N = angka terbesar yang ada + 1). Tanpa hotkey: Ctrl+G bentrok dgn browser.
+- **Grup datar.** Objek hanya milik satu grup; mengelompokkan objek yang sudah bergrup
+  memindahkannya ke grup baru (grup lama yang kosong hilang). Grup bertingkat TV tak ditiru.
+- **Chart:** klik anggota = seluruh grup terpilih (anggota tersembunyi dilewati). Ctrl/⌘+klik
+  anggota = grup masuk/keluar seleksi sbg satu kesatuan. Menyeret badan anggota yang BELUM
+  terpilih tetap membawa seluruh grup. Seret handle titik = objek itu saja.
+- **Object Tree:** grup = baris folder di posisi anggota terbarunya, anggota menjorok di bawahnya.
+  Caret = lipat/buka (sesi saja, tak disimpan). Klik baris grup = pilih semua anggota (Ctrl/⌘ =
+  toggle); klik baris ANGGOTA = objek itu saja (jalan untuk mengedit satu anggota). Tombol
+  Ungroup / Lock / Hide / Remove berlaku ke semua anggota; status Lock/Hide di baris grup =
+  "semua anggota". Remove membiarkan anggota terkunci + toast. Klik dua kali nama = ganti nama
+  (Enter/blur simpan, Esc batal, maks 60 karakter).
+- **Persist:** per objek di payload: `grp` (id grup, `'g'+base36`) dan `gname`. Karena id overlay
+  berganti tiap restore, id grup yang ikut payload yang membuat grup utuh melewati reload, undo
+  (snapshot), dan sync server — tanpa tabel atau migrasi. Objek dihapus → keluar dari grupnya;
+  grup tanpa anggota hilang.
+
+## Bukan tujuan PR3
+
+Grup bertingkat, hotkey Group/Ungroup, drag & drop baris di Object Tree untuk memindah anggota
+atau mengubah urutan z, dan menyembunyikan/mengunci grup lewat modal setelan objek.

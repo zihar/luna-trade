@@ -204,7 +204,7 @@
     <div class="ap-body"><div id="alertList"></div></div>
   </div>
   <div id="objTreePane" role="region" aria-label="Object tree">
-    <div class="ap-head">Object Tree<span class="ot-count" id="objTreeCount"></span><span class="grow"></span><button class="ap-x" id="objTreeClose" title="Close">✕</button></div>
+    <div class="ap-head">Object Tree<span class="ot-count" id="objTreeCount"></span><span class="grow"></span><button class="ap-x ot-hbtn" id="objTreeGroup" title="Select 2 or more drawings to group them" aria-label="Group selected drawings" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></button><button class="ap-x" id="objTreeClose" title="Close">✕</button></div>
     <div class="ap-body"><div id="objTreeList" role="listbox" aria-label="Drawings"></div></div>
   </div>
   <div class="dmodal-scrim" id="alertModal">
@@ -461,6 +461,7 @@
 <script src="/js/draw-rail.js"></script>
 <script src="/js/draw-object-tree.js"></script>
 <script src="/js/draw-multi-select.js"></script>
+<script src="/js/draw-groups.js"></script>
 <script src="/js/measure.js"></script>
 <script src="/js/stats-journal.js"></script>
 <script src="/js/trades-panel.js"></script>

@@ -61,6 +61,11 @@ $('#chart').addEventListener('contextmenu',e=>{
     // reflow yang tak perlu untuk sesuatu yang sudah ada di closure.
     pasteOverlayAt(e.clientX-rect.left, e.clientY-rect.top);
   }});
+  // Grup objek (js/draw-groups.js). Klik kanan BADAN objek membuka modal setelannya (di atas),
+  // jadi Group/Ungroup hadir di menu area kosong + tombol di header Object Tree.
+  { const n=[...multiSel].filter(id=>drawIds.includes(id)).length, gs=grpSelectedGroups();
+    if(n>=2) items.push({label:`⧉ Group ${n} drawings`, fn:()=>grpCreate()});
+    if(gs.length) items.push({label:gs.length===1?'⧈ Ungroup':`⧈ Ungroup ${gs.length} groups`, fn:()=>gs.forEach(grpUngroup)}); }
   // Aksi PENGGUNA → removeAllDrawings (menghormati kunci). clearDrawings() sengaja tak dipakai di
   // sini: ia jalur internal tanpa syarat utk undo snapshot & ganti instrumen (js/draw-lock.js).
   if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:removeAllDrawings}); }

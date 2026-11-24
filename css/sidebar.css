@@ -89,6 +89,18 @@
   .ot-btn:hover{ background:var(--btn); color:var(--txt); }
   .ot-btn.on{ color:var(--txt); }
   .ot-del:hover{ color:var(--red); }
+  /* Grup (js/draw-groups.js): baris folder + anggota menjorok */
+  .ot-group .ot-name{ font-weight:600; }
+  .ot-child{ padding-left:28px; }
+  .ot-caret{ width:16px; height:18px; padding:0; margin-right:-4px; flex:none; display:flex; align-items:center; justify-content:center;
+             border:0; background:transparent; color:var(--muted); cursor:pointer; }
+  .ot-caret svg{ width:12px; height:12px; transition:transform .12s; }
+  .ot-group.open .ot-caret svg{ transform:rotate(90deg); }
+  .ot-gcount{ font-family:var(--mono); font-size:11px; color:var(--muted); flex:none; }
+  .ot-rename{ flex:1; min-width:0; font:inherit; font-weight:600; color:var(--txt); background:var(--btn);
+              border:1px solid var(--accent, #4f8cff); border-radius:4px; padding:1px 4px; outline:none; }
+  #objTreePane .ot-hbtn svg{ width:16px; height:16px; }
+  #objTreePane .ot-hbtn:disabled{ opacity:.4; cursor:default; background:transparent; }
   .ot-empty{ padding:18px 12px; color:var(--muted); font-size:12.5px; text-align:center; }
   .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
   .al-item:hover{ background:var(--btn-hover); }

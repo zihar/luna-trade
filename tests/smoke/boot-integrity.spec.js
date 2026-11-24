@@ -46,6 +46,7 @@ const SENTINEL = {
   'multi-chart.js': 'SEC_DEFAULTS',
   'draw-object-tree.js': 'renderObjTree',
   'draw-multi-select.js': 'msReconcile',
+  'draw-groups.js': 'grpCreate',
   'boot.js': 'bootApp',
   'auth-menu.js': 'setAvatar',
   'analytics.js': 'openAnalyticsDashboard',
