@@ -165,7 +165,8 @@ const EYEOFF_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 // ikon aksi bergaya sama (stroke currentColor, 24-grid) — dipakai tombol legend indikator & lainnya
 const GEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 const XMARK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-function applyDrawsVisibility(){ drawIds.forEach(id=>{ try{chart.overrideOverlay({id, visible:!drawsHidden});}catch(e){} }); }
+// drawVisible() (js/draw-object-tree.js) = !drawsHidden && objek tak disembunyikan per-objek.
+function applyDrawsVisibility(){ drawIds.forEach(id=>{ try{chart.overrideOverlay({id, visible:drawVisible(id)});}catch(e){} }); }
 const _hd=document.createElement('button'); _hd.id='hideDrawBtn'; _hd.className='dtool';
 function syncHideDrawBtn(){ _hd.innerHTML=drawsHidden?EYEOFF_SVG:EYE_SVG; _hd.title=drawsHidden?'Show all drawings':'Hide all drawings'; _hd.classList.toggle('armed',drawsHidden); }
 syncHideDrawBtn();
@@ -205,6 +206,7 @@ function syncLockAllBtn(){
   _lk.classList.toggle('armed',all);
   _lk.title = all?'Unlock all drawings':'Lock all drawings';
   _lk.disabled = (n===0);
+  try{ objTreeDirty(); }catch(_){}   // dipanggil di semua jalur buat/hapus/kunci → Object Tree ikut segar
 }
 _lk.onclick=()=>{ const n=drawIds.length; if(!n) return; setLockAllDrawings(lockedDrawCount()!==n); };
 // urutan tombol bawah (atas→bawah): magnet, keep-drawing, lock-all, hide, trash — urutan TV

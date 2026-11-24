@@ -288,11 +288,12 @@ function delHooks(){ return {
   onRightClick:(e)=>{ if(e.overlay.id!==inProgressId) selectedId=e.overlay.id; return true; },
   onDoubleClick:(e)=>{ clearTimeout(addTextTimer); try{ const o=e.overlay, n=o&&o.name;   // batalkan editor inline → double-click = modal
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
-  onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); return false; },
-  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); return false; },
+  onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); try{objTreeDirty();}catch(_){} return false; },
+  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); try{objTreeDirty();}catch(_){} return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
+    try{ delete objHidden[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
     // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.
     // Gerbang suppressDrawSave WAJIB: clearDrawings() saat reload (js/load-chart.js) dan tiap
     // langkah undo/redo (js/draw-undo.js) juga lewat chart.removeOverlay → onRemoved ini, dgn

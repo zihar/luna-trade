@@ -225,6 +225,7 @@ function stopAlertPoll(){ clearInterval(alertPollTimer); alertPollTimer=null; }
 $('#alertAddBtn').onclick=openAlertDialog;
 // rail kanan: buka/tutup panel Alerts (slide-in). Persist supaya tetap saat reload.
 function setAlertsPane(open){
+  if(open) try{ setObjTreePane(false); }catch(_){}   // slot kanan yang sama dgn Object Tree
   $('#alertsPane').classList.toggle('open', open);
   $('#railAlerts').classList.toggle('on', open);
   $('#railAlerts').setAttribute('aria-pressed', open?'true':'false');
