@@ -262,7 +262,8 @@ function magnetSnap(time, value, px, py){
   // antar bar tetangga, jadi "terdekat dalam waktu" = "terdekat dalam piksel". Sama seperti
   // snapTimeToBar untuk garis vertikal.
   if(i+1<arr.length && (time-arr[i].timestamp) > (arr[i+1].timestamp-time)) i++;
-  const bar=arr[i], barOpen=bar.timestamp, barEnd=barEndAt(cur,i,arr);
+  // bar yang DIGAMBAR (menyambung, js/bar-gapless.js) — magnet tak boleh menempel ke open mentah
+  const bar=sealBar(arr[i-1],arr[i]), barOpen=bar.timestamp, barEnd=barEndAt(cur,i,arr);
   // Kandidat harga PERSIS EMPAT: O/H/L/C bar yang tampak. Titik magnet harus DISKRIT — geser
   // kursor beberapa piksel di dalam candle yang sama tak boleh memindahkannya; yang memindahkan
   // hanya pindah candle atau pindah ke level OHLC lain.

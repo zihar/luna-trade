@@ -69,7 +69,7 @@ function makeSecondary(slot){
         if(!j.candles) return;
         this.data=j.candles.filter(x=>x.complete).map(x=>({timestamp:Date.parse(x.time),open:+x.mid.o,high:+x.mid.h,low:+x.mid.l,close:+x.mid.c,volume:+(x.volume||0)})).sort((a,b)=>a.timestamp-b.timestamp);
         try{ this.chart.setPriceVolumePrecision(decimalsFor(this.sym),0); resetPriceAxisWidth(this.chart); }catch(e){}
-        this.chart.applyNewData(this.data);
+        this.chart.applyNewData(sealBars(this.data));   // tampil menyambung (js/bar-gapless.js)
       }catch(e){}
     },
     tick(){
@@ -87,7 +87,8 @@ function makeSecondary(slot){
       // dari OHLC-nya; (b) candle terakhir = periode LAMPAU → forming = bar baru sesudahnya.
       let openTs, sOpen, sHi, sLo;
       if(now < lastEnd){
-        openTs=last.timestamp; sOpen=last.open; sHi=last.high; sLo=last.low;     // (a)
+        const sb=sealBar(this.data[this.data.length-2], last);   // (a) menyambung spt yg digambar
+        openTs=last.timestamp; sOpen=sb.open; sHi=sb.high; sLo=sb.low;
       } else {
         openTs=lastEnd; sOpen=last.close; sHi=last.close; sLo=last.close;  // (b)
         if(now>=stepBarTs(this.tf, openTs, 1)) this.scheduleRoll();    // periode forming pun sudah lewat → tarik candle baru
@@ -106,7 +107,7 @@ function makeSecondary(slot){
         const r=await fetch(u); const j=await r.json(); if(!j.candles) return;
         const fresh=j.candles.filter(x=>x.complete).map(x=>({timestamp:Date.parse(x.time),open:+x.mid.o,high:+x.mid.h,low:+x.mid.l,close:+x.mid.c,volume:+(x.volume||0)})).sort((a,b)=>a.timestamp-b.timestamp);
         const lastTs=this.data.length?this.data[this.data.length-1].timestamp:0; let added=false;
-        fresh.forEach(c=>{ if(c.timestamp>lastTs){ this.data.push(c); try{this.chart.updateData(c);}catch(e){} added=true; } });
+        fresh.forEach(c=>{ if(c.timestamp>lastTs){ const prev=this.data[this.data.length-1]; this.data.push(c); try{this.chart.updateData(sealBar(prev,c));}catch(e){} added=true; } });
         if(added) this.forming=null;
       }catch(e){}
     },

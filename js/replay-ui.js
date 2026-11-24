@@ -65,7 +65,7 @@ replayBtn.onclick=()=>{
   track('replay',{inst});
   pickMode=!pickMode; replayBtn.classList.toggle('on',pickMode);
   if(pickMode){
-    chart.applyNewData(tfData[currentTF]); lastLen=tfData[currentTF].length;  // tampilkan semua bar
+    chart.applyNewData(sealBars(tfData[currentTF])); lastLen=tfData[currentTF].length;  // tampilkan semua bar
     setStatus('Bar Replay: point & CLICK a bar on the chart to pick the replay start.');
   }else{ render(true); setStatus('Point selection cancelled.'); }
   setPickCut(pickMode);   // garis potong + veil kanan hanya saat pick
