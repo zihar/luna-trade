@@ -10,6 +10,9 @@
 //  - Grup BERSARANG spt TV: mengelompokkan seleksi yang memuat satu grup UTUH menjadikan grup itu
 //    sub-grup dari grup baru. Klik anggota di chart memilih grup TERLUAR; tombol per folder di tree
 //    (Lock/Hide/Remove/seleksi/hitungan) berlaku ke SELURUH isinya, termasuk sub-grup.
+//  - Hotkey Ctrl/⌘+G = Group, Ctrl/⌘+Shift+G = Ungroup (konvensi Figma/Excalidraw). Keduanya
+//    bentrok dgn "find next/previous" browser, jadi grpHotkey() HANYA mencegat saat aksinya berlaku;
+//    tanpa seleksi yang relevan keystroke dibiarkan ke browser.
 //
 // Keanggotaan disimpan PER OBJEK di payload (`grp` = id grup terdalam, `gname` = nama, `gpar` =
 // rantai leluhurnya [[gid,nama],…] dari luar ke dalam; absen = grup tingkat atas), lihat
@@ -182,7 +185,22 @@ function grpSyncBtn(){
   const b=$('#objTreeGroup'); if(!b) return;
   const n=[...multiSel].filter(id=>drawIds.includes(id)).length, ok=n>=2 && grpCanCreate();
   b.disabled = !ok;
-  b.title = n<2 ? 'Select 2 or more drawings to group them' : ok ? 'Group '+n+' selected drawings' : 'Already one group';
+  b.title = (n<2 ? 'Select 2 or more drawings to group them' : ok ? 'Group '+n+' selected drawings' : 'Already one group')+' ('+grpKeyLabel(false)+')';
+}
+// Label hint shortcut (menu klik-kanan & tooltip). IS_MAC dari js/draw-rail.js.
+function grpKeyLabel(ungroup){
+  return IS_MAC ? (ungroup?'⇧⌘G':'⌘G') : (ungroup?'Ctrl+Shift+G':'Ctrl+G');
+}
+// Ctrl/⌘+G (ungroup=false) / Ctrl/⌘+Shift+G (ungroup=true) dari js/keyboard.js. true = ditangani
+// (pemanggil lalu preventDefault); false = tak berlaku → biarkan browser memakai keystroke-nya.
+function grpHotkey(ungroup){
+  if(ungroup){
+    const gs=grpSelectedGroups(); if(!gs.length) return false;
+    gs.forEach(grpUngroup); return true;
+  }
+  const n=[...multiSel].filter(id=>drawIds.includes(id)).length;
+  if(n<2 || !grpCanCreate()) return false;
+  return !!grpCreate();
 }
 $('#objTreeGroup').onclick=()=>{ const g=grpCreate(); if(g) grpCollapsed.delete(g); };
 

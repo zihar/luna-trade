@@ -64,8 +64,9 @@ $('#chart').addEventListener('contextmenu',e=>{
   // Grup objek (js/draw-groups.js). Klik kanan BADAN objek membuka modal setelannya (di atas),
   // jadi Group/Ungroup hadir di menu area kosong + tombol di header Object Tree.
   { const n=[...multiSel].filter(id=>drawIds.includes(id)).length, gs=grpSelectedGroups();
-    if(n>=2 && grpCanCreate()) items.push({label:`⧉ Group ${n} drawings`, fn:()=>grpCreate()});
-    if(gs.length) items.push({label:gs.length===1?'⧈ Ungroup':`⧈ Ungroup ${gs.length} groups`, fn:()=>gs.forEach(grpUngroup)}); }
+    const kbd=(u)=>`<span class="ctxkbd">${grpKeyLabel(u)}</span>`;
+    if(n>=2 && grpCanCreate()) items.push({label:`⧉ Group ${n} drawings${kbd(false)}`, fn:()=>grpCreate()});
+    if(gs.length) items.push({label:(gs.length===1?'⧈ Ungroup':`⧈ Ungroup ${gs.length} groups`)+kbd(true), fn:()=>gs.forEach(grpUngroup)}); }
   // Aksi PENGGUNA → removeAllDrawings (menghormati kunci). clearDrawings() sengaja tak dipakai di
   // sini: ia jalur internal tanpa syarat utk undo snapshot & ganti instrumen (js/draw-lock.js).
   if(drawIds.length){ const nd=drawIds.length; items.push({label:`🗑 Remove all drawings (${nd})`, fn:removeAllDrawings}); }
