@@ -49,13 +49,13 @@ function objTreeDirty(){
   _otTimer=requestAnimationFrame(()=>{ _otTimer=0; renderObjTree(); });
 }
 function objTreeOpen(){ const p=$('#objTreePane'); return !!(p && p.classList.contains('open')); }
-function otObjRow(id, child){
+function otObjRow(id, depth){
   const o=chart.getOverlayById(id); if(!o) return null;
   const locked=!!o.lock, hidden=isDrawHidden(id);
   const row=document.createElement('div');
   const sel=msIsSel(id);
-  row.className='ot-row'+(child?' ot-child':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-  row.dataset.id=id; row.draggable=true; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.className='ot-row'+(depth?' ot-child':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
+  row.dataset.id=id; row.draggable=true; if(depth) row.style.setProperty('--d', depth); row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
   row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name"></span>'+otBtns(locked,hidden,'');
   row.querySelector('.ot-name').textContent=drawLabel(o);
   return row;
@@ -70,13 +70,13 @@ const OT_FOLDER_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const OT_UNGROUP_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="8" height="8" rx="1.4"/><rect x="12.5" y="12.5" width="8" height="8" rx="1.4"/><path d="M15 8.5h2.5V11M9 15.5H6.5V13" stroke-dasharray="2 1.6"/></svg>';
 const OT_CARET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg>';
 // Baris folder grup (js/draw-groups.js): status Lock/Hide = "semua anggota".
-function otGroupRow(gid, members){
+function otGroupRow(gid, members, depth){
   const locked=grpAllLocked(gid), hidden=grpAllHidden(gid), open=!grpCollapsed.has(gid);
   const live=members.filter(id=>!isDrawHidden(id));
   const sel=live.length>0 && live.every(msIsSel);
   const row=document.createElement('div');
   row.className='ot-row ot-group'+(open?' open':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-  row.dataset.gid=gid; row.draggable=true; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.dataset.gid=gid; row.draggable=true; if(depth) row.style.setProperty('--d', depth); row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
   row.setAttribute('aria-expanded', open?'true':'false');
   row.innerHTML='<button class="ot-caret" title="'+(open?'Collapse':'Expand')+'" aria-label="'+(open?'Collapse':'Expand')+'">'+OT_CARET_SVG+'</button>'+
     '<span class="ot-ico">'+OT_FOLDER_SVG+'</span><span class="ot-name" title="Double-click to rename"></span><span class="ot-gcount">'+members.length+'</span>'+
@@ -93,15 +93,14 @@ function renderObjTree(){
   $('#objTreeCount').textContent=ids.length ? String(ids.length) : '';
   if(!ids.length){ list.innerHTML='<div class="ot-empty">No drawings on this chart yet.</div>'; return; }
   const frag=document.createDocumentFragment();
-  // Paling depan (z-order, js/draw-zorder.js) di atas. Grup menempati posisi anggotanya yang TERBARU; anggotanya menjorok di bawahnya.
-  const order=ids.slice().reverse(), done=new Set();
-  order.forEach(id=>{
-    const g=grpOf(id);
-    if(!g){ const r=otObjRow(id,false); if(r) frag.appendChild(r); return; }
-    if(done.has(g)) return; done.add(g);
-    const members=order.filter(x=>grpOf(x)===g);
-    frag.appendChild(otGroupRow(g, members));
-    if(!grpCollapsed.has(g)) members.forEach(x=>{ const r=otObjRow(x,true); if(r) frag.appendChild(r); });
+  // Paling depan (z-order, js/draw-zorder.js) di atas. Folder menempati posisi isinya yang paling
+  // depan; isinya (objek & sub-grup) menjorok di bawahnya. Isi folder yang dilipat dilewati.
+  let fold=Infinity;
+  grpWalk(ids.slice().reverse()).forEach(e=>{
+    if(e.depth>fold) return;
+    fold=Infinity;
+    if(e.gid){ frag.appendChild(otGroupRow(e.gid, e.members, e.depth)); if(grpCollapsed.has(e.gid)) fold=e.depth; return; }
+    const r=otObjRow(e.id, e.depth); if(r) frag.appendChild(r);
   });
   list.replaceChildren(frag);
 }

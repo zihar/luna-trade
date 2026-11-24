@@ -96,7 +96,7 @@
   .ot-row.drop-after{ box-shadow:inset 0 -2px 0 var(--accent, #4f8cff); }
   .ot-row.drop-into{ box-shadow:inset 0 0 0 1.5px var(--accent, #4f8cff); }
   .ot-group .ot-name{ font-weight:600; }
-  .ot-child{ padding-left:28px; }
+  .ot-row{ padding-left:calc(6px + var(--d, 0) * 22px); }   /* --d = kedalaman (grup bersarang) */
   .ot-caret{ width:16px; height:18px; padding:0; margin-right:-4px; flex:none; display:flex; align-items:center; justify-content:center;
              border:0; background:transparent; color:var(--muted); cursor:pointer; }
   .ot-caret svg{ width:12px; height:12px; transition:transform .12s; }
