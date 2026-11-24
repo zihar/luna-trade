@@ -296,7 +296,7 @@ function delHooks(){ return {
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
-  onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
+  onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; try{ zApply(); }catch(_){} posRerender(e.overlay); return false; },   // zApply: hover klinecharts menaikkan zLevel ke MAX selamanya (js/draw-zorder.js)
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
     try{ delete objHidden[e.overlay.id]; delete objName[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js

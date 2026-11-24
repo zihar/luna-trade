@@ -100,6 +100,7 @@ function buildDrawsFromArray(arr){
       if(d.style){ objStyle[id]=d.style; if(!BUILTIN_LINE[d.name]) try{chart.overrideOverlay({id,points:pts});}catch(_){} } }
   }catch(e){} });
   suppressDrawSave=prev; clearTimeout(drawSaveTimer);
+  try{ zApply(); }catch(_){}           // urutan tumpukan = urutan payload (js/draw-zorder.js)
   try{ syncLockAllBtn(); }catch(_){}   // restore bisa membawa objek terkunci → samakan tombol rail
 }
 // Jaring akhir "tangkap drag/edit yg belum ter-flush" pindah SELURUHNYA ke flushSyncDrawsOnExit()

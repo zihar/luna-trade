@@ -9,6 +9,7 @@
 // Grup (js/draw-groups.js) dirender di sini sbg baris folder; logikanya di modul itu.
 // Rancangan: docs/superpowers/specs/2026-11-24-object-tree-design.md
 let objHidden={};
+let _otDrag=null;   // {kind:'obj', id} | {kind:'grp', gid} selama baris diseret (js/draw-zorder.js)
 function isDrawHidden(id){ return !!objHidden[id]; }
 function drawVisible(id){ return !drawsHidden && !objHidden[id]; }
 function setDrawHidden(id,on){
@@ -65,7 +66,7 @@ function otObjRow(id, child){
   const row=document.createElement('div');
   const sel=msIsSel(id);
   row.className='ot-row'+(child?' ot-child':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-  row.dataset.id=id; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.dataset.id=id; row.draggable=true; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
   row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name" title="Double-click to rename"></span>'+otBtns(locked,hidden,'');
   row.querySelector('.ot-name').textContent=drawLabel(o);
   return row;
@@ -86,7 +87,7 @@ function otGroupRow(gid, members){
   const sel=live.length>0 && live.every(msIsSel);
   const row=document.createElement('div');
   row.className='ot-row ot-group'+(open?' open':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-  row.dataset.gid=gid; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.dataset.gid=gid; row.draggable=true; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
   row.setAttribute('aria-expanded', open?'true':'false');
   row.innerHTML='<button class="ot-caret" title="'+(open?'Collapse':'Expand')+'" aria-label="'+(open?'Collapse':'Expand')+'">'+OT_CARET_SVG+'</button>'+
     '<span class="ot-ico">'+OT_FOLDER_SVG+'</span><span class="ot-name" title="Double-click to rename"></span><span class="ot-gcount">'+members.length+'</span>'+
@@ -98,11 +99,12 @@ function renderObjTree(){
   const list=$('#objTreeList'); if(!list || !objTreeOpen()) return;
   try{ grpSyncBtn(); }catch(_){}
   if(_grpEditing) return;   // input ganti nama grup sedang terbuka (js/draw-groups.js)
+  if(_otDrag) return;       // baris sedang diseret: render ulang akan membuang elemen sumber seret
   const ids=drawIds.filter(id=>{ try{ const o=chart.getOverlayById(id); return o && o.name!=='measure' && id!==inProgressId; }catch(_){ return false; } });
   $('#objTreeCount').textContent=ids.length ? String(ids.length) : '';
   if(!ids.length){ list.innerHTML='<div class="ot-empty">No drawings on this chart yet.</div>'; return; }
   const frag=document.createDocumentFragment();
-  // Terbaru di atas. Grup menempati posisi anggotanya yang TERBARU; anggotanya menjorok di bawahnya.
+  // Paling depan (z-order, js/draw-zorder.js) di atas. Grup menempati posisi anggotanya yang TERBARU; anggotanya menjorok di bawahnya.
   const order=ids.slice().reverse(), done=new Set();
   order.forEach(id=>{
     const g=grpOf(id);
