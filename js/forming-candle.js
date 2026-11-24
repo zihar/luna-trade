@@ -21,7 +21,8 @@ function pushFormingCandle(){
   // dgn grid, yg dulu bikin seed benar terbuang saat openTs grid meleset).
   const seed = (formingSeed && formingSeed.tf===currentTF && formingSeed.inst===inst
                 && formingSeed.candle.timestamp>last.timestamp) ? formingSeed.candle : null;
-  // open = close candle sebelumnya (jalur grid, tak ada gap harga) / open OANDA (jalur seed).
+  // open = close candle sebelumnya di KEDUA jalur (grid & seed) — candle menyambung, lihat
+  // js/bar-gapless.js. Dari seed hanya high/low (ekstrem yg sudah terjadi) yang dipakai.
   const openTs = seed ? seed.timestamp : stepBarTs(currentTF, last.timestamp, 1);
   if(now<openTs) return;                            // periode forming belum mulai
   // Periode forming sudah lewat sepenuhnya = data ketinggalan (mis. sesudah exit Bar Replay:
@@ -39,9 +40,9 @@ function pushFormingCandle(){
   // 18:00 NY & gap akhir pekan memang membuat openTs > last+dur tanpa ada bar yang terlewat.
   if(seed && formingSeed.prevTs!=null && formingSeed.prevTs>last.timestamp){ scheduleRollRefresh(); return; }
   if(!formingBar || formingBar.timestamp!==openTs){
-    const o = seed ? seed.open : last.close;
-    const hi = seed ? seed.high : last.close;
-    const lo = seed ? seed.low  : last.close;
+    const o = last.close;
+    const hi = seed ? Math.max(seed.high, o) : o;
+    const lo = seed ? Math.min(seed.low,  o) : o;
     formingBar={timestamp:openTs, open:o, high:Math.max(hi,mid), low:Math.min(lo,mid), close:mid, volume:seed?seed.volume:0};
   } else {
     formingBar.close=mid;
@@ -50,7 +51,6 @@ function pushFormingCandle(){
     const lo = seed ? Math.min(seed.low,  formingBar.low)  : formingBar.low;
     formingBar.high = Math.max(hi, mid);
     formingBar.low  = Math.min(lo, mid);
-    if(seed) formingBar.open = seed.open;            // open otoritatif dari OANDA
   }
   try{ chart.updateData(formingBar); }catch(e){}
 }

@@ -27,11 +27,12 @@ function render(full){
   }
   const needFull = full || lastLen<0 || data.length<lastLen || stale
                  || (chartHasPartial && !hasPartial && data.length===lastLen);
-  if(needFull){ chart.applyNewData(data); }
-  else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(data[k]); }
+  // Yang digambar = versi MENYAMBUNG (js/bar-gapless.js); `data` sendiri tetap mentah.
+  if(needFull){ chart.applyNewData(sealBars(data)); }
+  else if(data.length>lastLen){ for(let k=lastLen;k<data.length;k++) chart.updateData(sealBar(data[k-1],data[k])); }
   // Forming bar: timestamp selalu = open bar berikutnya → saat bar itu benar-benar menutup,
   // updateData(dataTutup) menimpanya di tempat (transisi partial→closed mulus, tak ada bar nyangkut).
-  if(hasPartial) chart.updateData(replayPartial.candle);
+  if(hasPartial) chart.updateData(sealBar(data[data.length-1], replayPartial.candle));
   chartHasPartial=hasPartial;
   lastLen=data.length;
   drawPaperLines();
