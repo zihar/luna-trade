@@ -47,6 +47,7 @@ const SENTINEL = {
   'draw-object-tree.js': 'renderObjTree',
   'draw-multi-select.js': 'msReconcile',
   'draw-groups.js': 'grpCreate',
+  'draw-marquee.js': 'mqHits',
   'boot.js': 'bootApp',
   'auth-menu.js': 'setAvatar',
   'analytics.js': 'openAnalyticsDashboard',
