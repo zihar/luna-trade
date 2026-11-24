@@ -65,3 +65,13 @@ function cloneOverlay(id, pts){
   const d=descOf(id); if(!d) return null;
   return createFromDesc(d, pts||d.points);
 }
+
+// Ctrl/⌘+seret saat seleksi ganda / grup (js/draw-multi-select.js msDragStart): SEMUA anggota
+// tersalin di posisi AWAL gestur, sementara aslinya yang ikut berpindah — sama dgn clone satu objek.
+// `others` = msDrag.others ({id, pts} snapshot), jadi tak bergantung pada urutan tulis drag.
+function cloneSet(id, pts, others){
+  const pairs=[[grpOf(id), cloneOverlay(id, pts)]];
+  (others||[]).forEach(m=>pairs.push([grpOf(m.id), cloneOverlay(m.id, m.pts)]));
+  try{ grpAdopt(pairs); }catch(_){}
+  return pairs.map(p=>p[1]).filter(Boolean);
+}
