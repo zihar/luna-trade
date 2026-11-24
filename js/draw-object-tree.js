@@ -7,6 +7,7 @@
 // js/draw-persist.js). Ia BERBEDA dari "Hide all drawings" di rail (drawsHidden) yang sengaja
 // sementara (tak tersimpan). Visibilitas akhir = keduanya: lihat drawVisible().
 // Grup (js/draw-groups.js) dirender di sini sbg baris folder; logikanya di modul itu.
+// Kolom Search di atas daftar menyaring baris (label objek / nama grup), lihat otMatches().
 // Rancangan: docs/superpowers/specs/2026-11-24-object-tree-design.md
 let objHidden={};
 let _otDrag=null;   // {kind:'obj', id} | {kind:'grp', gid} selama baris diseret (js/draw-zorder.js)
@@ -103,17 +104,37 @@ function renderObjTree(){
   const ids=drawIds.filter(id=>{ try{ const o=chart.getOverlayById(id); return o && o.name!=='measure' && id!==inProgressId; }catch(_){ return false; } });
   $('#objTreeCount').textContent=ids.length ? String(ids.length) : '';
   if(!ids.length){ list.innerHTML='<div class="ot-empty">No drawings on this chart yet.</div>'; return; }
+  // Pencarian: objek yang labelnya ATAU nama salah satu grup di jalurnya memuat kata kunci. Folder
+  // induknya ikut tampil sbg konteks dan dipaksa terbuka (tak ada gunanya cocok tapi terlipat).
+  const q=otQuery();
+  const shown=q ? ids.filter(id=>otMatches(id,q)) : ids;
+  if(!shown.length){ list.innerHTML='<div class="ot-empty">No matching drawings.</div>'; return; }
   const frag=document.createDocumentFragment();
   // Paling depan (z-order, js/draw-zorder.js) di atas. Folder menempati posisi isinya yang paling
   // depan; isinya (objek & sub-grup) menjorok di bawahnya. Isi folder yang dilipat dilewati.
   let fold=Infinity;
-  grpWalk(ids.slice().reverse()).forEach(e=>{
+  grpWalk(shown.slice().reverse()).forEach(e=>{
     if(e.depth>fold) return;
     fold=Infinity;
-    if(e.gid){ frag.appendChild(otGroupRow(e.gid, e.members, e.depth)); if(grpCollapsed.has(e.gid)) fold=e.depth; return; }
+    if(e.gid){ frag.appendChild(otGroupRow(e.gid, e.members, e.depth)); if(!q && grpCollapsed.has(e.gid)) fold=e.depth; return; }
     const r=otObjRow(e.id, e.depth); if(r) frag.appendChild(r);
   });
   list.replaceChildren(frag);
+}
+function otQuery(){ const i=$('#objTreeSearch'); return i ? i.value.trim().toLowerCase() : ''; }
+function otMatches(id,q){
+  try{ const o=chart.getOverlayById(id); if(o && drawLabel(o).toLowerCase().includes(q)) return true; }catch(_){}
+  return grpPath(id).some(g=>(grpName[g]||'').toLowerCase().includes(q));
+}
+{
+  const inp=$('#objTreeSearch');
+  inp.addEventListener('input', ()=>renderObjTree());
+  // Escape mengosongkan dulu; baru bila sudah kosong ia dilepas (fokus kembali ke chart).
+  inp.addEventListener('keydown',(e)=>{
+    if(e.key!=='Escape') return;
+    e.stopPropagation();
+    if(inp.value){ inp.value=''; renderObjTree(); } else inp.blur();
+  });
 }
 // Satu listener terdelegasi untuk semua baris (daftar dirender ulang utuh).
 $('#objTreeList').addEventListener('click',(e)=>{
