@@ -48,6 +48,17 @@ function grpCreate(ids){
   grpChanged();
   return gid;
 }
+// Salinan (paste / clone ganda): pasangan [gidSumber, idBaru]. Objek baru yang sumbernya satu grup
+// → satu grup BARU bernama "Group N" (TV juga tak menggabungkan salinan ke grup sumber). Sumber
+// grup yang cuma tersalin satu anggota → salinannya lepas, karena grup satu objek tak ada artinya.
+function grpAdopt(pairs){
+  const by={};
+  pairs.forEach(([g,id])=>{ if(g && id) (by[g]=by[g]||[]).push(id); });
+  let any=false;
+  Object.values(by).forEach(ids=>{ if(ids.length<2) return;
+    const gid=grpNewId(); ids.forEach(id=>{ objGroup[id]=gid; }); grpName[gid]=grpNextName(); any=true; });
+  if(any) grpChanged();
+}
 function grpUngroup(gid){
   if(!gid) return;
   grpMembers(gid).forEach(id=>{ delete objGroup[id]; });

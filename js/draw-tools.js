@@ -115,7 +115,8 @@ function delHooks(){ return {
     //
     // `!o.lock` cuma sabuk pengaman: klinecharts sendiri tak memanggil pressed-move untuk objek
     // terkunci, jadi jalur ini tak pernah tercapai — tapi mengandalkan itu diam-diam mahal.
-    cloneArmed = !!(cloneModHeld && o && !o.lock && selectedId===o.id); cloneDone=false;
+    // Anggota seleksi ganda juga sah (selectedId = primer, belum tentu objek yang diseret).
+    cloneArmed = !!(cloneModHeld && o && !o.lock && (selectedId===o.id || (multiSel.size>=2 && multiSel.has(o.id)))); cloneDone=false;
     try{ msDragStart(o,e); }catch(_){}   // seleksi ganda → anggota lain ikut (js/draw-multi-select.js)
     return false; },
   onPressedMoving:(e)=>{ try{ msDragMove(e); }catch(_){}   // SEBELUM guard subBar: vertical line pun boleh memimpin
@@ -165,7 +166,7 @@ function delHooks(){ return {
       // memang harus ditinggalkan, dan ia tak bergantung pada apakah drag sudah sempat menulis
       // titik baru. Clone hanya di cabang BADAN: menyeret handle titik tetap mengedit titik,
       // sesuai TV yang memperlakukan clone sebagai operasi seluruh objek.
-      if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneOverlay(o.id, dragBase.pts); }catch(_){} }
+      if(cloneArmed && !cloneDone){ cloneDone=true; try{ cloneSet(o.id, dragBase.pts, msDrag && msDrag.others); }catch(_){} }
       const sx=barAnchorFromPx(dragBase.x-OX), sv=pxToValue(dragBase.y-OY);
       if(!sx || sv==null) return false;
       const dIdx=xa.dataIndex-sx.dataIndex, dV=v-sv;
