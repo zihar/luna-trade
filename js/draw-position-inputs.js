@@ -16,7 +16,13 @@ function posDefaultLot(instName){
   const m=/^([A-Z]{3})_([A-Z]{3})$/.exec(n);
   return (m && POS_FX_CCY.has(m[1]) && POS_FX_CCY.has(m[2])) ? 100000 : 1;
 }
-function posDefaults(){ try{ return JSON.parse(localStorage.getItem(POS_DEF_KEY)||'{}')||{}; }catch(e){ return {}; } }
+// dibaca tiap frame render pill → parse hanya bila string mentahnya berubah (salinan, supaya aman dimutasi)
+let posDefRaw=null, posDefObj={};
+function posDefaults(){
+  let raw=null; try{ raw=localStorage.getItem(POS_DEF_KEY); }catch(e){}
+  if(raw!==posDefRaw){ posDefRaw=raw; try{ posDefObj=JSON.parse(raw||'{}')||{}; }catch(e){ posDefObj={}; } }
+  return JSON.parse(JSON.stringify(posDefObj));
+}
 function posSettings(o){
   const st=(o&&objStyle[o.id])||{}, d=posDefaults();
   const pick=(a,b,c)=> a!=null?a : b!=null?b : c;
@@ -88,4 +94,17 @@ function applyPosTicks(o, which, n){
   const v=lv.entry+(up?1:-1)*n*posTickSize();
   if(!(v>0)) return false;
   return applyPosLevel(o, which, v);
+}
+// teks pill chart (dipanggil dari posFigures dgn overlay yang SEDANG dirender → pakai o.points)
+const posUsd=v=>(v<0?'-':'+')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+function posPillTexts(o){
+  const c=posCalcPts(o, o&&o.points); if(!c) return null;
+  const dec=priceDecimals(), s=posSettings(o);
+  const pip=parseFloat($('#pipSize').value)||0.0001;
+  const lvl=(lbl,v,ticks)=>{ const d=Math.abs(v-c.entry);
+    return lbl+'  '+v.toFixed(dec)+'   '+Math.round(d/pip)+'p · '+ticks+'t ('+(d/c.entry*100).toFixed(3)+'%)'; };
+  const dir=o.name==='shortPosition'?'SHORT':'LONG';
+  return { target: lvl('Target',c.tp,c.tpTicks)+'  '+posUsd(c.pnlTp),
+           stop:   lvl('Stop',c.sl,c.slTicks)+'  '+posUsd(c.pnlSl),
+           center: dir+' · Qty '+c.qtyLots.toFixed(s.qtyPrec)+' '+(s.lot===1?'units':'lot')+' · RR 1:'+c.rr.toFixed(2) };
 }

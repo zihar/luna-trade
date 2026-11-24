@@ -170,3 +170,19 @@ test('tab Inputs: Qty precision mengubah readout Qty', async ({ page }) => {
   await expect(page.locator('#ppQty')).toHaveText(/^Qty \d+\.\d{4} lot$/);
   assertNoPageErrors(page);
 });
+
+// ---------- label pill di chart ----------
+for (const name of ['longPosition', 'shortPosition']) {
+  test(`${name}: posPillTexts memuat Qty, P&L nominal & RR`, async ({ page }) => {
+    const obj = await place(page, name);
+    const r = await page.evaluate((id) => { const o = chart.getOverlayById(id);
+      setPosSettings(o, { account: 10000, risk: 1, riskUnit: '%', lot: 100000, qtyPrec: 2 });
+      return { t: posPillTexts(o), c: posCalc(o) }; }, obj.id);
+    expect(r.t.stop).toContain('-$100.00');
+    expect(r.t.target).toContain('+$' + r.c.pnlTp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    expect(r.t.center).toContain('Qty ' + r.c.qtyLots.toFixed(2) + ' lot');
+    expect(r.t.center).toContain('RR 1:' + r.c.rr.toFixed(2));
+    expect(r.t.center).toContain(name === 'longPosition' ? 'LONG' : 'SHORT');
+    assertNoPageErrors(page);
+  });
+}
