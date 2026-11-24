@@ -111,6 +111,12 @@
   #objTreePane .ot-search input{ width:100%; box-sizing:border-box; height:28px; padding:0 8px 0 28px; border:1px solid var(--line); border-radius:6px;
     background:transparent; color:var(--txt); font:inherit; font-size:12.5px; outline:none; }
   #objTreePane .ot-search input:focus{ border-color:var(--accent); }
+  #objTreeOther .ot-oh{ margin:14px 6px 4px; padding-top:10px; border-top:1px solid var(--line); color:var(--muted);
+    font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  #objTreeOther .ot-sym{ display:flex; align-items:center; gap:8px; width:100%; padding:6px 8px; border:0; border-radius:6px;
+    background:transparent; color:var(--txt); font:inherit; font-size:12.5px; text-align:left; cursor:pointer; }
+  #objTreeOther .ot-sym:hover{ background:var(--btn-hover); }
+  #objTreeOther .ot-sym .ot-gcount{ margin-left:auto; }
   .ot-empty{ padding:18px 12px; color:var(--muted); font-size:12.5px; text-align:center; }
   .al-item{ position:relative; margin:0 6px; padding:8px 26px 8px 8px; border-radius:8px; }
   .al-item:hover{ background:var(--btn-hover); }

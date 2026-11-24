@@ -177,3 +177,47 @@ func TestDrawingsInstrumentRequired(t *testing.T) {
 		t.Fatalf("status=%d, mau 400", w.Code)
 	}
 }
+
+// Ringkasan lintas instrumen untuk Object Tree: hanya instrumen yang PUNYA objek, hanya milik
+// user itu, urut nama. Payload kosong ("[]", sisa menghapus semua objek) tak ikut terdaftar.
+func TestDrawingsSummary(t *testing.T) {
+	storeForAPI(t)
+	save := func(uid int64, inst, payload string) {
+		w := httptest.NewRecorder()
+		handleDrawingsSave(w, reqAsUser("POST", "/api/drawings",
+			`{"instrument":"`+inst+`","payload":`+payload+`,"baseVersion":0}`, uid))
+		if w.Code != http.StatusOK {
+			t.Fatalf("simpan %s: status=%d body=%s", inst, w.Code, w.Body.String())
+		}
+	}
+	save(1, "GBP_USD", `[{"name":"rect"}]`)
+	save(1, "EUR_USD", `[{"name":"trendline"},{"name":"text"}]`)
+	save(1, "XAU_USD", `[]`)
+	save(2, "USD_JPY", `[{"name":"trendline"}]`)
+
+	w := httptest.NewRecorder()
+	handleDrawingsSummary(w, reqAsUser("GET", "/api/drawings/summary", "", 1))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Instruments []struct {
+			Instrument string `json:"instrument"`
+			Count      int    `json:"count"`
+		} `json:"instruments"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("json: %v body=%s", err, w.Body.String())
+	}
+	b, _ := json.Marshal(got.Instruments)
+	if want := `[{"instrument":"EUR_USD","count":2},{"instrument":"GBP_USD","count":1}]`; string(b) != want {
+		t.Fatalf("instruments=%s, mau %s", b, want)
+	}
+
+	// user tanpa gambar → daftar kosong (bukan null) supaya klien tak perlu cabang khusus
+	w = httptest.NewRecorder()
+	handleDrawingsSummary(w, reqAsUser("GET", "/api/drawings/summary", "", 3))
+	if strings.TrimSpace(w.Body.String()) != `{"instruments":[]}` {
+		t.Fatalf("body=%s", w.Body.String())
+	}
+}

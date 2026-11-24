@@ -222,6 +222,12 @@ async function installStubs(page) {
           ],
         });
 
+      case '/api/drawings/summary':
+        // cermin store.DrawingCounts: instrumen ber-objek saja, urut nama
+        return json(route, { instruments: Object.keys(state.drawings).sort()
+          .map((k) => ({ instrument: k, count: (state.drawings[k].payload || []).length }))
+          .filter((x) => x.count > 0) });
+
       case '/api/drawings': {
         // Stub INI menyimpan state sungguhan (bukan selalu balas kosong): seluruh test
         // persistensi bergantung pada isinya bertahan lewat reload.

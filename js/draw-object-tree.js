@@ -8,6 +8,7 @@
 // sementara (tak tersimpan). Visibilitas akhir = keduanya: lihat drawVisible().
 // Grup (js/draw-groups.js) dirender di sini sbg baris folder; logikanya di modul itu.
 // Kolom Search di atas daftar menyaring baris (label objek / nama grup), lihat otMatches().
+// Di bawah daftar: "Other symbols" = instrumen lain yang punya objek (lihat fetchObjOther).
 // Rancangan: docs/superpowers/specs/2026-11-24-object-tree-design.md
 let objHidden={};
 let _otDrag=null;   // {kind:'obj', id} | {kind:'grp', gid} selama baris diseret (js/draw-zorder.js)
@@ -99,6 +100,7 @@ function otGroupRow(gid, members, depth){
 function renderObjTree(){
   const list=$('#objTreeList'); if(!list || !objTreeOpen()) return;
   try{ grpSyncBtn(); }catch(_){}
+  if(_otOther.inst!==inst) fetchObjOther(); else renderObjOther();
   if(_grpEditing) return;   // input ganti nama grup sedang terbuka (js/draw-groups.js)
   if(_otDrag) return;       // baris sedang diseret: render ulang akan membuang elemen sumber seret
   const ids=drawIds.filter(id=>{ try{ const o=chart.getOverlayById(id); return o && o.name!=='measure' && id!==inProgressId; }catch(_){ return false; } });
@@ -136,6 +138,46 @@ function otMatches(id,q){
     if(inp.value){ inp.value=''; renderObjTree(); } else inp.blur();
   });
 }
+// ---- "Other symbols": instrumen lain yang punya objek gambar (GET /api/drawings/summary). Klik =
+// buka chart simbol itu. Diambil saat panel dibuka & saat instrumen berganti — jumlah objek simbol
+// LAIN tak berubah selama kita di chart ini, jadi tak perlu diperbarui tiap simpan. Gagal / anonim
+// → bagiannya disembunyikan saja (fitur tambahan, bukan jalur penting).
+let _otOther={inst:null, rows:[]}, _otOtherSeq=0;
+async function fetchObjOther(){
+  const my=++_otOtherSeq, at=inst;
+  _otOther={inst:at, rows:_otOther.rows};
+  try{
+    const r=await fetch('/api/drawings/summary'); if(!r.ok) throw 0;
+    const j=await r.json();
+    if(my!==_otOtherSeq) return;   // respons basi (instrumen sudah berganti lagi)
+    _otOther={inst:at, rows:Array.isArray(j && j.instruments) ? j.instruments : []};
+  }catch(_){ if(my===_otOtherSeq) _otOther={inst:at, rows:[]}; }
+  renderObjOther();
+}
+function renderObjOther(){
+  const box=$('#objTreeOther'); if(!box) return;
+  const q=otQuery();
+  const rows=_otOther.rows.filter(x=>x && x.instrument && x.instrument!==inst && x.count>0 &&
+    (!q || (dispSym(x.instrument)+' '+x.instrument).toLowerCase().includes(q)));
+  if(!rows.length){ box.replaceChildren(); return; }
+  const frag=document.createDocumentFragment();
+  const h=document.createElement('div'); h.className='ot-oh'; h.textContent='Other symbols'; frag.appendChild(h);
+  rows.forEach(x=>{
+    const b=document.createElement('button');
+    b.className='ot-sym'; b.dataset.sym=x.instrument; b.title='Open '+dispSym(x.instrument)+' chart';
+    b.innerHTML='<span class="ot-name"></span><span class="ot-gcount"></span>';
+    b.querySelector('.ot-name').textContent=dispSym(x.instrument);
+    b.querySelector('.ot-gcount').textContent=String(x.count);
+    frag.appendChild(b);
+  });
+  box.replaceChildren(frag);
+}
+$('#objTreeOther').addEventListener('click',(e)=>{
+  const b=e.target.closest('.ot-sym'); if(!b) return;
+  try{ track('objtree_open_symbol'); }catch(_){}
+  selectSymbol(b.dataset.sym);
+});
+
 // Satu listener terdelegasi untuk semua baris (daftar dirender ulang utuh).
 $('#objTreeList').addEventListener('click',(e)=>{
   const row=e.target.closest('.ot-row'); if(!row) return;
@@ -196,7 +238,7 @@ function setObjTreePane(open){
   b.classList.toggle('on', open);
   b.setAttribute('aria-pressed', open?'true':'false');
   try{ localStorage.setItem('br_objTreePane', open?'1':'0'); }catch(_){}
-  if(open){ try{ setAlertsPane(false); }catch(_){} renderObjTree(); }
+  if(open){ try{ setAlertsPane(false); }catch(_){} _otOther.inst=null; renderObjTree(); }   // inst=null → ambil ulang Other symbols
 }
 $('#railObjTree').onclick=()=>setObjTreePane(!objTreeOpen());
 $('#objTreeClose').onclick=()=>setObjTreePane(false);

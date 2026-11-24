@@ -1010,6 +1010,34 @@ func (s *Store) GetDrawings(userID int64, instrument string) (string, int64, err
 	return payload, version, nil
 }
 
+// DrawingCount = jumlah objek gambar satu instrumen (ringkasan lintas instrumen Object Tree).
+type DrawingCount struct {
+	Instrument string `json:"instrument"`
+	Count      int    `json:"count"`
+}
+
+// DrawingCounts menghitung objek per instrumen milik user langsung di SQLite (json_array_length),
+// tanpa memuat payload utuh ke Go. Instrumen dgn payload kosong / tak valid dilewati. Selalu
+// slice non-nil supaya JSON-nya `[]`, bukan `null`.
+func (s *Store) DrawingCounts(userID int64) ([]DrawingCount, error) {
+	rows, err := s.db.Query(`SELECT instrument, json_array_length(payload) FROM drawings
+WHERE user_id=? AND json_valid(payload) AND json_type(payload)='array' AND json_array_length(payload)>0
+ORDER BY instrument`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []DrawingCount{}
+	for rows.Next() {
+		var d DrawingCount
+		if err := rows.Scan(&d.Instrument, &d.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // SaveDrawings menyimpan payload HANYA bila baseVersion masih cocok dengan versi server.
 // ok=false berarti versi basi — itu keadaan normal (perangkat lain menyimpan duluan), bukan error
 // teknis, jadi ia tidak dikembalikan sebagai err. Versi yang dikembalikan SELALU versi server
