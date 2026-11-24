@@ -90,6 +90,11 @@
   .ot-btn.on{ color:var(--txt); }
   .ot-del:hover{ color:var(--red); }
   /* Grup (js/draw-groups.js): baris folder + anggota menjorok */
+  /* drag & drop baris (js/draw-zorder.js): garis sisip atas/bawah, bingkai = masuk grup */
+  .ot-row.dragging{ opacity:.45; }
+  .ot-row.drop-before{ box-shadow:inset 0 2px 0 var(--accent, #4f8cff); }
+  .ot-row.drop-after{ box-shadow:inset 0 -2px 0 var(--accent, #4f8cff); }
+  .ot-row.drop-into{ box-shadow:inset 0 0 0 1.5px var(--accent, #4f8cff); }
   .ot-group .ot-name{ font-weight:600; }
   .ot-child{ padding-left:28px; }
   .ot-caret{ width:16px; height:18px; padding:0; margin-right:-4px; flex:none; display:flex; align-items:center; justify-content:center;
