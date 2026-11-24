@@ -123,4 +123,47 @@ test.describe('object tree', () => {
     await expect(page.locator('#objTreeCount')).toHaveText('');
     assertNoPageErrors(page);
   });
+
+  test('ganti nama objek: dblclick → input; Esc batal, kosong = nama otomatis; bertahan undo & reload', async ({ page }) => {
+    await gotoApp(page);
+    const { obj } = await drawTool(page, 'trendline');
+    await page.evaluate(() => deselectOverlay());
+    await openTree(page);
+    const name = row(page, obj.id).locator('.ot-name');
+    const auto = (await name.textContent()).trim();
+    const inp = page.locator('#objTreeList .ot-rename');
+
+    // Esc = batal
+    await name.dblclick();
+    await expect(inp).toBeFocused();
+    await inp.fill('Ignored');
+    await inp.press('Escape');
+    await expect(name).toHaveText(auto);
+
+    await name.dblclick();
+    await inp.fill('  Weekly high  ');
+    await inp.press('Enter');
+    await expect(name).toHaveText('Weekly high');
+
+    // undo → nama otomatis (restore = id baru, bandingkan label baris satu-satunya)
+    const only = page.locator('#objTreeList .ot-row .ot-name');
+    await page.waitForTimeout(500);
+    await page.evaluate(() => undoDraw());
+    await expect(only).toHaveText(auto);
+    await page.evaluate(() => redoDraw());
+    await expect(only).toHaveText('Weekly high');
+
+    await page.waitForTimeout(500); // debounce saveDraws 350ms
+    await page.reload();
+    await page.waitForFunction(() => typeof drawIds !== 'undefined' && drawIds.length === 1, null, { timeout: 8000 });
+    await expect(only).toHaveText('Weekly high');
+
+    // nama kosong = kembali ke nama otomatis
+    await only.dblclick();
+    await inp.fill('   ');
+    await inp.press('Enter');
+    await expect(only).toHaveText(auto);
+    expect(await page.evaluate(() => Object.keys(objName).length)).toBe(0);
+    assertNoPageErrors(page);
+  });
 });

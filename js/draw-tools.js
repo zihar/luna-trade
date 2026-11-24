@@ -298,7 +298,7 @@ function delHooks(){ return {
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
-    try{ delete objHidden[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
+    try{ delete objHidden[e.overlay.id]; delete objName[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
     try{ msForget(e.overlay.id); }catch(_){}           // js/draw-multi-select.js
     try{ grpForget(e.overlay.id); }catch(_){}          // js/draw-groups.js
     // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.

@@ -120,21 +120,10 @@ function grpSyncBtn(){
 }
 $('#objTreeGroup').onclick=()=>{ const g=grpCreate(); if(g) grpCollapsed.delete(g); };
 
-// Ganti nama inline (klik dua kali nama grup). Enter/blur = simpan, Esc = batal.
+// Ganti nama inline (klik dua kali nama grup) — mekanismenya otInlineRename (js/draw-object-tree.js).
 function grpStartRename(row){
   const gid=row.dataset.gid, span=row.querySelector('.ot-name'); if(!gid || !span) return;
-  _grpEditing=true;
-  const inp=document.createElement('input');
-  inp.className='ot-rename'; inp.value=grpName[gid]||''; inp.setAttribute('aria-label','Group name'); inp.maxLength=60;
-  span.replaceWith(inp); inp.focus(); inp.select();
-  let done=false;
-  const end=(save)=>{ if(done) return; done=true; _grpEditing=false;
-    if(save) grpRename(gid, inp.value); renderObjTree(); };
-  inp.addEventListener('keydown',ev=>{ ev.stopPropagation();
-    if(ev.key==='Enter'){ ev.preventDefault(); end(true); } else if(ev.key==='Escape'){ ev.preventDefault(); end(false); } });
-  inp.addEventListener('blur',()=>end(true));
-  inp.addEventListener('click',ev=>ev.stopPropagation());
-  inp.addEventListener('mousedown',ev=>ev.stopPropagation());
+  otInlineRename(span, grpName[gid]||'', 'Group name', (v)=>grpRename(gid, v));
 }
 $('#objTreeList').addEventListener('dblclick',(e)=>{
   const row=e.target.closest('.ot-group'); if(!row || !e.target.closest('.ot-name')) return;
