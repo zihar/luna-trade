@@ -6,6 +6,7 @@
 // Hide PER OBJEK disimpan di `objHidden[id]` dan ikut payload (field `hidden:1`, lihat
 // js/draw-persist.js). Ia BERBEDA dari "Hide all drawings" di rail (drawsHidden) yang sengaja
 // sementara (tak tersimpan). Visibilitas akhir = keduanya: lihat drawVisible().
+// Grup (js/draw-groups.js) dirender di sini sbg baris folder; logikanya di modul itu.
 // Rancangan: docs/superpowers/specs/2026-11-24-object-tree-design.md
 let objHidden={};
 function isDrawHidden(id){ return !!objHidden[id]; }
@@ -47,31 +48,74 @@ function objTreeDirty(){
   _otTimer=requestAnimationFrame(()=>{ _otTimer=0; renderObjTree(); });
 }
 function objTreeOpen(){ const p=$('#objTreePane'); return !!(p && p.classList.contains('open')); }
+function otObjRow(id, child){
+  const o=chart.getOverlayById(id); if(!o) return null;
+  const locked=!!o.lock, hidden=isDrawHidden(id);
+  const row=document.createElement('div');
+  const sel=msIsSel(id);
+  row.className='ot-row'+(child?' ot-child':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
+  row.dataset.id=id; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name"></span>'+otBtns(locked,hidden,'');
+  row.querySelector('.ot-name').textContent=drawLabel(o);
+  return row;
+}
+function otBtns(locked,hidden,extra){
+  return extra+
+    '<button class="ot-btn ot-lock'+(locked?' on':'')+'" title="'+(locked?'Unlock':'Lock')+'" aria-label="'+(locked?'Unlock':'Lock')+'">'+(locked?LOCK_SVG:OT_LOCK_OPEN_SVG)+'</button>'+
+    '<button class="ot-btn ot-eye'+(hidden?' on':'')+'" title="'+(hidden?'Show':'Hide')+'" aria-label="'+(hidden?'Show':'Hide')+'">'+(hidden?EYEOFF_SVG:EYE_SVG)+'</button>'+
+    '<button class="ot-btn ot-del" title="Remove" aria-label="Remove">'+TRASH_SVG+'</button>';
+}
+const OT_FOLDER_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+const OT_UNGROUP_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="8" height="8" rx="1.4"/><rect x="12.5" y="12.5" width="8" height="8" rx="1.4"/><path d="M15 8.5h2.5V11M9 15.5H6.5V13" stroke-dasharray="2 1.6"/></svg>';
+const OT_CARET_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg>';
+// Baris folder grup (js/draw-groups.js): status Lock/Hide = "semua anggota".
+function otGroupRow(gid, members){
+  const locked=grpAllLocked(gid), hidden=grpAllHidden(gid), open=!grpCollapsed.has(gid);
+  const live=members.filter(id=>!isDrawHidden(id));
+  const sel=live.length>0 && live.every(msIsSel);
+  const row=document.createElement('div');
+  row.className='ot-row ot-group'+(open?' open':'')+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
+  row.dataset.gid=gid; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
+  row.setAttribute('aria-expanded', open?'true':'false');
+  row.innerHTML='<button class="ot-caret" title="'+(open?'Collapse':'Expand')+'" aria-label="'+(open?'Collapse':'Expand')+'">'+OT_CARET_SVG+'</button>'+
+    '<span class="ot-ico">'+OT_FOLDER_SVG+'</span><span class="ot-name" title="Double-click to rename"></span><span class="ot-gcount">'+members.length+'</span>'+
+    otBtns(locked,hidden,'<button class="ot-btn ot-ungroup" title="Ungroup" aria-label="Ungroup">'+OT_UNGROUP_SVG+'</button>');
+  row.querySelector('.ot-name').textContent=grpName[gid]||'Group';
+  return row;
+}
 function renderObjTree(){
   const list=$('#objTreeList'); if(!list || !objTreeOpen()) return;
+  try{ grpSyncBtn(); }catch(_){}
+  if(_grpEditing) return;   // input ganti nama grup sedang terbuka (js/draw-groups.js)
   const ids=drawIds.filter(id=>{ try{ const o=chart.getOverlayById(id); return o && o.name!=='measure' && id!==inProgressId; }catch(_){ return false; } });
   $('#objTreeCount').textContent=ids.length ? String(ids.length) : '';
   if(!ids.length){ list.innerHTML='<div class="ot-empty">No drawings on this chart yet.</div>'; return; }
   const frag=document.createDocumentFragment();
-  ids.slice().reverse().forEach(id=>{
-    const o=chart.getOverlayById(id); if(!o) return;
-    const locked=!!o.lock, hidden=isDrawHidden(id);
-    const row=document.createElement('div');
-    const sel=msIsSel(id);
-    row.className='ot-row'+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-    row.dataset.id=id; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
-    row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name"></span>'+
-      '<button class="ot-btn ot-lock'+(locked?' on':'')+'" title="'+(locked?'Unlock':'Lock')+'" aria-label="'+(locked?'Unlock':'Lock')+'">'+(locked?LOCK_SVG:OT_LOCK_OPEN_SVG)+'</button>'+
-      '<button class="ot-btn ot-eye'+(hidden?' on':'')+'" title="'+(hidden?'Show':'Hide')+'" aria-label="'+(hidden?'Show':'Hide')+'">'+(hidden?EYEOFF_SVG:EYE_SVG)+'</button>'+
-      '<button class="ot-btn ot-del" title="Remove" aria-label="Remove">'+TRASH_SVG+'</button>';
-    row.querySelector('.ot-name').textContent=drawLabel(o);
-    frag.appendChild(row);
+  // Terbaru di atas. Grup menempati posisi anggotanya yang TERBARU; anggotanya menjorok di bawahnya.
+  const order=ids.slice().reverse(), done=new Set();
+  order.forEach(id=>{
+    const g=grpOf(id);
+    if(!g){ const r=otObjRow(id,false); if(r) frag.appendChild(r); return; }
+    if(done.has(g)) return; done.add(g);
+    const members=order.filter(x=>grpOf(x)===g);
+    frag.appendChild(otGroupRow(g, members));
+    if(!grpCollapsed.has(g)) members.forEach(x=>{ const r=otObjRow(x,true); if(r) frag.appendChild(r); });
   });
   list.replaceChildren(frag);
 }
 // Satu listener terdelegasi untuk semua baris (daftar dirender ulang utuh).
 $('#objTreeList').addEventListener('click',(e)=>{
   const row=e.target.closest('.ot-row'); if(!row) return;
+  const gid=row.dataset.gid;
+  if(gid){
+    if(e.target.closest('.ot-caret')){ if(grpCollapsed.has(gid)) grpCollapsed.delete(gid); else grpCollapsed.add(gid); renderObjTree(); return; }
+    if(e.target.closest('.ot-ungroup')){ grpUngroup(gid); return; }
+    if(e.target.closest('.ot-lock')){ grpSetLock(gid, !grpAllLocked(gid)); return; }
+    if(e.target.closest('.ot-eye')){ grpSetHidden(gid, !grpAllHidden(gid)); return; }
+    if(e.target.closest('.ot-del')){ grpDelete(gid); return; }
+    if(e.target.closest('.ot-rename')) return;
+    grpSelect(gid, e.ctrlKey||e.metaKey); return;
+  }
   const id=row.dataset.id;
   if(e.target.closest('.ot-lock')){ toggleDrawLock(id); objTreeDirty(); return; }
   if(e.target.closest('.ot-eye')){ setDrawHidden(id, !isDrawHidden(id)); return; }
@@ -80,9 +124,10 @@ $('#objTreeList').addEventListener('click',(e)=>{
   // — memilih objek yang tak tampak tak ada gunanya).
   if(isDrawHidden(id)) setDrawHidden(id,false);
   if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }
-  // Ctrl/⌘+klik = tambah/lepas, Shift+klik = rentang menurut urutan baris (js/draw-multi-select.js)
+  // Ctrl/⌘+klik = tambah/lepas, Shift+klik = rentang menurut urutan baris (js/draw-multi-select.js).
+  // Baris anggota grup memilih objek itu SAJA (jalan untuk mengedit satu anggota, spt TV).
   if(e.ctrlKey||e.metaKey){ msTreeToggle(id); return; }
-  if(e.shiftKey){ msTreeRange(id, [...e.currentTarget.querySelectorAll('.ot-row')].map(r=>r.dataset.id)); return; }
+  if(e.shiftKey){ msTreeRange(id, [...e.currentTarget.querySelectorAll('.ot-row[data-id]')].map(r=>r.dataset.id)); return; }
   try{ msSelectOnly(id); _msAnchor=id; }catch(_){}
   objTreeDirty();
 });

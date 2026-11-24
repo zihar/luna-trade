@@ -300,6 +300,7 @@ function delHooks(){ return {
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
     try{ delete objHidden[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
     try{ msForget(e.overlay.id); }catch(_){}           // js/draw-multi-select.js
+    try{ grpForget(e.overlay.id); }catch(_){}          // js/draw-groups.js
     // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.
     // Gerbang suppressDrawSave WAJIB: clearDrawings() saat reload (js/load-chart.js) dan tiap
     // langkah undo/redo (js/draw-undo.js) juga lewat chart.removeOverlay → onRemoved ini, dgn
