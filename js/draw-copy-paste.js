@@ -9,28 +9,41 @@
 //
 // Clipboard hidup di memori saja: ia sengaja tak selamat dari reload (clipboard yang mengingat
 // objek dari kemarin mengagetkan, untungnya tipis).
-let drawClip=null;   // {name, styles, extendData, objStyle, off:[{dx,dy}]}
+let drawClip=null;   // {items:[{name, styles, extendData, objStyle, grp, off:[{dx,dy}]}]}
 
-// Salin objek TERPILIH. Hanya `selectedId` — hover sengaja TIDAK dipakai (walau Delete memakainya):
+// Salin objek TERPILIH. Hanya seleksi — hover sengaja TIDAK dipakai (walau Delete memakainya):
 // menyalin objek yang cuma kelewatan kursor tak punya niat di baliknya. Objek terkunci boleh
 // disalin: menyalin tak mengubah apa pun.
+//
+// Seleksi ganda (js/draw-multi-select.js) → SEMUA anggota tersalin sbg satu set, sama spt TV.
+// Offset tiap titik diukur dari titik ke-1 objek PRIMER, yang ditaruh paling depan, sehingga paste
+// satu objek tetap persis perilaku lama (titik ke-1 mendarat di kursor).
 function copyOverlay(){
-  const id=selectedId; if(!id) return false;
-  const d=descOf(id); if(!d) return false;
-  // Gerbang PERSIST_DRAW (js/draw-persist.js): tool ephemeral (measure) lewat jalur normal yang
-  // sama jadi BISA selectedId & lolos sampai sini, tapi menyalinnya melahirkan overlay `measure`
-  // permanen di drawIds — persistence tak menjangkaunya (tak masuk PERSIST_DRAW) dan
-  // clearMeasure() tak tahu id-nya, jadi ia jadi hantu yang cuma hilang saat reload.
-  if(!PERSIST_DRAW[d.name]) return false;
-  const px=d.points.map(anchorPx);
-  if(px.some(p=>!p)) return false;   // ada titik yang tak terkonversi → jangan simpan bentuk separuh
-  drawClip={ name:d.name, styles:d.styles, extendData:d.extendData, objStyle:d.objStyle,
-             off:px.map(p=>({dx:p.x-px[0].x, dy:p.y-px[0].y})) };
+  if(selectedId==null) return false;
+  const ids=[selectedId];
+  if(multiSel.size>=2 && multiSel.has(selectedId))
+    multiSel.forEach(id=>{ if(id!==selectedId && msLive(id)) ids.push(id); });
+  let base=null; const items=[];
+  for(const id of ids){
+    const d=descOf(id); if(!d) continue;
+    // Gerbang PERSIST_DRAW (js/draw-persist.js): tool ephemeral (measure) lewat jalur normal yang
+    // sama jadi BISA selectedId & lolos sampai sini, tapi menyalinnya melahirkan overlay `measure`
+    // permanen di drawIds — persistence tak menjangkaunya (tak masuk PERSIST_DRAW) dan
+    // clearMeasure() tak tahu id-nya, jadi ia jadi hantu yang cuma hilang saat reload.
+    if(!PERSIST_DRAW[d.name]) continue;
+    const px=d.points.map(anchorPx);
+    if(px.some(p=>!p)) continue;   // ada titik yang tak terkonversi → jangan simpan bentuk separuh
+    if(!base) base=px[0];
+    items.push({ name:d.name, styles:d.styles, extendData:d.extendData, objStyle:d.objStyle, grp:grpOf(id),
+                 off:px.map(p=>({dx:p.x-base.x, dy:p.y-base.y})) });
+  }
+  if(!items.length) return false;
+  drawClip={items};
   return true;
 }
 
-// Tempatkan isi clipboard sehingga TITIK KE-1 mendarat di (px,py) container-relative terhadap
-// #chart. Mengembalikan id objek baru, atau null.
+// Tempatkan isi clipboard sehingga TITIK KE-1 objek primer mendarat di (px,py) container-relative
+// terhadap #chart. Mengembalikan id objek baru (primer), atau null.
 function pasteOverlayAt(px,py){
   if(!drawClip) return null;
   // Sama seperti createDraw() (js/draw-tools.js): mau membuat objek baru → tampilkan lagi semua
@@ -38,21 +51,29 @@ function pasteOverlayAt(px,py){
   // sendirian di tengah chart yang kosong, sementara tombol mata masih bilang "Show all drawings" —
   // membingungkan, seolah objek lama hilang padahal cuma disembunyikan.
   if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }
-  const pts=[];
-  for(const o of drawClip.off){
-    const x=px+o.dx, y=py+o.dy;
-    const v=pxToValue(y); if(v==null) return null;
-    // Jalur anchor: js/util.js:anchorFromPx() — kebijakan SAMA dgn instantDropPoint
-    // (js/draw-tools.js), satu tempat, supaya salinan tak "loncat" saat dibuat.
-    const np=anchorFromPx(drawClip.name, x, v); if(!np) return null;
-    pts.push(np);
+  const made=[];   // [{nid, grp}]
+  for(const it of drawClip.items){
+    const pts=[];
+    for(const o of it.off){
+      const x=px+o.dx, y=py+o.dy;
+      const v=pxToValue(y); if(v==null){ pts.length=0; break; }
+      // Jalur anchor: js/util.js:anchorFromPx() — kebijakan SAMA dgn instantDropPoint
+      // (js/draw-tools.js), satu tempat, supaya salinan tak "loncat" saat dibuat.
+      const np=anchorFromPx(it.name, x, v); if(!np){ pts.length=0; break; }
+      pts.push(np);
+    }
+    if(!pts.length) continue;   // satu objek gagal (mis. titiknya di luar data) tak membatalkan yang lain
+    const nid=createFromDesc(it, pts);
+    if(nid) made.push({nid, grp:it.grp});
   }
-  const nid=createFromDesc(drawClip, pts);
-  if(!nid) return null;
+  if(!made.length) return null;
+  // Objek yang sumbernya satu grup → satu grup BARU (bukan bergabung ke grup sumber; TV sama).
+  try{ grpAdopt(made.map(m=>[m.grp, m.nid])); }catch(_){}
   // Dua hal yang clone dapat GRATIS dari drag-nya, dan paste harus kerjakan sendiri:
   scheduleSaveDraws();   // tanpa ini objek hilang saat reload & Ctrl+Z tak bisa membatalkannya
-  selectPastedOverlay(nid);
-  return nid;
+  if(made.length===1){ selectPastedOverlay(made[0].nid); try{ msSelectOnly(made[0].nid); }catch(_){} }
+  else { multiSel=new Set(made.map(m=>m.nid)); msSetPrimary(made[0].nid); msRender(); }
+  return made[0].nid;
 }
 
 // Pilih objek yang baru di-paste — kebalikan deselectOverlay() (js/draw-tools.js), lewat jalur
