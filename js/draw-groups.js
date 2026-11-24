@@ -103,6 +103,17 @@ function grpCreate(ids){
   grpChanged();
   return gid;
 }
+// Salinan (paste / clone ganda): pasangan [gidSumber, idBaru]. Objek baru yang sumbernya satu grup
+// → satu grup BARU bernama "Group N" (TV juga tak menggabungkan salinan ke grup sumber). Sumber
+// grup yang cuma tersalin satu anggota → salinannya lepas, karena grup satu objek tak ada artinya.
+function grpAdopt(pairs){
+  const by={};
+  pairs.forEach(([g,id])=>{ if(g && id) (by[g]=by[g]||[]).push(id); });
+  let any=false;
+  Object.values(by).forEach(ids=>{ if(ids.length<2) return;
+    const gid=grpNewId(); ids.forEach(id=>{ objGroup[id]=gid; }); grpName[gid]=grpNextName(); any=true; });
+  if(any) grpChanged();
+}
 // Bubarkan satu tingkat: isi langsungnya (objek & sub-grup) naik ke induk grup itu.
 function grpUngroup(gid){
   if(!gid || !grpName[gid]) return;
@@ -186,21 +197,10 @@ function grpSyncBtn(){
 }
 $('#objTreeGroup').onclick=()=>{ const g=grpCreate(); if(g) grpCollapsed.delete(g); };
 
-// Ganti nama inline (klik dua kali nama grup). Enter/blur = simpan, Esc = batal.
+// Ganti nama inline (klik dua kali nama grup) — mekanismenya otInlineRename (js/draw-object-tree.js).
 function grpStartRename(row){
   const gid=row.dataset.gid, span=row.querySelector('.ot-name'); if(!gid || !span) return;
-  _grpEditing=true;
-  const inp=document.createElement('input');
-  inp.className='ot-rename'; inp.value=grpName[gid]||''; inp.setAttribute('aria-label','Group name'); inp.maxLength=60;
-  span.replaceWith(inp); inp.focus(); inp.select();
-  let done=false;
-  const end=(save)=>{ if(done) return; done=true; _grpEditing=false;
-    if(save) grpRename(gid, inp.value); renderObjTree(); };
-  inp.addEventListener('keydown',ev=>{ ev.stopPropagation();
-    if(ev.key==='Enter'){ ev.preventDefault(); end(true); } else if(ev.key==='Escape'){ ev.preventDefault(); end(false); } });
-  inp.addEventListener('blur',()=>end(true));
-  inp.addEventListener('click',ev=>ev.stopPropagation());
-  inp.addEventListener('mousedown',ev=>ev.stopPropagation());
+  otInlineRename(span, grpName[gid]||'', 'Group name', (v)=>grpRename(gid, v));
 }
 $('#objTreeList').addEventListener('dblclick',(e)=>{
   const row=e.target.closest('.ot-group'); if(!row || !e.target.closest('.ot-name')) return;
