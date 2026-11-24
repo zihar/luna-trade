@@ -43,6 +43,7 @@ func registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/alerts/by-drawing/delete", requireUser(handleAlertDeleteByDrawing))
 	mux.HandleFunc("GET /api/drawings", requireUser(handleDrawingsGet))
 	mux.HandleFunc("POST /api/drawings", requireUser(handleDrawingsSave))
+	mux.HandleFunc("GET /api/drawings/summary", requireUser(handleDrawingsSummary))
 }
 
 // handleTrack mencatat satu event pemakaian fitur (analytics DIY, lihat store.LogEvent).
@@ -374,6 +375,18 @@ func handleDrawingsGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"payload":` + payload + `,"version":` + strconv.FormatInt(version, 10) + `}`))
+}
+
+// GET /api/drawings/summary → {instruments:[{instrument, count}]} — instrumen lain yang punya
+// objek gambar, untuk bagian "Other symbols" di Object Tree (js/draw-object-tree.js).
+func handleDrawingsSummary(w http.ResponseWriter, r *http.Request) {
+	uid, _ := userIDFromCtx(r)
+	rows, err := store.DrawingCounts(uid)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"instruments": rows})
 }
 
 // POST /api/drawings {instrument, payload, baseVersion}
