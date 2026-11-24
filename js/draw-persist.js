@@ -36,7 +36,8 @@ function serializeDraws(){
     if(pts.some(p=>p.vt==null)) return;   // jangan simpan gambar dgn titik anchorless (rusak → far-left saat restore)
     // hidden:1 = disembunyikan per objek dari Object Tree (js/draw-object-tree.js); absen = tampak.
     // grp/gname = keanggotaan grup (js/draw-groups.js); absen = tak bergrup.
-    out.push({ name:o.name, points:pts, lock:o.lock?1:0, did:didOf(id), ...(sb?{xm:1}:{}), ...(objHidden[id]?{hidden:1}:{}), ...grpSerialize(id),
+    // oname = nama pilihan pengguna (js/draw-object-tree.js); absen = nama otomatis.
+    out.push({ name:o.name, points:pts, lock:o.lock?1:0, did:didOf(id), ...(sb?{xm:1}:{}), ...(objHidden[id]?{hidden:1}:{}), ...(objName[id]?{oname:objName[id]}:{}), ...grpSerialize(id),
       extendData:(o.extendData!==undefined?o.extendData:null), style:objStyle[id]||null });
   }catch(e){} });
   return out;
@@ -92,6 +93,7 @@ function buildDrawsFromArray(arr){
       // dan ia ikut tersimpan pada penyimpanan berikutnya.
       objDid[id]= (typeof d.did==='string' && d.did) ? d.did : newDid();
       if(d.hidden) objHidden[id]=true;
+      if(typeof d.oname==='string' && d.oname) objName[id]=d.oname.slice(0,60);   // nama pilihan (js/draw-object-tree.js)
       grpRestore(id,d);   // grp/gname → keanggotaan grup (js/draw-groups.js)
       try{ applyXDateFlag(chart.getOverlayById(id)); }catch(_){}   // restore full-point tak picu onDrawEnd → set flag di sini
       if(d.lock) try{ applyLockVisual(id,true); }catch(_){}        // muncul tanpa handle sejak awal
