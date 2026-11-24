@@ -191,6 +191,9 @@ test.describe('groups', () => {
     await expect(item).toBeVisible();
     await item.click();
     await expect(groupRows(page)).toHaveCount(1);
+    // Group & rename harus jadi dua langkah undo: tunggu debounce saveDraws (350ms) di antaranya,
+    // kalau tidak keduanya terlebur dan undo melompat ke sebelum grup dibuat.
+    await page.waitForTimeout(500);
 
     await groupRows(page).locator('.ot-name').dblclick();
     const inp = page.locator('#objTreeList .ot-rename');

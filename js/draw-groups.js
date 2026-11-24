@@ -7,23 +7,61 @@
 //  - Object Tree: grup tampil sbg baris folder yang bisa dilipat, dgn Lock / Hide / Remove /
 //    Ungroup untuk seluruh anggota; klik dua kali namanya = ganti nama. Klik baris ANGGOTA di tree
 //    memilih objek itu saja (jalan untuk mengedit satu anggota, sama spt TV).
-//  - Grup datar: objek hanya milik satu grup. Mengelompokkan objek yang sudah bergrup memindahkannya
-//    ke grup baru (grup bertingkat TV sengaja tak ditiru, lihat spec).
+//  - Grup BERSARANG spt TV: mengelompokkan seleksi yang memuat satu grup UTUH menjadikan grup itu
+//    sub-grup dari grup baru. Klik anggota di chart memilih grup TERLUAR; tombol per folder di tree
+//    (Lock/Hide/Remove/seleksi/hitungan) berlaku ke SELURUH isinya, termasuk sub-grup.
 //
-// Keanggotaan disimpan PER OBJEK di payload (`grp` = id grup, `gname` = nama), lihat
+// Keanggotaan disimpan PER OBJEK di payload (`grp` = id grup terdalam, `gname` = nama, `gpar` =
+// rantai leluhurnya [[gid,nama],…] dari luar ke dalam; absen = grup tingkat atas), lihat
 // js/draw-persist.js. Id overlay klinecharts berganti tiap restore/undo, tapi id grup ikut payload
 // jadi grup utuh melewati reload, undo, dan sync antarperangkat tanpa tabel terpisah.
 // Rancangan: docs/superpowers/specs/2026-11-24-object-tree-design.md (bagian PR3)
-let objGroup={};            // id overlay → id grup
-let grpName={};             // id grup → nama tampilan
+let objGroup={};            // id overlay → id grup TERDALAM yang memuatnya langsung
+let grpName={};             // id grup → nama tampilan (sekaligus daftar grup yang hidup)
+let grpParent={};           // id grup → id grup induk (absen = tingkat atas)
 let grpCollapsed=new Set(); // id grup yang dilipat di Object Tree (sesi saja, spt TV)
 let _grpEditing=false;      // input ganti nama sedang terbuka → tahan render ulang tree
 
 function grpOf(id){ return (id!=null && objGroup[id]) || null; }
-function grpMembers(gid){ return gid ? drawIds.filter(id=>objGroup[id]===gid) : []; }
-// Himpunan yang dipilih bila `id` diklik di chart: seluruh anggota grupnya yang tampak, atau id itu sendiri.
+// Rantai grup dari LUAR ke DALAM untuk sebuah grup (termasuk dirinya). Penjaga siklus: data rusak
+// dari payload tak boleh membuat loop tak berujung.
+function grpChain(gid){
+  const a=[], seen=new Set();
+  for(let g=gid; g && !seen.has(g); g=grpParent[g]||null){ seen.add(g); a.unshift(g); }
+  return a;
+}
+function grpPath(id){ return grpChain(grpOf(id)); }          // grup yang memuat objek, luar → dalam
+function grpTopOf(id){ const p=grpPath(id); return p.length ? p[0] : null; }
+function grpHas(gid,id){ return !!gid && grpPath(id).includes(gid); }
+// SELURUH objek di dalam grup, termasuk lewat sub-grup.
+function grpMembers(gid){ return gid ? drawIds.filter(id=>grpHas(gid,id)) : []; }
+// Grup kosong (anggotanya terhapus/pindah semua) dibuang; sub-grup yang induknya hilang naik ke atas.
+function grpPrune(){
+  Object.keys(grpName).forEach(g=>{ if(!grpMembers(g).length){ delete grpName[g]; delete grpParent[g]; grpCollapsed.delete(g); } });
+  Object.keys(grpParent).forEach(g=>{ if(!grpName[grpParent[g]]) delete grpParent[g]; });
+}
+// Urutan baris tree untuk `order` (depan → belakang): entri {gid, depth, members} untuk folder dan
+// {id, depth} untuk objek. Folder menempati posisi isinya yang paling depan; isinya menyusul di
+// bawahnya. Dipakai renderObjTree DAN drag & drop (js/draw-zorder.js) supaya keduanya sepakat.
+function grpWalk(order){
+  const out=[], path=new Map(order.map(id=>[id,grpPath(id)]));
+  const rec=(ids, L, depth)=>{
+    const done=new Set();
+    ids.forEach(id=>{
+      const p=path.get(id), k=L ? p.indexOf(L)+1 : 0;
+      if(k>=p.length){ out.push({id, depth}); return; }
+      const g=p[k]; if(done.has(g)) return; done.add(g);
+      const sub=ids.filter(x=>path.get(x)[k]===g);
+      out.push({gid:g, depth, members:sub});
+      rec(sub, g, depth+1);
+    });
+  };
+  rec(order, null, 0);
+  return out;
+}
+// Himpunan yang dipilih bila `id` diklik di chart: seluruh isi grup TERLUAR-nya yang tampak, atau id itu sendiri.
 function grpExpand(id){
-  const g=grpOf(id); if(!g) return [id];
+  const g=grpTopOf(id); if(!g) return [id];
   const m=grpMembers(g).filter(x=>x===id || !isDrawHidden(x));
   return m.length ? m : [id];
 }
@@ -35,15 +73,32 @@ function grpNextName(){
 }
 function grpChanged(){ try{ scheduleSaveDraws(); }catch(_){} try{ objTreeDirty(); }catch(_){} }
 
-// Objek terpilih (≥2) → satu grup baru. Mengembalikan id grup, atau null bila tak memenuhi syarat.
-function grpCreate(ids){
+// Seleksi → "unit" yang akan dikelompokkan: grup TERLUAR yang seluruh isinya terpilih (jadi sub-grup),
+// selain itu objeknya sendiri (keluar dari grup lamanya, spt TV).
+function grpUnits(ids){
   ids=(ids||[...multiSel]).filter(id=>drawIds.includes(id));
-  if(ids.length<2) return null;
+  const set=new Set(ids), units=[], seen=new Set();
+  ids.forEach(id=>{
+    const g=grpPath(id).find(x=>grpMembers(x).every(m=>set.has(m)));
+    const u=g ? {gid:g} : {id};
+    const k=g ? 'g:'+g : 'o:'+id;
+    if(!seen.has(k)){ seen.add(k); units.push(u); }
+  });
+  return units;
+}
+function grpCanCreate(ids){ return grpUnits(ids).length>=2; }
+// Seleksi → satu grup baru. Mengembalikan id grup, atau null bila tak memenuhi syarat.
+function grpCreate(ids){
+  const units=grpUnits(ids);
+  if(units.length<2) return null;
   const gid=grpNewId();
-  const olds=new Set(ids.map(grpOf).filter(Boolean));
-  ids.forEach(id=>{ objGroup[id]=gid; });
-  olds.forEach(g=>{ if(!grpMembers(g).length) delete grpName[g]; });
+  // induk bersama semua unit (mis. semua di dalam "Group 1") → grup baru jadi sub-grupnya
+  const par=units.map(u=>u.gid ? (grpParent[u.gid]||null) : grpOf(u.id));
+  const common=par.every(p=>p===par[0]) ? par[0] : null;
+  units.forEach(u=>{ if(u.gid) grpParent[u.gid]=gid; else objGroup[u.id]=gid; });
   grpName[gid]=grpNextName();
+  if(common) grpParent[gid]=common;
+  grpPrune();
   try{ track('draw_group'); }catch(_){}
   grpChanged();
   return gid;
@@ -59,33 +114,44 @@ function grpAdopt(pairs){
     const gid=grpNewId(); ids.forEach(id=>{ objGroup[id]=gid; }); grpName[gid]=grpNextName(); any=true; });
   if(any) grpChanged();
 }
+// Bubarkan satu tingkat: isi langsungnya (objek & sub-grup) naik ke induk grup itu.
 function grpUngroup(gid){
-  if(!gid) return;
-  grpMembers(gid).forEach(id=>{ delete objGroup[id]; });
-  delete grpName[gid]; grpCollapsed.delete(gid);
+  if(!gid || !grpName[gid]) return;
+  const p=grpParent[gid]||null;
+  drawIds.forEach(id=>{ if(objGroup[id]===gid){ if(p) objGroup[id]=p; else delete objGroup[id]; } });
+  Object.keys(grpParent).forEach(g=>{ if(grpParent[g]===gid){ if(p) grpParent[g]=p; else delete grpParent[g]; } });
+  delete grpName[gid]; delete grpParent[gid]; grpCollapsed.delete(gid);
   grpChanged();
 }
-// Grup yang tersentuh seleksi saat ini (untuk "Ungroup" di menu klik kanan).
+// Grup TERLUAR yang tersentuh seleksi saat ini (untuk "Ungroup" di menu klik kanan).
 function grpSelectedGroups(){
-  const s=new Set(); multiSel.forEach(id=>{ const g=grpOf(id); if(g) s.add(g); });
-  if(selectedId!=null){ const g=grpOf(selectedId); if(g) s.add(g); }
+  const s=new Set(); multiSel.forEach(id=>{ const g=grpTopOf(id); if(g) s.add(g); });
+  if(selectedId!=null){ const g=grpTopOf(selectedId); if(g) s.add(g); }
   return [...s];
 }
 // Dipanggil onRemoved (js/draw-tools.js). Grup tanpa anggota tersisa ikut hilang.
 function grpForget(id){
-  const g=objGroup[id]; if(!g) return;
+  if(!objGroup[id]) return;
   delete objGroup[id];
-  if(!grpMembers(g).length){ delete grpName[g]; grpCollapsed.delete(g); }
+  grpPrune();
 }
 // Pemulihan dari payload (js/draw-persist.js buildDrawsFromArray).
 function grpRestore(id, d){
   if(typeof d.grp!=='string' || !d.grp) return;
   objGroup[id]=d.grp;
-  if(typeof d.gname==='string' && d.gname) grpName[d.grp]=d.gname;
-  else if(!grpName[d.grp]) grpName[d.grp]=grpNextName();
+  const chain=(Array.isArray(d.gpar) ? d.gpar : []).filter(x=>Array.isArray(x) && typeof x[0]==='string' && x[0])
+    .concat([[d.grp, d.gname]]);
+  chain.forEach(([g,name],i)=>{
+    if(typeof name==='string' && name) grpName[g]=name;
+    else if(!grpName[g]) grpName[g]=grpNextName();
+    if(i>0 && g!==chain[i-1][0]) grpParent[g]=chain[i-1][0];
+  });
 }
 function grpSerialize(id){
-  const g=objGroup[id]; return g ? {grp:g, gname:grpName[g]||''} : {};
+  const p=grpPath(id); if(!p.length) return {};
+  const g=p[p.length-1], out={grp:g, gname:grpName[g]||''};
+  if(p.length>1) out.gpar=p.slice(0,-1).map(x=>[x, grpName[x]||'']);
+  return out;
 }
 
 // ---- aksi per grup (Object Tree) ----
@@ -125,9 +191,9 @@ function grpSelect(gid, mod){
 // ---- tombol Group di header Object Tree ----
 function grpSyncBtn(){
   const b=$('#objTreeGroup'); if(!b) return;
-  const n=[...multiSel].filter(id=>drawIds.includes(id)).length;
-  b.disabled = n<2;
-  b.title = n<2 ? 'Select 2 or more drawings to group them' : 'Group '+n+' selected drawings';
+  const n=[...multiSel].filter(id=>drawIds.includes(id)).length, ok=n>=2 && grpCanCreate();
+  b.disabled = !ok;
+  b.title = n<2 ? 'Select 2 or more drawings to group them' : ok ? 'Group '+n+' selected drawings' : 'Already one group';
 }
 $('#objTreeGroup').onclick=()=>{ const g=grpCreate(); if(g) grpCollapsed.delete(g); };
 

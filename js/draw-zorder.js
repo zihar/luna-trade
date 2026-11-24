@@ -15,9 +15,10 @@
 //  - seret baris objek ke separuh atas/bawah baris lain = sisipkan di atas/bawahnya; ikut menjadi
 //    anggota grup baris itu (anggota grup) atau keluar dari grup (baris tingkat atas);
 //  - seret ke TENGAH baris folder grup = masuk grup itu (paling atas); ke bawah folder yang terbuka
-//    = juga masuk; seperempat bawah anggota TERAKHIR = keluar ke bawah grup;
-//  - seret baris folder = pindahkan seluruh grup sbg satu blok (grup tak bisa bersarang, lihat
-//    backlog item 5).
+//    = juga masuk; seperempat bawah anggota TERAKHIR = keluar satu tingkat ke bawah grup;
+//  - seret baris folder = pindahkan seluruh grup sbg satu blok, dgn aturan jatuh yang SAMA → folder
+//    bisa masuk folder lain (grup bersarang, js/draw-groups.js) atau keluar ke tingkat atas. Jatuh
+//    ke dalam dirinya sendiri / sub-grupnya ditolak.
 // Status seret `_otDrag` dideklarasikan di js/draw-object-tree.js (renderObjTree menahan diri selama seret).
 
 function zApply(){
@@ -27,31 +28,20 @@ function zApply(){
   });
 }
 
-// Urutan baris tree (atas → bawah), termasuk anggota grup yang terlipat — sama dgn renderObjTree.
-function otVisualOrder(ids){
-  const order=ids.slice().reverse(), out=[], done=new Set();
-  order.forEach(id=>{
-    const g=grpOf(id);
-    if(!g){ out.push(id); return; }
-    if(done.has(g)) return; done.add(g);
-    order.forEach(x=>{ if(grpOf(x)===g) out.push(x); });
-  });
-  return out;
-}
+// Urutan baris tree (atas → bawah), termasuk isi folder yang terlipat — sama dgn renderObjTree.
+function otVisualOrder(ids){ return grpWalk(ids.slice().reverse()).filter(e=>e.id).map(e=>e.id); }
 function otTreeIds(){
   return drawIds.filter(id=>{ try{ const o=chart.getOverlayById(id); return o && o.name!=='measure' && id!==inProgressId; }catch(_){ return false; } });
 }
 
-// Posisi jatuh relatif baris di bawah pointer: before | after | into (folder) | out (keluar grup).
+// Baris `x` termasuk isi grup `g` (folder dirinya, sub-folder, atau objek di dalamnya)?
+function otRowIn(g, x){
+  return x.dataset.gid ? grpChain(x.dataset.gid).includes(g) : grpHas(g, x.dataset.id);
+}
+// Posisi jatuh relatif baris di bawah pointer: before | after | into (folder) | gbefore/gafter (batas blok grup).
 function otSlot(row, y){
   const r=row.getBoundingClientRect(), f=(y-r.top)/Math.max(1,r.height);
   const gid=row.dataset.gid;
-  if(_otDrag.kind==='grp'){
-    // blok grup hanya bisa jatuh di tingkat atas: baris anggota dipetakan ke blok grupnya
-    const g=gid || grpOf(row.dataset.id);
-    if(!g) return {row, pos:f<.5?'before':'after'};
-    return {row, pos:f<.5?'gbefore':'gafter', gid:g};
-  }
   if(gid){
     if(f<.25) return {row, pos:'gbefore', gid};
     if(f>.75 && grpCollapsed.has(gid)) return {row, pos:'gafter', gid};
@@ -59,43 +49,44 @@ function otSlot(row, y){
   }
   const g=grpOf(row.dataset.id);
   if(g && f>.75){
-    const vis=[...row.parentNode.querySelectorAll('.ot-row[data-id]')].filter(x=>grpOf(x.dataset.id)===g);
+    const vis=[...row.parentNode.querySelectorAll('.ot-row')].filter(x=>otRowIn(g,x));
     if(vis[vis.length-1]===row) return {row, pos:'gafter', gid:g};
   }
   return {row, pos:f<.5?'before':'after'};
 }
 // Slot → indeks sisip di urutan visual TANPA yang diseret + grup tujuan (null = tingkat atas).
 function otResolve(slot, rest){
-  const span=(g)=>{ let a=-1,b=-1; rest.forEach((id,i)=>{ if(grpOf(id)===g){ if(a<0) a=i; b=i; } }); return [a,b]; };
+  const span=(g)=>{ let a=-1,b=-1; rest.forEach((id,i)=>{ if(grpHas(g,id)){ if(a<0) a=i; b=i; } }); return [a,b]; };
   if(slot.gid && slot.pos!=='before' && slot.pos!=='after'){
-    const [a,b]=span(slot.gid); if(a<0) return null;   // grup yang diseret dijatuhkan ke dirinya sendiri
-    if(slot.pos==='gbefore') return {at:a, grp:null};
-    if(slot.pos==='gafter')  return {at:b+1, grp:null};
+    const [a,b]=span(slot.gid); if(a<0) return null;   // grup yang diseret dijatuhkan ke dirinya / sub-grupnya
+    const up=grpParent[slot.gid]||null;
+    if(slot.pos==='gbefore') return {at:a, grp:up};
+    if(slot.pos==='gafter')  return {at:b+1, grp:up};
     return {at:a, grp:slot.gid};                         // into
   }
   const id=slot.row.dataset.id, i=rest.indexOf(id); if(i<0) return null;
   return {at:slot.pos==='before'?i:i+1, grp:grpOf(id)};
 }
-
 // Terapkan perpindahan. Mengembalikan true bila sesuatu berubah.
 function otMove(drag, slot){
   const tree=otTreeIds(), vis=otVisualOrder(tree);
-  const moving=drag.kind==='grp' ? vis.filter(id=>grpOf(id)===drag.gid) : [drag.id];
+  const moving=drag.kind==='grp' ? vis.filter(id=>grpHas(drag.gid,id)) : [drag.id];
   if(!moving.length || !moving.every(id=>vis.includes(id))) return false;
   const rest=vis.filter(id=>!moving.includes(id));
   const t=otResolve(slot, rest); if(!t) return false;
+  if(drag.kind==='grp' && t.grp && grpChain(t.grp).includes(drag.gid)) return false;   // ke dalam dirinya sendiri
   const nv=rest.slice(0,t.at).concat(moving, rest.slice(t.at));
   const others=drawIds.filter(id=>!tree.includes(id));   // measure / objek yang masih digambar: tetap di depan
   const next=nv.slice().reverse().concat(others);
   let changed=next.some((id,i)=>drawIds[i]!==id);
   if(drag.kind==='obj'){
-    const id=drag.id, old=grpOf(id);
-    if(old!==t.grp){
-      changed=true;
-      if(t.grp) objGroup[id]=t.grp; else delete objGroup[id];
-      if(old && !grpMembers(old).length){ delete grpName[old]; grpCollapsed.delete(old); }
-    }
+    const id=drag.id;
+    if(grpOf(id)!==t.grp){ changed=true; if(t.grp) objGroup[id]=t.grp; else delete objGroup[id]; }
+  } else {
+    const g=drag.gid;
+    if((grpParent[g]||null)!==t.grp){ changed=true; if(t.grp) grpParent[g]=t.grp; else delete grpParent[g]; }
   }
+  grpPrune();   // grup asal yang jadi kosong ikut hilang
   if(!changed) return false;
   drawIds=next;
   zApply();
@@ -115,7 +106,7 @@ function otMarkDrop(list, slot){
   else if(slot.pos==='after') cls='drop-after';
   else {
     // batas blok grup: garis di atas folder / di bawah baris terakhir grup
-    const rows=[...list.querySelectorAll('.ot-row')].filter(x=>x.dataset.gid===slot.gid || grpOf(x.dataset.id)===slot.gid);
+    const rows=[...list.querySelectorAll('.ot-row')].filter(x=>otRowIn(slot.gid,x));
     el=slot.pos==='gbefore' ? rows[0] : rows[rows.length-1];
     cls=slot.pos==='gbefore' ? 'drop-before' : 'drop-after';
   }
