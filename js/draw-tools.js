@@ -116,8 +116,10 @@ function delHooks(){ return {
     // `!o.lock` cuma sabuk pengaman: klinecharts sendiri tak memanggil pressed-move untuk objek
     // terkunci, jadi jalur ini tak pernah tercapai — tapi mengandalkan itu diam-diam mahal.
     cloneArmed = !!(cloneModHeld && o && !o.lock && selectedId===o.id); cloneDone=false;
+    try{ msDragStart(o,e); }catch(_){}   // seleksi ganda → anggota lain ikut (js/draw-multi-select.js)
     return false; },
-  onPressedMoving:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
+  onPressedMoving:(e)=>{ try{ msDragMove(e); }catch(_){}   // SEBELUM guard subBar: vertical line pun boleh memimpin
+    const o=e&&e.overlay; if(!o||!o.points||!subBar(o.name)) return false;
     const OX=0, OY=0;
     // Shift = kunci sudut, jangkar = ujung SEBERANG. Dihitung sebelum anchor supaya jalur
     // magnet & penulisan titik di bawah memakai koordinat yang sama. Hanya cabang "seret satu
@@ -176,7 +178,7 @@ function delHooks(){ return {
     return true;                                        // lewati snap bawaan klinecharts
   },
   // scheduleSaveDraws() WAJIB ikut: tanpa itu hasil drag tak tersimpan & tak masuk history undo.
-  onPressedMoveEnd:(e)=>{ dragBase=null; cloneArmed=false; cloneDone=false;
+  onPressedMoveEnd:(e)=>{ dragBase=null; cloneArmed=false; cloneDone=false; try{ msDragEnd(); }catch(_){}
     try{ if(magnetActive()&&e&&e.overlay) refineMagnetPoints(e.overlay.id); }catch(_){}
     try{scheduleSaveDraws();}catch(_){} return false; },
   onDrawStart:(e)=>{ pendingClicks=[]; return false; },   // buang sisa klik dari gambar yg batal
@@ -275,6 +277,9 @@ function delHooks(){ return {
     rearmDraw(); return false; },
   onClick:(e)=>{ if(eraserOn){ if(!blockedByLock(e.overlay.id)) try{chart.removeOverlay(e.overlay.id);}catch(_){} return false; }
     const o=e.overlay; selectedId=o&&o.id;
+    try{ msOnClick(o&&o.id); }catch(_){}
+    // Ctrl/⌘+klik = menambah ke seleksi ganda, bukan mengisi teks.
+    if(msModClick()) return false;
     // klik pada undangan "+ Add text" objek KOSONG → editor INLINE (bukan modal). Timer 220ms:
     // double-click (buka modal) akan membatalkannya lewat clearTimeout di onDoubleClick.
     if(o && ADDTEXT_CLICK.has(o.name) && !(o.extendData&&String(o.extendData).trim()) && overPlaceholder(o)){
@@ -288,12 +293,13 @@ function delHooks(){ return {
   onRightClick:(e)=>{ if(e.overlay.id!==inProgressId) selectedId=e.overlay.id; return true; },
   onDoubleClick:(e)=>{ clearTimeout(addTextTimer); try{ const o=e.overlay, n=o&&o.name;   // batalkan editor inline → double-click = modal
     if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
-  onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); try{objTreeDirty();}catch(_){} return false; },
-  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); try{objTreeDirty();}catch(_){} return false; },
+  onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
+  onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; posRerender(e.overlay); return false; },
   onMouseLeave:(e)=>{ if(hoverId===e.overlay.id){ hoverId=null; hoverName=null; posRerender(e.overlay); } return false; },
   onRemoved:(e)=>{ drawIds=drawIds.filter(x=>x!==e.overlay.id); if(selectedId===e.overlay.id) selectedId=null; if(hoverId===e.overlay.id) hoverId=null;
     try{ delete objHidden[e.overlay.id]; }catch(_){}   // js/draw-object-tree.js
+    try{ msForget(e.overlay.id); }catch(_){}           // js/draw-multi-select.js
     // Objek dihapus di sesi ini → alertnya seketika, tanpa menunggu penyapuan saat muat berikutnya.
     // Gerbang suppressDrawSave WAJIB: clearDrawings() saat reload (js/load-chart.js) dan tiap
     // langkah undo/redo (js/draw-undo.js) juga lewat chart.removeOverlay → onRemoved ini, dgn

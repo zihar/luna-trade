@@ -1,6 +1,6 @@
 # Object Tree + grouping objek gambar (ala TradingView)
 
-**Tanggal:** 2026-11-24 · **Status:** PR1 (Object Tree) diimplementasi; PR2/PR3 menyusul.
+**Tanggal:** 2026-11-24 · **Status:** PR1 (Object Tree) MERGED (#207); PR2 (multi-select) diimplementasi; PR3 menyusul.
 
 ## Kenapa
 
@@ -35,3 +35,33 @@ virtualisasi, pencarian, atau drag-reorder.
 ## Bukan tujuan PR1
 
 Rename objek, drag-reorder z-order, pencarian, dan daftar lintas instrumen.
+
+## PR2: multi-select — keputusan
+
+Modul `js/draw-multi-select.js`. klinecharts 9.8.10 hanya punya SATU seleksi (`selectedId`), jadi
+multi-select dibangun di atasnya: `multiSel` = himpunan id, dan objek **primer** tetap seleksi
+klinecharts (handle-nya digambar klinecharts). Anggota lain diberi handle tiruan (gaya
+`OVERLAY_POINT`) di kanvas `#msLayer` yang digambar ulang tiap frame selama himpunan ≥2.
+
+- **Chart:** Ctrl/⌘+klik = tambah/lepas (primer = yang terakhir diklik). Klik biasa = pilih itu
+  saja. Klik area kosong / Esc = lepas semua. Ctrl/⌘+klik tak membuka editor "+ Add text".
+- **Urutan event yang dipegang:** seleksi klinecharts baru berubah saat CLICK (mouseup tanpa
+  gerak); seret membatalkan klik. Jadi menyeret anggota tak mengubah himpunan. `onClick` menimpa
+  `selectedId` sebelum `onDeselected(lama)`, maka seleksi sebelum klik dicatat sendiri di
+  mousedown (fase capture). Rekonsiliasi ditunda satu tick (`setTimeout 0`) supaya
+  onClick + onDeselected + onSelected dari satu klik selesai dulu.
+- **Seret badan** salah satu anggota = anggota lain (tak terkunci, bukan long/shortPosition)
+  bergeser dgn delta bar (dibulatkan) + harga yang sama, dihitung dari kursor dgn rumus translasi
+  badan yang sudah ada. Seret **handle titik** = hanya objek itu. Ctrl/⌘+seret objek primer tetap
+  **clone satu objek** (perilaku #175). Hasil seret = satu langkah undo (scheduleSaveDraws di
+  onPressedMoveEnd).
+- **Delete** = hapus semua anggota tak terkunci; yang terkunci tetap terpilih + toast.
+- **Object Tree:** baris anggota ber-kelas `sel`. Ctrl/⌘+klik = tambah/lepas, Shift+klik =
+  rentang menurut urutan baris dari jangkar (klik biasa/Ctrl terakhir); objek tersembunyi dalam
+  rentang dilewati.
+- Objek yang dihapus / disembunyikan keluar dari himpunan. Himpunan tak disimpan.
+
+## Bukan tujuan PR2
+
+Copy/paste & clone banyak objek sekaligus, kotak seleksi (marquee), dan Ctrl+klik di macOS
+(itu klik kanan di macOS — pakai ⌘).

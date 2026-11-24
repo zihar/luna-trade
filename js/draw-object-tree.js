@@ -17,6 +17,7 @@ function setDrawHidden(id,on){
   // objek yang disembunyikan tak boleh tetap terpilih: Delete berikutnya akan menghapus sesuatu
   // yang tak tampak di layar.
   if(on && selectedId===id) try{ deselectOverlay(); }catch(_){}
+  if(on) try{ msForget(id); }catch(_){}
   if(on && hoverId===id) hoverId=null;
   try{ scheduleSaveDraws(); }catch(_){}
   objTreeDirty();
@@ -56,8 +57,9 @@ function renderObjTree(){
     const o=chart.getOverlayById(id); if(!o) return;
     const locked=!!o.lock, hidden=isDrawHidden(id);
     const row=document.createElement('div');
-    row.className='ot-row'+(id===selectedId?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
-    row.dataset.id=id; row.setAttribute('role','option'); row.setAttribute('aria-selected', id===selectedId?'true':'false');
+    const sel=msIsSel(id);
+    row.className='ot-row'+(sel?' sel':'')+(hidden?' is-hidden':'')+(locked?' is-locked':'');
+    row.dataset.id=id; row.setAttribute('role','option'); row.setAttribute('aria-selected', sel?'true':'false');
     row.innerHTML='<span class="ot-ico">'+drawToolSvg(o.name)+'</span><span class="ot-name"></span>'+
       '<button class="ot-btn ot-lock'+(locked?' on':'')+'" title="'+(locked?'Unlock':'Lock')+'" aria-label="'+(locked?'Unlock':'Lock')+'">'+(locked?LOCK_SVG:OT_LOCK_OPEN_SVG)+'</button>'+
       '<button class="ot-btn ot-eye'+(hidden?' on':'')+'" title="'+(hidden?'Show':'Hide')+'" aria-label="'+(hidden?'Show':'Hide')+'">'+(hidden?EYEOFF_SVG:EYE_SVG)+'</button>'+
@@ -78,7 +80,10 @@ $('#objTreeList').addEventListener('click',(e)=>{
   // — memilih objek yang tak tampak tak ada gunanya).
   if(isDrawHidden(id)) setDrawHidden(id,false);
   if(drawsHidden){ drawsHidden=false; applyDrawsVisibility(); syncHideDrawBtn(); }
-  try{ selectPastedOverlay(id); }catch(_){}
+  // Ctrl/⌘+klik = tambah/lepas, Shift+klik = rentang menurut urutan baris (js/draw-multi-select.js)
+  if(e.ctrlKey||e.metaKey){ msTreeToggle(id); return; }
+  if(e.shiftKey){ msTreeRange(id, [...e.currentTarget.querySelectorAll('.ot-row')].map(r=>r.dataset.id)); return; }
+  try{ msSelectOnly(id); _msAnchor=id; }catch(_){}
   objTreeDirty();
 });
 

@@ -44,6 +44,8 @@
     background:var(--accent); color:#fff; font:600 10px/1 var(--mono); white-space:nowrap;
     padding:3px 6px; border-radius:0 0 4px 4px; letter-spacing:.02em; }
   /* reticle titik cursor 'dot' (juga penanda snap Magnet): dot kecil solid, minimalis */
+  /* handle anggota non-primer seleksi ganda (js/draw-multi-select.js) */
+  .ms-layer{ position:absolute; left:0; top:0; z-index:7; pointer-events:none; display:none; }
   .mag-dot{ position:absolute; z-index:7; pointer-events:none; display:none;
     width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
     background:var(--mag); box-shadow:0 0 0 1px rgba(0,0,0,.4); }

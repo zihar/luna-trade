@@ -45,6 +45,7 @@ const SENTINEL = {
   // PR-1 — ekstraksi ekor (425 baris) ke enam file.
   'multi-chart.js': 'SEC_DEFAULTS',
   'draw-object-tree.js': 'renderObjTree',
+  'draw-multi-select.js': 'msReconcile',
   'boot.js': 'bootApp',
   'auth-menu.js': 'setAvatar',
   'analytics.js': 'openAnalyticsDashboard',

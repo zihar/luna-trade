@@ -74,7 +74,7 @@
   /* Object Tree (js/draw-object-tree.js): baris objek gambar; tombol aksi muncul saat hover,
      Lock/Hide yang AKTIF selalu tampak (perilaku TV) */
   .ot-count{ font-family:var(--mono); font-size:11px; font-weight:400; color:var(--muted); letter-spacing:0; }
-  .ot-row{ display:flex; align-items:center; gap:6px; margin:0 4px; padding:5px 6px; border-radius:6px;
+  .ot-row{ user-select:none; -webkit-user-select:none; display:flex; align-items:center; gap:6px; margin:0 4px; padding:5px 6px; border-radius:6px;
            cursor:pointer; color:var(--txt); font-size:12.5px; }
   .ot-row:hover{ background:var(--btn-hover); }
   .ot-row.sel{ background:color-mix(in srgb, var(--accent, #4f8cff) 18%, transparent); }
