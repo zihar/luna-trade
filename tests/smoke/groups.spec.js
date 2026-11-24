@@ -23,14 +23,15 @@ function ptsPx(page, id) {
     });
   }, id);
 }
-async function midOf(page, id) {
+/** Titik di badan garis pada pecahan t (0.5 = tengah). */
+async function midOf(page, id, t = 0.5) {
   const c = await ptsPx(page, id);
-  return { x: (c[0].x + c[1].x) / 2, y: (c[0].y + c[1].y) / 2 };
+  return { x: c[0].x + (c[1].x - c[0].x) * t, y: c[0].y + (c[1].y - c[0].y) * t };
 }
 /** Klik badan (jeda >400ms dari klik sebelumnya, lihat tests/README.md). */
-async function clickBody(page, rect, id, mod = false) {
+async function clickBody(page, rect, id, mod = false, t = 0.5) {
   await page.waitForTimeout(450);
-  const m = await midOf(page, id);
+  const m = await midOf(page, id, t);
   await page.mouse.move(rect.x + m.x, rect.y + m.y, { steps: 3 });
   if (mod) await page.keyboard.down(MOD);
   await page.mouse.down();
@@ -122,8 +123,10 @@ test.describe('groups', () => {
       expect(c1[i], 'objek di luar grup diam').toEqual(c0[i]);
     }
 
-    // Delete saat grup terpilih = semua anggota terhapus, grup ikut hilang
-    await clickBody(page, rect, a);
+    // Delete saat grup terpilih = semua anggota terhapus, grup ikut hilang.
+    // Klik di 20% badan, BUKAN tengah: seret tadi membuat a terpilih, dan klik tengah trendline
+    // terpilih yang kosong = undangan "+ Add text" (overPlaceholder ±55px) → textarea menelan Delete.
+    await clickBody(page, rect, a, false, 0.2);
     await page.keyboard.press('Delete');
     await expect.poll(() => page.evaluate(() => drawIds.slice())).toEqual([c]);
     await expect(groupRows(page)).toHaveCount(0);
