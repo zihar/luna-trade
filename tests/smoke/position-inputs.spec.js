@@ -104,3 +104,69 @@ test('lot terakhir dipakai disimpan per instrumen', async ({ page }) => {
   expect(r.lotMap).toEqual({ EUR_USD: 1000 });
   expect(r.xau).toBe(100);
 });
+
+// ---------- tab Inputs di modal ----------
+async function openInputs(page, name = 'longPosition') {
+  const obj = await place(page, name);
+  await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 300, 200, 'levels'), obj.id);
+  await expect(page.locator('.dmodal-scrim.show #ppAcc')).toBeVisible();
+  return obj;
+}
+const commitField = async (page, sel, v) => { const i = page.locator(sel); await i.fill(String(v)); await i.press('Enter'); };
+
+test('tab Inputs: label & default dari #balance/#riskPct', async ({ page }) => {
+  await openInputs(page);
+  await expect(page.locator('.dm-tab[data-tab="levels"]')).toHaveText('Inputs');
+  const d = await page.evaluate(() => ({ bal: $('#balance').value, risk: $('#riskPct').value }));
+  expect(+(await page.locator('#ppAcc').inputValue())).toBe(+d.bal);
+  expect(+(await page.locator('#ppRisk').inputValue())).toBe(+d.risk);
+  await expect(page.locator('#ppRiskUnit')).toHaveValue('%');
+  for (const id of ['#ppLot', '#ppEntry', '#ppTpTicks', '#ppTp', '#ppSlTicks', '#ppSl', '#ppQtyPrec', '#ppQty'])
+    await expect(page.locator(id)).toHaveCount(1);
+  assertNoPageErrors(page);
+});
+
+test('tab Inputs: TP ticks ↔ price saling menyegarkan', async ({ page }) => {
+  await openInputs(page);
+  const { tick, dec } = await page.evaluate(() => ({ tick: posTickSize(), dec: priceDecimals() }));
+  const entry = (await vals(page))[0];
+  await commitField(page, '#ppTpTicks', 50);
+  const p = await vals(page);
+  expect(p[1]).toBeCloseTo(entry + 50 * tick, 8); expect(p[3]).toBeCloseTo(entry + 50 * tick, 8);
+  await expect(page.locator('#ppTp')).toHaveValue((entry + 50 * tick).toFixed(dec));
+  const tp = +(entry + 80 * tick).toFixed(dec);
+  await commitField(page, '#ppTp', tp);
+  await expect(page.locator('#ppTpTicks')).toHaveValue(String(Math.round(Math.abs(tp - entry) / tick)));
+  assertNoPageErrors(page);
+});
+
+test('tab Inputs: Entry menggeser semua titik, ticks tetap', async ({ page }) => {
+  await openInputs(page);
+  const b = await vals(page);
+  const tpT = await page.locator('#ppTpTicks').inputValue(), slT = await page.locator('#ppSlTicks').inputValue();
+  await commitField(page, '#ppEntry', +(b[0] + 0.001).toFixed(6));
+  const a = await vals(page), d = a[0] - b[0];
+  expect(d).toBeCloseTo(0.001, 5);
+  for (let i = 0; i < 6; i++) expect(a[i] - b[i]).toBeCloseTo(d, 9);
+  await expect(page.locator('#ppTpTicks')).toHaveValue(tpT);
+  await expect(page.locator('#ppSlTicks')).toHaveValue(slT);
+});
+
+test('tab Inputs: ganti unit risk mengonversi angka; account 0 ditolak', async ({ page }) => {
+  await openInputs(page);
+  await commitField(page, '#ppAcc', 10000);
+  await commitField(page, '#ppRisk', 1);
+  await page.locator('#ppRiskUnit').selectOption('USD');
+  await expect(page.locator('#ppRisk')).toHaveValue('100');
+  await commitField(page, '#ppAcc', 0);
+  await expect(page.locator('#ppAcc')).toHaveClass(/bad/);
+  await expect(page.locator('#ppAcc')).toHaveValue('10000');
+  assertNoPageErrors(page);
+});
+
+test('tab Inputs: Qty precision mengubah readout Qty', async ({ page }) => {
+  await openInputs(page);
+  await commitField(page, '#ppQtyPrec', 4);
+  await expect(page.locator('#ppQty')).toHaveText(/^Qty \d+\.\d{4} lot$/);
+  assertNoPageErrors(page);
+});

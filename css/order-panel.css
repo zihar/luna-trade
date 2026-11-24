@@ -422,3 +422,7 @@
     background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow); border-radius:8px; }
   .wl-x{ padding:1px 6px; font-size:11px; background:transparent; border-color:transparent; color:var(--muted); border-radius:5px; }
   .wl-x:hover{ color:var(--txt); background:var(--btn-hover); }
+  /* tab Inputs Long/Short Position (js/draw-style-modal.js posInputsPaneHTML) */
+  .dm-pos-in .dm-co-row{ margin-bottom:12px; }
+  .dm-co-sel{ flex:0 0 76px; padding-right:8px; cursor:pointer; }
+  .dm-co-qty{ color:var(--muted); font-size:12px; font-family:var(--mono, inherit); font-variant-numeric:tabular-nums; }
