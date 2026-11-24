@@ -279,9 +279,8 @@ function posFigures(dir){
     if(!coordinates.length||pts[0].value==null) return [];
     const dec=priceDecimals();
     const pip=parseFloat(document.getElementById('pipSize').value)||0.0001;
-    // mintick utk hitung jumlah tick: emas (XAU) pakai 0.01 spt TV (TV emas 2 desimal,
-    // Luna 3) → tick tak 10× lebih banyak; instrumen lain pakai 10^-desimal.
-    const tkSize = inst.includes('XAU') ? 0.01 : Math.pow(10,-dec);
+    // mintick (emas 0.01 spt TV, lainnya 10^-desimal) — js/draw-position-inputs.js; dipanggil saat render
+    const tkSize = posTickSize();
     const tickN=d=>Math.round(d/tkSize);
     const C=subBarCoords(overlay,coordinates);
     const xs=C.map(c=>c.x).filter(x=>x!=null&&isFinite(x));
@@ -315,16 +314,15 @@ function posFigures(dir){
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
     box(yE,yT,tgtFill); line(yE,'#9aa4b2');   // body target + garis Entry (garis TP atas dihapus)
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
-    pill(xL, tY, 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', tgtColor, 'left', tBase);
+    // Qty & P&L nominal dari setelan akun/risiko per objek (js/draw-position-inputs.js); butuh SL (Qty = risk/jarak SL)
+    const T=haveSL ? posPillTexts(overlay) : null;
+    pill(xL, tY, T ? T.target : 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', tgtColor, 'left', tBase);
 
     if(haveSL){
       const sl=pts[2].value, yS=C[2].y;
-      const slPips=Math.round(Math.abs(entry-sl)/pip), slPct=(Math.abs(entry-sl)/entry*100);
-      const rr=Math.abs(entry-sl)?(Math.abs(tp-entry)/Math.abs(entry-sl)):0;
       box(yE,yS,stopFill);   // body stop (garis SL bawah dihapus)
       const sBase=yS<=yE?'bottom':'top', sY=yS<=yE?yS-2:yS+2;
-      pill(xL, sY, 'Stop  '+sl.toFixed(dec)+'   '+slPips+'p · '+tickN(Math.abs(entry-sl))+'t ('+slPct.toFixed(3)+'%)', stopColor, 'left', sBase);
-      pill((xL+xR)/2, yE, dir.toUpperCase()+'   ·   RR 1:'+rr.toFixed(2), 'rgba(20,28,40,0.92)', 'center', 'middle');
+      if(T){ pill(xL, sY, T.stop, stopColor, 'left', sBase); pill((xL+xR)/2, yE, T.center, 'rgba(20,28,40,0.92)', 'center', 'middle'); }
     } else {
       pill(xL, yE, 'Entry '+entry.toFixed(dec)+'  ['+dir.toUpperCase()+']', 'rgba(20,28,40,0.92)', 'left', 'middle');
     }

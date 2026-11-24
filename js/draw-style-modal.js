@@ -49,14 +49,22 @@ function posStylePaneHTML(o){
   const st=dstyle(o);
   return `<div class="dm-pane" data-pane="style">${posZoneHTML(st,'tgt')}<div class="dm-gap"></div>${posZoneHTML(st,'stop')}</div>`;
 }
-// tab Levels: Take Profit & Stop Loss sebagai harga (Entry hanya baca — menggesernya = memindahkan posisi)
-function posLevelsPaneHTML(o){
-  const lv=posLevels(o); if(!lv) return '';
-  const f=(id,label,val,ro)=>`<div class="pp-lbl">${label}</div><div class="dm-co-row"><span class="dm-co-f">`
-    +`<input class="dm-co" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="${id}" value="${coordPriceText(val)}" data-base="${coordPriceText(val)}" aria-label="${label} price"${ro?' readonly tabindex="-1"':''}></span></div>`;
-  return `<div class="dm-pane" data-pane="levels">${f('ppTp','Take profit',lv.tp)}${f('ppSl','Stop loss',lv.sl)}</div>`;
+// tab Inputs (key internal 'levels'): akun/risiko per objek + Entry/TP/SL ala TradingView
+// (js/draw-position-inputs.js). Semua field type=text (jebakan locale input number, lihat draw-coords.js).
+function posInputsPaneHTML(o){
+  if(!posLevels(o)) return '';
+  const inp=(id,label,w)=>`<span class="dm-co-f"${w?` style="flex:0 0 ${w}px"`:''}><input class="dm-co" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="${id}" aria-label="${label}"></span>`;
+  const row=(label,body)=>`<div class="pp-lbl">${label}</div><div class="dm-co-row">${body}</div>`;
+  const tp2=(k,label)=>row(label,`<span class="dm-co-x">Ticks</span>${inp('pp'+k+'Ticks',label+' ticks')}<span class="dm-co-x">Price</span>${inp('pp'+k,label+' price')}`);
+  return `<div class="dm-pane dm-pos-in" data-pane="levels">`
+    +row('Account size',inp('ppAcc','Account size'))
+    +row('Lot size',inp('ppLot','Lot size'))
+    +row('Risk',inp('ppRisk','Risk')+`<select class="dm-co dm-co-sel" id="ppRiskUnit" aria-label="Risk unit"><option value="%">%</option><option value="USD">USD</option></select>`)
+    +row('Entry price',inp('ppEntry','Entry price'))
+    +tp2('Tp','Profit level')+tp2('Sl','Stop level')
+    +row('Qty precision',inp('ppQtyPrec','Qty precision'))
+    +`<div class="dm-co-qty" id="ppQty"></div></div>`;
 }
-// kabel tab Style & Levels khusus posisi
 function wirePosPanes(panel, o){
   const kinds={tgt:['tgtColor','tgtAlpha'],stop:['stopColor','stopAlpha']};
   panel.querySelectorAll('[data-pcol]').forEach(b=>b.onclick=()=>{
@@ -67,31 +75,62 @@ function wirePosPanes(panel, o){
     panel.querySelectorAll(`[data-pcol="${k}"]`).forEach(x=>x.classList.remove('on')); i.closest('.sw').classList.add('on'); });
   panel.querySelectorAll('[data-palpha]').forEach(r=>r.oninput=()=>{
     r.parentElement.querySelector('.dm-sval').textContent=r.value+'%'; setObjStyle(o.id,{[kinds[r.dataset.palpha][1]]:+r.value}); });
-  // Enter / blur = tulis. Tak valid (bukan angka, atau menyeberangi Entry) → field merah & kembali
-  // ke nilai objek; objek tak bergerak.
-  [['#ppTp','tp'],['#ppSl','sl']].forEach(([sel,which])=>{
+  wirePosInputs(panel, o);
+}
+// Enter / blur = tulis. Tak valid → field merah & kembali ke nilai objek; objek tak bergerak.
+// Sukses → SEMUA field disegarkan (ticks↔price, Qty ikut berubah).
+function wirePosInputs(panel, o){
+  if(!panel.querySelector('#ppAcc')) return;
+  const num=v=>String(+(+v).toFixed(8));
+  const int=t=>{ const n=parseCoordNum(t); return Number.isInteger(n)?n:NaN; };
+  const F={
+    '#ppAcc':    [()=>num(posSettings(o).account), t=>setPosSettings(o,{account:parseCoordNum(t)})],
+    '#ppLot':    [()=>num(posSettings(o).lot),     t=>setPosSettings(o,{lot:parseCoordNum(t)})],
+    '#ppRisk':   [()=>num(posSettings(o).risk),    t=>setPosSettings(o,{risk:parseCoordNum(t)})],
+    '#ppEntry':  [()=>coordPriceText(posLevels(o).entry), t=>applyPosEntry(o,parseCoordNum(t))],
+    '#ppTpTicks':[()=>String(posCalc(o).tpTicks),  t=>applyPosTicks(o,'tp',int(t))],
+    '#ppTp':     [()=>coordPriceText(posLevels(o).tp), t=>applyPosLevel(o,'tp',parseCoordNum(t))],
+    '#ppSlTicks':[()=>String(posCalc(o).slTicks),  t=>applyPosTicks(o,'sl',int(t))],
+    '#ppSl':     [()=>coordPriceText(posLevels(o).sl), t=>applyPosLevel(o,'sl',parseCoordNum(t))],
+    '#ppQtyPrec':[()=>String(posSettings(o).qtyPrec), t=>setPosSettings(o,{qtyPrec:int(t)})],
+  };
+  const unit=panel.querySelector('#ppRiskUnit'), qty=panel.querySelector('#ppQty');
+  const refresh=()=>{
+    if(!posLevels(o)) return;
+    Object.keys(F).forEach(sel=>{ const i=panel.querySelector(sel); if(i){ const t=F[sel][0](); i.value=t; i.dataset.base=t; } });
+    const s=posSettings(o), c=posCalc(o);
+    unit.value=s.riskUnit;
+    if(c) qty.textContent=`Qty ${c.qtyLots.toFixed(s.qtyPrec)} ${s.lot===1?'units':'lot'}`;
+  };
+  Object.keys(F).forEach(sel=>{
     const inp=panel.querySelector(sel); if(!inp) return;
     const commit=()=>{
       if(inp.value===inp.dataset.base) return;
-      const ok=applyPosLevel(o, which, parseCoordNum(inp.value));
-      const cur=posLevels(o);
-      if(ok){ inp.classList.remove('bad'); scheduleSaveDraws(); }
-      else inp.classList.add('bad');
-      if(cur){ const t=coordPriceText(cur[which]); inp.value=t; inp.dataset.base=t; }
+      const ok=F[sel][1](inp.value);
+      if(ok){ inp.classList.remove('bad'); scheduleSaveDraws(); } else inp.classList.add('bad');
+      refresh();
     };
     inp.oninput=()=>inp.classList.remove('bad');
     inp.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation();   // hotkey chart (digit→interval, Delete) tak boleh ikut; Esc tetap menutup modal
       if(e.key==='Enter'){ e.preventDefault(); commit(); } };
     inp.onblur=commit;
   });
+  // ganti satuan risk → angka dikonversi supaya nominal USD-nya tetap
+  unit.onchange=()=>{
+    const s=posSettings(o), to=unit.value;
+    setPosSettings(o,{risk:convertRisk(s.risk,s.riskUnit,to,s.account), riskUnit:to});
+    refresh();
+  };
+  unit.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation(); };
+  refresh();
 }
 function openDrawModal(o, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
   const name=o.name, st=dstyle(o), isFib=(name==='fib3');
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
   const hasAlert=ALERTABLE.has(name), isPos=POS_OBJS.has(name);
-  const coordsPane=isPos?posLevelsPaneHTML(o):coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js (posisi: tab Levels)
-  const coordsTab=isPos?'levels':'coords', coordsLabel=isPos?'Levels':'Coordinates';
+  const coordsPane=isPos?posInputsPaneHTML(o):coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js (posisi: tab Inputs)
+  const coordsTab=isPos?'levels':'coords', coordsLabel=isPos?'Inputs':'Coordinates';
   const active=(tab==='text'&&hasText)?'text':((tab==='coords'||tab==='levels')&&hasCoords)?coordsTab:(tab==='alert'&&hasAlert)?'alert':'style';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
@@ -142,7 +181,7 @@ function openDrawModal(o, tab){
     const del=panel.querySelector('.dm-del');
     del.disabled=on; del.title = on?'Unlock to delete':'';
     // Koordinat ikut mati saat terkunci: menggeser objek lewat angka sama saja dengan menyeretnya.
-    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co, .dm-pane[data-pane="coords"] button.dm-co-st, .dm-pane[data-pane="levels"] input.dm-co')
+    panel.querySelectorAll('.dm-pane[data-pane="coords"] input.dm-co, .dm-pane[data-pane="coords"] button.dm-co-st, .dm-pane[data-pane="levels"] .dm-co')
       .forEach(el=>{ el.disabled=on; });
   };
   lockBtn.onclick=()=>{ toggleDrawLock(o.id); syncLock(); };
