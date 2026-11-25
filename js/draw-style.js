@@ -5,16 +5,16 @@ const DRAW_DEFAULT = {
   fib3:{color:'#4a71ff',size:1,style:'solid'},
   dateRange:{color:'#4a71ff',size:2,style:'solid'},
   text:{color:'',size:13,style:'solid',textAlign:'left',textValign:'top'},
-  horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},  // default dotted, warna bisa diganti
-  verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted'},
+  horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'top'},  // default dotted, warna bisa diganti
+  verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'bottom'},   // bawah: atas pane ditempati legenda OHLC
   // Long/Short Position: warna & transparansi zona Profit (tgt) & Stop terpisah, per objek.
   longPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
   shortPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
   // --- garis bawaan klinecharts yang di-ekspos ---
-  straightLine:{color:'#4a71ff',size:1,style:'solid'},
-  rayLine:{color:'#4a71ff',size:1,style:'solid'},
-  horizontalRayLine:{color:'#4a71ff',size:1,style:'solid'},
-  priceLine:{color:'#4a71ff',size:1,style:'dashed'},
+  straightLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
+  rayLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
+  horizontalRayLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'right',textValign:'top'},
+  priceLine:{color:'#4a71ff',size:1,style:'dashed',textAlign:'right',textValign:'top'},   // kanan: label harga bawaan ada di kiri-atas
   parallelStraightLine:{color:'#4a71ff',size:1,style:'solid'},
   priceChannelLine:{color:'#4a71ff',size:1,style:'solid'},
   fibonacciLine:{color:'#4a71ff',size:1,style:'solid'},

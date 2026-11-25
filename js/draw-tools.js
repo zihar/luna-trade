@@ -293,7 +293,7 @@ function delHooks(){ return {
   // contextmenu), jadi ia tak boleh meninggalkan selectedId ke objek yang sebentar lagi dibuang.
   onRightClick:(e)=>{ if(e.overlay.id!==inProgressId) selectedId=e.overlay.id; return true; },
   onDoubleClick:(e)=>{ clearTimeout(addTextTimer); try{ const o=e.overlay, n=o&&o.name;   // batalkan editor inline → double-click = modal
-    if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, DM_TEXT_OBJS.has(n)?'text':'style'); }catch(_){} return false; },
+    if(DRAW_DEFAULT[n]!==undefined) openObjSettings(o, lastPtr.x, lastPtr.y, (DM_TEXT_OBJS.has(n)&&!LINE_TEXT[n])?'text':'style'); }catch(_){} return false; },   // garis (LINE_TEXT): Style dulu, teks pelengkap
   onSelected:(e)=>{ selectedId=e.overlay.id; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
   onDeselected:(e)=>{ if(selectedId===e.overlay.id) selectedId=null; posRerender(e.overlay); try{objTreeDirty(); msOnSelChange();}catch(_){} return false; },
   onMouseEnter:(e)=>{ hoverId=e.overlay.id; hoverName=e.overlay.name; try{ zApply(); }catch(_){} posRerender(e.overlay); return false; },   // zApply: hover klinecharts menaikkan zLevel ke MAX selamanya (js/draw-zorder.js)
