@@ -49,6 +49,8 @@ window.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
     if(k==='z'){ e.preventDefault(); e.shiftKey?redoDraw():undoDraw(); return; }
     if(k==='y'){ e.preventDefault(); redoDraw(); return; }
+    // cheat-sheet shortcut (js/shortcuts-help.js)
+    if(e.key==='/'){ e.preventDefault(); toggleShortcutsHelp(); return; }
     // copy/paste objek gambar (js/draw-copy-paste.js). Teks yang sedang terseleksi menang:
     // menyalin harga dari panel trades tak boleh berubah jadi menyalin objek gambar.
     if(k==='c'){ let sel=''; try{ sel=String(getSelection()||''); }catch(_){}
@@ -63,6 +65,7 @@ window.addEventListener('keydown',e=>{
   // Ketik HURUF / '/' → symbol search. Digit vs huruf → tak ada tabrakan namespace.
   // Ctrl/⌘ + huruf/digit = shortcut browser (⌘R refresh, ⌘L address bar, dst) → jangan intersepsi.
   if(!e.ctrlKey && !e.metaKey){
+    if(e.key==='?'){ e.preventDefault(); openShortcutsHelp(); return; }   // cheat-sheet (js/shortcuts-help.js)
     if(e.key>='0' && e.key<='9'){ e.preventDefault(); openIntervalDialog(e.key); return; }
     if(!e.altKey && (e.key==='/' || /^[a-zA-Z]$/.test(e.key))){
       e.preventDefault();

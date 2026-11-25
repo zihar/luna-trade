@@ -1,5 +1,23 @@
   /* ===================== popup setting objek gambar & chart (TradingView-like) ===================== */
   /* "Change interval" dialog — konfirmasi ganti TF via keyboard (ala TradingView), tema Luna */
+  /* Cheat-sheet shortcut keyboard (js/shortcuts-help.js) */
+  .kbs-scrim{ position:fixed; inset:0; z-index:1500; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); }
+  .kbs-scrim.show{ display:flex; }
+  .kbs-card{ background:var(--panel); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);
+             width:min(760px,calc(100vw - 32px)); max-height:calc(100vh - 64px); display:flex; flex-direction:column; }
+  .kbs-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px 10px; }
+  .kbs-title{ font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--txt); }
+  .kbs-body{ overflow:auto; padding:4px 20px 18px; columns:2 320px; column-gap:28px; }
+  .kbs-sec{ break-inside:avoid; margin:0 0 14px; }
+  .kbs-sec h4{ margin:0 0 6px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .kbs-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 0; font-size:12.5px; color:var(--txt); }
+  .kbs-keys{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .kbs-combo{ display:inline-flex; align-items:center; gap:3px; }
+  .kbs-keys i{ font-style:normal; font-size:11px; color:var(--muted); }
+  .kbs-keys kbd, .kbs-hint{ font-family:var(--font-num); font-size:11px; line-height:1; padding:3px 6px; border-radius:5px;
+             background:var(--inset); border:1px solid var(--border); color:var(--txt); white-space:nowrap; }
+  .kbs-hint{ margin-left:6px; color:var(--muted); }
+  .kbs-act{ font-size:11.5px; color:var(--muted); white-space:nowrap; }
   .ivl-overlay{ position:fixed; inset:0; z-index:1500; display:none; align-items:center; justify-content:center; }
   .ivl-overlay.show{ display:flex; }
   .ivl-card{ background:var(--panel); border:1px solid var(--border); border-radius:16px;
