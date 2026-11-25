@@ -268,7 +268,7 @@ function delHooks(){ return {
       }
     } }catch(_){}
     pendingClicks=[];
-    try{expandPosition(o); expandBox(o); applyTextInput(o);}catch(_){}
+    try{expandPosition(o); expandBox(o); snapshotFibSettings(o); applyTextInput(o);}catch(_){}
     if(magnetActive() && o) refineMagnetPoints(o.id);   // magnet: geser titik ke OHLC M5 presisi (async, on-demand)
     // measure (ephemeral): id-nya dipegang di sini, BUKAN saat di-arm — supaya Esc selama menggambar
     // tetap jatuh ke cancelInProgressDraw() seperti tool lain (lihat js/measure.js).
