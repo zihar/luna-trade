@@ -6,11 +6,12 @@
 // Kunci di objStyle: objek 'text' memakai `size`/`color` (teks ADALAH objeknya; data tersimpan lama
 // tetap terbaca tanpa migrasi). Objek lain memakai `fontSize`/`textColor` karena `size`/`color` di
 // sana milik garis/border. textColor kosong = Auto (ikut tema, drawTextColor).
-const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,circle:12,ellipse:12,arrow:12,
+const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,circle:12,ellipse:12,arrow:12,parallelStraightLine:12,priceChannelLine:12,dateRange:12,
   horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12};
 // garis yang bisa diberi teks (tab Text + lineTextFigs). Double-click tetap membuka Style dulu:
 // pada garis, warna/ketebalan lebih sering diubah daripada teks.
-const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1,arrow:1};
+const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1,arrow:1,
+  parallelStraightLine:1,priceChannelLine:1,dateRange:1};   // channel/Date Range: teks di ruas p0–p1 yang digambar
 // bentuk tertutup yang menampung teks DI DALAM kotak pembatasnya (boxTextFigs) — pola rect
 const BOX_TEXT={rect:1,circle:1,ellipse:1};
 const TEXT_SIZES=[10,11,12,13,14,16,18,20,24,28,32,40];

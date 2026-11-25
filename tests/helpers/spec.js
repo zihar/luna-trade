@@ -50,8 +50,8 @@ const TOOL_SPEC = [
   { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
 
   // ---- Channels ----
-  { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
-  { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
+  { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
 
   // ---- Fibonacci ----
   { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: null, settings: 'modal', coords: 'box', persist: true, sc: 'F' },
@@ -68,7 +68,7 @@ const TOOL_SPEC = [
   // ---- Positions ----
   { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
   { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
-  { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true },
 
   // ---- Measure ----
   // Ephemeral: tak tersimpan (persist:false), tak punya panel setting (tak ada di DRAW_DEFAULT),
