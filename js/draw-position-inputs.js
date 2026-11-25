@@ -111,13 +111,17 @@ function applyPosTicks(o, which, n){
 }
 // teks pill chart (dipanggil dari posFigures dgn overlay yang SEDANG dirender → pakai o.points)
 const posUsd=v=>(v<0?'-':'+')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
-function posPillTexts(o){
+// compact (tab Style "Compact stats"): cukup harga + P&L per level, tengah cukup RR
+function posPillTexts(o, compact){
   const c=posCalcPts(o, o&&o.points); if(!c) return null;
   const dec=priceDecimals(), s=posSettings(o);
   const pip=parseFloat($('#pipSize').value)||0.0001;
   const lvl=(lbl,v,ticks)=>{ const d=Math.abs(v-c.entry);
     return lbl+'  '+v.toFixed(dec)+'   '+Math.round(d/pip)+'p · '+ticks+'t ('+(d/c.entry*100).toFixed(3)+'%)'; };
   const dir=o.name==='shortPosition'?'SHORT':'LONG';
+  if(compact) return { target:'Target  '+c.tp.toFixed(dec)+'  '+posUsd(c.pnlTp),
+                       stop:  'Stop  '+c.sl.toFixed(dec)+'  '+posUsd(c.pnlSl),
+                       center:'RR 1:'+c.rr.toFixed(2) };
   return { target: lvl('Target',c.tp,c.tpTicks)+'  '+posUsd(c.pnlTp),
            stop:   lvl('Stop',c.sl,c.slTicks)+'  '+posUsd(c.pnlSl),
            center: dir+' · Qty '+c.qtyLots.toFixed(s.qtyPrec)+' '+(s.lot===1?'units':'lot')+' · RR 1:'+c.rr.toFixed(2) };

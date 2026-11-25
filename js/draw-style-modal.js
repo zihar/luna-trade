@@ -66,9 +66,20 @@ function posZoneHTML(st, kind){
     +`<div class="pp-row">${sw}<label class="sw sw-custom ${inList?'':'on'}" title="Custom color"><input type="color" data-pcol-in="${kind}" value="${cur}" aria-label="Custom color"></label></div>`
     +`<div class="dm-slider"><span>Opacity</span><input type="range" data-palpha="${kind}" min="0" max="100" value="${alpha}" aria-label="${tgt?'Profit':'Stop'} zone opacity"><span class="dm-sval">${alpha}%</span></div>`;
 }
+// tab Style Long/Short ala TradingView: Lines · zona Profit/Stop · Text · Stats (per objek, objStyle)
+const POS_FONT_SIZES=[8,10,11,12,14,16,20];
 function posStylePaneHTML(o){
-  const st=dstyle(o);
-  return `<div class="dm-pane" data-pane="style">${posZoneHTML(st,'tgt')}<div class="dm-gap"></div>${posZoneHTML(st,'stop')}</div>`;
+  const st=dstyle(o), lw=+st.posLineWidth||1, fs=+st.posFontSize||10;
+  const sizes=POS_FONT_SIZES.includes(fs)?POS_FONT_SIZES:[...POS_FONT_SIZES,fs].sort((a,b)=>a-b);
+  return `<div class="dm-pane dm-pos-st" data-pane="style">`
+    +`<div class="pp-lbl">Lines</div><div class="pp-row"><label class="sw sw-custom on" title="Line color"><input type="color" data-pslcol value="${st.posLineColor||'#9aa4b2'}" aria-label="Line color"></label>`
+    +[1,2,3,4].map(w=>fibChip(`data-pslw="${w}"`,lw===w,w+'px')).join('')+`</div>`
+    +posZoneHTML(st,'tgt')+`<div class="dm-gap"></div>`+posZoneHTML(st,'stop')+`<div class="dm-gap"></div>`
+    +`<div class="pp-lbl">Text</div><div class="dm-co-row dm-font-row"><label class="sw sw-custom on" title="Text color"><input type="color" data-pstcol value="${st.posTextColor||'#ffffff'}" aria-label="Text color"></label>`
+    +`<select class="dm-co dm-co-sel" data-psfs aria-label="Font size">${sizes.map(s=>`<option value="${s}"${s===fs?' selected':''}>${s}</option>`).join('')}</select></div>`
+    +`<div class="pp-lbl">Stats</div><div class="pp-row">${fibChip('data-psflag="posCompact"',!!st.posCompact,'Compact')}`
+    +`${fibChip('data-psflag="posAlwaysStats"',!!st.posAlwaysStats,'Always show')}${fibChip('data-psflag="posPriceLabels"',st.posPriceLabels!==false,'Price labels')}</div>`
+    +`</div>`;
 }
 // tab Inputs (key internal 'levels'): akun/risiko per objek + Entry/TP/SL ala TradingView
 // (js/draw-position-inputs.js). Semua field type=text (jebakan locale input number, lihat draw-coords.js).
@@ -96,6 +107,17 @@ function wirePosPanes(panel, o){
     panel.querySelectorAll(`[data-pcol="${k}"]`).forEach(x=>x.classList.remove('on')); i.closest('.sw').classList.add('on'); });
   panel.querySelectorAll('[data-palpha]').forEach(r=>r.oninput=()=>{
     r.parentElement.querySelector('.dm-sval').textContent=r.value+'%'; setObjStyle(o.id,{[kinds[r.dataset.palpha][1]]:+r.value}); });
+  const pane=panel.querySelector('.dm-pos-st');
+  if(pane){
+    const set=p=>setObjStyle(o.id,p);
+    const press=(b,on)=>{ b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); };
+    const lc=pane.querySelector('[data-pslcol]'); lc.oninput=()=>set({posLineColor:lc.value});
+    pane.querySelectorAll('[data-pslw]').forEach(b=>b.onclick=()=>{ set({posLineWidth:+b.dataset.pslw}); pane.querySelectorAll('[data-pslw]').forEach(x=>press(x,x===b)); });
+    const tc=pane.querySelector('[data-pstcol]'); tc.oninput=()=>set({posTextColor:tc.value});
+    const fs=pane.querySelector('[data-psfs]'); fs.onchange=()=>set({posFontSize:+fs.value});
+    fs.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation(); };
+    pane.querySelectorAll('[data-psflag]').forEach(b=>b.onclick=()=>{ const on=!b.classList.contains('on'); press(b,on); set({[b.dataset.psflag]:on}); });
+  }
   wirePosInputs(panel, o);
 }
 // Enter / blur = tulis. Tak valid → field merah & kembali ke nilai objek; objek tak bergerak.

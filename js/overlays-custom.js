@@ -393,29 +393,33 @@ function posFigures(dir){
     const tgtColor=st.tgtColor||POS_GREEN, stopColor=st.stopColor||POS_RED;
     const tgtFill=tgtColor+alphaHex(st.tgtAlpha!=null?st.tgtAlpha:12);
     const stopFill=stopColor+alphaHex(st.stopAlpha!=null?st.stopAlpha:12);
+    // tab Style (js/draw-style-modal.js): garis Entry, teks pill, compact/always-show stats
+    const lineCol=st.posLineColor||'#9aa4b2', lineW=+st.posLineWidth||1;
+    const txtCol=st.posTextColor||'#ffffff', txtSize=+st.posFontSize||10, compact=!!st.posCompact;
     const F=[];
-    const line=(y,c)=>F.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:c,size:1}});
+    const line=(y,c)=>F.push({type:'line',attrs:{coordinates:[{x:xL,y},{x:xR,y}]},styles:{color:c,size:lineW}});
     const box =(y1,y2,c)=>F.push({type:'rect',attrs:{x:xL,y:Math.min(y1,y2),width:xR-xL,height:Math.abs(y2-y1)},styles:{style:'fill',color:c}});
     // Teks pill & handle hanya tampil saat posisi DIPILIH (klik) atau di-HOVER; selain itu hilang
     // (cuma body + garis Entry yang tersisa). posRerender() di hook select/hover memaksa toggle.
     const showH = (overlay.id===selectedId || overlay.id===hoverId);
-    // pill ala TV: teks putih + background berwarna + sudut membulat
-    const pill=(x,y,text,bg,align,baseline)=>{ if(showH) F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
-      styles:{color:'#ffffff',size:10,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}}); };
+    const showS = showH || !!st.posAlwaysStats;   // "Always show stats": pill tetap tampil; handle tetap hanya saat pilih/hover
+    // pill ala TV: teks (default putih) + background berwarna + sudut membulat
+    const pill=(x,y,text,bg,align,baseline)=>{ if(showS) F.push({type:'text',attrs:{x,y,text,align:align||'left',baseline:baseline||'middle'},
+      styles:{color:txtCol,size:txtSize,family:AXIS_FONT,paddingLeft:6,paddingRight:6,paddingTop:3,paddingBottom:3,borderRadius:3,backgroundColor:bg,borderColor:'transparent'}}); };
     const handle=(x,y)=>{ if(showH) F.push({type:'rect',attrs:{x:x-5,y:y-5,width:10,height:10},styles:{style:'stroke_fill',color:'#ffffff',borderColor:'rgba(0,0,0,0.35)',borderSize:1.5,borderRadius:3}}); };
 
     const entry=pts[0].value, yE=C[0].y;
     const haveTP = pts.length>1 && pts[1] && pts[1].value!=null && coordinates.length>1;
     const haveSL = pts.length>2 && pts[2] && pts[2].value!=null && coordinates.length>2;
-    if(!haveTP){ line(yE,'#9aa4b2'); pill(xL,yE,'Entry '+entry.toFixed(dec),'rgba(20,28,40,0.92)'); handle(C[0].x,yE); return F; }
+    if(!haveTP){ line(yE,lineCol); pill(xL,yE,'Entry '+entry.toFixed(dec),'rgba(20,28,40,0.92)'); handle(C[0].x,yE); return F; }
 
     const tp=pts[1].value, yT=C[1].y;
     const tpPips=Math.round(Math.abs(tp-entry)/pip), tpPct=(Math.abs(tp-entry)/entry*100);
-    box(yE,yT,tgtFill); line(yE,'#9aa4b2');   // body target + garis Entry (garis TP atas dihapus)
+    box(yE,yT,tgtFill); line(yE,lineCol);   // body target + garis Entry (garis TP atas dihapus)
     const tBase=yT<=yE?'bottom':'top', tY=yT<=yE?yT-2:yT+2;
     // Qty & P&L nominal dari setelan akun/risiko per objek (js/draw-position-inputs.js); butuh SL (Qty = risk/jarak SL)
-    const T=haveSL ? posPillTexts(overlay) : null;
-    pill(xL, tY, T ? T.target : 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', tgtColor, 'left', tBase);
+    const T=haveSL ? posPillTexts(overlay, compact) : null;
+    pill(xL, tY, T ? T.target : compact ? 'Target  '+tp.toFixed(dec) : 'Target  '+tp.toFixed(dec)+'   '+tpPips+'p · '+tickN(Math.abs(tp-entry))+'t ('+tpPct.toFixed(3)+'%)', tgtColor, 'left', tBase);
 
     if(haveSL){
       const sl=pts[2].value, yS=C[2].y;
@@ -436,8 +440,23 @@ function posFigures(dir){
 // Pembungkus ini memindahkan resolusi ke saat DIPANGGIL (user men-drag), ketika semua script
 // sudah termuat — lihat docs/superpowers/plans/2026-07-28-split-index-js-chunks-800.md.
 // Dijaga tests/drawing/32-position-handles.spec.js (tanpa handler terpasang: 6/6 merah).
-klinecharts.registerOverlay({name:'longPosition', totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('long')});
-klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('short')});
+// "Price labels" (tab Style): label harga Entry/Target/Stop di sumbu harga saat objek dipilih/di-hover (pola Fib)
+function posYAxisFigures({overlay,coordinates,bounding,yAxis}){
+  const st=dstyle(overlay), pts=overlay.points;
+  if(st.posPriceLabels===false || (overlay.id!==selectedId && overlay.id!==hoverId)) return [];
+  const fromZero=yAxis&&yAxis.isFromZero&&yAxis.isFromZero(), dec=priceDecimals();
+  const cols=[st.posLineColor||'#9aa4b2', st.tgtColor||POS_GREEN, st.stopColor||POS_RED];
+  const F=[];
+  for(let i=0;i<3;i++){
+    const p=pts[i], c=coordinates[i]; if(!p||p.value==null||!c||!isFinite(c.y)) continue;
+    F.push({type:'text', ignoreEvent:true,
+      attrs:{x:fromZero?0:bounding.width, y:c.y, text:p.value.toFixed(dec), align:fromZero?'left':'right', baseline:'middle'},
+      styles:{color:'#fff', backgroundColor:cols[i], borderColor:'rgba(0,0,0,0)'}});
+  }
+  return F;
+}
+klinecharts.registerOverlay({name:'longPosition', totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('long'), createYAxisFigures:posYAxisFigures});
+klinecharts.registerOverlay({name:'shortPosition',totalStep:2, needDefaultPointFigure:true, performEventPressedMove:(...a)=>posPressedMove(...a), createPointFigures:posFigures('short'), createYAxisFigures:posYAxisFigures});
 
 // custom overlay: Text bebas — 1 klik taruh titik, lalu modal Style/Text tab Text (lihat applyTextInput)
 let drawTextColor='#e8edf2';   // diperbarui oleh applyTheme agar kontras di light/dark

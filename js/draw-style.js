@@ -8,8 +8,11 @@ const DRAW_DEFAULT = {
   horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'top'},  // default dotted, warna bisa diganti
   verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'bottom'},   // bawah: atas pane ditempati legenda OHLC
   // Long/Short Position: warna & transparansi zona Profit (tgt) & Stop terpisah, per objek.
-  longPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
-  shortPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12},
+  // + tab Style ala TV: Lines (garis Entry), Text (warna/ukuran pill), Compact stats, Always show stats, Price labels.
+  longPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12,
+    posLineColor:'#9aa4b2',posLineWidth:1,posTextColor:'#ffffff',posFontSize:10,posCompact:false,posAlwaysStats:false,posPriceLabels:true},
+  shortPosition:{tgtColor:'#089981',tgtAlpha:12,stopColor:'#f23645',stopAlpha:12,
+    posLineColor:'#9aa4b2',posLineWidth:1,posTextColor:'#ffffff',posFontSize:10,posCompact:false,posAlwaysStats:false,posPriceLabels:true},
   // --- garis bawaan klinecharts yang di-ekspos ---
   straightLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   rayLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
