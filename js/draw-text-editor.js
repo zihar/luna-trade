@@ -51,12 +51,12 @@ function openOverlayTextEditor(o, removeIfEmpty){
   // WYSIWYG: editor pakai font/ukuran/warna/align PERSIS seperti figure canvas yang di-render
   // (lihat createPointFigures tiap overlay) → tak ada "loncatan" gaya saat commit.
   const st=dstyle(o), name=o.name;
-  const mir = name==='text'     ? { size:(st.size||13), color:(st.color||drawTextColor), lh:16, align:(st.textAlign||'left') }
-            : name==='callout'  ? { size:12, color:drawTextColor, lh:15, align:'left' }
-            : name==='rect'     ? { size:12, color:drawTextColor, lh:15, align:(st.textAlign||'center') }
-            : name==='trendline'? { size:10, color:drawTextColor, lh:14, align:(st.textAlign||'center') }
-            :                     { size:13, color:drawTextColor, lh:16, align:'left' };
+  const ts=textStyle(o);   // js/draw-text-style.js — sumber yang sama dgn render canvas
+  const mir = { size:ts.size, color:ts.color, lh:ts.lh,
+    align: name==='callout' ? 'left' : (st.textAlign||(name==='text'?'left':'center')) };
   ta.style.fontFamily=AXIS_FONT;
+  ta.style.fontWeight=ts.bold?'bold':'normal';
+  ta.style.fontStyle=ts.italic?'italic':'normal';
   ta.style.fontSize=mir.size+'px';
   ta.style.lineHeight=mir.lh+'px';
   ta.style.color=mir.color;
@@ -65,8 +65,8 @@ function openOverlayTextEditor(o, removeIfEmpty){
   if(name==='text'){                         // baseline 'top' di titik klik → pojok kiri-atas editor di situ
     ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y-2)+'px'; ta.style.transform='none';
   } else if(name==='callout'){               // teks rata kiri-atas di dalam kotak (pusat kotak = anchor)
-    const t=(o.extendData||'')||'Add text', lines=String(t).split('\n'), lh=15, pad=6;
-    const cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
+    const t=(o.extendData||'')||'Add text', lines=String(t).split('\n'), lh=ts.lh, pad=6;
+    const cw=Math.max(...lines.map(l=>l.length))*textCharW(ts)+pad*2, ch=lines.length*lh+pad*2;
     ta.style.left=Math.round(x-cw/2+pad)+'px'; ta.style.top=Math.round(y-ch/2+pad)+'px'; ta.style.transform='none';
   } else {                                   // rect/trendline: teks di tengah anchor
     ta.style.left=Math.round(x)+'px'; ta.style.top=Math.round(y)+'px'; ta.style.transform='translate(-50%,-50%)';

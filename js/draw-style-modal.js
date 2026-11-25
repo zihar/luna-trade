@@ -129,13 +129,16 @@ function openDrawModal(o, tab){
   const name=o.name, st=dstyle(o), isFib=(name==='fib3');
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
   const hasAlert=ALERTABLE.has(name), isPos=POS_OBJS.has(name);
+  // objek 'text': teks ADALAH objeknya → tak ada garis utk di-style; warna/ukuran ada di tab Text
+  // (dulu chip Thickness 1–4px di tab Style menulis `size` = ukuran font → teks mikroskopis)
+  const hasStyle=(name!=='text');
   const coordsPane=isPos?posInputsPaneHTML(o):coordsPaneHTML(o), hasCoords=!!coordsPane;   // js/draw-coords.js (posisi: tab Inputs)
   const coordsTab=isPos?'levels':'coords', coordsLabel=isPos?'Inputs':'Coordinates';
-  const active=(tab==='text'&&hasText)?'text':((tab==='coords'||tab==='levels')&&hasCoords)?coordsTab:(tab==='alert'&&hasAlert)?'alert':'style';
+  const active=(tab==='text'&&hasText)?'text':((tab==='coords'||tab==='levels')&&hasCoords)?coordsTab:(tab==='alert'&&hasAlert)?'alert':hasStyle?'style':'text';
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  const stylePane=isPos?posStylePaneHTML(o):`<div class="dm-pane" data-pane="style">`
+  const stylePane=!hasStyle?'':isPos?posStylePaneHTML(o):`<div class="dm-pane" data-pane="style">`
     +(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
@@ -148,13 +151,14 @@ function openDrawModal(o, tab){
     const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
     const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
     textPane=`<div class="dm-pane" data-pane="text"><textarea class="dm-ta" placeholder="Add text">${dmEsc(o.extendData)}</textarea>`
+      +textStylePaneHTML(o)
       +(hasAlign?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
       +`</div>`;
   }
   const alertPane=hasAlert?alertPaneHTML(o):'';
   const panel=drawModal.querySelector('.dmodal');
   panel.innerHTML=`<div class="dm-head">${OBJ_ICON[name]?`<span class="dm-ico">${OBJ_ICON[name]}</span>`:''}<span class="dm-title">${dmEsc(OBJ_TITLE[name]||name)}</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
-    +`<div class="dm-tabs"><button class="dm-tab" data-tab="style">Style</button>${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasCoords?`<button class="dm-tab" data-tab="${coordsTab}">${coordsLabel}</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
+    +`<div class="dm-tabs">${hasStyle?`<button class="dm-tab" data-tab="style">Style</button>`:''}${hasText?`<button class="dm-tab" data-tab="text">Text</button>`:''}${hasCoords?`<button class="dm-tab" data-tab="${coordsTab}">${coordsLabel}</button>`:''}${hasAlert?`<button class="dm-tab" data-tab="alert">Alert</button>`:''}</div>`
     +`<div class="dm-body">${stylePane}${textPane}${coordsPane}${alertPane}</div>`
     +`<div class="dm-foot"><button class="dm-lock"></button><button class="dm-del">${TRASH_SVG}<span>Delete</span></button><button class="dm-close">Close</button></div>`;
   const mark=(sel,el)=>{ panel.querySelectorAll(sel).forEach(x=>x.classList.remove('on')); el.classList.add('on'); };
@@ -168,6 +172,7 @@ function openDrawModal(o, tab){
   panel.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{style:b.dataset.st}); mark('[data-st]',b); });
   panel.querySelectorAll('[data-ha]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textAlign:b.dataset.ha}); mark('[data-ha]',b); });
   panel.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); mark('[data-va]',b); });
+  if(hasText) wireTextStylePane(panel, o);
   const ta=panel.querySelector('.dm-ta');
   if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
   const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(); };

@@ -65,6 +65,7 @@ const SENTINEL = {
   'util.js': 'priceDecimals',
   'replay-forming-bar.js': 'buildReplayPartial',
   'draw-style.js': 'DRAW_DEFAULT',
+  'draw-text-style.js': 'textStyle',
 
   // PR-9 — potongan 797-1540 (744 baris) ke lima file.
   'box-resize.js': 'BOX_TOOLS',
