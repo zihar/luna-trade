@@ -63,6 +63,9 @@ const chartLoad = (()=>{
 })();
 
 async function loadInit(latest){
+  // Generasi muat: klik cepat antar-instrumen → hanya panggilan TERBARU yg boleh menulis data/cursor.
+  // Tanpa ini, respons muat lama yg datang belakangan menimpa chart instrumen baru.
+  const gen = loadInit._gen = (loadInit._gen||0) + 1;
   // Render pertama tunggu font sumbu (Inter Tight) siap — cegah "tremor": kalau chart menggambar
   // dgn metrik font fallback lalu Inter Tight swap-in, lebar y-axis berubah → sumbu bergeser (hanya cold load).
   if(!loadInit._fontReady){ loadInit._fontReady=true;
@@ -76,6 +79,10 @@ async function loadInit(latest){
   localStorage.setItem('br_inst',inst); if(date) localStorage.setItem('br_date',date);
   if(live) stopLive();
   for(const k in tfData) delete tfData[k];
+  // Cursor milik instrumen LAMA tak berlaku lagi. Dibiarkan, switchTF selama muat me-refetch TF baru
+  // dgn to=T lama (bisa di masa depan → OANDA "Time is in the future"; produksi 2026-11-25 XAU_USD).
+  // T==null → switchTF hanya mencatat TF pilihan; loop fetch di bawah yang memuatnya.
+  T = null;
   suppressDrawSave=true; clearTimeout(drawSaveTimer);   // clear+reload jangan timpa storage (restore di akhir)
   // Dorongan yg masih antre utk instrumen ini DIKIRIM DULU (bukan dibuang) dan ditunggu sebelum
   // restoreDraws() melakukan GET-nya — lihat flushPendingPushFor (js/draw-sync.js). Janjinya
@@ -91,10 +98,15 @@ async function loadInit(latest){
   try{
     const todayStr=new Date().toISOString().slice(0,10);
     const opt = (latest || !date || date>=todayStr) ? {count:5000} : {count:5000,to:date+'T00:00:00Z'};
-    const c = await fetchCandles(currentTF,opt);
-    if(!c.length) throw new Error('data kosong');
-    tfData[currentTF]=c;
-  }catch(e){ suppressDrawSave=false; chartLoad.hide(loadTok); setStatus('Failed to load: '+e.message,true); return; }
+    // Muat TF yg AKTIF saat fetch selesai: TF diganti selama muat → ambil juga TF baru itu.
+    while(!tfData[currentTF]){
+      const tf=currentTF;
+      const c = await fetchCandles(tf,opt);
+      if(gen!==loadInit._gen) return;   // sudah ada muat yg lebih baru → biarkan ia yg menyelesaikan
+      if(!c.length) throw new Error('data kosong');
+      tfData[tf]=c;
+    }
+  }catch(e){ if(gen!==loadInit._gen) return; suppressDrawSave=false; chartLoad.hide(loadTok); setStatus('Failed to load: '+e.message,true); return; }
   const a=tfData[currentTF];
   T = cursorAtNewest(currentTF, a);
   lastLen=-1;
