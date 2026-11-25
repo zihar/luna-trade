@@ -159,12 +159,11 @@ function openDrawModal(o, tab){
   const cols=PALETTE.map(c=>`<button class="sw ${st.color===c?'on':''}" data-col="${c}" style="background:${c}"></button>`).join('');
   const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
   const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
-  const stylePane=!hasStyle?'':isPos?posStylePaneHTML(o):`<div class="dm-pane" data-pane="style">`
-    +(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
+  const stylePane=!hasStyle?'':isPos?posStylePaneHTML(o):isFib?fibStylePaneHTML(o):`<div class="dm-pane" data-pane="style">`
+    +`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
     +(FILL_OBJS.has(name)?fillHTML(st):'')
-    +(isFib?`<div class="pp-row" style="margin-top:2px"><button class="pp-chip" id="dmFib">⚙ Level &amp; Color</button></div>`:'')
     +`</div>`;
   let textPane='';
   if(hasText){
@@ -198,7 +197,7 @@ function openDrawModal(o, tab){
   if(FILL_OBJS.has(name)) wireFill(panel, o);
   const ta=panel.querySelector('.dm-ta');
   if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
-  const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(); };
+  if(isFib) wireFibPane(panel, o);
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
   // Lock objek: terkunci = tak bisa digeser & tak bisa terhapus (js/draw-lock.js). Delete dimatikan
   // selama terkunci supaya "buka kunci" jadi langkah sadar, bukan klik yang sama dua kali.
@@ -226,31 +225,92 @@ function openDrawModal(o, tab){
   dmSwitch(active);
   if(active==='text'&&ta){ ta.focus(); const L=ta.value.length; try{ta.setSelectionRange(L,L);}catch(e){} }
 }
-// ===================== editor level Fibonacci (tambah/hapus/ubah nilai) =====================
-// modal gaya .dmodal (scrim "live": tanpa blur supaya efek level ke chart terlihat). fibPop = scrim; Esc via handler di bawah.
-const fibPop=document.createElement('div'); fibPop.className='dmodal-scrim live';
-fibPop.innerHTML='<div class="dmodal fib-modal" role="dialog" aria-modal="true" aria-label="Fibonacci levels"></div>';
-document.body.appendChild(fibPop);
-fibPop.addEventListener('mousedown',e=>{ if(e.target===fibPop) hideFibPop(); });
-function showFibPop(){
-  const panel=fibPop.querySelector('.dmodal');
-  const rows=fibLevels.map((lv,i)=>`<div class="fp-row"><input type="color" class="fp-color" value="${lv.color||fibColor(lv.value,i)}" data-ci="${i}" title="Level color" aria-label="Level color"><input type="number" step="0.001" value="${lv.value}" data-i="${i}" aria-label="Level value"><button class="fp-x" data-i="${i}" title="Delete level" aria-label="Delete level">✕</button></div>`).join('');
-  panel.innerHTML=`<div class="dm-head"><span class="dm-title">Fibonacci levels</span><button class="dm-x" title="Close" aria-label="Close">✕</button></div>`
-    +`<div class="dm-body"><div class="pp-lbl">Levels</div><div class="fp-list">${rows}</div><button class="fp-add" id="fpAdd">+ Add level</button>`
-    +`<div class="pp-lbl fp-gap">Background</div><div class="fp-bg"><label><input type="checkbox" id="fpBgOn"${fibBg.on?' checked':''}> Fill between levels</label>`
-    +`<input type="range" id="fpBgOp" min="0" max="100" value="${fibBg.opacity}"${fibBg.on?'':' disabled'}><span id="fpBgVal">${fibBg.opacity}%</span></div></div>`
-    +`<div class="dm-foot"><button class="dm-ghost" id="fpReset">Reset to default</button><button class="dm-close">Close</button></div>`;
-  fibPop.classList.add('show');
-  panel.querySelector('.dm-x').onclick=panel.querySelector('.dm-close').onclick=hideFibPop;
-  panel.querySelectorAll('input[data-i]').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){ fibLevels[+inp.dataset.i].value=v; saveFibLevels(); } });
-  panel.querySelectorAll('input[data-ci]').forEach(inp=>inp.oninput=()=>{ fibLevels[+inp.dataset.ci].color=inp.value; saveFibLevels(); });
-  panel.querySelectorAll('.fp-x').forEach(b=>b.onclick=()=>{ fibLevels.splice(+b.dataset.i,1); if(!fibLevels.length) fibLevels=[{value:0,color:fibColor(0,0)}]; saveFibLevels(); showFibPop(); });
-  const bgOn=panel.querySelector('#fpBgOn'), bgOp=panel.querySelector('#fpBgOp'), bgVal=panel.querySelector('#fpBgVal');
-  bgOn.onchange=()=>{ fibBg.on=bgOn.checked; bgOp.disabled=!fibBg.on; saveFibBg(); };
-  bgOp.oninput=()=>{ fibBg.opacity=+bgOp.value; bgVal.textContent=fibBg.opacity+'%'; saveFibBg(); };
-  panel.querySelector('#fpAdd').onclick=()=>{ fibLevels.push({value:0.618,color:fibColor(0.618,fibLevels.length)}); saveFibLevels(); showFibPop(); };
-  panel.querySelector('#fpReset').onclick=()=>{ fibLevels=defaultFibLevels(); saveFibLevels(); showFibPop(); };
+// ===================== tab Style Fibonacci Retracement (per objek, ala TradingView) =====================
+// Semua setelan menulis ke objStyle objek ini (setObjStyle). Level & background juga menulis DEFAULT
+// global (setFibLevels/setFibBg, js/overlays-custom.js) → Fib berikutnya mewarisi setelan terakhir.
+// Nilai level = input type=text + parseCoordNum (jebakan input number ter-lokal, lihat draw-coords.js).
+const FIB_FONT_SIZES=[8,10,11,12,14,16,20];
+function fibChip(attr, on, label){ return `<button class="pp-chip ${on?'on':''}" ${attr} aria-pressed="${!!on}">${label}</button>`; }
+function fibLevelRowsHTML(levels){
+  return levels.map((lv,i)=>`<div class="fp-row" data-li="${i}">`
+    +`<input type="checkbox" class="fp-on" data-lon="${i}"${lv.on!==false?' checked':''} title="Show level" aria-label="Show level ${dmEsc(lv.value)}">`
+    +`<input type="text" class="dm-co fp-val" inputmode="decimal" autocomplete="off" spellcheck="false" data-lval="${i}" value="${dmEsc(lv.value)}" aria-label="Level value">`
+    +`<input type="color" class="fp-color" data-lcol="${i}" value="${lv.color||fibColor(lv.value,i)}" title="Level color" aria-label="Level color">`
+    +`<button class="fp-x" data-ldel="${i}" title="Delete level" aria-label="Delete level">✕</button></div>`).join('');
 }
-function hideFibPop(){ fibPop.classList.remove('show'); }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); hideFibPop(); chartSet.classList.remove('show'); } });
+function fibStylePaneHTML(o){
+  const st=dstyle(o), bg=fibBgOf(o);
+  const ws=[1,2,3,4].map(w=>`<button class="pp-chip ${(+st.size)===w?'on':''}" data-w="${w}">${w}px</button>`).join('');
+  const ss=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${st.style===p[0]?'on':''}" data-st="${p[0]}">${p[1]}</button>`).join('');
+  const ts=[['solid','Solid'],['dashed','Dash'],['dotted','Dot']].map(p=>`<button class="pp-chip ${(st.fibTrendStyle||'dashed')===p[0]?'on':''}" data-fts="${p[0]}">${p[1]}</button>`).join('');
+  const H=st.fibLabelH||'left', V=st.fibLabelV||'middle', fs=+st.fibFontSize||10;
+  const sizes=FIB_FONT_SIZES.includes(fs)?FIB_FONT_SIZES:[...FIB_FONT_SIZES,fs].sort((a,b)=>a-b);
+  return `<div class="dm-pane dm-fib" data-pane="style">`
+    +`<div class="pp-lbl">Trend line</div><div class="pp-row">${fibChip('data-ftrend',st.fibTrend,'Show')}`
+    +`<label class="sw sw-custom on" title="Trend line color"><input type="color" data-ftcol value="${st.fibTrendColor||'#787b86'}" aria-label="Trend line color"></label>${ts}</div>`
+    +`<div class="pp-lbl">Levels line</div><div class="pp-row">${ws}</div><div class="pp-row">${ss}</div>`
+    +`<div class="pp-lbl">Extend</div><div class="pp-row">${fibChip('data-fext="fibExtendLeft"',st.fibExtendLeft,'Left')}${fibChip('data-fext="fibExtendRight"',st.fibExtendRight,'Right')}</div>`
+    +`<div class="pp-lbl">Levels</div><div class="fp-list">${fibLevelRowsHTML(fibLevelsOf(o))}</div>`
+    +`<div class="pp-row"><button class="pp-chip" id="fpAdd">+ Add level</button><button class="pp-chip" id="fpReset">Reset</button></div>`
+    +`<div class="pp-lbl">Use one color</div><div class="pp-row">${fibChip('data-fone',!!st.fibOneColor,'On')}`
+    +`<label class="sw sw-custom on" title="Color for all levels"><input type="color" data-fonecol value="${st.fibOneColor||'#4a71ff'}" aria-label="One color for all levels"></label></div>`
+    +`<div class="pp-lbl">Background</div><div class="pp-row">${fibChip('data-fbg',bg.on,'Fill')}</div>`
+    +`<div class="dm-slider"><span>Opacity</span><input type="range" data-fbgop min="0" max="100" value="${bg.opacity}" aria-label="Background opacity"><span class="dm-sval">${bg.opacity}%</span></div><div class="dm-gap"></div>`
+    +`<div class="pp-lbl">Labels</div><div class="pp-row">${fibChip('data-fflag="fibShowLevels"',st.fibShowLevels!==false,'Levels')}${fibChip('data-fflag="fibShowPrices"',st.fibShowPrices,'Prices')}${fibChip('data-fflag="fibReverse"',st.fibReverse,'Reverse')}</div>`
+    +`<div class="pp-row">${fibChip('data-fmode="pct"',st.fibLevelsMode!=='value','Percents')}${fibChip('data-fmode="value"',st.fibLevelsMode==='value','Values')}</div>`
+    +`<div class="pp-row">${['left','center','right'].map(k=>fibChip(`data-flh="${k}"`,H===k,k[0].toUpperCase()+k.slice(1))).join('')}</div>`
+    +`<div class="pp-row">${['top','middle','bottom'].map(k=>fibChip(`data-flv="${k}"`,V===k,k[0].toUpperCase()+k.slice(1))).join('')}</div>`
+    +`<div class="pp-lbl">Font size</div><div class="dm-co-row dm-font-row"><select class="dm-co dm-co-sel" data-ffs aria-label="Font size">`
+    +sizes.map(s=>`<option value="${s}"${s===fs?' selected':''}>${s}</option>`).join('')+`</select></div>`
+    +`</div>`;
+}
+function wireFibPane(panel, o){
+  const pane=panel.querySelector('.dm-fib'); if(!pane) return;
+  const set=p=>setObjStyle(o.id,p);
+  const press=(b,on)=>{ b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); };
+  const group=(sel,key,val)=>pane.querySelectorAll(sel).forEach(b=>b.onclick=()=>{ set({[key]:val(b)}); pane.querySelectorAll(sel).forEach(x=>press(x,x===b)); });
+  pane.querySelectorAll('[data-fts]').forEach(b=>b.onclick=()=>{ set({fibTrendStyle:b.dataset.fts}); pane.querySelectorAll('[data-fts]').forEach(x=>x.classList.toggle('on',x===b)); });
+  const tog=(b,key)=>{ if(b) b.onclick=()=>{ const on=!b.classList.contains('on'); press(b,on); set({[key]:on}); }; };
+  tog(pane.querySelector('[data-ftrend]'),'fibTrend');
+  pane.querySelectorAll('[data-fext]').forEach(b=>tog(b,b.dataset.fext));
+  pane.querySelectorAll('[data-fflag]').forEach(b=>tog(b,b.dataset.fflag));
+  const tc=pane.querySelector('[data-ftcol]'); tc.oninput=()=>{ const b=pane.querySelector('[data-ftrend]'); press(b,true); set({fibTrendColor:tc.value, fibTrend:true}); };
+  // Use one color: fibOneColor '' = mati; warna dipilih = langsung aktif
+  const one=pane.querySelector('[data-fone]'), oc=pane.querySelector('[data-fonecol]');
+  one.onclick=()=>{ const on=!one.classList.contains('on'); press(one,on); set({fibOneColor:on?oc.value:''}); };
+  oc.oninput=()=>{ press(one,true); set({fibOneColor:oc.value}); };
+  const bgb=pane.querySelector('[data-fbg]'), op=pane.querySelector('[data-fbgop]');
+  bgb.onclick=()=>{ const on=!bgb.classList.contains('on'); press(bgb,on); setFibBg(o,{on}); };
+  op.oninput=()=>{ op.parentElement.querySelector('.dm-sval').textContent=op.value+'%';
+    // geser opacity saat background mati = jelas ingin tampak → nyalakan
+    if(!bgb.classList.contains('on')) press(bgb,true);
+    setFibBg(o,{on:true, opacity:+op.value}); };
+  group('[data-fmode]','fibLevelsMode',b=>b.dataset.fmode);
+  group('[data-flh]','fibLabelH',b=>b.dataset.flh);
+  group('[data-flv]','fibLabelV',b=>b.dataset.flv);
+  const fs=pane.querySelector('[data-ffs]'); fs.onchange=()=>set({fibFontSize:+fs.value});
+  fs.onkeydown=e=>{ if(e.key!=='Escape') e.stopPropagation(); };
+  // daftar level: setiap perubahan menulis array BARU (lihat catatan fibLevelsOf)
+  const list=pane.querySelector('.fp-list');
+  const cur=()=>fibLevelsOf(o).map(l=>Object.assign({},l));
+  const rerender=()=>{ list.innerHTML=fibLevelRowsHTML(fibLevelsOf(o)); wireRows(); };
+  function wireRows(){
+    list.querySelectorAll('[data-lon]').forEach(c=>c.onchange=()=>{ const L=cur(); L[+c.dataset.lon].on=c.checked; setFibLevels(o,L); });
+    list.querySelectorAll('[data-lcol]').forEach(c=>c.oninput=()=>{ const L=cur(); L[+c.dataset.lcol].color=c.value; setFibLevels(o,L); });
+    list.querySelectorAll('[data-lval]').forEach(inp=>{
+      inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); if(e.key!=='Escape') e.stopPropagation(); };
+      inp.oninput=()=>inp.classList.toggle('bad', isNaN(parseCoordNum(inp.value)));
+      inp.onchange=()=>{ const v=parseCoordNum(inp.value);
+        if(isNaN(v)){ inp.value=fibLevelsOf(o)[+inp.dataset.lval].value; inp.classList.remove('bad'); return; }
+        const L=cur(); L[+inp.dataset.lval].value=v; setFibLevels(o,L); };
+    });
+    list.querySelectorAll('[data-ldel]').forEach(b=>b.onclick=()=>{ const L=cur(); L.splice(+b.dataset.ldel,1);
+      setFibLevels(o, L.length?L:[{value:0,color:fibColor(0,0),on:true}]); rerender(); });
+  }
+  wireRows();
+  pane.querySelector('#fpAdd').onclick=()=>{ const L=cur(); L.push({value:0.618,color:fibColor(0.618,L.length),on:true}); setFibLevels(o,L); rerender();
+    const last=list.querySelector('.fp-row:last-child .fp-val'); if(last){ last.focus(); last.select(); } };
+  pane.querySelector('#fpReset').onclick=()=>{ setFibLevels(o,defaultFibLevels()); rerender(); };
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); chartSet.classList.remove('show'); } });
 

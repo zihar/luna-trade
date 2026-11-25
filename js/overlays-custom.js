@@ -229,32 +229,71 @@ klinecharts.registerOverlay({
   klinecharts.registerOverlay(tpl);
 });
 
-// custom overlay: Fibonacci 0 · 0.5 · 1 (lebar = selebar tarikan, arah ikut tarik)
-// level Fibonacci yang bisa diatur (tambah/hapus/ubah nilai) — global, tersimpan di localStorage
+// custom overlay: Fibonacci Retracement (lebar = selebar tarikan, arah ikut tarik)
+// Setelan per objek di objStyle[id] (tab Style, js/draw-style-modal.js) → ikut persist, sync server,
+// copy/paste & clone. Level & background punya DEFAULT global (localStorage br_fibLevels/br_fibBg):
+// Fib baru men-snapshot default saat dibuat (snapshotFibSettings), Fib lama tanpa snapshot tetap
+// mengikuti default — pola yang sama dgn setelan posisi (js/draw-position-inputs.js).
+// fibLevels di objStyle SELALU diganti array baru (tak pernah dimutasi): clone menyalin objStyle
+// secara dangkal, jadi mutasi di tempat akan ikut mengubah salinannya.
 const FIB_DEFAULT=[0,0.5,1];
 // warna per-level ala TradingView (level umum di-map; lainnya pakai palet berputar) — dipakai sbg warna default
 const FIB_COLORS={0:'#787b86',0.236:'#f23645',0.382:'#ff9800',0.5:'#4caf50',0.618:'#089981',0.786:'#00bcd4',1:'#787b86',1.272:'#f23645',1.414:'#ff9800',1.618:'#4caf50',2:'#787b86',2.618:'#089981'};
 const FIB_PALETTE=['#787b86','#f23645','#ff9800','#4caf50','#089981','#00bcd4','#2962ff','#9c27b0'];
 function fibColor(Lv,i){ return FIB_COLORS[Lv]!=null?FIB_COLORS[Lv]:FIB_PALETTE[i%FIB_PALETTE.length]; }
-// tiap level: {value, color}. color bisa diatur user; default ikut fibColor()
-function defaultFibLevels(){ return FIB_DEFAULT.map((v,i)=>({value:v,color:fibColor(v,i)})); }
-let fibLevels;
-try{
-  const raw=JSON.parse(localStorage.getItem('br_fibLevels'));
-  if(!Array.isArray(raw)||!raw.length) fibLevels=defaultFibLevels();
-  // migrasi skema lama (array angka) → array objek {value,color}
-  else fibLevels=raw.map((it,i)=> (typeof it==='number') ? {value:it,color:fibColor(it,i)} : {value:+it.value,color:it.color||fibColor(+it.value,i)});
-}catch(e){ fibLevels=defaultFibLevels(); }
+// tiap level: {value, color, on}. on=false = level disimpan tapi tak digambar (checkbox ala TV)
+function defaultFibLevels(){ return FIB_DEFAULT.map((v,i)=>({value:v,color:fibColor(v,i),on:true})); }
+function normFibLevels(raw){
+  if(!Array.isArray(raw)||!raw.length) return null;
+  // migrasi skema lama (array angka) → array objek {value,color,on}
+  const out=raw.map((it,i)=> (typeof it==='number') ? {value:it,color:fibColor(it,i),on:true}
+    : {value:+it.value, color:it.color||fibColor(+it.value,i), on:it.on!==false}).filter(l=>isFinite(l.value));
+  return out.length?out:null;
+}
+let fibLevels;   // DEFAULT level utk Fib baru (& Fib lama tanpa snapshot)
+try{ fibLevels=normFibLevels(JSON.parse(localStorage.getItem('br_fibLevels')))||defaultFibLevels(); }
+catch(e){ fibLevels=defaultFibLevels(); }
 function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
 function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
-// background isian antar level: default MATI; bisa diaktifkan + atur transparansi (opacity %) via editor
+// background isian antar level (default global): default MATI; opacity %
 let fibBg;
 try{ const raw=JSON.parse(localStorage.getItem('br_fibBg')); fibBg=(raw&&typeof raw==='object')?{on:!!raw.on,opacity:Math.max(0,Math.min(100,(+raw.opacity||12)))}:{on:false,opacity:12}; }
 catch(e){ fibBg={on:false,opacity:12}; }
 function saveFibBg(){ try{localStorage.setItem('br_fibBg',JSON.stringify(fibBg));}catch(e){} redrawFibs(); }
 function alphaHex(pct){ const a=Math.max(0,Math.min(255,Math.round(pct/100*255))); return a.toString(16).padStart(2,'0'); }
+// level & background efektif sebuah Fib: snapshot objek, fallback ke default global
+function fibLevelsOf(o){ const s=(o&&objStyle[o.id])||{}; return normFibLevels(s.fibLevels)||fibLevels; }
+function fibBgOf(o){ const s=(o&&objStyle[o.id])||{};
+  return {on: s.fibBg!=null?!!s.fibBg:fibBg.on, opacity: s.fibBgAlpha!=null?Math.max(0,Math.min(100,+s.fibBgAlpha||0)):fibBg.opacity}; }
+// dipanggil saat Fib selesai digambar: bekukan default saat ini ke objek
+function snapshotFibSettings(o){
+  if(!o||o.name!=='fib3') return;
+  const s=objStyle[o.id]||{};
+  if(Array.isArray(s.fibLevels)) return;   // sudah punya (paste/clone/restore)
+  const bg=fibBgOf(o);
+  setObjStyle(o.id,{fibLevels:fibLevels.map(l=>Object.assign({},l)), fibBg:bg.on, fibBgAlpha:bg.opacity});
+}
+// tulis level/background ke objek DAN default (Fib berikutnya mewarisi setelan terakhir)
+function setFibLevels(o, levels){
+  const L=normFibLevels(levels)||defaultFibLevels();
+  fibLevels=L.map(l=>Object.assign({},l)); try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){}
+  if(o) setObjStyle(o.id,{fibLevels:L.map(l=>Object.assign({},l))});
+}
+function setFibBg(o, patch){
+  const cur=fibBgOf(o), nx={on:patch.on!=null?!!patch.on:cur.on, opacity:patch.opacity!=null?Math.max(0,Math.min(100,+patch.opacity||0)):cur.opacity};
+  fibBg=Object.assign({},nx); try{localStorage.setItem('br_fibBg',JSON.stringify(fibBg));}catch(e){}
+  if(o) setObjStyle(o.id,{fibBg:nx.on, fibBgAlpha:nx.opacity});
+}
+// teks label sebuah level: "61.80%" / "0.618", + " (harga)" bila Prices aktif
+function fibLabel(r, st){
+  const lv = st.fibLevelsMode==='value' ? String(+r.Lv.toFixed(4)) : (r.Lv*100).toFixed(2)+'%';
+  const showLv = st.fibShowLevels!==false, showPx = !!st.fibShowPrices;
+  if(showLv&&showPx) return lv+' ('+fmtPx(r.price)+')';
+  if(showPx) return fmtPx(r.price);
+  return showLv ? lv : '';
+}
 
-// hitung posisi y, harga & warna tiap level fib (urut atas→bawah) + batas x
+// hitung posisi y, harga & warna tiap level fib yg AKTIF (urut atas→bawah) + batas x
 function fibRowsOf(overlay,coordinates){
   const C=subBarCoords(overlay,coordinates);
   const xs=C.map(c=>c.x), ys=C.map(c=>c.y);
@@ -264,40 +303,56 @@ function fibRowsOf(overlay,coordinates){
   const vTop=Math.max(...vals), vBot=Math.min(...vals);
   // arah: dari extendData bila sudah final (box 8-titik); saat preview (2 titik, extendData belum ada)
   // turunkan langsung dari tarikan → 0% di titik akhir, sama spt hasil final (anti-flip saat klik).
-  let zeroTop;
-  if(overlay.extendData && overlay.extendData.zeroTop!=null){ zeroTop = overlay.extendData.zeroTop!==false; }
+  let zeroTop, startLeft=true;
+  const ed=overlay.extendData;
+  if(ed && typeof ed==='object' && ed.zeroTop!=null){ zeroTop = ed.zeroTop!==false; if(ed.startLeft!=null) startLeft=ed.startLeft!==false; }
   else { const p0=overlay.points[0], p1=overlay.points[1];
-    zeroTop = (p0&&p1&&p0.value!=null&&p1.value!=null) ? (p1.value>=p0.value) : true; }
-  const rows=fibLevels.map((lv,i)=>{
+    zeroTop = (p0&&p1&&p0.value!=null&&p1.value!=null) ? (p1.value>=p0.value) : true;
+    if(C.length>=2&&C[0].x!=null&&C[1].x!=null) startLeft = C[0].x<=C[1].x; }
+  const st=dstyle(overlay);
+  const z0 = st.fibReverse ? !zeroTop : zeroTop;      // Reverse: tukar ujung 0% ↔ 100%
+  const rows=fibLevelsOf(overlay).map((lv,i)=>{
+    if(lv.on===false) return null;
     const Lv=lv.value;
-    const f = zeroTop ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
-    return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: lv.color||fibColor(Lv,i) };
-  }).sort((a,b)=>a.y-b.y);
-  return {rows,xL,xR};
+    const f = z0 ? Lv : (1-Lv);                 // 0 di atas / di bawah sesuai arah tarik
+    return { Lv, y: yTop+(yBot-yTop)*f, price: vTop+(vBot-vTop)*f, color: st.fibOneColor || lv.color || fibColor(Lv,i) };
+  }).filter(Boolean).sort((a,b)=>a.y-b.y);
+  // trend line: dari titik awal tarikan (100%) ke titik akhir (0%) — tak terpengaruh Reverse
+  const trend={x0:startLeft?xL:xR, y0:zeroTop?yBot:yTop, x1:startLeft?xR:xL, y1:zeroTop?yTop:yBot};
+  return {rows,xL,xR,trend,st};
 }
 klinecharts.registerOverlay({
   name:'fib3', totalStep:3, needDefaultPointFigure:true,
   needDefaultYAxisFigure:false,   // penanda harga (Y) kita render sendiri, hanya saat aktif
   performEventPressedMove:boxPressedMove,
-  createPointFigures:({overlay,coordinates})=>{
+  createPointFigures:({overlay,coordinates,bounding})=>{
     if(coordinates.length<2) return [];
     const R=fibRowsOf(overlay,coordinates); if(!R) return [];
-    const {rows,xL,xR}=R;
-    const st=dstyle(overlay);
+    const {rows,xL,xR,trend,st}=R;
+    // Extend Left/Right: garis level (dan background) memanjang ke tepi pane
+    const W=bounding&&bounding.width||0;
+    const lx = st.fibExtendLeft ? 0 : xL, rx = st.fibExtendRight && W ? W : xR;
     const figs=[];
-    // background terisi antar level (warna = level batas atasnya) — default mati, opacity diatur di editor
-    if(fibBg.on){ const ah=alphaHex(fibBg.opacity);
+    // background terisi antar level (warna = level batas atasnya) — default mati
+    const bg=fibBgOf(overlay);
+    if(bg.on){ const ah=alphaHex(bg.opacity);
       for(let i=0;i<rows.length-1;i++){
-        figs.push({type:'rect',attrs:{x:xL,y:rows[i].y,width:xR-xL,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+ah,borderColor:'transparent'}});
+        figs.push({type:'rect',attrs:{x:lx,y:rows[i].y,width:rx-lx,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+ah,borderColor:'transparent'}});
       }
     }
-    // garis + label persentase (harga dihilangkan dari garis → muncul di sumbu Y saat aktif)
-    // persentase ditaruh di pinggir kiri & sejajar tengah garis (bukan di atas garis)
+    if(st.fibTrend){ const tc=st.fibTrendColor||'#787b86', ts=st.fibTrendStyle||'dashed';
+      figs.push({type:'line',attrs:{coordinates:[{x:trend.x0,y:trend.y0},{x:trend.x1,y:trend.y1}]},
+        styles:Object.assign({color:tc,size:st.fibTrendSize||1},lsLine({style:ts,size:st.fibTrendSize||1}))}); }
+    // posisi label: horizontal Left = di LUAR kiri kotak (rata-kanan, tak bertumpuk dgn handle),
+    // Right = di luar kanan, Center = tengah kotak; vertikal = di atas / sejajar / di bawah garis.
+    const H=st.fibLabelH||'left', V=st.fibLabelV||'middle', fs=+st.fibFontSize||10;
+    const tx = H==='right' ? xR+5 : H==='center' ? (xL+xR)/2 : xL-5;
+    const ta = H==='right' ? 'left' : H==='center' ? 'center' : 'right';
+    const bl = V==='top' ? 'bottom' : V==='bottom' ? 'top' : 'middle', dy = V==='top' ? -2 : V==='bottom' ? 2 : 0;
     rows.forEach(r=>{
-      figs.push({type:'line',attrs:{coordinates:[{x:xL,y:r.y},{x:xR,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
-      // angka persen: SEMUA rata-kanan di sisi kiri garis (di luar/kiri titik jangkar xL) →
-      // seragam untuk semua level & tak pernah tumpang-tindih dgn buletan handle.
-      figs.push({type:'text',attrs:{x:xL-5,y:r.y,text:(r.Lv*100).toFixed(2)+'%',align:'right',baseline:'middle'},styles:{color:r.color,size:10,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
+      figs.push({type:'line',attrs:{coordinates:[{x:lx,y:r.y},{x:rx,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
+      const t=fibLabel(r,st);
+      if(t) figs.push({type:'text',attrs:{x:tx,y:r.y+dy,text:t,align:ta,baseline:bl},styles:{color:r.color,size:fs,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     });
     return figs;
   },

@@ -35,7 +35,7 @@ function expandBox(o){
   // & handle bertumpuk (tak bisa di-resize). Beri lebar minimum 1 bar ke kanan.
   if(Math.abs(fidxOf(Rxa)-fidxOf(Lxa)) < 0.5){ Rxa={dataIndex: fidxOf(Lxa)+1}; }
   const T=Math.max(p0.value,p1.value), B=Math.min(p0.value,p1.value);
-  const ext = o.name==='fib3' ? {zeroTop:p1.value>=p0.value} : o.extendData;  // fib: 100% di titik start, 0% di titik akhir (arah tarik) → tarik ke atas 0% di atas, ke bawah 0% di bawah
+  const ext = o.name==='fib3' ? {zeroTop:p1.value>=p0.value, startLeft:left} : o.extendData;  // fib: 100% di titik start, 0% di titik akhir (arah tarik) → tarik ke atas 0% di atas, ke bawah 0% di bawah; startLeft = arah X tarikan (utk trend line)
   const pts=new Array(8); writeBox(pts,Lxa,Rxa,T,B);
   try{ chart.overrideOverlay({id:o.id, points:pts, extendData:ext}); }catch(e){}
 }
