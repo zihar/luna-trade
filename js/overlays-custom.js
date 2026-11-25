@@ -1,3 +1,6 @@
+// fill bentuk tertutup (rect/circle/ellipse/callout): warna + opacity per objek (tab Style → Background).
+// Default #4a71ff @10% = nilai hardcode lama → objek tersimpan tak berubah rupa.
+function shapeFill(st){ const c=(st&&st.fillColor)||'#4a71ff', a=(st&&st.fillAlpha!=null)?st.fillAlpha:10; return c+alphaHex(a); }
 // ===================== custom overlay: rectangle/zona =====================
 klinecharts.registerOverlay({
   name:'rect', totalStep:3, needDefaultPointFigure:true,
@@ -10,13 +13,9 @@ klinecharts.registerOverlay({
     const st=dstyle(overlay);
     const rl=lsLine(st);
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
-      styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
-    const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');    // teks opsional → posisi via textAlign/textValign
-    if(t!==''){ const ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=t.split('\n'), lh=ts.lh;
-      const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
-      const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
-      lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
-        styles:textFigStyles(ts)})); }
+      styles:{ style:'stroke_fill', color:shapeFill(st), borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
+    const t=overlay&&overlay.extendData!=null?String(overlay.extendData):'';    // teks opsional → posisi via textAlign/textValign
+    if(t!=='') figs.push(...boxTextFigs(overlay,{x,y,w,h}));
     else if(showAddTextHint(overlay) && w>=ADDTEXT_MIN_W && h>=ADDTEXT_MIN_H)    // kosong + hover/terpilih & kotak sanggup memuat label → undangan "+ Add text" menyatu di tengah (ala TradingView); kotak kecil dibiarkan bersih
       figs.push({type:'text',attrs:{x:x+w/2,y:y+h/2,text:'+ Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
@@ -32,7 +31,8 @@ klinecharts.registerOverlay({
     const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1];
     const r=Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2); const st=dstyle(overlay); const rl=lsLine(st);
     return [{type:'circle', attrs:{x:a.x,y:a.y,r},
-      styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}}];
+      styles:{style:'stroke_fill', color:shapeFill(st), borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}},
+      ...boxTextFigs(overlay,{x:a.x-r,y:a.y-r,w:2*r,h:2*r})];
   }
 });
 // ===================== custom overlay: ellipse (bounding box 2 sudut) =====================
@@ -46,7 +46,8 @@ klinecharts.registerOverlay({
     const st=dstyle(overlay); const rl=lsLine(st);
     const pts=[]; const N=48; for(let i=0;i<=N;i++){ const t=i/N*2*Math.PI; pts.push({x:cx+rx*Math.cos(t), y:cy+ry*Math.sin(t)}); }
     return [{type:'polygon', attrs:{coordinates:pts},
-      styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}}];
+      styles:{style:'stroke_fill', color:shapeFill(st), borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2]}},
+      ...boxTextFigs(overlay,{x:cx-rx,y:cy-ry,w:2*rx,h:2*ry})];
   }
 });
 // ===================== custom overlay: arrow (pangkal → ujung, dgn kepala) =====================
@@ -63,6 +64,7 @@ klinecharts.registerOverlay({
       {type:'line', attrs:{coordinates:[a,b]}, styles:line},
       {type:'line', attrs:{coordinates:[h1,b]}, styles:line},
       {type:'line', attrs:{coordinates:[h2,b]}, styles:line},
+      ...lineTextFigs(overlay,[a,b]),
     ];
   }
 });
@@ -78,7 +80,7 @@ klinecharts.registerOverlay({
     const bx=b.x-cw/2, by=b.y-ch/2;
     const figs=[
       {type:'line', attrs:{coordinates:[a,{x:b.x,y:b.y}]}, styles:Object.assign({color:st.color,size:st.size},ls)},
-      {type:'rect', attrs:{x:bx,y:by,width:cw,height:ch}, styles:{style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:ls.style}},
+      {type:'rect', attrs:{x:bx,y:by,width:cw,height:ch}, styles:{style:'stroke_fill', color:shapeFill(st), borderColor:st.color, borderSize:st.size, borderStyle:ls.style}},
     ];
     if(overlay.id===editingTextId) return figs;   // sedang diedit → teks dirender oleh editor (kotak+penunjuk tetap tampil)
     lines.forEach((ln,i)=>figs.push({type:'text', attrs:{x:bx+pad,y:by+pad+i*lh, text:ln, align:'left', baseline:'top'},

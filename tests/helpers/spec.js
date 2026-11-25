@@ -24,6 +24,7 @@
 //               js/draw-constrain.js). Y tetap bebas.
 // text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, js/draw-style-modal.js)
 //               'line' = tab Text ada, tapi double-click membuka Style dulu (LINE_TEXT, js/draw-text-style.js)
+// fill        = true → tab Style punya Background (warna + opacity) (FILL_OBJS, js/draw-style-modal.js)
 // autoEditor  = true bila editor teks inline terbuka sendiri setelah objek jadi
 //               (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306) → test wajib menutupnya.
 // persist     = ada di PERSIST_DRAW (index.html pra-Fase-2:3158) → wajib bertahan setelah reload.
@@ -57,10 +58,10 @@ const TOOL_SPEC = [
   { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
 
   // ---- Shapes ----
-  { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'box', persist: true, sc: 'R' },
-  { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
-  { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'A' },
+  { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', fill: true, settings: 'modal', coords: 'box', persist: true, sc: 'R' },
+  { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
+  { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'A' },
   { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
   { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
 
@@ -77,7 +78,7 @@ const TOOL_SPEC = [
 
   // ---- Text ----
   { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'modal', autoEditor: true, settings: 'modal', coords: 'points', persist: true, sc: 'X' },
-  { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', autoEditor: true, settings: 'modal', coords: 'points', persist: true },
+  { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', fill: true, autoEditor: true, settings: 'modal', coords: 'points', persist: true },
   // simpleAnnotation ("Annotation") & simpleTag ("Tag") DITARIK dari rail 2026-07-27 (Temuan 3),
   // jadi keduanya keluar dari tabel ini — bukan karena testnya rewel, tapi karena tool-nya tak ada
   // lagi di UI. Keduanya overlay bawaan klinecharts yang menandai semua figure-nya
