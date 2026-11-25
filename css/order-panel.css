@@ -186,6 +186,10 @@
   .sw-custom{ position:relative; display:inline-block; overflow:hidden; box-sizing:border-box;
     background:conic-gradient(#f23645,#f5a623,#54c88c,#22d3ee,#4a71ff,#a78bfa,#f23645); }
   .sw-custom input{ position:absolute; inset:-6px; width:32px; height:32px; opacity:0; cursor:pointer; padding:0; border:0; }
+  /* tab Text (js/draw-text-style.js): swatch Auto = warna teks ikut tema (terang/gelap dibelah diagonal) */
+  .sw-auto{ background:linear-gradient(135deg,#e8edf2 50%,#131722 50%); }
+  .dm-font-row .dm-co-sel{ flex:0 0 84px; }
+  .dm-font-row .pp-chip{ min-width:34px; padding:6px 0; font-size:13px; }
   .dm-slider{ display:flex; align-items:center; gap:10px; margin:-6px 0 0; font-size:12px; color:var(--muted); }
   .dm-slider input[type=range]{ flex:1; min-width:0; accent-color:var(--accent); }
   .dm-sval{ width:34px; text-align:right; font-variant-numeric:tabular-nums; color:var(--txt); }

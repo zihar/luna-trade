@@ -12,11 +12,11 @@ klinecharts.registerOverlay({
     const figs=[{ type:'rect', attrs:{x,y,width:w,height:h},
       styles:{ style:'stroke_fill', color:'rgba(74,113,255,0.10)', borderColor:st.color, borderSize:st.size, borderStyle:rl.style, borderDashedValue:rl.dashedValue||[2,2] } }];
     const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');    // teks opsional → posisi via textAlign/textValign
-    if(t!==''){ const ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=t.split('\n'), lh=15;
+    if(t!==''){ const ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'middle', pad=4, lines=t.split('\n'), lh=ts.lh;
       const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
       const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
       lines.forEach((ln,i)=>figs.push({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},
-        styles:{color:drawTextColor,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}})); }
+        styles:textFigStyles(ts)})); }
     else if(showAddTextHint(overlay) && w>=ADDTEXT_MIN_W && h>=ADDTEXT_MIN_H)    // kosong + hover/terpilih & kotak sanggup memuat label → undangan "+ Add text" menyatu di tengah (ala TradingView); kotak kecil dibiarkan bersih
       figs.push({type:'text',attrs:{x:x+w/2,y:y+h/2,text:'+ Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
@@ -74,7 +74,7 @@ klinecharts.registerOverlay({
     const C=subBarCoords(overlay,coordinates), a=C[0], b=C[1]; const st=dstyle(overlay); const ls=lsLine(st);
     const raw=(overlay&&overlay.extendData)? String(overlay.extendData):'';
     const empty=(raw===''), t = empty ? 'Add text' : raw;   // kosong → placeholder muted, bukan teks literal
-    const lines=t.split('\n'), lh=15, pad=6, cw=Math.max(...lines.map(l=>l.length))*7+pad*2, ch=lines.length*lh+pad*2;
+    const ts=textStyle(overlay), lines=t.split('\n'), lh=ts.lh, pad=6, cw=Math.max(...lines.map(l=>l.length))*textCharW(ts)+pad*2, ch=lines.length*lh+pad*2;
     const bx=b.x-cw/2, by=b.y-ch/2;
     const figs=[
       {type:'line', attrs:{coordinates:[a,{x:b.x,y:b.y}]}, styles:Object.assign({color:st.color,size:st.size},ls)},
@@ -82,7 +82,7 @@ klinecharts.registerOverlay({
     ];
     if(overlay.id===editingTextId) return figs;   // sedang diedit → teks dirender oleh editor (kotak+penunjuk tetap tampil)
     lines.forEach((ln,i)=>figs.push({type:'text', attrs:{x:bx+pad,y:by+pad+i*lh, text:ln, align:'left', baseline:'top'},
-      styles:{color:(empty?drawTextMuted:drawTextColor),size:12,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}));
+      styles:textFigStyles(ts, empty?drawTextMuted:null)}));
     return figs;
   }
 });
@@ -123,13 +123,13 @@ klinecharts.registerOverlay({
     const st=dstyle(overlay);
     const figs=[{type:'line',attrs:{coordinates:[a,b]},styles:Object.assign({color:st.color,size:st.size},lsLine(st))}];
     const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');
-    if(t!==''){ const ha=st.textAlign||'center', va=st.textValign||'top', off=4;
+    if(t!==''){ const ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'top', off=4;
       const px = ha==='left' ? a.x : ha==='right' ? b.x : (a.x+b.x)/2;
       const py = ha==='left' ? a.y : ha==='right' ? b.y : (a.y+b.y)/2;
       const ty = va==='top' ? py-off : va==='bottom' ? py+off : py;
       const bl = va==='top' ? 'bottom' : va==='bottom' ? 'top' : 'middle';
       figs.push({type:'text',attrs:{x:px,y:ty,text:t,align:ha,baseline:bl},
-        styles:{color:drawTextColor,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}}); }
+        styles:textFigStyles(ts)}); }
     else if(showAddTextHint(overlay))    // kosong + hover/terpilih → "Add text" muted DI GARIS (bisa diklik utk input inline)
       figs.push({type:'text',attrs:{x:(a.x+b.x)/2,y:(a.y+b.y)/2,text:'Add text',align:'center',baseline:'middle'},
         styles:{color:drawTextMuted,size:10,family:AXIS_FONT,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
@@ -351,15 +351,14 @@ klinecharts.registerOverlay({
     if(overlay.id===editingTextId) return [];   // sedang diedit → teks dirender oleh editor, jangan dobel
     const t=overlay.extendData;
     if(t==null||t==='') return [];
-    const C=subBarCoords(overlay,coordinates), x=C[0].x, y0=C[0].y, lh=16;
+    const ts=textStyle(overlay), C=subBarCoords(overlay,coordinates), x=C[0].x, y0=C[0].y, lh=ts.lh;
     const st=dstyle(overlay);
     const lines=String(t).split('\n');
     const ha=st.textAlign||'left', va=st.textValign||'top';
     const yTop = va==='top' ? y0 : va==='bottom' ? y0-(lines.length-1)*lh : y0-(lines.length-1)*lh/2;
     return lines.map((ln,i)=>({ type:'text',
       attrs:{x, y:yTop+i*lh, text:ln, align:ha, baseline:va},
-      styles:{color:(st.color||drawTextColor), size:(st.size||13), family:AXIS_FONT, backgroundColor:'transparent', borderColor:'transparent',
-              paddingLeft:0, paddingRight:0, paddingTop:0, paddingBottom:0} }));
+      styles:textFigStyles(ts) }));
   }
 });
 
