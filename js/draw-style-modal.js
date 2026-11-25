@@ -1,8 +1,9 @@
 // ===================== setting objek gambar: modal Style/Text (double-click / klik-kanan) =====================
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
 // objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
-const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline']);
-const DM_ALIGN_OBJS=new Set(['text','rect','trendline']);   // callout selalu kiri-atas → tanpa chip align
+const DM_LINE_TEXT=Object.keys(LINE_TEXT);   // garis bertekst (js/draw-text-style.js)
+const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline',...DM_LINE_TEXT]);
+const DM_ALIGN_OBJS=new Set(['text','rect','trendline',...DM_LINE_TEXT]);   // callout selalu kiri-atas → tanpa chip align
 const ADDTEXT_CLICK=new Set(['rect','trendline','callout']);   // klik saat kosong → langsung tambah teks (undangan "+ Add text" di canvas)
 // judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
 const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();

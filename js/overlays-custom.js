@@ -155,10 +155,10 @@ function xDateFig(x, ts, overlay){ return {type:'text', ignoreEvent:true,
 klinecharts.registerOverlay({
   name:'horizontalStraightLine', totalStep:2, needDefaultPointFigure:true,
   needDefaultXAxisFigure:false, needDefaultYAxisFigure:false,  // tag harga (Y) kita render sendiri; tanggal (X) tak perlu utk garis horizontal
-  createPointFigures:({coordinates,bounding})=>{ const cy=coordinates[0].y; return [
+  createPointFigures:({overlay,coordinates,bounding})=>{ const cy=coordinates[0].y, seg=[{x:0,y:cy},{x:bounding.width,y:cy}]; return [
     // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
     {type:'rect', attrs:{x:0,y:cy-6,width:bounding.width,height:12}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
-    {type:'line', attrs:{coordinates:[{x:0,y:cy},{x:bounding.width,y:cy}]}} ]; },
+    {type:'line', attrs:{coordinates:seg}}, ...lineTextFigs(overlay,seg) ]; },
   createYAxisFigures:({overlay,coordinates,bounding,yAxis})=>{
     const c=coordinates[0], p=overlay.points[0]; if(!c||!p||p.value==null) return [];
     const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
@@ -175,14 +175,31 @@ klinecharts.registerOverlay({
 klinecharts.registerOverlay({
   name:'verticalStraightLine', totalStep:2, needDefaultPointFigure:true,
   needDefaultXAxisFigure:false, needDefaultYAxisFigure:false,  // tag waktu (X) kita render sendiri & selalu; price (Y) tak perlu utk garis vertikal
-  createPointFigures:({coordinates,bounding})=>{ const cx=coordinates[0].x; return [
+  createPointFigures:({overlay,coordinates,bounding})=>{ const cx=coordinates[0].x, seg=[{x:cx,y:0},{x:cx,y:bounding.height}]; return [
     // grab-zone transparan ±6px (hit-test garis bawaan cuma ±2px → nyaris tak bisa diklik/dihapus)
     {type:'rect', attrs:{x:cx-6,y:0,width:12,height:bounding.height}, styles:{style:'fill',color:'rgba(0,0,0,0)',borderColor:'rgba(0,0,0,0)'}},
-    {type:'line', attrs:{coordinates:[{x:cx,y:0},{x:cx,y:bounding.height}]}} ]; },
+    {type:'line', attrs:{coordinates:seg}}, ...lineTextFigs(overlay,seg) ]; },
   createXAxisFigures:({overlay,coordinates})=>{
     const c=coordinates[0], p=overlay.points[0], ts=tsOf(p); if(!c||!p||ts==null) return [];
     return [xDateFig(c.x, ts, overlay)];   // pill tanggal seragam ala hover crosshair
   }
+});
+
+// Garis BAWAAN klinecharts (ray/extended/horizontal ray/price line) didaftarkan ulang dgn nama
+// yang sama: template aslinya dibungkus, ditambah teks (lineTextFigs) di ruas yang tampak = figure
+// 'line' pertama hasil template asli. Geometri, drag (performEvent*) & label harga priceLine tetap
+// persis bawaan — kita hanya menambah figure, tak menulis ulang.
+['rayLine','straightLine','horizontalRayLine','priceLine'].forEach(name=>{
+  const C=klinecharts.getOverlayClass(name); if(!C) return;
+  const base=new C({}), tpl={name};
+  ['totalStep','needDefaultPointFigure','needDefaultXAxisFigure','needDefaultYAxisFigure',
+   'createXAxisFigures','createYAxisFigures','performEventPressedMove','performEventMoveForDrawing']
+    .forEach(k=>{ if(base[k]!=null) tpl[k]=base[k]; });
+  tpl.createPointFigures=(args)=>{
+    const figs=base.createPointFigures(args)||[], ln=figs.find(f=>f&&f.type==='line');
+    return ln ? figs.concat(lineTextFigs(args.overlay, ln.attrs&&ln.attrs.coordinates)) : figs;
+  };
+  klinecharts.registerOverlay(tpl);
 });
 
 // custom overlay: Fibonacci 0 · 0.5 · 1 (lebar = selebar tarikan, arah ikut tarik)

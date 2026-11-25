@@ -22,7 +22,8 @@
 //               semua tool yang dulu 'subbar' kini men-snap X ke tengah candle — saat menggambar,
 //               menyeret ujung, maupun menggeser badan (barAnchorFromPx/lockPx, js/util.js &
 //               js/draw-constrain.js). Y tetap bebas.
-// text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, index.html pra-Fase-2:5546)
+// text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, js/draw-style-modal.js)
+//               'line' = tab Text ada, tapi double-click membuka Style dulu (LINE_TEXT, js/draw-text-style.js)
 // autoEditor  = true bila editor teks inline terbuka sendiri setelah objek jadi
 //               (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306) → test wajib menutupnya.
 // persist     = ada di PERSIST_DRAW (index.html pra-Fase-2:3158) → wajib bertahan setelah reload.
@@ -38,14 +39,14 @@
 const TOOL_SPEC = [
   // ---- Trend Lines ----
   { name: 'trendline', group: 'trend', groupTitle: 'Trend Lines', title: 'Trend Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'points', persist: true, sc: 'T' },
-  { name: 'rayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
-  { name: 'straightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
-  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'H' },
+  { name: 'rayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
+  { name: 'straightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
+  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'H' },
   // Horizontal Ray: klik ke-2 hanya menentukan arah/panjang di sumbu X — Y-nya WAJIB diabaikan,
   // kalau tidak garisnya tak lagi horizontal. Jadi landing Y klik ke-2 memang tak dinilai.
-  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'center', clickAxes: ['xy', 'x'], text: null, settings: 'modal', coords: 'hray', persist: true, builtin: true },
-  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: null, settings: 'modal', coords: 'bar', persist: true, sc: 'V' },
-  { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
+  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'center', clickAxes: ['xy', 'x'], text: 'line', settings: 'modal', coords: 'hray', persist: true, builtin: true },
+  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: 'line', settings: 'modal', coords: 'bar', persist: true, sc: 'V' },
+  { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
 
   // ---- Channels ----
   { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
