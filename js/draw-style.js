@@ -3,7 +3,7 @@ const DRAW_DEFAULT = {
   trendline:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   rect:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   fib3:{color:'#4a71ff',size:1,style:'solid'},
-  dateRange:{color:'#4a71ff',size:2,style:'solid'},
+  dateRange:{color:'#4a71ff',size:2,style:'solid',textAlign:'center',textValign:'top'},
   text:{color:'',size:13,style:'solid',textAlign:'left',textValign:'top'},
   horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'top'},  // default dotted, warna bisa diganti
   verticalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'bottom'},   // bawah: atas pane ditempati legenda OHLC
@@ -15,8 +15,9 @@ const DRAW_DEFAULT = {
   rayLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   horizontalRayLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'right',textValign:'top'},
   priceLine:{color:'#4a71ff',size:1,style:'dashed',textAlign:'right',textValign:'top'},   // kanan: label harga bawaan ada di kiri-atas
-  parallelStraightLine:{color:'#4a71ff',size:1,style:'solid'},
-  priceChannelLine:{color:'#4a71ff',size:1,style:'solid'},
+  parallelStraightLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top',fillColor:'#4a71ff',fillAlpha:0},
+  priceChannelLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top',fillColor:'#4a71ff',fillAlpha:0},
+  // channel: fillAlpha 0 = tampilan lama (tanpa isi); memilih warna Background menaikkannya (wireFill)
   fibonacciLine:{color:'#4a71ff',size:1,style:'solid'},
   // --- shape custom baru ---
   circle:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},

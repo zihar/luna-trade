@@ -34,7 +34,7 @@ function openObjSettings(o, cx, cy, tab){
 }
 const POS_OBJS=new Set(['longPosition','shortPosition']);
 // bentuk tertutup ber-fill (shapeFill, js/overlays-custom.js): bagian Background di tab Style
-const FILL_OBJS=new Set(['rect','circle','ellipse','callout']);
+const FILL_OBJS=new Set(['rect','circle','ellipse','callout','parallelStraightLine','priceChannelLine']);
 function fillHTML(st){
   const cur=(st.fillColor||'#4a71ff').toLowerCase(), alpha=st.fillAlpha!=null?st.fillAlpha:10, inList=PALETTE.includes(cur);
   const sw=PALETTE.map(c=>`<button class="sw ${cur===c?'on':''}" data-fcol="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
@@ -44,10 +44,12 @@ function fillHTML(st){
 }
 function wireFill(panel, o){
   const off=()=>panel.querySelectorAll('[data-fcol], [data-fcol-in]').forEach(x=>(x.closest('.sw')||x).classList.remove('on'));
-  panel.querySelectorAll('[data-fcol]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{fillColor:b.dataset.fcol}); off(); b.classList.add('on'); });
-  const ci=panel.querySelector('[data-fcol-in]');
-  if(ci) ci.oninput=()=>{ setObjStyle(o.id,{fillColor:ci.value}); off(); ci.closest('.sw').classList.add('on'); };
   const r=panel.querySelector('[data-falpha]');
+  // channel default tanpa isi (alpha 0): memilih warna pada alpha 0 = jelas ingin tampak → naikkan ke 20%
+  const setCol=c=>{ const p={fillColor:c}; if(!(+dstyle(o).fillAlpha>0)){ p.fillAlpha=20; if(r){ r.value=20; r.parentElement.querySelector('.dm-sval').textContent='20%'; } } setObjStyle(o.id,p); };
+  panel.querySelectorAll('[data-fcol]').forEach(b=>b.onclick=()=>{ setCol(b.dataset.fcol); off(); b.classList.add('on'); });
+  const ci=panel.querySelector('[data-fcol-in]');
+  if(ci) ci.oninput=()=>{ setCol(ci.value); off(); ci.closest('.sw').classList.add('on'); };
   if(r) r.oninput=()=>{ r.parentElement.querySelector('.dm-sval').textContent=r.value+'%'; setObjStyle(o.id,{fillAlpha:+r.value}); };
 }
 // swatch zona Profit & Stop: default TradingView-ish di urutan pertama, sisanya turunan palet Luna

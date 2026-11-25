@@ -204,6 +204,31 @@ klinecharts.registerOverlay({
   klinecharts.registerOverlay(tpl);
 });
 
+// Channel bawaan (parallel/price) dibungkus dgn cara sama: + isi (polygon) di antara dua garis TERLUAR
+// hasil template asli + teks di ruas p0–p1 yang digambar pengguna (bukan garis selebar layar).
+// priceChannelLine: garis [0] = sumbu tengah, [1]/[2] = tepi → isi antara [1] & [2].
+['parallelStraightLine','priceChannelLine'].forEach(name=>{
+  const C=klinecharts.getOverlayClass(name); if(!C) return;
+  const base=new C({}), tpl={name};
+  ['totalStep','needDefaultPointFigure','needDefaultXAxisFigure','needDefaultYAxisFigure',
+   'createXAxisFigures','createYAxisFigures','performEventPressedMove','performEventMoveForDrawing']
+    .forEach(k=>{ if(base[k]!=null) tpl[k]=base[k]; });
+  tpl.createPointFigures=(args)=>{
+    const figs=base.createPointFigures(args)||[], ln=figs.find(f=>f&&f.type==='line'), L=ln&&ln.attrs;
+    const st=dstyle(args.overlay), pre=[];
+    if(Array.isArray(L)&&L.length>=2&&+st.fillAlpha>0){
+      const [p,q]=L.length>2?[L[1],L[2]]:[L[0],L[1]];
+      // ignoreEvent: isi tak ikut hit-test → klik di dalam channel tetap ke chart, spt sebelumnya
+      pre.push({type:'polygon', ignoreEvent:true,
+        attrs:{coordinates:[p.coordinates[0],p.coordinates[1],q.coordinates[1],q.coordinates[0]]},
+        styles:{style:'fill', color:shapeFill(st)}});
+    }
+    const c=args.coordinates;
+    return pre.concat(figs, c&&c.length>=2 ? lineTextFigs(args.overlay,[c[0],c[1]]) : []);
+  };
+  klinecharts.registerOverlay(tpl);
+});
+
 // custom overlay: Fibonacci 0 · 0.5 · 1 (lebar = selebar tarikan, arah ikut tarik)
 // level Fibonacci yang bisa diatur (tambah/hapus/ubah nilai) — global, tersimpan di localStorage
 const FIB_DEFAULT=[0,0.5,1];
@@ -433,6 +458,7 @@ klinecharts.registerOverlay({
       figs.push({type:'rect',attrs:{x:cx-w/2,y:cy-9,width:w,height:18},styles:{style:'fill',color:'#4a71ff'}});
       figs.push({type:'text',attrs:{x:cx,y:cy,text:label,align:'center',baseline:'middle'},styles:{color:'#fff',size:11}});
     }
+    figs.push(...lineTextFigs(overlay,[a,b]));   // teks pengguna (tab Text); pill bar·durasi tetap di bawah
     return figs;
   }
 });

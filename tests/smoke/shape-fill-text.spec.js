@@ -1,4 +1,4 @@
-// Bentuk tertutup (rect/circle/ellipse/callout): Background (warna + opacity) per objek di tab Style
+// Bentuk tertutup (rect/circle/ellipse/callout) + channel (parallel/price): Background (warna + opacity) per objek di tab Style
 // (shapeFill, js/overlays-custom.js), dan teks DI DALAM circle/ellipse (boxTextFigs, pola rect) +
 // Arrow ikut LINE_TEXT (diuji di line-text.spec.js). Fill dulu hardcode biru 10% — default-nya harus tetap itu.
 
@@ -43,6 +43,26 @@ test.describe('fill & teks bentuk', () => {
       assertNoPageErrors(page);
     });
   }
+
+  test('channel: default tanpa isi (tampilan lama); pilih warna pada alpha 0 → naik ke 20%', async ({ page }) => {
+    await gotoApp(page);
+    const { obj } = await drawTool(page, 'parallelStraightLine');
+    const polys = (id) => page.evaluate((i) => {
+      const o = chart.getOverlayById(i), C = klinecharts.getOverlayClass(o.name);
+      const L = [{ x: 0, y: 100 }, { x: 400, y: 50 }, { x: 0, y: 200 }];
+      return new C({}).createPointFigures({ overlay: o, coordinates: L, bounding: { width: 800, height: 400 } })
+        .filter((f) => f.type === 'polygon').map((f) => f.attrs.coordinates.length);
+    }, id);
+    expect(await polys(obj.id), 'default alpha 0 → tak ada polygon').toEqual([]);
+    await page.evaluate((id) => openObjSettings(chart.getOverlayById(id), 10, 10, 'style'), obj.id);
+    const pane = page.locator('.dmodal-scrim.show .dm-pane[data-pane="style"]');
+    await expect(pane.locator('[data-falpha]')).toHaveValue('0');
+    await pane.locator('[data-fcol="#54c88c"]').click();
+    await expect(pane.locator('[data-falpha]')).toHaveValue('20');
+    expect(await page.evaluate((id) => Object.assign({}, objStyle[id]), obj.id)).toMatchObject({ fillColor: '#54c88c', fillAlpha: 20 });
+    expect(await polys(obj.id), 'isi = satu polygon 4 titik').toEqual([4]);
+    assertNoPageErrors(page);
+  });
 
   for (const name of ['circle', 'ellipse']) {
     test(`${name}: teks tergambar di canvas`, async ({ page }) => {
