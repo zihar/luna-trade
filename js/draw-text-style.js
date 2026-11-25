@@ -6,7 +6,11 @@
 // Kunci di objStyle: objek 'text' memakai `size`/`color` (teks ADALAH objeknya; data tersimpan lama
 // tetap terbaca tanpa migrasi). Objek lain memakai `fontSize`/`textColor` karena `size`/`color` di
 // sana milik garis/border. textColor kosong = Auto (ikut tema, drawTextColor).
-const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10};
+const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,
+  horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12};
+// garis yang bisa diberi teks (tab Text + lineTextFigs). Double-click tetap membuka Style dulu:
+// pada garis, warna/ketebalan lebih sering diubah daripada teks.
+const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1};
 const TEXT_SIZES=[10,11,12,13,14,16,18,20,24,28,32,40];
 function textKeys(name){ return name==='text' ? {size:'size',color:'color'} : {size:'fontSize',color:'textColor'}; }
 function textStyle(o){
@@ -53,4 +57,32 @@ function wireTextStylePane(panel, o){
   panel.querySelectorAll('[data-tcol]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{[k.color]:b.dataset.tcol}); offAll(); b.classList.add('on'); });
   const ci=panel.querySelector('[data-tcol-in]');
   if(ci) ci.oninput=()=>{ setObjStyle(o.id,{[k.color]:ci.value}); offAll(); ci.closest('.sw').classList.add('on'); };
+}
+// Teks pada GARIS: seg = 2 ujung ruas yang TAMPAK (pixel pane) — utk ray/extended itu ujung di tepi pane,
+// bukan titik objek, jadi Left/Right menempel di tepi yang kelihatan. Teks tak diputar (sama dgn trendline):
+//   garis non-vertikal → Horizontal = posisi sepanjang garis (ujung kiri/tengah/ujung kanan),
+//                        Vertical   = di atas / menumpang / di bawah garis
+//   garis vertikal     → Horizontal = sisi garis (kiri/tengah/kanan),
+//                        Vertical   = posisi sepanjang garis (atas/tengah/bawah pane)
+// Multi-baris ditumpuk per lh (figure text klinecharts tak mengenal \n).
+function lineTextFigs(overlay, seg){
+  if(!overlay||!seg||seg.length<2||!seg[0]||!seg[1]) return [];
+  const raw=overlay.extendData, t=(raw!=null?String(raw):'');
+  if(t.trim()==='') return [];
+  const st=dstyle(overlay), ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'top';
+  const lines=t.split('\n'), lh=ts.lh, H=lines.length*lh, off=4, pad=6;
+  const [a,b]=seg[0].x<=seg[1].x?[seg[0],seg[1]]:[seg[1],seg[0]];
+  let x, y, align;   // y = sisi ATAS blok teks
+  if(Math.abs(b.x-a.x)<0.5){
+    const top=Math.min(a.y,b.y), bot=Math.max(a.y,b.y);
+    x = ha==='left' ? a.x-off : ha==='right' ? a.x+off : a.x;
+    align = ha==='left' ? 'right' : ha==='right' ? 'left' : 'center';
+    y = va==='top' ? top+pad : va==='bottom' ? bot-pad-H : (top+bot)/2-H/2;
+  } else {
+    x = ha==='left' ? a.x+pad : ha==='right' ? b.x-pad : (a.x+b.x)/2;
+    const py=a.y+(b.y-a.y)*(x-a.x)/(b.x-a.x);
+    align = ha;
+    y = va==='top' ? py-off-H : va==='bottom' ? py+off : py-H/2;
+  }
+  return lines.map((ln,i)=>({type:'text', attrs:{x, y:y+i*lh, text:ln, align, baseline:'top'}, styles:textFigStyles(ts)}));
 }
