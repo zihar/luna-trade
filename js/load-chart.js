@@ -121,7 +121,11 @@ async function loadInit(latest){
 
 async function fetchCandles(tf,{count,to,from}){
   let u=`/api/candles?instrument=${encodeURIComponent(inst)}&granularity=${GRAN[tf]||tf}&count=${count||5000}`;
-  if(to)   u+=`&to=${encodeURIComponent(to)}`;
+  // OANDA menolak `to` di masa depan ("Invalid value specified for 'to'. Time is in the future").
+  // Cursor T bisa melewati sekarang lalu ganti TF meminta to=T: mis. ganti TF saat loadInit instrumen
+  // baru masih memuat (T masih milik instrumen lama — bar saham Yahoo yg berjalan ditandai complete →
+  // cursor-nya di masa depan), atau Play replay di TF kasar. `to` ≥ sekarang ≡ "data terbaru" → tak dikirim.
+  if(to && !(Date.parse(to) >= Date.now())) u+=`&to=${encodeURIComponent(to)}`;
   if(from) u+=`&from=${encodeURIComponent(from)}`;
   // 5xx = gangguan SEMENTARA penyedia data (OANDA) → coba ulang sekali. Status dicek SEBELUM
   // parse: dulu body teks "error code: 504" langsung di-r.json() dan pengguna melihat

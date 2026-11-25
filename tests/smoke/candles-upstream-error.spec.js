@@ -45,3 +45,18 @@ test('4xx → pesan dari server diteruskan, TANPA percobaan ulang', async ({ pag
   expect(hits).toBe(1);
   assertNoPageErrors(page);
 });
+
+// OANDA menolak `to` di masa depan: "Invalid value specified for 'to'. Time is in the future".
+// Cursor T bisa melewati sekarang — Play replay di TF kasar melangkah dur×speed per frame
+// (W @10× ≈ +17 hari) melewati bar terakhir — lalu ganti TF memanggil fetchCandles({to:T}).
+test('`to` di masa depan → tak dikirim ke server (ambil data terbaru)', async ({ page }) => {
+  await gotoApp(page);
+  const seen = [];
+  await page.route('**/api/candles**', async (route) => { seen.push(route.request().url()); await route.fallback(); });
+  const n = await page.evaluate(async () =>
+    (await fetchCandles(currentTF, { count: 50, to: new Date(Date.now() + 30 * 864e5).toISOString() })).length);
+  expect(n).toBeGreaterThan(0);
+  expect(seen.length).toBe(1);
+  expect(new URL(seen[0]).searchParams.get('to')).toBeNull();
+  assertNoPageErrors(page);
+});
