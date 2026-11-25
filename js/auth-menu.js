@@ -38,6 +38,7 @@ function onAuthed(u){
       '  <div class="user-pop-row"><span>Balance</span><b id="userPopBal">—</b></div>'+
       '  <div class="user-pop-row"><span>Theme</span>'+
       '    <span class="theme-seg" id="themeSeg"><button data-theme="dark">Dark</button><button data-theme="light">Light</button></span></div>'+
+      '  <button class="user-pop-logout" id="shortcutsBtn" style="margin-bottom:8px">⌨ Keyboard shortcuts <span class="kbs-hint">?</span></button>'+
       '  <button class="user-pop-logout" id="analyticsBtn" style="display:none;margin-bottom:8px">📊 Analytics</button>'+
       '  <button class="user-pop-logout" id="logoutBtn">Logout</button>'+
       '</div>';
@@ -52,6 +53,7 @@ function onAuthed(u){
     pop.addEventListener('click',e=>e.stopPropagation());
     document.addEventListener('click',()=>pop.classList.remove('open'));
     el.querySelector('#logoutBtn').onclick = doLogout;
+    el.querySelector('#shortcutsBtn').onclick = ()=>{ pop.classList.remove('open'); openShortcutsHelp(); };
     el.querySelector('#analyticsBtn').onclick = ()=>{ pop.classList.remove('open'); openAnalyticsDashboard(30); };
     el.querySelectorAll('#themeSeg button').forEach(btn=>{ btn.onclick=()=>applyTheme(btn.dataset.theme); });
     syncThemeUI(document.body.classList.contains('light'));
