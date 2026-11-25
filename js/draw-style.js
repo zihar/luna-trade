@@ -1,7 +1,7 @@
 // ===== style per-objek gambar (ala TradingView): id → {color,size,style} =====
 const DRAW_DEFAULT = {
   trendline:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
-  rect:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle'},
+  rect:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   fib3:{color:'#4a71ff',size:1,style:'solid'},
   dateRange:{color:'#4a71ff',size:2,style:'solid'},
   text:{color:'',size:13,style:'solid',textAlign:'left',textValign:'top'},
@@ -19,12 +19,12 @@ const DRAW_DEFAULT = {
   priceChannelLine:{color:'#4a71ff',size:1,style:'solid'},
   fibonacciLine:{color:'#4a71ff',size:1,style:'solid'},
   // --- shape custom baru ---
-  circle:{color:'#4a71ff',size:1,style:'solid'},
-  ellipse:{color:'#4a71ff',size:1,style:'solid'},
-  arrow:{color:'#4a71ff',size:2,style:'solid'},
+  circle:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
+  ellipse:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
+  arrow:{color:'#4a71ff',size:2,style:'solid',textAlign:'center',textValign:'top'},
   arrowMarkUp:{color:'#089981',size:2,style:'solid'},
   arrowMarkDown:{color:'#f23645',size:2,style:'solid'},
-  callout:{color:'#4a71ff',size:1,style:'solid',textAlign:'left',textValign:'top'},
+  callout:{color:'#4a71ff',size:1,style:'solid',textAlign:'left',textValign:'top',fillColor:'#4a71ff',fillAlpha:10},
 };
 // garis bawaan klinecharts (horizontal/vertical) — pakai styles.line, bukan createPointFigures
 const BUILTIN_LINE={horizontalStraightLine:1, verticalStraightLine:1,

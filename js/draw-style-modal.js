@@ -2,8 +2,9 @@
 const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d3ee','#89898b'];
 // objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
 const DM_LINE_TEXT=Object.keys(LINE_TEXT);   // garis bertekst (js/draw-text-style.js)
-const DM_TEXT_OBJS=new Set(['text','callout','rect','trendline',...DM_LINE_TEXT]);
-const DM_ALIGN_OBJS=new Set(['text','rect','trendline',...DM_LINE_TEXT]);   // callout selalu kiri-atas → tanpa chip align
+const DM_BOX_TEXT=Object.keys(BOX_TEXT);     // bentuk bertekst di dalam kotak pembatas (rect/circle/ellipse)
+const DM_TEXT_OBJS=new Set(['text','callout','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT]);
+const DM_ALIGN_OBJS=new Set(['text','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT]);   // callout selalu kiri-atas → tanpa chip align
 const ADDTEXT_CLICK=new Set(['rect','trendline','callout']);   // klik saat kosong → langsung tambah teks (undangan "+ Add text" di canvas)
 // judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
 const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();
@@ -32,6 +33,23 @@ function openObjSettings(o, cx, cy, tab){
   openDrawModal(o, tab);
 }
 const POS_OBJS=new Set(['longPosition','shortPosition']);
+// bentuk tertutup ber-fill (shapeFill, js/overlays-custom.js): bagian Background di tab Style
+const FILL_OBJS=new Set(['rect','circle','ellipse','callout']);
+function fillHTML(st){
+  const cur=(st.fillColor||'#4a71ff').toLowerCase(), alpha=st.fillAlpha!=null?st.fillAlpha:10, inList=PALETTE.includes(cur);
+  const sw=PALETTE.map(c=>`<button class="sw ${cur===c?'on':''}" data-fcol="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
+  return `<div class="pp-lbl">Background</div>`
+    +`<div class="pp-row">${sw}<label class="sw sw-custom ${inList?'':'on'}" title="Custom color"><input type="color" data-fcol-in value="${cur}" aria-label="Custom background color"></label></div>`
+    +`<div class="dm-slider"><span>Opacity</span><input type="range" data-falpha min="0" max="100" value="${alpha}" aria-label="Background opacity"><span class="dm-sval">${alpha}%</span></div>`;
+}
+function wireFill(panel, o){
+  const off=()=>panel.querySelectorAll('[data-fcol], [data-fcol-in]').forEach(x=>(x.closest('.sw')||x).classList.remove('on'));
+  panel.querySelectorAll('[data-fcol]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{fillColor:b.dataset.fcol}); off(); b.classList.add('on'); });
+  const ci=panel.querySelector('[data-fcol-in]');
+  if(ci) ci.oninput=()=>{ setObjStyle(o.id,{fillColor:ci.value}); off(); ci.closest('.sw').classList.add('on'); };
+  const r=panel.querySelector('[data-falpha]');
+  if(r) r.oninput=()=>{ r.parentElement.querySelector('.dm-sval').textContent=r.value+'%'; setObjStyle(o.id,{fillAlpha:+r.value}); };
+}
 // swatch zona Profit & Stop: default TradingView-ish di urutan pertama, sisanya turunan palet Luna
 const POS_TGT_COLORS=['#089981','#54c88c','#22d3ee','#4a71ff','#a78bfa','#f5a623'];
 const POS_STOP_COLORS=['#f23645','#ff6f6f','#f5a623','#a78bfa','#89898b','#ffffff'];
@@ -143,6 +161,7 @@ function openDrawModal(o, tab){
     +(isFib?'':`<div class="pp-lbl">Color</div><div class="pp-row">${cols}</div>`)
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
+    +(FILL_OBJS.has(name)?fillHTML(st):'')
     +(isFib?`<div class="pp-row" style="margin-top:2px"><button class="pp-chip" id="dmFib">⚙ Level &amp; Color</button></div>`:'')
     +`</div>`;
   let textPane='';
@@ -174,6 +193,7 @@ function openDrawModal(o, tab){
   panel.querySelectorAll('[data-ha]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textAlign:b.dataset.ha}); mark('[data-ha]',b); });
   panel.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); mark('[data-va]',b); });
   if(hasText) wireTextStylePane(panel, o);
+  if(FILL_OBJS.has(name)) wireFill(panel, o);
   const ta=panel.querySelector('.dm-ta');
   if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
   const fb=panel.querySelector('#dmFib'); if(fb) fb.onclick=()=>{ closeDrawModal(); showFibPop(); };

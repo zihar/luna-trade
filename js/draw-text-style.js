@@ -6,11 +6,13 @@
 // Kunci di objStyle: objek 'text' memakai `size`/`color` (teks ADALAH objeknya; data tersimpan lama
 // tetap terbaca tanpa migrasi). Objek lain memakai `fontSize`/`textColor` karena `size`/`color` di
 // sana milik garis/border. textColor kosong = Auto (ikut tema, drawTextColor).
-const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,
+const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,circle:12,ellipse:12,arrow:12,
   horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12};
 // garis yang bisa diberi teks (tab Text + lineTextFigs). Double-click tetap membuka Style dulu:
 // pada garis, warna/ketebalan lebih sering diubah daripada teks.
-const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1};
+const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1,arrow:1};
+// bentuk tertutup yang menampung teks DI DALAM kotak pembatasnya (boxTextFigs) — pola rect
+const BOX_TEXT={rect:1,circle:1,ellipse:1};
 const TEXT_SIZES=[10,11,12,13,14,16,18,20,24,28,32,40];
 function textKeys(name){ return name==='text' ? {size:'size',color:'color'} : {size:'fontSize',color:'textColor'}; }
 function textStyle(o){
@@ -85,4 +87,15 @@ function lineTextFigs(overlay, seg){
     y = va==='top' ? py-off-H : va==='bottom' ? py+off : py-H/2;
   }
   return lines.map((ln,i)=>({type:'text', attrs:{x, y:y+i*lh, text:ln, align, baseline:'top'}, styles:textFigStyles(ts)}));
+}
+// Teks DI DALAM bentuk (rect/circle/ellipse): box = kotak pembatas pixel {x,y,w,h}.
+// Horizontal/Vertical = posisi di dalam kotak; multi-baris ditumpuk per lh.
+function boxTextFigs(overlay, box){
+  const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');
+  if(t==='') return [];
+  const st=dstyle(overlay), ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'middle';
+  const {x,y,w,h}=box, pad=4, lines=t.split('\n'), lh=ts.lh;
+  const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
+  const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
+  return lines.map((ln,i)=>({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},styles:textFigStyles(ts)}));
 }

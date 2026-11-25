@@ -1,5 +1,5 @@
 // Teks pada garis (js/draw-text-style.js lineTextFigs): Horizontal/Vertical/Ray/Extended/
-// Horizontal Ray/Price Line punya tab Text. Empat yang bawaan klinecharts didaftarkan ulang
+// Horizontal Ray/Price Line (+ Arrow) punya tab Text. Empat yang bawaan klinecharts didaftarkan ulang
 // (overlays-custom.js) dgn template asli dibungkus — kalau pembungkus itu rusak, garis bawaan
 // berhenti tergambar sama sekali, jadi ini layak di smoke.
 
