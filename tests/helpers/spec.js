@@ -24,6 +24,7 @@
 //               js/draw-constrain.js). Y tetap bebas.
 // text        = null | 'modal' | 'modal+inline' (DM_TEXT_OBJS / ADDTEXT_CLICK, js/draw-style-modal.js)
 //               'line' = tab Text ada, tapi double-click membuka Style dulu (LINE_TEXT, js/draw-text-style.js)
+//               'aux'  = sama dgn 'line' utk objek yang intinya bukan garis: Fib & penanda panah (AUX_TEXT)
 // fill        = true → tab Style punya Background (warna + opacity) (FILL_OBJS, js/draw-style-modal.js)
 // autoEditor  = true bila editor teks inline terbuka sendiri setelah objek jadi
 //               (applyTextInput → editTextOverlay, index.html pra-Fase-2:3306) → test wajib menutupnya.
@@ -54,16 +55,16 @@ const TOOL_SPEC = [
   { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
 
   // ---- Fibonacci ----
-  { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: null, settings: 'modal', coords: 'box', persist: true, sc: 'F' },
-  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'aux', settings: 'modal', coords: 'box', persist: true, sc: 'F' },
+  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true, builtin: true },
 
   // ---- Shapes ----
   { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', fill: true, settings: 'modal', coords: 'box', persist: true, sc: 'R' },
   { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
   { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true },
   { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'A' },
-  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: null, settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
 
   // ---- Positions ----
   { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },

@@ -3,8 +3,10 @@ const PALETTE=['#ffffff','#4a71ff','#54c88c','#ff6f6f','#f5a623','#a78bfa','#22d
 // objek yang mendukung teks (tab Text) & subset yang menghormati alignment saat render
 const DM_LINE_TEXT=Object.keys(LINE_TEXT);   // garis bertekst (js/draw-text-style.js)
 const DM_BOX_TEXT=Object.keys(BOX_TEXT);     // bentuk bertekst di dalam kotak pembatas (rect/circle/ellipse)
-const DM_TEXT_OBJS=new Set(['text','callout','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT]);
-const DM_ALIGN_OBJS=new Set(['text','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT]);   // callout selalu kiri-atas → tanpa chip align
+const DM_AUX_TEXT=Object.keys(AUX_TEXT);     // teks pelengkap (Fib, penanda panah)
+const DM_TEXT_OBJS=new Set(['text','callout','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT,...DM_AUX_TEXT]);
+// callout selalu kiri-atas & penanda panah selalu di tengah ekornya → tanpa chip align
+const DM_ALIGN_OBJS=new Set(['text','trendline',...DM_BOX_TEXT,...DM_LINE_TEXT,'fib3','fibonacciLine']);
 const ADDTEXT_CLICK=new Set(['rect','trendline','callout']);   // klik saat kosong → langsung tambah teks (undangan "+ Add text" di canvas)
 // judul objek utk header modal (diambil dari daftar tool; definisi belakang menang → arrow=shape)
 const OBJ_TITLE=(()=>{ const m={}; try{ DRAW_GROUPS.forEach(g=>g.tools.forEach(t=>{ m[t.name]=t.title; })); }catch(e){} return m; })();
@@ -193,7 +195,7 @@ function openDrawModal(o, tab){
     const tvalign=st.textValign||(DRAW_DEFAULT[name]&&DRAW_DEFAULT[name].textValign)||'middle';
     const has=[['left','Left'],['center','Center'],['right','Right']].map(p=>`<button class="pp-chip ${talign===p[0]?'on':''}" data-ha="${p[0]}">${p[1]}</button>`).join('');
     const vas=[['top','Top'],['middle','Middle'],['bottom','Bottom']].map(p=>`<button class="pp-chip ${tvalign===p[0]?'on':''}" data-va="${p[0]}">${p[1]}</button>`).join('');
-    textPane=`<div class="dm-pane" data-pane="text"><textarea class="dm-ta" placeholder="Add text">${dmEsc(o.extendData)}</textarea>`
+    textPane=`<div class="dm-pane" data-pane="text"><textarea class="dm-ta" placeholder="Add text">${dmEsc(objText(o))}</textarea>`
       +textStylePaneHTML(o)
       +(hasAlign?`<div class="pp-lbl">Horizontal</div><div class="pp-row">${has}</div><div class="pp-lbl">Vertical</div><div class="pp-row">${vas}</div>`:'')
       +`</div>`;
@@ -218,7 +220,7 @@ function openDrawModal(o, tab){
   if(hasText) wireTextStylePane(panel, o);
   if(FILL_OBJS.has(name)) wireFill(panel, o);
   const ta=panel.querySelector('.dm-ta');
-  if(ta) ta.addEventListener('input',()=>{ try{chart.overrideOverlay({id:o.id,extendData:ta.value});}catch(e){} });   // live update di canvas
+  if(ta) ta.addEventListener('input',()=>setObjText(o, ta.value));   // live update di canvas (fib3: objStyle.textBody)
   if(isFib) wireFibPane(panel, o);
   panel.querySelector('.dm-del').onclick=()=>{ const id=o.id; dmTarget=null; closeDrawModal(); try{chart.removeOverlay(id);}catch(e){} };
   // Lock objek: terkunci = tak bisa digeser & tak bisa terhapus (js/draw-lock.js). Delete dimatikan

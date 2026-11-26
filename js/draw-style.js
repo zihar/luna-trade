@@ -2,7 +2,7 @@
 const DRAW_DEFAULT = {
   trendline:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   rect:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
-  fib3:{color:'#4a71ff',size:1,style:'solid'},
+  fib3:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   dateRange:{color:'#4a71ff',size:2,style:'solid',textAlign:'center',textValign:'top'},
   text:{color:'',size:13,style:'solid',textAlign:'left',textValign:'top'},
   horizontalStraightLine:{color:'#4a71ff',size:1,style:'dotted',textAlign:'right',textValign:'top'},  // default dotted, warna bisa diganti
@@ -21,7 +21,7 @@ const DRAW_DEFAULT = {
   parallelStraightLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top',fillColor:'#4a71ff',fillAlpha:0},
   priceChannelLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top',fillColor:'#4a71ff',fillAlpha:0},
   // channel: fillAlpha 0 = tampilan lama (tanpa isi); memilih warna Background menaikkannya (wireFill)
-  fibonacciLine:{color:'#4a71ff',size:1,style:'solid'},
+  fibonacciLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
   // --- shape custom baru ---
   circle:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   ellipse:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},

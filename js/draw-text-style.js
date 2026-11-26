@@ -7,13 +7,30 @@
 // tetap terbaca tanpa migrasi). Objek lain memakai `fontSize`/`textColor` karena `size`/`color` di
 // sana milik garis/border. textColor kosong = Auto (ikut tema, drawTextColor).
 const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,circle:12,ellipse:12,arrow:12,parallelStraightLine:12,priceChannelLine:12,dateRange:12,
-  horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12};
+  horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12,
+  fib3:12,fibonacciLine:12,arrowMarkUp:12,arrowMarkDown:12};
 // garis yang bisa diberi teks (tab Text + lineTextFigs). Double-click tetap membuka Style dulu:
 // pada garis, warna/ketebalan lebih sering diubah daripada teks.
 const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1,arrow:1,
   parallelStraightLine:1,priceChannelLine:1,dateRange:1};   // channel/Date Range: teks di ruas p0–p1 yang digambar
 // bentuk tertutup yang menampung teks DI DALAM kotak pembatasnya (boxTextFigs) — pola rect
 const BOX_TEXT={rect:1,circle:1,ellipse:1};
+// teks PELENGKAP pada objek yang intinya bukan teks → tab Text ada di semua tool gambar yang bisa di-setting
+// (kecuali Long/Short: teksnya = pill statistik, diatur di tab Style). Double-click tetap membuka Style
+// dulu (sama dgn LINE_TEXT). Fib: teks di dalam kotak tarikan (boxTextFigs); penanda panah: di ujung ekor (markTextFigs).
+const AUX_TEXT={fib3:1,fibonacciLine:1,arrowMarkUp:1,arrowMarkDown:1};
+// teks pengguna sebuah objek: umumnya extendData (string). fib3 sudah memakai extendData utk arah
+// tarikan ({zeroTop,startLeft}, js/box-resize.js) → teksnya disimpan di objStyle.textBody
+// (ikut persist, sync server, clone & copy/paste seperti setelan per-objek lain).
+function objText(o){
+  if(!o) return '';
+  if(o.name==='fib3'){ const s=objStyle[o.id]; return (s&&s.textBody!=null) ? String(s.textBody) : ''; }
+  return typeof o.extendData==='string' ? o.extendData : '';
+}
+function setObjText(o, v){
+  if(o.name==='fib3') setObjStyle(o.id,{textBody:v});
+  else try{ chart.overrideOverlay({id:o.id, extendData:v}); }catch(e){}
+}
 const TEXT_SIZES=[10,11,12,13,14,16,18,20,24,28,32,40];
 function textKeys(name){ return name==='text' ? {size:'size',color:'color'} : {size:'fontSize',color:'textColor'}; }
 function textStyle(o){
@@ -70,7 +87,7 @@ function wireTextStylePane(panel, o){
 // Multi-baris ditumpuk per lh (figure text klinecharts tak mengenal \n).
 function lineTextFigs(overlay, seg){
   if(!overlay||!seg||seg.length<2||!seg[0]||!seg[1]) return [];
-  const raw=overlay.extendData, t=(raw!=null?String(raw):'');
+  const t=objText(overlay);
   if(t.trim()==='') return [];
   const st=dstyle(overlay), ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'top';
   const lines=t.split('\n'), lh=ts.lh, H=lines.length*lh, off=4, pad=6;
@@ -92,11 +109,20 @@ function lineTextFigs(overlay, seg){
 // Teks DI DALAM bentuk (rect/circle/ellipse): box = kotak pembatas pixel {x,y,w,h}.
 // Horizontal/Vertical = posisi di dalam kotak; multi-baris ditumpuk per lh.
 function boxTextFigs(overlay, box){
-  const raw=overlay&&overlay.extendData, t=(raw!=null?String(raw):'');
+  const t=objText(overlay);
   if(t==='') return [];
   const st=dstyle(overlay), ts=textStyle(overlay), ha=st.textAlign||'center', va=st.textValign||'middle';
   const {x,y,w,h}=box, pad=4, lines=t.split('\n'), lh=ts.lh;
   const cx = ha==='left' ? x+pad : ha==='right' ? x+w-pad : x+w/2;
   const cyTop = va==='top' ? y+pad : va==='bottom' ? y+h-pad-(lines.length-1)*lh : (y+h/2)-(lines.length-1)*lh/2;
   return lines.map((ln,i)=>({type:'text',attrs:{x:cx,y:cyTop+i*lh,text:ln,align:ha,baseline:va},styles:textFigStyles(ts)}));
+}
+// Teks pada penanda panah (arrowMarkUp/Down): tail = ujung ekor (pixel), dir -1 = panah naik (ekor di bawah
+// → teks di bawahnya), +1 = panah turun (ekor di atas → teks di atasnya). Selalu rata tengah pada sumbu panah.
+function markTextFigs(overlay, tail, dir){
+  const t=objText(overlay);
+  if(!tail||t.trim()==='') return [];
+  const ts=textStyle(overlay), lines=t.split('\n'), lh=ts.lh, off=4;
+  const top = dir<0 ? tail.y+off : tail.y-off-lines.length*lh;
+  return lines.map((ln,i)=>({type:'text', attrs:{x:tail.x, y:top+i*lh, text:ln, align:'center', baseline:'top'}, styles:textFigStyles(ts)}));
 }
