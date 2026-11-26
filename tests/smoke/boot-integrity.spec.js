@@ -115,6 +115,7 @@ const SENTINEL = {
   'draw-catalog.js': 'DRAW_GROUPS',
   // Dipecah dari ekor ny-time.js: klinecharts.init memang bukan util waktu NY.
   'chart-init.js': 'chart',
+  'chart-draw-guard.js': 'guardChartCanvasDraw',
 
   // Measure tool (ruler) — modul domain baru, bukan hasil pemecahan index.html.
   'measure.js': 'measureStats',
