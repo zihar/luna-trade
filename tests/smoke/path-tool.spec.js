@@ -153,4 +153,66 @@ test.describe('Path (polyline)', () => {
     expect(saved).toMatchObject({ lineStart: 'arrow', lineEnd: 'normal' });
     assertNoPageErrors(page);
   });
+
+  // Klik kanan saat menggambar Path = SELESAI (TV), bukan batal — selama ≥2 titik sudah diklik.
+  // Dengan 1 titik tak ada garis untuk disimpan, jadi tetap batal (sama dgn Esc).
+  test('klik kanan menyelesaikan bila ≥2 titik; dengan 1 titik membatalkan', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const T = targets(rect);
+    await armPath(page);
+    await clickAt(page, rect, T[0]); await page.waitForTimeout(CLICK_GAP_MS);
+    await page.mouse.move(rect.x + T[1].x, rect.y + T[1].y, { steps: 6 });
+    await page.mouse.click(rect.x + T[1].x, rect.y + T[1].y, { button: 'right' });
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 3000 });
+    expect(await lastPath(page), '1 titik + klik kanan = batal').toBeNull();
+
+    await armPath(page);
+    for (const t of T.slice(0, 3)) { await clickAt(page, rect, t); await page.waitForTimeout(CLICK_GAP_MS); }
+    await page.mouse.move(rect.x + T[3].x, rect.y + T[3].y, { steps: 6 });   // karet di T[3], belum diklik
+    await page.mouse.click(rect.x + T[3].x, rect.y + T[3].y, { button: 'right' });
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 3000 });
+    const o = await lastPath(page);
+    expect(o, 'klik kanan dgn 3 titik = selesai').toBeTruthy();
+    expect(o.points.length).toBe(3);
+    // klik kanan yang menyelesaikan tak boleh sekaligus membuka menu konteks / modal Style
+    await page.waitForTimeout(200);
+    await expect(page.locator('.ctxmenu')).toBeHidden();
+    await expect(page.locator('.dmodal-scrim.show')).toHaveCount(0);
+    const saved = await page.evaluate(() => serializeDraws().filter((d) => d.name === 'path'));
+    expect(saved.length).toBe(1);
+    expect(saved[0].points.length).toBe(3);
+    assertNoPageErrors(page);
+  });
+
+  // Kursor melintas ke sumbu harga saat menggambar: klinecharts mengirim event itu dari widget
+  // sumbu-Y dgn e.x RELATIF SUMBU (≈0–60px). Dulu onDrawing membacanya sbg x area chart → titik
+  // karet terlempar ke tepi KIRI chart. Kini titik karet menempel di tepi kanan area plot.
+  test('kursor di atas sumbu harga: titik karet tetap di tepi kanan, tak loncat ke kiri', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const a = { x: Math.round(rect.width * 0.5), y: Math.round(rect.height * 0.6) };
+    const b = { x: Math.round(rect.width * 0.7), y: Math.round(rect.height * 0.3) };
+    await armPath(page);
+    await clickAt(page, rect, a); await page.waitForTimeout(CLICK_GAP_MS);
+    await clickAt(page, rect, b); await page.waitForTimeout(CLICK_GAP_MS);
+    const ay = Math.round(rect.height * 0.45);
+    // chartRect = seluruh #chart (termasuk sumbu harga); lebar area plot dari klinecharts
+    const plotW = await page.evaluate(() => chart.getSize('candle_pane', 'main').width);
+    expect(rect.width - plotW, 'sumbu harga harus ada di kanan plot').toBeGreaterThan(30);
+    await page.mouse.move(rect.x + plotW - 40, rect.y + ay, { steps: 4 });
+    await page.mouse.move(rect.x + plotW + 20, rect.y + ay, { steps: 6 });   // di atas sumbu harga
+    await page.waitForTimeout(80);
+    const pts = await page.evaluate(() => chart.getOverlayById(inProgressId).points);
+    const px = await toPixels(page, pts);
+    const last = px[px.length - 1];
+    expect(last.x, `titik karet loncat ke x=${Math.round(last.x)}`).toBeGreaterThanOrEqual(plotW - 12);
+    expect(last.x).toBeLessThanOrEqual(plotW);
+    expect(Math.abs(last.y - ay), 'Y titik karet ikut kursor').toBeLessThanOrEqual(2);
+    // titik yg sudah diklik tak ikut bergeser
+    expect(Math.abs(px[0].x - a.x)).toBeLessThanOrEqual(12);
+    expect(Math.abs(px[1].x - b.x)).toBeLessThanOrEqual(12);
+    await page.keyboard.press('Escape');
+    assertNoPageErrors(page);
+  });
 });

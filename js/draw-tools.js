@@ -97,7 +97,8 @@ function delHooks(){ return {
   // meng-snap ke bar itu), bukan menempel harga saja sementara X ikut kursor. Tanpa itu, geser
   // kursor 3px = titik geser 3px walau magnet menyala — "nempel"-nya cuma di sumbu harga.
   // Presisi lintas-TF tetap: timestamp yang disimpan adalah menit sub-bar yang mencetak nilai itu.
-  // e.x/e.y = container-relative (sama ruang dgn fracAnchorFromPx/pxToValue).
+  // X/Y dari drawPtrPx (js/draw-pointer.js), BUKAN e.x/e.y: event dari widget sumbu harga membawa
+  // x relatif sumbu → titik karet loncat ke kiri. Fallback e.x/e.y bila pointer belum tercatat.
   onDrawing:(e)=>{ const o=e&&e.overlay; if(!o||!o.points||!o.points.length||!subBar(o.name)) return false;
     const m=o.points.length-1;                        // titik yg sedang ditarik = indeks terakhir
     for(let k=0;k<m;k++){ const pc=pendingClicks[k];  // titik yg sudah diklik → re-anchor ke fidx presisi
@@ -108,10 +109,11 @@ function delHooks(){ return {
     // menarik titik ke-2 (m===1): pada channel 3 titik, titik #3 cuma mengatur jarak paralel dan
     // tak punya makna sudut. Saat terkunci, magnet dilewati untuk titik ini — "auto lurus" hanya
     // bermakna kalau sudutnya persis, dan magnet yang ikut menarik membuatnya miring lagi.
-    let ex=e.x, ey=e.y, locked=false;
+    const pp=drawPtrPx||{x:e.x, y:e.y};
+    let ex=pp.x, ey=pp.y, locked=false;
     const ai=lockAnchorIdx(o.name, m);   // Path: tiap segmen terhadap titik sebelumnya
     if(ai>=0){ const a=anchorPx(o.points[ai]);
-      if(a){ const c=lockPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
+      if(a){ const c=lockPx(a.x, a.y, pp.x, pp.y); ex=c.x; ey=c.y; locked=true; } }
     const fa=barAnchorFromPx(ex); let v=pxToValue(ey);
     if(magnetActive() && !locked && v!=null){ const xa=xAnchorFromPx(ex);
       if(xa && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, ex, ey);
