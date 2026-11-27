@@ -23,7 +23,10 @@ const _dt=$('#drawtools');
 const _fly=document.createElement('div'); _fly.id='dtFlyout'; document.body.appendChild(_fly);
 let _flyOpenKey=null;
 function toolByName(n){ for(const g of DRAW_GROUPS){ const t=g.tools.find(x=>x.name===n); if(t) return t; } return null; }
-function lastToolOf(g){ const saved=localStorage.getItem('br_lasttool_'+g.key); return (saved&&g.tools.find(t=>t.name===saved))||g.tools[0]; }
+// `def` = tool bawaan grup bila belum pernah dipilih (mis. Geometric shapes → Rectangle walau seksi
+// Arrows di urutan TV tampil lebih dulu); tanpa `def` → tool pertama.
+function lastToolOf(g){ const saved=localStorage.getItem('br_lasttool_'+g.key);
+  return (saved&&g.tools.find(t=>t.name===saved))||(g.def&&g.tools.find(t=>t.name===g.def))||g.tools[0]; }
 function closeFlyout(){ _fly.classList.remove('show'); _flyOpenKey=null; }
 // ---- favorites: bintang di flyout → bar melayang di atas chart (Image #3, ala TradingView) ----
 let favBar=null;                                                   // elemen bar; dibuat saat init rail
@@ -43,7 +46,11 @@ function resolveFav(key){
     const g=favGroupOf(key), t=g&&g.tools.find(x=>x.name===key); return (g&&t)?{g,t}:null; }
   const gk=key.slice(0,i), nm=key.slice(i+1);
   const g=DRAW_GROUPS.find(x=>x.key===gk), t=g&&g.tools.find(x=>x.name===nm);
-  return (g&&t)?{g,t}:null;
+  if(g&&t) return {g,t};
+  // grup lamanya dilebur/diganti (mis. `channel:` → `trend:` sejak pengelompokan ala TV) → cari
+  // tool itu di grup non-cursor mana pun; migrateFavKeys menulis ulang kuncinya.
+  const g2=favGroupOf(nm), t2=g2&&g2.tools.find(x=>x.name===nm);
+  return (g2&&t2)?{g:g2,t:t2}:null;
 }
 // Grup yang bisa difavoritkan saja: bintang HANYA dirender untuk grup non-cursor (lihat openFlyout),
 // jadi favorite tak pernah bisa berarti mode kursor. Itu sekaligus yang membuat migrasi data lama
@@ -53,9 +60,10 @@ function favGroupOf(n){ for(const g of DRAW_GROUPS){ if(!g.cursor && g.tools.som
 let favTools=[]; try{ favTools=JSON.parse(localStorage.getItem('br_fav_tools')||'[]')||[]; }catch(_){ favTools=[]; }
 (function migrateFavKeys(){                       // sekali jalan: nama telanjang → berkualifikasi grup
   let changed=false;
-  favTools=favTools.map(k=>{ if(String(k).indexOf(':')>=0) return k;
+  favTools=favTools.map(k=>{
     const r=resolveFav(k); if(!r) return k;       // tak terpetakan (tool ditarik) → dibuang di filter bawah
-    changed=true; return favKey(r.g,r.t); }).filter(k=>resolveFav(k));
+    const nk=favKey(r.g,r.t); if(nk!==k) changed=true; return nk; })   // nama telanjang / grup lama
+    .filter((k,i,a)=>resolveFav(k) && a.indexOf(k)===i);
   if(changed){ try{localStorage.setItem('br_fav_tools',JSON.stringify(favTools));}catch(_){} }
 })();
 function isFav(g,t){ return favTools.includes(favKey(g,t)); }
@@ -79,8 +87,13 @@ function pickTool(g, t, catBtn, instant){
 function openFlyout(g, catBtn){
   _fly.innerHTML=''; _flyOpenKey=g.key;
   const cur=(g.cursor?cursorMode:lastToolOf(g).name);
-  const ttl=document.createElement('div'); ttl.className='dt-fly-title'; ttl.textContent=g.title.toUpperCase(); _fly.appendChild(ttl);
-  g.tools.forEach(t=>{ const it=document.createElement('div'); it.className='dt-item'+(t.name===cur?' active':'');
+  // Judul seksi ala flyout TV (LINES / CHANNELS, ...): muncul tiap `sec` berganti. Grup tanpa seksi
+  // (Cursors, Measure) memakai nama grup sebagai satu judul.
+  const head=(txt)=>{ const h=document.createElement('div'); h.className='dt-fly-title'; h.textContent=txt.toUpperCase(); _fly.appendChild(h); };
+  if(!g.tools.some(t=>t.sec)) head(g.title);
+  let sec=null;
+  g.tools.forEach(t=>{ if(t.sec && t.sec!==sec){ sec=t.sec; head(sec); }
+    const it=document.createElement('div'); it.className='dt-item'+(t.name===cur?' active':'');
     it.innerHTML=t.svg+'<span class="dt-nm">'+t.title+'</span>'+(t.sc?'<span class="dt-sc">'+scLabel(t.sc)+'</span>':'');
     it.onclick=(ev)=>{ ev.stopPropagation(); pickTool(g, t, catBtn); };
     if(!g.cursor){                                                 // bintang favorite (overlay saja, bukan cursor)
@@ -106,7 +119,7 @@ function buildDrawRail(){
     cat.onclick=(e)=>{ e.stopPropagation(); pickTool(g, g.cursor?(toolByName(cursorMode)||g.tools[0]):lastToolOf(g), cat); };
     // caret expand TERPISAH di kanan (muncul saat hover) = buka daftar tool
     const caret=document.createElement('span'); caret.className='dt-caret'; caret.setAttribute('aria-hidden','true'); caret.textContent='▸';
-    caret.title='More '+g.title+' tools';
+    caret.title=g.title;
     caret.onclick=(e)=>{ e.stopPropagation(); if(_flyOpenKey===g.key){ closeFlyout(); return; } openFlyout(g, cat); };
     row.appendChild(cat); row.appendChild(caret);
     _dt.appendChild(row);

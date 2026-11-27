@@ -25,6 +25,7 @@
   .dt-caret:hover{color:var(--txt);background:rgba(255,255,255,.06)}
   /* header grup + bintang favorite di flyout (ala TradingView) */
   .dt-fly-title{font-size:11px;letter-spacing:.06em;color:var(--muted);padding:6px 10px 4px;text-transform:uppercase}
+  .dt-item+.dt-fly-title{margin-top:4px;padding-top:8px;border-top:1px solid var(--border)}  /* seksi ke-2 dst */
   .dt-fav{margin-left:8px;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;flex:0 0 auto}
   .dt-fav.on{color:var(--accent)}
   .dt-fav:hover{color:var(--txt)}

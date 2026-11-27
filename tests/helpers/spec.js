@@ -40,37 +40,37 @@
 
 const TOOL_SPEC = [
   // ---- Trend Lines ----
-  { name: 'trendline', group: 'trend', groupTitle: 'Trend Lines', title: 'Trend Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'points', persist: true, sc: 'T' },
-  { name: 'rayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
-  { name: 'straightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
-  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'H' },
+  { name: 'trendline', group: 'trend', groupTitle: 'Trend tools', title: 'Trend Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', settings: 'modal', coords: 'points', persist: true, sc: 'T' },
+  { name: 'rayLine', group: 'trend', groupTitle: 'Trend tools', title: 'Ray', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'Y', builtin: true },
+  { name: 'straightLine', group: 'trend', groupTitle: 'Trend tools', title: 'Extended Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'E', builtin: true },
+  { name: 'horizontalStraightLine', group: 'trend', groupTitle: 'Trend tools', title: 'Horizontal Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'H' },
   // Horizontal Ray: klik ke-2 hanya menentukan arah/panjang di sumbu X — Y-nya WAJIB diabaikan,
   // kalau tidak garisnya tak lagi horizontal. Jadi landing Y klik ke-2 memang tak dinilai.
-  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'center', clickAxes: ['xy', 'x'], text: 'line', settings: 'modal', coords: 'hray', persist: true, builtin: true },
-  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: 'line', settings: 'modal', coords: 'bar', persist: true, sc: 'V' },
-  { name: 'priceLine', group: 'trend', groupTitle: 'Trend Lines', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
+  { name: 'horizontalRayLine', group: 'trend', groupTitle: 'Trend tools', title: 'Horizontal Ray', clicks: 2, pointsAfter: 2, anchor: 'center', clickAxes: ['xy', 'x'], text: 'line', settings: 'modal', coords: 'hray', persist: true, builtin: true },
+  { name: 'verticalStraightLine', group: 'trend', groupTitle: 'Trend tools', title: 'Vertical Line', clicks: 1, pointsAfter: 1, anchor: 'bar', anchorWhy: 'penanda waktu = waktu candle yang diklik (index.html pra-Fase-2:590)', text: 'line', settings: 'modal', coords: 'bar', persist: true, sc: 'V' },
+  { name: 'priceLine', group: 'trend', groupTitle: 'Trend tools', title: 'Price Line', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'line', settings: 'modal', coords: 'price', persist: true, sc: 'P', builtin: true },
 
   // ---- Channels ----
-  { name: 'parallelStraightLine', group: 'channel', groupTitle: 'Channels', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
-  { name: 'priceChannelLine', group: 'channel', groupTitle: 'Channels', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
+  { name: 'parallelStraightLine', group: 'trend', groupTitle: 'Trend tools', title: 'Parallel Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
+  { name: 'priceChannelLine', group: 'trend', groupTitle: 'Trend tools', title: 'Price Channel', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, builtin: true, fill: true },
 
   // ---- Fibonacci ----
-  { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'aux', settings: 'modal', coords: 'box', persist: true, sc: 'F' },
-  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true, builtin: true },
-  { name: 'fibExtension', group: 'fib', groupTitle: 'Fibonacci', title: 'Trend-Based Fib Extension', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'fib3', group: 'fib', groupTitle: 'Gann and Fibonacci tools', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'aux', settings: 'modal', coords: 'box', persist: true, sc: 'F' },
+  { name: 'fibExtension', group: 'fib', groupTitle: 'Gann and Fibonacci tools', title: 'Trend-Based Fib Extension', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'fibonacciLine', group: 'fib', groupTitle: 'Gann and Fibonacci tools', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true, builtin: true },
 
   // ---- Shapes ----
-  { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', fill: true, settings: 'modal', coords: 'box', persist: true, sc: 'R' },
-  { name: 'circle', group: 'shapes', groupTitle: 'Shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
-  { name: 'ellipse', group: 'shapes', groupTitle: 'Shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrow', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'A' },
-  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
-  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrow', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Arrow', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true, sc: 'A' },
+  { name: 'arrowMarkUp', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Arrow Mark Up', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'arrowMarkDown', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Arrow Mark Down', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
+  { name: 'rect', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', fill: true, settings: 'modal', coords: 'box', persist: true, sc: 'R' },
+  { name: 'circle', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Circle', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true, sc: 'O' },
+  { name: 'ellipse', group: 'shapes', groupTitle: 'Geometric shapes', title: 'Ellipse', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal', fill: true, settings: 'modal', coords: 'points', persist: true },
 
   // ---- Positions ----
-  { name: 'longPosition', group: 'positions', groupTitle: 'Positions', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
-  { name: 'shortPosition', group: 'positions', groupTitle: 'Positions', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
-  { name: 'dateRange', group: 'positions', groupTitle: 'Positions', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true },
+  { name: 'longPosition', group: 'positions', groupTitle: 'Forecasting and measurement tools', title: 'Long Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
+  { name: 'shortPosition', group: 'positions', groupTitle: 'Forecasting and measurement tools', title: 'Short Position', clicks: 1, pointsAfter: 6, anchor: 'bar', anchorWhy: 'entry mendarat di center candle terpilih (index.html pra-Fase-2:3408-3412)', text: null, settings: 'pospopup', coords: null, persist: true },
+  { name: 'dateRange', group: 'positions', groupTitle: 'Forecasting and measurement tools', title: 'Date Range', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'line', settings: 'modal', coords: 'points', persist: true },
 
   // ---- Measure ----
   // Ephemeral: tak tersimpan (persist:false), tak punya panel setting (tak ada di DRAW_DEFAULT),
@@ -79,8 +79,8 @@ const TOOL_SPEC = [
   { name: 'measure', group: 'measure', groupTitle: 'Measure', title: 'Measure', clicks: 2, pointsAfter: 2, anchor: 'center', text: null, settings: null, coords: null, persist: false, ephemeral: true, sc: 'M' },
 
   // ---- Text ----
-  { name: 'text', group: 'text', groupTitle: 'Text', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'modal', autoEditor: true, settings: 'modal', coords: 'points', persist: true, sc: 'X' },
-  { name: 'callout', group: 'text', groupTitle: 'Text', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', fill: true, autoEditor: true, settings: 'modal', coords: 'points', persist: true },
+  { name: 'text', group: 'text', groupTitle: 'Annotation tools', title: 'Text', clicks: 1, pointsAfter: 1, anchor: 'center', text: 'modal', autoEditor: true, settings: 'modal', coords: 'points', persist: true, sc: 'X' },
+  { name: 'callout', group: 'text', groupTitle: 'Annotation tools', title: 'Callout', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'modal+inline', fill: true, autoEditor: true, settings: 'modal', coords: 'points', persist: true },
   // simpleAnnotation ("Annotation") & simpleTag ("Tag") DITARIK dari rail 2026-07-27 (Temuan 3),
   // jadi keduanya keluar dari tabel ini — bukan karena testnya rewel, tapi karena tool-nya tak ada
   // lagi di UI. Keduanya overlay bawaan klinecharts yang menandai semua figure-nya
@@ -99,7 +99,7 @@ const RETIRED_TOOLS = [
 // / Esc), sedangkan seluruh tes generik (parity, landing, drag, modal) mengandaikan N klik lalu objek
 // selesai sendiri. Masing-masing punya spec sendiri. `after` = judul tool sebelumnya di flyout grupnya.
 const VARIADIC_TOOLS = [
-  { name: 'path', group: 'shapes', title: 'Path', after: 'Arrow', spec: 'tests/smoke/path-tool.spec.js' },
+  { name: 'path', group: 'shapes', title: 'Path', after: 'Rectangle', spec: 'tests/smoke/path-tool.spec.js' },
 ];
 
 // Mode cursor (bukan overlay — mengubah crosshair global, index.html pra-Fase-2:3509).

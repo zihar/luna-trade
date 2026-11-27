@@ -81,7 +81,7 @@ test.describe('favorites', () => {
     await page.keyboard.press('Escape');
 
     const btn = page.locator('#favBar .favbar-btn').first();
-    await expect(btn, 'tooltip harus varian Shapes, bukan Cursor').toHaveAttribute('title', /Shapes/);
+    await expect(btn, 'tooltip harus varian Shapes, bukan Cursor').toHaveAttribute('title', /^Geometric shapes: Arrow/);
     await expect(btn).not.toHaveAttribute('title', /no crosshair/);
 
     const before = await page.evaluate(() => cursorMode);
