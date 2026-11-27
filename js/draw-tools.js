@@ -65,7 +65,7 @@ function deselectOverlay(){
 function posRerender(o){ try{
   if(!o||o.id===inProgressId||!o.points) return;
   if((o.name==='longPosition'||o.name==='shortPosition')&&o.points.length>=6) chart.overrideOverlay({id:o.id,points:o.points});
-  else if(o.name==='fib3'&&o.points.length>=2) chart.overrideOverlay({id:o.id,points:o.points});  // toggle penanda harga Y saat aktif
+  else if(FIB_TOOLS[o.name]&&o.points.length>=2) chart.overrideOverlay({id:o.id,points:o.points});  // toggle penanda harga Y saat aktif
   // rect/trendline kosong: paksa redraw saat hover/select → undangan "+ Add text" muncul/hilang seketika
   else if((o.name==='rect'||o.name==='trendline')&&o.points.length>=2&&!(o.extendData&&String(o.extendData).trim())) chart.overrideOverlay({id:o.id,points:o.points});
 }catch(_){} }

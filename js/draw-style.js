@@ -22,6 +22,7 @@ const DRAW_DEFAULT = {
   priceChannelLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top',fillColor:'#4a71ff',fillAlpha:0},
   // channel: fillAlpha 0 = tampilan lama (tanpa isi); memilih warna Background menaikkannya (wireFill)
   fibonacciLine:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'top'},
+  fibExtension:{color:'#4a71ff',size:1,style:'solid',fibTrend:true},   // trend A→B→C inti alatnya → default tampil
   // --- shape custom baru ---
   circle:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   ellipse:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
