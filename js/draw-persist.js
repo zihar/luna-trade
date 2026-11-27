@@ -6,7 +6,7 @@ let suppressDrawSave=false, drawSaveTimer=null;
 const PERSIST_DRAW={trendline:1,rect:1,fib3:1,text:1,dateRange:1,longPosition:1,shortPosition:1,
   horizontalStraightLine:1,verticalStraightLine:1,
   straightLine:1,rayLine:1,horizontalRayLine:1,priceLine:1,parallelStraightLine:1,priceChannelLine:1,fibonacciLine:1,
-  circle:1,ellipse:1,arrow:1,arrowMarkUp:1,arrowMarkDown:1,callout:1};
+  circle:1,ellipse:1,arrow:1,path:1,arrowMarkUp:1,arrowMarkDown:1,callout:1};
 // simpleAnnotation & simpleTag sengaja TIDAK di sini (ditarik dari rail, lihat DRAW_GROUPS):
 // buildDrawsFromArray memfilter lewat daftar ini, jadi objek lama yang masih tersimpan di
 // localStorage pengguna otomatis berhenti dimuat — tak perlu migrasi.

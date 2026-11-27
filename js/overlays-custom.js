@@ -68,6 +68,35 @@ klinecharts.registerOverlay({
     ];
   }
 });
+// ===================== custom overlay: path (polyline multi-titik, ala TradingView Path) =====================
+// totalStep SENGAJA tak diisi → klinecharts menjadikannya 1 = titik tak terbatas (nextStep tak pernah
+// "selesai"). Objek selesai lewat double-click (forceComplete bawaan klinecharts) atau Esc
+// (finishInProgressPath, js/draw-tools.js); titik ganda dari double-click dibuang trimPathPoints.
+// Kepala panah: lineEnd default 'arrow', lineStart default 'normal' — sama dgn default TV.
+// Kepala SELALU garis solid (dash pada kepala sepanjang 10px cuma jadi bintik).
+function pathHeadFigs(C, atEnd, st){
+  // ujung + titik pembanding pertama yang BERBEDA (saat menggambar, rubber-band bisa menumpuk di titik terakhir)
+  const tip=atEnd?C[C.length-1]:C[0];
+  let from=null;
+  for(let k=1;k<C.length;k++){ const q=atEnd?C[C.length-1-k]:C[k]; if(Math.hypot(q.x-tip.x,q.y-tip.y)>0.5){ from=q; break; } }
+  if(!from) return [];
+  const ang=Math.atan2(tip.y-from.y,tip.x-from.x), hl=Math.max(10,st.size*6), spread=Math.PI/7;
+  const h1={x:tip.x-hl*Math.cos(ang-spread), y:tip.y-hl*Math.sin(ang-spread)};
+  const h2={x:tip.x-hl*Math.cos(ang+spread), y:tip.y-hl*Math.sin(ang+spread)};
+  return [{type:'line', attrs:{coordinates:[h1,tip,h2]}, styles:{color:st.color,size:st.size,style:'solid'}}];
+}
+klinecharts.registerOverlay({
+  name:'path', needDefaultPointFigure:true,
+  createPointFigures:({overlay,coordinates})=>{
+    const C=subBarCoords(overlay,coordinates).filter(c=>c&&isFinite(c.x)&&isFinite(c.y));
+    if(C.length<2) return [];
+    const st=dstyle(overlay);
+    const figs=[{type:'line', attrs:{coordinates:C}, styles:Object.assign({color:st.color,size:st.size},lsLine(st))}];
+    if(st.lineEnd==='arrow') figs.push(...pathHeadFigs(C,true,st));
+    if(st.lineStart==='arrow') figs.push(...pathHeadFigs(C,false,st));
+    return figs;
+  }
+});
 // ===================== custom overlay: callout (anchor → kotak teks + penunjuk) =====================
 klinecharts.registerOverlay({
   name:'callout', totalStep:3, needDefaultPointFigure:true,

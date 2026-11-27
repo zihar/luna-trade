@@ -8,7 +8,20 @@
 
 // Tool yang kena. Bentuk (rect/circle/ellipse), fib, position, dan text sengaja di luar — di TV
 // Shift pada bentuk berarti "kunci rasio 1:1", perilaku yang berbeda dan belum dicakup di sini.
-const ANGLE_LOCK={trendline:1, rayLine:1, straightLine:1, arrow:1, parallelStraightLine:1, priceChannelLine:1};
+const ANGLE_LOCK={trendline:1, rayLine:1, straightLine:1, arrow:1, parallelStraightLine:1, priceChannelLine:1, path:1};
+
+// Jangkar penguncian = indeks titik yang jadi pangkal sinar 45°, atau -1 (tak dikunci).
+// Path (polyline N titik): TIAP segmen terkunci terhadap titik SEBELUMNYA, seperti TradingView.
+// Tool lain: hanya titik ke-2 terhadap titik ke-1 (titik #3 channel cuma jarak paralel).
+function lockAnchorIdx(name, m){        // m = indeks titik yang sedang digambar
+  if(!angleLockOn(name) || m<1) return -1;
+  return name==='path' ? m-1 : (m===1 ? 0 : -1);
+}
+function dragLockAnchorIdx(name, i, n){ // i = indeks ujung yang diseret, n = jumlah titik
+  if(!angleLockOn(name) || n<2 || i==null || i<0) return -1;
+  if(name==='path') return i>0 ? i-1 : 1;
+  return i<2 ? (i===0?1:0) : -1;
+}
 
 // Status Shift dilacak dari DUA sumber. keydown/keyup saja tak cukup: bila Shift dilepas ketika
 // window kehilangan fokus (mis. pindah aplikasi di tengah gestur), `keyup` tak pernah datang dan

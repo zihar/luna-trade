@@ -79,7 +79,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();togglePlay()}
   else if((e.key==='Delete'||e.key==='Backspace') && msCount()>1){ e.preventDefault(); msDeleteSelected(); }   // js/draw-multi-select.js
   else if(e.key==='Delete'||e.key==='Backspace'){ const id=selectedId||hoverId; if(id){ e.preventDefault(); if(blockedByLock(id)) return; try{chart.removeOverlay(id);}catch(_){} } }
-  else if(e.key==='Escape'){ clearMeasure(); if(!cancelInProgressDraw()){ msClear(); if(selectedId) deselectOverlay(); } }
+  else if(e.key==='Escape'){ clearMeasure(); if(!finishInProgressPath() && !cancelInProgressDraw()){ msClear(); if(selectedId) deselectOverlay(); } }
   // ('b'/'s' telanjang → submit order dihapus: huruf kini memicu symbol search, bukan eksekusi order)
 });
 

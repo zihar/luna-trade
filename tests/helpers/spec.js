@@ -94,6 +94,13 @@ const RETIRED_TOOLS = [
   { name: 'simpleTag', title: 'Tag', why: 'figure ber-ignoreEvent → tak bisa dijangkau; redundan dgn priceLine' },
 ];
 
+// Tool di rail yang SENGAJA di luar TOOL_SPEC: jumlah kliknya tak tetap (selesai lewat double-click
+// / Esc), sedangkan seluruh tes generik (parity, landing, drag, modal) mengandaikan N klik lalu objek
+// selesai sendiri. Masing-masing punya spec sendiri. `after` = judul tool sebelumnya di flyout grupnya.
+const VARIADIC_TOOLS = [
+  { name: 'path', group: 'shapes', title: 'Path', after: 'Arrow', spec: 'tests/smoke/path-tool.spec.js' },
+];
+
 // Mode cursor (bukan overlay — mengubah crosshair global, index.html pra-Fase-2:3509).
 const CURSOR_MODES = [
   { name: 'cross', title: 'Cross', crosshair: true, line: true },
@@ -124,4 +131,4 @@ const inGroup = (g) => TOOL_SPEC.filter((t) => t.group === g);
 const withShortcut = () => TOOL_SPEC.filter((t) => t.sc);
 const multiPoint = () => TOOL_SPEC.filter((t) => t.clicks > 1);
 
-module.exports = { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, snapsCenter, axisOf, byName, inGroup, withShortcut, multiPoint };
+module.exports = { TOOL_SPEC, RETIRED_TOOLS, VARIADIC_TOOLS, CURSOR_MODES, TOL_SUBBAR_PX, TOL_Y_PX, tolX, snapsCenter, axisOf, byName, inGroup, withShortcut, multiPoint };

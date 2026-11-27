@@ -27,6 +27,7 @@ const DRAW_GROUPS=[
     {name:'circle', sc:'O', title:'Circle', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg>'},
     {name:'ellipse', title:'Ellipse', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>'},
     {name:'arrow', sc:'A', title:'Arrow', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="4" y1="20" x2="20" y2="4"/><path d="M20 4v6M20 4h-6"/></svg>'},
+    {name:'path', title:'Path', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 19l5-8 5 5 7-11"/><path d="M20 5l-.4 5.2M20 5l-4.8 2"/></svg>'},
     {name:'arrowMarkUp', title:'Arrow Mark Up', svg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l6 8h-4v10h-4V11H6z"/></svg>'},
     {name:'arrowMarkDown', title:'Arrow Mark Down', svg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21l6-8h-4V3h-4v10H6z"/></svg>'},
   ]},
