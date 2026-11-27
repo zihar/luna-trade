@@ -13,7 +13,7 @@
 // Bentuk baris per tool. Satu tabel, bukan rantai if — tool baru = satu entri di sini
 // (+ satu kolom `coords` di tests/helpers/spec.js).
 const COORD_SPEC={
-  trendline:'points', rayLine:'points', straightLine:'points', arrow:'points',
+  trendline:'points', rayLine:'points', straightLine:'points', arrow:'points', path:'points',
   circle:'points', ellipse:'points', fibonacciLine:'points', dateRange:'points',
   parallelStraightLine:'points', priceChannelLine:'points',
   text:'points', callout:'points', arrowMarkUp:'points', arrowMarkDown:'points',

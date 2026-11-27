@@ -37,6 +37,18 @@ function openObjSettings(o, cx, cy, tab){
 const POS_OBJS=new Set(['longPosition','shortPosition']);
 // bentuk tertutup ber-fill (shapeFill, js/overlays-custom.js): bagian Background di tab Style
 const FILL_OBJS=new Set(['rect','circle','ellipse','callout','parallelStraightLine','priceChannelLine']);
+// Path (ala TV): pilihan ujung garis "Line start" / "Line end" = Normal | Arrow (dstyle lineStart/lineEnd)
+const PATH_END_OBJS=new Set(['path']);
+function pathEndsHTML(st){
+  const row=(key,label)=>`<div class="pp-lbl">${label}</div><div class="pp-row">`
+    +[['normal','Normal'],['arrow','Arrow']].map(p=>`<button class="pp-chip ${st[key]===p[0]?'on':''}" data-pend="${key}" data-pv="${p[0]}" aria-pressed="${st[key]===p[0]}">${p[1]}</button>`).join('')+`</div>`;
+  return row('lineStart','Line start')+row('lineEnd','Line end');
+}
+function wirePathEnds(panel, o){
+  panel.querySelectorAll('[data-pend]').forEach(b=>b.onclick=()=>{ const k=b.dataset.pend;
+    setObjStyle(o.id,{[k]:b.dataset.pv});
+    panel.querySelectorAll(`[data-pend="${k}"]`).forEach(x=>{ const on=(x===b); x.classList.toggle('on',on); x.setAttribute('aria-pressed',on); }); });
+}
 function fillHTML(st){
   const cur=(st.fillColor||'#4a71ff').toLowerCase(), alpha=st.fillAlpha!=null?st.fillAlpha:10, inList=PALETTE.includes(cur);
   const sw=PALETTE.map(c=>`<button class="sw ${cur===c?'on':''}" data-fcol="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
@@ -188,6 +200,7 @@ function openDrawModal(o, tab){
     +`<div class="pp-lbl">Thickness</div><div class="pp-row">${ws}</div>`
     +`<div class="pp-lbl">Line style</div><div class="pp-row">${ss}</div>`
     +(FILL_OBJS.has(name)?fillHTML(st):'')
+    +(PATH_END_OBJS.has(name)?pathEndsHTML(st):'')
     +`</div>`;
   let textPane='';
   if(hasText){
@@ -219,6 +232,7 @@ function openDrawModal(o, tab){
   panel.querySelectorAll('[data-va]').forEach(b=>b.onclick=()=>{ setObjStyle(o.id,{textValign:b.dataset.va}); mark('[data-va]',b); });
   if(hasText) wireTextStylePane(panel, o);
   if(FILL_OBJS.has(name)) wireFill(panel, o);
+  if(PATH_END_OBJS.has(name)) wirePathEnds(panel, o);
   const ta=panel.querySelector('.dm-ta');
   if(ta) ta.addEventListener('input',()=>setObjText(o, ta.value));   // live update di canvas (fib3: objStyle.textBody)
   if(isFib) wireFibPane(panel, o);

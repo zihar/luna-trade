@@ -5,7 +5,7 @@ const { test, expect } = require('@playwright/test');
 const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { chartRect } = require('../helpers/chart');
 const { openFlyout, overlays, setCursor, clickAt, CLICK_GAP_MS } = require('../helpers/draw');
-const { TOOL_SPEC, RETIRED_TOOLS, CURSOR_MODES, withShortcut } = require('../helpers/spec');
+const { TOOL_SPEC, RETIRED_TOOLS, VARIADIC_TOOLS, CURSOR_MODES, withShortcut } = require('../helpers/spec');
 
 const GROUPS = [...new Set(TOOL_SPEC.map((t) => t.group))];
 
@@ -28,6 +28,7 @@ test.describe('rail', () => {
       await openFlyout(page, g);
       const names = await page.locator('#dtFlyout .dt-item .dt-nm').allTextContents();
       const expected = TOOL_SPEC.filter((t) => t.group === g).map((t) => t.title);
+      for (const v of VARIADIC_TOOLS.filter((t) => t.group === g)) expected.splice(expected.indexOf(v.after) + 1, 0, v.title);
       expect(names, `isi flyout grup ${g}`).toEqual(expected);
       await page.keyboard.press('Escape');
     }

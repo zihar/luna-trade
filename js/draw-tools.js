@@ -18,6 +18,36 @@ function cancelInProgressDraw(){
   inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){}
   return true;
 }
+// Path (polyline N-titik ala TV) tak punya jumlah klik tetap: ia selesai lewat double-click
+// (jalur bawaan klinecharts) atau Esc (js/keyboard.js). Menyelesaikan = jalur yang SAMA dgn double-click
+// klinecharts (forceComplete → progressInstanceComplete → onDrawEnd), jadi efek-samping onDrawEnd
+// (refine, simpan, rearm) tak perlu digandakan. Balikan true = sudah diselesaikan (Esc tak membatalkan).
+// Path dgn < 2 titik yang sudah diklik tak bisa jadi garis → false, pemanggil membatalkannya.
+function finishInProgressPath(){
+  if(!inProgressId) return false;
+  const o=chart.getOverlayById(inProgressId);
+  if(!o||o.name!=='path'||pendingClicks.length<2) return false;
+  try{ const os=chart.getChartStore().getOverlayStore(), info=os.getProgressInstanceInfo(), inst=info&&info.instance;
+    if(!inst||inst.id!==inProgressId) return false;
+    inst.forceComplete(); os.progressInstanceComplete();
+    if(typeof inst.onDrawEnd==='function') inst.onDrawEnd({overlay:inst, figureKey:'', figureIndex:-1});
+    try{ chart.overrideOverlay({id:inst.id, points:inst.points}); }catch(_){}   // render ulang tanpa titik karet
+  }catch(_){ return false; }
+  return true;
+}
+// Rapikan titik Path saat selesai: buang titik "karet" (mengikuti kursor, belum diklik) dan titik
+// kembar beruntun — double-click menambah DUA mousedown (pendingClicks) + satu klik (titik) di
+// tempat yang sama. Ambang 5px = DBLCLICK_SLOP_PX (js/click-guard.js). Dijalankan SEBELUM refine
+// supaya jumlah klik ↔ titik kembali selaras. Balikan false bila sisa < 2 titik (objek dibuang).
+function trimPathPoints(o){
+  const px=(p)=>{ if(!p) return null; try{ let c=chart.convertToPixel(p.timestamp!=null?{timestamp:p.timestamp,value:p.value}:{dataIndex:(p.dataIndex!=null?p.dataIndex:p.fidx),value:p.value},{paneId:'candle_pane',absolute:true}); if(Array.isArray(c))c=c[0]; return (c&&isFinite(c.x)&&isFinite(c.y))?c:null; }catch(_){ return null; } };
+  const dedupe=(arr)=>{ const out=[]; let prev=null;
+    arr.forEach(p=>{ const c=px(p); if(prev&&c&&Math.abs(c.x-prev.x)+Math.abs(c.y-prev.y)<DBLCLICK_SLOP_PX) return; out.push(p); if(c) prev=c; });
+    return out; };
+  if(pendingClicks.length && o.points.length>pendingClicks.length) o.points=o.points.slice(0,pendingClicks.length);
+  o.points=dedupe(o.points); pendingClicks=dedupe(pendingClicks);
+  return o.points.length>=2;
+}
 // Lepas seleksi objek gambar yang sudah jadi (Esc). selectedId=null saja TAK cukup: klinecharts
 // menyimpan state seleksi di OverlayStore._clickInstanceInfo (inilah yang menggambar handle). Bersihkan
 // lewat setClickInstanceInfo(instance:null) → memicu onDeselected (yang mereset selectedId) + re-render pane.
@@ -186,6 +216,9 @@ function delHooks(){ return {
   onDrawEnd:(e)=>{ const o=e&&e.overlay;
     applyXDateFlag(o);   // buang tanggal sumbu X utk draw non-waktu (built-in klinecharts set flag ini true)
     if(suppressDrawSave) return false;   // restore programatik: jangan expand/buka editor/simpan
+    if(o && o.name==='path' && !trimPathPoints(o)){   // Path < 2 titik (mis. double-click di titik pertama) → buang
+      const id=o.id; inProgressId=null; pendingClicks=[]; disarmIcons(); try{hideMagDot();}catch(_){}
+      setTimeout(()=>{ try{chart.removeOverlay(id);}catch(_){} },0); return false; }
     // kembalikan handle titik yg disembunyikan saat menggambar → buletan hover/drag normal lagi (muncul saat objek di-hover/pilih)
     try{ if(o) chart.overrideOverlay({id:o.id, styles:{point:OVERLAY_POINT}}); }catch(_){}
     // Tempelkan klik presisi ke titik final by-index (klik & titik urut sama), lalu JARING

@@ -26,6 +26,7 @@ const DRAW_DEFAULT = {
   circle:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   ellipse:{color:'#4a71ff',size:1,style:'solid',textAlign:'center',textValign:'middle',fillColor:'#4a71ff',fillAlpha:10},
   arrow:{color:'#4a71ff',size:2,style:'solid',textAlign:'center',textValign:'top'},
+  path:{color:'#4a71ff',size:2,style:'solid',lineStart:'normal',lineEnd:'arrow'},   // Line start/end ala TV (tab Style)
   arrowMarkUp:{color:'#089981',size:2,style:'solid'},
   arrowMarkDown:{color:'#f23645',size:2,style:'solid'},
   callout:{color:'#4a71ff',size:1,style:'solid',textAlign:'left',textValign:'top',fillColor:'#4a71ff',fillAlpha:10},
