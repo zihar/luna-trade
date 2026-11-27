@@ -183,7 +183,7 @@ function wirePosInputs(panel, o){
 }
 function openDrawModal(o, tab){
   if(!o||DRAW_DEFAULT[o.name]===undefined) return;
-  const name=o.name, st=dstyle(o), isFib=(name==='fib3');
+  const name=o.name, st=dstyle(o), isFib=!!FIB_TOOLS[name];
   const hasText=DM_TEXT_OBJS.has(name), hasAlign=DM_ALIGN_OBJS.has(name);
   const hasAlert=ALERTABLE.has(name), isPos=POS_OBJS.has(name);
   // objek 'text': teks ADALAH objeknya → tak ada garis utk di-style; warna/ukuran ada di tab Text
@@ -294,7 +294,7 @@ function fibStylePaneHTML(o){
     +`<label class="sw sw-custom on" title="Color for all levels"><input type="color" data-fonecol value="${st.fibOneColor||'#4a71ff'}" aria-label="One color for all levels"></label></div>`
     +`<div class="pp-lbl">Background</div><div class="pp-row">${fibChip('data-fbg',bg.on,'Fill')}</div>`
     +`<div class="dm-slider"><span>Opacity</span><input type="range" data-fbgop min="0" max="100" value="${bg.opacity}" aria-label="Background opacity"><span class="dm-sval">${bg.opacity}%</span></div><div class="dm-gap"></div>`
-    +`<div class="pp-lbl">Labels</div><div class="pp-row">${fibChip('data-fflag="fibShowLevels"',st.fibShowLevels!==false,'Levels')}${fibChip('data-fflag="fibShowPrices"',st.fibShowPrices,'Prices')}${fibChip('data-fflag="fibReverse"',st.fibReverse,'Reverse')}</div>`
+    +`<div class="pp-lbl">Labels</div><div class="pp-row">${fibChip('data-fflag="fibShowLevels"',st.fibShowLevels!==false,'Levels')}${fibChip('data-fflag="fibShowPrices"',st.fibShowPrices,'Prices')}${o.name==='fib3'?fibChip('data-fflag="fibReverse"',st.fibReverse,'Reverse'):''}</div>`
     +`<div class="pp-row">${fibChip('data-fmode="pct"',st.fibLevelsMode!=='value','Percents')}${fibChip('data-fmode="value"',st.fibLevelsMode==='value','Values')}</div>`
     +`<div class="pp-row">${['left','center','right'].map(k=>fibChip(`data-flh="${k}"`,H===k,k[0].toUpperCase()+k.slice(1))).join('')}</div>`
     +`<div class="pp-row">${['top','middle','bottom'].map(k=>fibChip(`data-flv="${k}"`,V===k,k[0].toUpperCase()+k.slice(1))).join('')}</div>`
@@ -348,7 +348,7 @@ function wireFibPane(panel, o){
   wireRows();
   pane.querySelector('#fpAdd').onclick=()=>{ const L=cur(); L.push({value:0.618,color:fibColor(0.618,L.length),on:true}); setFibLevels(o,L); rerender();
     const last=list.querySelector('.fp-row:last-child .fp-val'); if(last){ last.focus(); last.select(); } };
-  pane.querySelector('#fpReset').onclick=()=>{ setFibLevels(o,defaultFibLevels()); rerender(); };
+  pane.querySelector('#fpReset').onclick=()=>{ setFibLevels(o,defaultFibLevels(o)); rerender(); };
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawModal(); chartSet.classList.remove('show'); } });
 

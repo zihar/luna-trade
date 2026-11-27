@@ -8,7 +8,7 @@
 // sana milik garis/border. textColor kosong = Auto (ikut tema, drawTextColor).
 const TEXT_DEF_SIZE={text:13,rect:12,callout:12,trendline:10,circle:12,ellipse:12,arrow:12,parallelStraightLine:12,priceChannelLine:12,dateRange:12,
   horizontalStraightLine:12,verticalStraightLine:12,horizontalRayLine:12,rayLine:12,straightLine:12,priceLine:12,
-  fib3:12,fibonacciLine:12,arrowMarkUp:12,arrowMarkDown:12};
+  fib3:12,fibExtension:12,fibonacciLine:12,arrowMarkUp:12,arrowMarkDown:12};
 // garis yang bisa diberi teks (tab Text + lineTextFigs). Double-click tetap membuka Style dulu:
 // pada garis, warna/ketebalan lebih sering diubah daripada teks.
 const LINE_TEXT={horizontalStraightLine:1,verticalStraightLine:1,horizontalRayLine:1,rayLine:1,straightLine:1,priceLine:1,arrow:1,
@@ -18,7 +18,7 @@ const BOX_TEXT={rect:1,circle:1,ellipse:1};
 // teks PELENGKAP pada objek yang intinya bukan teks → tab Text ada di semua tool gambar yang bisa di-setting
 // (kecuali Long/Short: teksnya = pill statistik, diatur di tab Style). Double-click tetap membuka Style
 // dulu (sama dgn LINE_TEXT). Fib: teks di dalam kotak tarikan (boxTextFigs); penanda panah: di ujung ekor (markTextFigs).
-const AUX_TEXT={fib3:1,fibonacciLine:1,arrowMarkUp:1,arrowMarkDown:1};
+const AUX_TEXT={fib3:1,fibExtension:1,fibonacciLine:1,arrowMarkUp:1,arrowMarkDown:1};
 // teks pengguna sebuah objek: umumnya extendData (string). fib3 sudah memakai extendData utk arah
 // tarikan ({zeroTop,startLeft}, js/box-resize.js) → teksnya disimpan di objStyle.textBody
 // (ikut persist, sync server, clone & copy/paste seperti setelan per-objek lain).

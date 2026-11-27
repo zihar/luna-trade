@@ -289,7 +289,10 @@ const FIB_COLORS={0:'#787b86',0.236:'#f23645',0.382:'#ff9800',0.5:'#4caf50',0.61
 const FIB_PALETTE=['#787b86','#f23645','#ff9800','#4caf50','#089981','#00bcd4','#2962ff','#9c27b0'];
 function fibColor(Lv,i){ return FIB_COLORS[Lv]!=null?FIB_COLORS[Lv]:FIB_PALETTE[i%FIB_PALETTE.length]; }
 // tiap level: {value, color, on}. on=false = level disimpan tapi tak digambar (checkbox ala TV)
-function defaultFibLevels(){ return FIB_DEFAULT.map((v,i)=>({value:v,color:fibColor(v,i),on:true})); }
+// Trend-Based Fib Extension: default level ala TradingView (proyeksi C + (B−A)·Lv)
+const FIB_EXT_DEFAULT=[0,0.236,0.382,0.5,0.618,0.786,1,1.618,2.618,3.618,4.236];
+const isFibExt=(o)=>!!o&&o.name==='fibExtension';
+function defaultFibLevels(o){ return (isFibExt(o)?FIB_EXT_DEFAULT:FIB_DEFAULT).map((v,i)=>({value:v,color:fibColor(v,i),on:true})); }
 function normFibLevels(raw){
   if(!Array.isArray(raw)||!raw.length) return null;
   // migrasi skema lama (array angka) → array objek {value,color,on}
@@ -300,35 +303,45 @@ function normFibLevels(raw){
 let fibLevels;   // DEFAULT level utk Fib baru (& Fib lama tanpa snapshot)
 try{ fibLevels=normFibLevels(JSON.parse(localStorage.getItem('br_fibLevels')))||defaultFibLevels(); }
 catch(e){ fibLevels=defaultFibLevels(); }
-function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&o.name==='fib3') chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
+// default terpisah utk Fib Extension (level-nya beda total: 1.618/2.618/… tak lazim di Retracement)
+let fibExtLevels;
+try{ fibExtLevels=normFibLevels(JSON.parse(localStorage.getItem('br_fibExtLevels')))||defaultFibLevels({name:'fibExtension'}); }
+catch(e){ fibExtLevels=defaultFibLevels({name:'fibExtension'}); }
+const FIB_TOOLS={fib3:1, fibExtension:1};
+function redrawFibs(){ drawIds.forEach(id=>{ try{ const o=chart.getOverlayById(id); if(o&&FIB_TOOLS[o.name]) chart.overrideOverlay({id,points:o.points}); }catch(e){} }); }
 function saveFibLevels(){ try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){} redrawFibs(); }
 // background isian antar level (default global): default MATI; opacity %
 let fibBg;
 try{ const raw=JSON.parse(localStorage.getItem('br_fibBg')); fibBg=(raw&&typeof raw==='object')?{on:!!raw.on,opacity:Math.max(0,Math.min(100,(+raw.opacity||12)))}:{on:false,opacity:12}; }
 catch(e){ fibBg={on:false,opacity:12}; }
+let fibExtBg;
+try{ const raw=JSON.parse(localStorage.getItem('br_fibExtBg')); fibExtBg=(raw&&typeof raw==='object')?{on:!!raw.on,opacity:Math.max(0,Math.min(100,(+raw.opacity||12)))}:{on:false,opacity:12}; }
+catch(e){ fibExtBg={on:false,opacity:12}; }
 function saveFibBg(){ try{localStorage.setItem('br_fibBg',JSON.stringify(fibBg));}catch(e){} redrawFibs(); }
 function alphaHex(pct){ const a=Math.max(0,Math.min(255,Math.round(pct/100*255))); return a.toString(16).padStart(2,'0'); }
 // level & background efektif sebuah Fib: snapshot objek, fallback ke default global
-function fibLevelsOf(o){ const s=(o&&objStyle[o.id])||{}; return normFibLevels(s.fibLevels)||fibLevels; }
-function fibBgOf(o){ const s=(o&&objStyle[o.id])||{};
-  return {on: s.fibBg!=null?!!s.fibBg:fibBg.on, opacity: s.fibBgAlpha!=null?Math.max(0,Math.min(100,+s.fibBgAlpha||0)):fibBg.opacity}; }
+function fibLevelsOf(o){ const s=(o&&objStyle[o.id])||{}; return normFibLevels(s.fibLevels)||(isFibExt(o)?fibExtLevels:fibLevels); }
+function fibBgOf(o){ const s=(o&&objStyle[o.id])||{}, d=isFibExt(o)?fibExtBg:fibBg;
+  return {on: s.fibBg!=null?!!s.fibBg:d.on, opacity: s.fibBgAlpha!=null?Math.max(0,Math.min(100,+s.fibBgAlpha||0)):d.opacity}; }
 // dipanggil saat Fib selesai digambar: bekukan default saat ini ke objek
 function snapshotFibSettings(o){
-  if(!o||o.name!=='fib3') return;
+  if(!o||!FIB_TOOLS[o.name]) return;
   const s=objStyle[o.id]||{};
   if(Array.isArray(s.fibLevels)) return;   // sudah punya (paste/clone/restore)
   const bg=fibBgOf(o);
-  setObjStyle(o.id,{fibLevels:fibLevels.map(l=>Object.assign({},l)), fibBg:bg.on, fibBgAlpha:bg.opacity});
+  setObjStyle(o.id,{fibLevels:fibLevelsOf(o).map(l=>Object.assign({},l)), fibBg:bg.on, fibBgAlpha:bg.opacity});
 }
 // tulis level/background ke objek DAN default (Fib berikutnya mewarisi setelan terakhir)
 function setFibLevels(o, levels){
-  const L=normFibLevels(levels)||defaultFibLevels();
-  fibLevels=L.map(l=>Object.assign({},l)); try{localStorage.setItem('br_fibLevels',JSON.stringify(fibLevels));}catch(e){}
+  const L=normFibLevels(levels)||defaultFibLevels(o), copy=L.map(l=>Object.assign({},l));
+  if(isFibExt(o)){ fibExtLevels=copy; try{localStorage.setItem('br_fibExtLevels',JSON.stringify(copy));}catch(e){} }
+  else { fibLevels=copy; try{localStorage.setItem('br_fibLevels',JSON.stringify(copy));}catch(e){} }
   if(o) setObjStyle(o.id,{fibLevels:L.map(l=>Object.assign({},l))});
 }
 function setFibBg(o, patch){
   const cur=fibBgOf(o), nx={on:patch.on!=null?!!patch.on:cur.on, opacity:patch.opacity!=null?Math.max(0,Math.min(100,+patch.opacity||0)):cur.opacity};
-  fibBg=Object.assign({},nx); try{localStorage.setItem('br_fibBg',JSON.stringify(fibBg));}catch(e){}
+  if(isFibExt(o)){ fibExtBg=Object.assign({},nx); try{localStorage.setItem('br_fibExtBg',JSON.stringify(nx));}catch(e){} }
+  else { fibBg=Object.assign({},nx); try{localStorage.setItem('br_fibBg',JSON.stringify(nx));}catch(e){} }
   if(o) setObjStyle(o.id,{fibBg:nx.on, fibBgAlpha:nx.opacity});
 }
 // teks label sebuah level: "61.80%" / "0.618", + " (harga)" bila Prices aktif
@@ -411,6 +424,71 @@ klinecharts.registerOverlay({
     if(coordinates.length<2) return [];
     if(overlay.id!==selectedId && overlay.id!==hoverId) return [];
     const R=fibRowsOf(overlay,coordinates); if(!R) return [];
+    const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
+    return R.rows.map(r=>({type:'text', ignoreEvent:true,
+      attrs:{x:fromZero?0:bounding.width, y:r.y, text:fmtPx(r.price), align:fromZero?'left':'right', baseline:'middle'},
+      styles:{color:'#fff', backgroundColor:r.color, borderColor:'rgba(0,0,0,0)'}}));
+  }
+});
+
+// custom overlay: Trend-Based Fib Extension (ala TradingView) — 3 titik bebas: A = awal gerak,
+// B = akhir gerak, C = akhir koreksi. Level = C + (B−A)·Lv (proyeksi panjang AB dari C), garis level
+// selebar rentang X antara B dan C (+ extend kiri/kanan), trend line putus-putus A→B→C.
+// Setelan per objek memakai skema yang sama dgn fib3 (fibLevels/fibBg/fibLabel…, tab Style yang sama),
+// tapi default global-nya terpisah (br_fibExtLevels/br_fibExtBg).
+function fibExtRowsOf(overlay, coordinates, yAxis){
+  const P=overlay.points, C=subBarCoords(overlay,coordinates);
+  if(C.length<3||P.length<3||[0,1,2].some(i=>P[i].value==null||C[i].x==null)) return null;
+  const d=P[1].value-P[0].value, st=dstyle(overlay);
+  const linY=(v)=>C[2].y+(C[1].y-C[0].y)*((v-P[2].value)/(d||1));   // fallback sumbu linear
+  const toY=(v)=>{ try{ if(yAxis&&yAxis.convertToPixel){ const y=yAxis.convertToPixel(v); if(isFinite(y)) return y; } }catch(_){}
+    return d ? linY(v) : C[2].y; };
+  const rows=fibLevelsOf(overlay).map((lv,i)=>{
+    if(lv.on===false) return null;
+    const price=P[2].value+d*lv.value;
+    return { Lv:lv.value, y:toY(price), price, color: st.fibOneColor || lv.color || fibColor(lv.value,i) };
+  }).filter(Boolean).sort((a,b)=>a.y-b.y);
+  return {rows, xL:Math.min(C[1].x,C[2].x), xR:Math.max(C[1].x,C[2].x), C, st};
+}
+klinecharts.registerOverlay({
+  name:'fibExtension', totalStep:4, needDefaultPointFigure:true,
+  needDefaultYAxisFigure:false,   // penanda harga (Y) per level dirender sendiri, hanya saat aktif
+  createPointFigures:({overlay,coordinates,bounding,yAxis})=>{
+    if(coordinates.length<2) return [];
+    const st=dstyle(overlay), figs=[];
+    const trendFig=(pts)=>{ const tc=st.fibTrendColor||'#787b86', ts=st.fibTrendStyle||'dashed';
+      return {type:'line',attrs:{coordinates:pts},styles:Object.assign({color:tc,size:st.fibTrendSize||1},lsLine({style:ts,size:st.fibTrendSize||1}))}; };
+    const C0=subBarCoords(overlay,coordinates);
+    // preview 2 titik (C belum ditaruh): cukup ruas A→B supaya arah gerak terlihat
+    if(coordinates.length<3){ if(st.fibTrend) figs.push(trendFig(C0.slice(0,2).map(c=>({x:c.x,y:c.y})))); return figs; }
+    const R=fibExtRowsOf(overlay,coordinates,yAxis); if(!R) return [];
+    const {rows,xL,xR,C}=R;
+    const W=bounding&&bounding.width||0;
+    const lx = st.fibExtendLeft ? 0 : xL, rx = st.fibExtendRight && W ? W : xR;
+    const bg=fibBgOf(overlay);
+    if(bg.on){ const ah=alphaHex(bg.opacity);
+      for(let i=0;i<rows.length-1;i++)
+        figs.push({type:'rect',attrs:{x:lx,y:rows[i].y,width:rx-lx,height:rows[i+1].y-rows[i].y},styles:{style:'fill',color:rows[i].color+ah,borderColor:'transparent'}});
+    }
+    if(st.fibTrend) figs.push(trendFig(C.slice(0,3).map(c=>({x:c.x,y:c.y}))));
+    const H=st.fibLabelH||'left', V=st.fibLabelV||'middle', fs=+st.fibFontSize||10;
+    const tx = H==='right' ? rx+5 : H==='center' ? (lx+rx)/2 : lx-5;
+    const ta = H==='right' ? 'left' : H==='center' ? 'center' : 'right';
+    const bl = V==='top' ? 'bottom' : V==='bottom' ? 'top' : 'middle', dy = V==='top' ? -2 : V==='bottom' ? 2 : 0;
+    rows.forEach(r=>{
+      figs.push({type:'line',attrs:{coordinates:[{x:lx,y:r.y},{x:rx,y:r.y}]},styles:Object.assign({color:r.color,size:st.size},lsLine(st))});
+      const t=fibLabel(r,st);
+      if(t) figs.push({type:'text',attrs:{x:tx,y:r.y+dy,text:t,align:ta,baseline:bl},styles:{color:r.color,size:fs,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
+    });
+    // teks pengguna (tab Text, extendData) di dalam kotak antar level terluar, selebar rentang B..C
+    const ys=rows.map(r=>r.y), yT=Math.min(...ys), yB=Math.max(...ys);
+    figs.push(...boxTextFigs(overlay,{x:Math.min(xL,xR), y:yT, w:Math.abs(xR-xL), h:yB-yT}));
+    return figs;
+  },
+  createYAxisFigures:({overlay,coordinates,bounding,yAxis})=>{
+    if(coordinates.length<3) return [];
+    if(overlay.id!==selectedId && overlay.id!==hoverId) return [];
+    const R=fibExtRowsOf(overlay,coordinates,yAxis); if(!R) return [];
     const fromZero = yAxis&&yAxis.isFromZero&&yAxis.isFromZero();
     return R.rows.map(r=>({type:'text', ignoreEvent:true,
       attrs:{x:fromZero?0:bounding.width, y:r.y, text:fmtPx(r.price), align:fromZero?'left':'right', baseline:'middle'},

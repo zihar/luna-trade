@@ -57,6 +57,7 @@ const TOOL_SPEC = [
   // ---- Fibonacci ----
   { name: 'fib3', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Retracement', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'aux', settings: 'modal', coords: 'box', persist: true, sc: 'F' },
   { name: 'fibonacciLine', group: 'fib', groupTitle: 'Fibonacci', title: 'Fib Line', clicks: 2, pointsAfter: 2, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true, builtin: true },
+  { name: 'fibExtension', group: 'fib', groupTitle: 'Fibonacci', title: 'Trend-Based Fib Extension', clicks: 3, pointsAfter: 3, anchor: 'center', text: 'aux', settings: 'modal', coords: 'points', persist: true },
 
   // ---- Shapes ----
   { name: 'rect', group: 'shapes', groupTitle: 'Shapes', title: 'Rectangle', clicks: 2, pointsAfter: 8, anchor: 'center', text: 'modal+inline', fill: true, settings: 'modal', coords: 'box', persist: true, sc: 'R' },

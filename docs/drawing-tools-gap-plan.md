@@ -40,7 +40,7 @@ per objek, persist per instrumen (`br_draws_<inst>`, `index.html:3323`).
 | T1.3 | ~~**Lock objek / lock all**~~ — ✅ **SELESAI** 2026-07-31 | Sekarang cuma Hide-all; objek gampang kegeser saat pan | `js/draw-lock.js`: toggle Lock di modal objek + tombol rail Lock all, persist di `br_draws_<INST>`, handle disembunyikan saat terkunci, dan proteksi hapus (Delete/eraser/Remove-all). `clearDrawings()` tetap tanpa syarat (dipakai undo & ganti instrumen) — aksi pengguna pakai `removeAllDrawings()`. Object Tree tetap Tier 2. Spec: `docs/superpowers/specs/2026-07-31-lock-drawings-design.md` |
 | T1.4 | **Alert dari objek gambar** | Sudah ada server price alerts + `alertLine`, tapi belum "alert dari H-line/trendline ini" | H-line trivial (harga sudah ada). Trendline butuh evaluasi harga-di-waktu di `alert_monitor.go` |
 | T1.5 | **Duplicate / clone objek** | Ctrl+drag atau Ctrl+D; sering untuk zona berulang | FE-only: copy points + style, offset kecil. Sekalian isi item ROADMAP "context-menu lebih kaya" |
-| T1.6 | **Trend-Based Fib Extension** | Fib kedua terpakai setelah retracement | Custom overlay 3 titik, pola sama dgn `fib3` |
+| T1.6 | ~~**Trend-Based Fib Extension**~~ — ✅ **SELESAI** 2026-11-27 | Fib kedua terpakai setelah retracement | Overlay `fibExtension` 3 titik (A→B tren, C titik proyeksi): level = C + (B−A)·Lv, default level TV 0…4.236, trend putus-putus A→B→C. Modal Style memakai ulang editor level `fib3` (tanpa Reverse); default global terpisah `br_fibExtLevels`/`br_fibExtBg`. Tes `tests/smoke/fib-extension.spec.js` + baris TOOL_SPEC |
 
 ## Tier 2 — sering diminta, effort sedang
 
@@ -73,7 +73,7 @@ alasan tiap penundaan: `docs/superpowers/specs/2026-11-24-object-tree-design.md`
   Bertemu dengan `docs/server-persistence-plan.md` (tabel `user_drawings`).
 - **Pitchfork** (klasik/Schiff) & **Regression Trend** — kelas channel yang belum tersentuh.
 - **Note/sticky, Price Label, Signpost, Icons/emoji** — anotasi baru text + callout.
-- **Brush / Highlighter**, **Polyline/Path**, **Triangle** — freehand & poligon belum ada.
+- **Brush / Highlighter**, **Triangle** — freehand & poligon belum ada. (~~Polyline/Path~~ ✅ PR #235)
 - **Magnet dua tingkat** — Luna hanya `strong_magnet` (`index.html:3290`); TV punya
   Weak/Strong + snap-to-indicator.
 
