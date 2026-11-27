@@ -35,9 +35,10 @@ $('#chart').addEventListener('contextmenu',e=>{
   // klik-kanan sambil SENGAJA menahan Ctrl tak lagi membuka menu/modal. Klik kanan biasa tak
   // tersentuh sama sekali, dan di Mac ⌘ adalah jalur yang dianjurkan justru karena bebas dari ini.
   if(e.ctrlKey){ hideCtx(); return; }
-  // Sedang menggambar → klik kanan = BATAL, bukan menu. Wajib sebelum cek hoverId: saat menggambar
-  // hoverId sering menunjuk objek in-progress itu sendiri, dan itu akan membuka modal Style-nya.
-  if(cancelInProgressDraw()){ hideCtx(); return; }
+  // Sedang menggambar → klik kanan bukan menu. Wajib sebelum cek hoverId: saat menggambar hoverId
+  // sering menunjuk objek in-progress itu sendiri, dan itu akan membuka modal Style-nya.
+  // Path dgn ≥2 titik = SELESAI (spt TV, sama dgn Esc); selain itu = BATAL.
+  if(finishInProgressPath() || cancelInProgressDraw()){ hideCtx(); return; }
   if(hoverId){ const o=chart.getOverlayById(hoverId); if(o&&DRAW_DEFAULT[o.name]!==undefined){ hideCtx(); openObjSettings(o, e.clientX, e.clientY, 'style'); return; } }
   const rect=$('#chart').getBoundingClientRect();
   const yIn=e.clientY-rect.top;

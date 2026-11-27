@@ -1,3 +1,17 @@
+// Posisi pointer di ruang #chart, dicatat di fase CAPTURE (sebelum klinecharts memproses event yg
+// sama) — sumber X/Y titik karet di onDrawing (js/draw-tools.js). e.x milik klinecharts TAK bisa
+// dipakai mentah: saat kursor di atas sumbu harga, event datang dari widget sumbu-Y dgn x RELATIF
+// SUMBU (≈0–60px), dan titik karet terlempar ke tepi KIRI chart. X di-clamp ke area plot: di atas
+// sumbu harga titik menempel di tepi kanan, spt TV. Pointer events → mouse & sentuh sama-sama tercatat.
+let drawPtrPx=null;
+function plotWidth(){ try{ const s=chart.getSize('candle_pane','main'); if(s && s.width>0) return s.width; }catch(_){} return null; }
+['pointermove','pointerdown'].forEach(t=>$('#chart').addEventListener(t, ev=>{
+  if(!inProgressId){ drawPtrPx=null; return; }
+  const r=$('#chart').getBoundingClientRect(), w=plotWidth();
+  let x=ev.clientX-r.left; if(w!=null) x=Math.min(Math.max(x,0), w-1);
+  drawPtrPx={x, y:ev.clientY-r.top};
+}, true));
+
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
 // waktu sub-bar; bila magnet aktif, snap ke nilai OHLC candle terdekat.
 $('#chart').addEventListener('mousedown', (ev)=>{
