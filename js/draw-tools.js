@@ -109,7 +109,8 @@ function delHooks(){ return {
     // tak punya makna sudut. Saat terkunci, magnet dilewati untuk titik ini — "auto lurus" hanya
     // bermakna kalau sudutnya persis, dan magnet yang ikut menarik membuatnya miring lagi.
     let ex=e.x, ey=e.y, locked=false;
-    if(m===1 && angleLockOn(o.name)){ const a=anchorPx(o.points[0]);
+    const ai=lockAnchorIdx(o.name, m);   // Path: tiap segmen terhadap titik sebelumnya
+    if(ai>=0){ const a=anchorPx(o.points[ai]);
       if(a){ const c=lockPx(a.x, a.y, e.x, e.y); ex=c.x; ey=c.y; locked=true; } }
     const fa=barAnchorFromPx(ex); let v=pxToValue(ey);
     if(magnetActive() && !locked && v!=null){ const xa=xAnchorFromPx(ex);
@@ -157,8 +158,9 @@ function delHooks(){ return {
     // ujung" yang kena — menggeser BADAN objek adalah translasi, sudutnya memang tak berubah.
     let ex=e.x-OX, ey=e.y-OY, locked=false;
     const fk=e.figureKey||'';
-    if(fk.indexOf('overlay_figure_point_')===0 && angleLockOn(o.name) && e.figureIndex<2 && o.points.length>=2){
-      const a=anchorPx(o.points[e.figureIndex===0?1:0]);
+    const dai=fk.indexOf('overlay_figure_point_')===0 ? dragLockAnchorIdx(o.name, e.figureIndex, o.points.length) : -1;
+    if(dai>=0){
+      const a=anchorPx(o.points[dai]);
       if(a){ const c=lockPx(a.x, a.y, ex, ey); ex=c.x; ey=c.y; locked=true; } }
     const xa=barAnchorFromPx(ex), v=pxToValue(ey);
     if(!xa || v==null) return false;

@@ -82,6 +82,40 @@ test.describe('Path (polyline)', () => {
     assertNoPageErrors(page);
   });
 
+  // Shift = kunci sudut (js/draw-constrain.js). Path: TIAP segmen terkunci terhadap titik
+  // SEBELUMNYA (bukan hanya segmen pertama spt trendline/channel). Kursor sengaja meleset dari
+  // kelipatan 45° — tanpa penguncian titiknya mendarat di kursor dan assertion gagal.
+  test('Shift mengunci tiap segmen ke kelipatan 45° dari titik sebelumnya', async ({ page }) => {
+    await gotoApp(page);
+    const rect = await chartRect(page);
+    const p0 = { x: Math.round(rect.width * 0.25), y: Math.round(rect.height * 0.5) };
+    const SEG = [ { dx: 200, dy: 30, deg: 0 }, { dx: 25, dy: -150, deg: -90 }, { dx: 160, dy: 125, deg: 45 } ];
+    await armPath(page);
+    await clickAt(page, rect, p0); await page.waitForTimeout(CLICK_GAP_MS);
+    await page.keyboard.down('Shift');
+    let cur = p0;
+    for (const s of SEG) {
+      cur = { x: cur.x + s.dx, y: cur.y + s.dy };
+      await page.mouse.move(rect.x + cur.x, rect.y + cur.y, { steps: 8 });
+      await page.waitForTimeout(80);
+      await clickAt(page, rect, cur); await page.waitForTimeout(CLICK_GAP_MS);
+    }
+    await page.keyboard.up('Shift');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => inProgressId == null, null, { timeout: 3000 });
+    const o = await lastPath(page);
+    expect(o.points.length).toBe(4);
+    const px = await toPixels(page, o.points);
+    SEG.forEach((s, i) => {
+      const a = px[i], b = px[i + 1], r = (s.deg * Math.PI) / 180;
+      const dist = Math.abs((b.x - a.x) * Math.sin(r) - (b.y - a.y) * Math.cos(r));
+      const deg = Math.round((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI / 45) * 45;
+      expect(deg, `segmen ${i + 1} tak dikunci ke ${s.deg}°`).toBe(s.deg);
+      expect(dist, `segmen ${i + 1} melenceng dari sinar ${s.deg}°`).toBeLessThanOrEqual(1.5);
+    });
+    assertNoPageErrors(page);
+  });
+
   test('tab Style: panah default di akhir; Line start/end mengubah gambar', async ({ page }) => {
     await gotoApp(page);
     const rect = await chartRect(page);

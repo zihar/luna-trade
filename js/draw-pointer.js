@@ -8,13 +8,13 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   // titik yang benar-benar di-commit datang dari pendingClicks ini, jadi tanpa penguncian di
   // jalur klik garis akan "lompat" ke kursor mentah tepat saat tombol ditekan.
   let locked=false;
-  if(pendingClicks.length===1){ const nm=(chart.getOverlayById(inProgressId)||{}).name;
-    if(angleLockOn(nm)){
+  { const nm=(chart.getOverlayById(inProgressId)||{}).name, ai=lockAnchorIdx(nm, pendingClicks.length);
+    if(ai>=0 && pendingClicks[ai]){
       // Jangkar WAJIB dibaca dgn aturan anchor yg sama dgn jalur commit (onDrawEnd): klik magnet
       // memakai `timestamp`, klik biasa memakai `fidx` PECAHAN. pendingClicks membawa KEDUANYA,
       // dan `timestamp` sendiri meng-snap ke pusat bar saat dikonversi — memakainya untuk klik
       // biasa menggeser jangkar s/d ½ bar, dan garis "vertikal" meleset beberapa piksel.
-      const pc=pendingClicks[0];
+      const pc=pendingClicks[ai];
       const a=anchorPx(pc.mag||!isFinite(pc.fidx) ? pc : {dataIndex:pc.fidx, value:pc.value});
       if(a){ const c=lockPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } } }
   const xa=xAnchorFromPx(px), v=pxToValue(py);
@@ -54,7 +54,8 @@ function updateMagDot(ev){
   // berbeda, dan justru penanda itulah yang dipercaya pengguna saat membidik.
   const o0=chart.getOverlayById(inProgressId);
   let locked=false;
-  if(o0 && o0.points && o0.points.length===2 && angleLockOn(o0.name)){ const a=anchorPx(o0.points[0]);
+  const ai0=(o0 && o0.points) ? lockAnchorIdx(o0.name, o0.points.length-1) : -1;
+  if(ai0>=0){ const a=anchorPx(o0.points[ai0]);
     if(a){ const c=lockPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } }
   const v=pxToValue(py); if(v==null){ hideMagDot(); return; }
   // Reticle WAJIB memakai anchor yg IDENTIK dgn titik yg akan di-commit, lalu dirender lewat
