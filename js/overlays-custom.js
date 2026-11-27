@@ -106,7 +106,8 @@ function arrowMarkFigures(dir){ // dir: -1 = up (tip di atas), +1 = down (tip di
       {x:x-sw,   y:y-d*hh},                   // dalam kiri
       {x:x-hw,   y:y-d*hh},                   // bahu kiri
     ];
-    return [{type:'polygon', attrs:{coordinates:pts}, styles:{style:'fill', color:st.color}}];
+    return [{type:'polygon', attrs:{coordinates:pts}, styles:{style:'fill', color:st.color}},
+      ...markTextFigs(overlay, {x, y:y-d*H}, d)];   // teks opsional (tab Text) di ujung ekor
   };
 }
 klinecharts.registerOverlay({ name:'arrowMarkUp',   totalStep:2, needDefaultPointFigure:true, createPointFigures:arrowMarkFigures(-1) });
@@ -228,6 +229,23 @@ klinecharts.registerOverlay({
   };
   klinecharts.registerOverlay(tpl);
 });
+
+// Fib Line bawaan dibungkus dgn cara sama: + teks pengguna di dalam kotak kedua titik tarikan
+// (level 1 & 0 jatuh tepat di y kedua titik itu). Level, label & drag tetap persis bawaan.
+(function(){
+  const C=klinecharts.getOverlayClass('fibonacciLine'); if(!C) return;
+  const base=new C({}), tpl={name:'fibonacciLine'};
+  ['totalStep','needDefaultPointFigure','needDefaultXAxisFigure','needDefaultYAxisFigure',
+   'createXAxisFigures','createYAxisFigures','performEventPressedMove','performEventMoveForDrawing']
+    .forEach(k=>{ if(base[k]!=null) tpl[k]=base[k]; });
+  tpl.createPointFigures=(args)=>{
+    const figs=base.createPointFigures(args)||[], c=args.coordinates;
+    if(!c||c.length<2) return figs;
+    const x=Math.min(c[0].x,c[1].x), y=Math.min(c[0].y,c[1].y);
+    return figs.concat(boxTextFigs(args.overlay,{x, y, w:Math.abs(c[1].x-c[0].x), h:Math.abs(c[1].y-c[0].y)}));
+  };
+  klinecharts.registerOverlay(tpl);
+})();
 
 // custom overlay: Fibonacci Retracement (lebar = selebar tarikan, arah ikut tarik)
 // Setelan per objek di objStyle[id] (tab Style, js/draw-style-modal.js) → ikut persist, sync server,
@@ -354,6 +372,9 @@ klinecharts.registerOverlay({
       const t=fibLabel(r,st);
       if(t) figs.push({type:'text',attrs:{x:tx,y:r.y+dy,text:t,align:ta,baseline:bl},styles:{color:r.color,size:fs,backgroundColor:'transparent',borderColor:'transparent',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0}});
     });
+    // teks pengguna (tab Text) di dalam kotak antar level terluar
+    const ys=rows.map(r=>r.y), yT=Math.min(...ys), yB=Math.max(...ys);
+    figs.push(...boxTextFigs(overlay,{x:Math.min(xL,xR), y:yT, w:Math.abs(xR-xL), h:yB-yT}));
     return figs;
   },
   // penanda harga di sumbu Y untuk tiap level — hanya saat fib aktif (terpilih/hover)

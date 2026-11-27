@@ -50,7 +50,7 @@ function setDrawName(id,name){
 function drawLabel(o){
   if(objName[o.id]) return objName[o.id];
   const base=drawToolTitle(o.name);
-  const t=(typeof o.extendData==='string') ? o.extendData.trim() : '';
+  const t=objText(o).trim();
   return t ? base+': '+(t.length>28 ? t.slice(0,28)+'…' : t) : base;
 }
 

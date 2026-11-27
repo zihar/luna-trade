@@ -2,7 +2,7 @@
 //
 // Aturan yang diuji, sesuai TOOL_SPEC.settings / .text:
 //   settings 'modal'    → double-click membuka modal; tab awal = Text untuk objek bisa-teks
-//                         (DM_TEXT_OBJS), Style untuk sisanya & untuk garis (text 'line')
+//                         (DM_TEXT_OBJS), Style untuk sisanya & untuk teks pelengkap (text 'line'/'aux')
 //   settings 'pospopup' → long/shortPosition memakai modal yang sama, tab Style|Inputs
 //   settings null       → tak punya panel setting (sejak simpleAnnotation/simpleTag ditarik dari
 //                         rail — Temuan 3 — tak ada lagi tool berkategori ini; kolomnya disimpan
@@ -14,6 +14,8 @@ const { gotoApp, assertNoPageErrors } = require('../helpers/app');
 const { toPixels } = require('../helpers/chart');
 const { drawTool, overlays, commitTextEditor, hoverableSpot } = require('../helpers/draw');
 const { TOOL_SPEC, byName } = require('../helpers/spec');
+// teks pelengkap (garis, Fib, penanda panah): tab Text ada, tapi double-click membuka Style dulu
+const STYLE_FIRST = new Set(['line', 'aux']);
 
 /**
  * Double-click DI ATAS objek. Titiknya sendiri belum tentu berada di atas bentuk yang
@@ -29,7 +31,7 @@ async function dblclickObject(page, obj, rect) {
 
 test.describe('modal setting objek', () => {
   for (const spec of TOOL_SPEC.filter((t) => t.settings === 'modal')) {
-    test(`${spec.name}: double-click membuka modal, tab awal ${spec.text && spec.text !== 'line' ? 'Text' : 'Style'}`, async ({ page }) => {
+    test(`${spec.name}: double-click membuka modal, tab awal ${spec.text && !STYLE_FIRST.has(spec.text) ? 'Text' : 'Style'}`, async ({ page }) => {
       await gotoApp(page);
       const { obj, rect } = await drawTool(page, spec.name);
       expect(obj, 'objek harus terbentuk lebih dulu').toBeTruthy();
@@ -39,7 +41,7 @@ test.describe('modal setting objek', () => {
       await expect(modal, `modal ${spec.name} harus terbuka`).toBeVisible();
 
       // Tab awal: Text untuk objek bisa-teks, Style untuk sisanya (index.html pra-Fase-2:5580).
-      const expectTab = spec.text && spec.text !== 'line' ? 'text' : 'style';
+      const expectTab = spec.text && !STYLE_FIRST.has(spec.text) ? 'text' : 'style';
       await expect(modal.locator('.dm-tab.on')).toHaveAttribute('data-tab', expectTab);
       // Pane yang tampil harus sesuai tab aktif.
       await expect(modal.locator(`.dm-pane[data-pane="${expectTab}"]`)).toBeVisible();
