@@ -14,15 +14,15 @@ function plotWidth(){ try{ const s=chart.getSize('candle_pane','main'); if(s && 
 
 // tangkap klik PRESISI saat menggambar (sebelum klinecharts snap ke bar) → simpan
 // waktu sub-bar; bila magnet aktif, snap ke nilai OHLC candle terdekat.
-$('#chart').addEventListener('mousedown', (ev)=>{
-  if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
+// `k` = indeks klik yg sedang dicatat (menentukan jangkar kunci Shift). Balikan: entri pendingClicks / null.
+function clickEntryAt(ev, k){
   const r=$('#chart').getBoundingClientRect();
   let px=ev.clientX-r.left, py=ev.clientY-r.top;
   // Shift = kunci sudut (js/draw-constrain.js). WAJIB di sini juga, bukan cuma di onDrawing:
   // titik yang benar-benar di-commit datang dari pendingClicks ini, jadi tanpa penguncian di
   // jalur klik garis akan "lompat" ke kursor mentah tepat saat tombol ditekan.
   let locked=false;
-  { const nm=(chart.getOverlayById(inProgressId)||{}).name, ai=lockAnchorIdx(nm, pendingClicks.length);
+  { const nm=(chart.getOverlayById(inProgressId)||{}).name, ai=lockAnchorIdx(nm, k);
     if(ai>=0 && pendingClicks[ai]){
       // Jangkar WAJIB dibaca dgn aturan anchor yg sama dgn jalur commit (onDrawEnd): klik magnet
       // memakai `timestamp`, klik biasa memakai `fidx` PECAHAN. pendingClicks membawa KEDUANYA,
@@ -32,7 +32,7 @@ $('#chart').addEventListener('mousedown', (ev)=>{
       const a=anchorPx(pc.mag||!isFinite(pc.fidx) ? pc : {dataIndex:pc.fidx, value:pc.value});
       if(a){ const c=lockPx(a.x, a.y, px, py); px=c.x; py=c.y; locked=true; } } }
   const xa=xAnchorFromPx(px), v=pxToValue(py);
-  if(!xa||v==null) return;
+  if(!xa||v==null) return null;
   // fidx = fractional dataIndex PRESISI di piksel klik (utk trendline; tsToPx meng-snap timestamp
   // jadi tak bisa direkonstruksi dari timestamp di onDrawEnd). Field ekstra → tool lain mengabaikan.
   const fa=barAnchorFromPx(px), fidx=fa?fa.dataIndex:undefined;
@@ -41,8 +41,60 @@ $('#chart').addEventListener('mousedown', (ev)=>{
   // "kelempar ke kiri". Biarkan anchor dataIndex-nya apa adanya supaya memanjang ke future.
   // `mag:true` menandai klik yang SUDAH di-snap: onDrawEnd memakainya untuk membiarkan anchor
   // timestamp-nya (= terkunci di candle) alih-alih menimpanya dengan fidx kursor.
-  if(magnetActive() && !locked && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s){ pendingClicks.push({timestamp:s.timestamp, value:s.value, fidx, mag:true}); return; } }
-  pendingClicks.push(Object.assign({value:v, fidx}, xa));
+  if(magnetActive() && !locked && xa.timestamp!=null){ const s=magnetSnap(tsOf(xa), v, px, py); if(s) return {timestamp:s.timestamp, value:s.value, fidx, mag:true}; }
+  return Object.assign({value:v, fidx}, xa);
+}
+
+// ===== klik "goyang" saat menggambar (T2, tests/drawing/11-click-wiggle.spec.js) =====
+// Tangan jarang diam sempurna antara mousedown & mouseup. klinecharts membatalkan klik begitu
+// geseran tertekan ≥5px manhattan (`_mouseMoveWithDownHandler` → `_cancelClick`) dan mengubahnya
+// jadi pan: titik tak tertanam, chart bergeser, dan entri pendingClicks dari mousedown jadi yatim
+// (desync → Esc Path menyimpan titik karet, refine onDrawEnd memasang klik yang salah). TradingView
+// memperlakukan goyangan kecil sebagai klik. Selama menggambar, geseran tertekan ≤ DRAW_CLICK_SLOP_PX
+// (euclid, dari titik mousedown) tak diteruskan ke klinecharts → klik tetap utuh & tak ada pan.
+// Lewat ambang = seret sungguhan: diteruskan apa adanya (pan, spt biasa) dan entri pendingClicks
+// mousedown itu dicabut, karena klinecharts tak akan memancarkan kliknya.
+//
+// Kenapa menimpa method INSTANCE: handler move-tertekan di-`bind` ulang di SETIAP mousedown
+// (`this._mouseMoveWithDownHandler.bind(this)` di `_mouseDownHandler`), jadi properti instance yg
+// ditimpa di sini terbaca di mousedown berikutnya. Defensif spt js/click-guard.js: bentuk internal
+// berubah setelah upgrade → no-op, perilaku kembali ke klinecharts mentah.
+const DRAW_CLICK_SLOP_PX = 8;
+let drawPress=null;   // {x,y: page px mousedown, n: indeks klik, pushed, moved, panned}
+function fixDrawClickSlop(inst){
+  try{
+    const se = inst && inst._chartEvent && inst._chartEvent._event;
+    if(!se || typeof se._mouseMoveWithDownHandler!=='function') return false;
+    const orig=se._mouseMoveWithDownHandler;
+    se._mouseMoveWithDownHandler=function(ev){
+      const p=drawPress;
+      if(p && !p.panned && inProgressId){
+        if(Math.hypot(ev.pageX-p.x, ev.pageY-p.y)<=DRAW_CLICK_SLOP_PX){ p.moved=true; return; }
+        p.panned=true;
+        if(p.pushed && pendingClicks.length===p.n+1) pendingClicks.pop();
+      }
+      return orig.call(this, ev);
+    };
+    return true;
+  }catch(_){ return false; }
+}
+const drawSlopOn=fixDrawClickSlop(chart);
+
+$('#chart').addEventListener('mousedown', (ev)=>{
+  drawPress=null;
+  if(!inProgressId || ev.button!==0) return;   // hanya klik kiri (klik kanan/tengah tak boleh jadi titik)
+  const n=pendingClicks.length, pc=clickEntryAt(ev, n);
+  if(pc) pendingClicks.push(pc);
+  if(drawSlopOn) drawPress={x:ev.pageX, y:ev.pageY, n, pushed:!!pc, moved:false, panned:false};
+}, true);
+// Klik goyang: klinecharts menanam titik di posisi MOUSEUP → entri pendingClicks ikut dipindah ke
+// sana, supaya refine onDrawEnd melihat klik ↔ titik selaras. Capture di window = jalan SEBELUM
+// handler mouseup klinecharts (bubble di documentElement) yg memancarkan klik & bisa memicu onDrawEnd.
+window.addEventListener('mouseup', (ev)=>{
+  const p=drawPress; drawPress=null;
+  if(!p || ev.button!==0 || !p.moved || p.panned || !p.pushed || !inProgressId) return;
+  if(pendingClicks.length!==p.n+1) return;
+  const pc=clickEntryAt(ev, p.n); if(pc) pendingClicks[p.n]=pc;
 }, true);
 
 // posisi kursor terakhir (client px) — untuk menempatkan popup setting objek.
